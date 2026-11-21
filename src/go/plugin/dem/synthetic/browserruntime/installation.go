@@ -26,7 +26,6 @@ type ReleaseOperation string
 
 const (
 	InstallRelease ReleaseOperation = "install"
-	ensureRelease  ReleaseOperation = "ensure"
 	PrepareRelease ReleaseOperation = "prepare"
 	RepairRelease  ReleaseOperation = "repair"
 )
@@ -56,57 +55,25 @@ func (s *Store) BeginPublishedInstall(
 	ctx context.Context,
 	options ReleaseInstallOptions,
 	load func(context.Context) (VerifiedRelease, error),
-) (*Candidate, error) {
-	// Ensure reports an existing selection, which only BeginPublishedEnsure returns.
-	if options.Operation == ensureRelease {
-		return nil, errInvalidOperation
-	}
-	candidate, _, err := s.beginPublishedInstall(ctx, options, load)
-	return candidate, err
-}
-
-// BeginPublishedEnsure enrolls only a proven absent selection. A usable selected
-// generation is checked under installer exclusion without discovery, inventory,
-// qualification or changing its update policy. The returned manifest is a
-// snapshot; exclusion is released before return. Damage requires explicit repair.
-// A new candidate records owner acquisition consent only when successfully selected.
-func (s *Store) BeginPublishedEnsure(
-	ctx context.Context,
-	load func(context.Context) (VerifiedRelease, error),
-) (*Candidate, *Manifest, error) {
-	return s.beginPublishedInstall(
-		ctx,
-		ReleaseInstallOptions{
-			Operation: ensureRelease,
-			Updates:   AutomaticUpdates,
-		},
-		load,
-	)
-}
-
-func (s *Store) beginPublishedInstall(
-	ctx context.Context,
-	options ReleaseInstallOptions,
-	load func(context.Context) (VerifiedRelease, error),
-) (_ *Candidate, _ *Manifest, result error) {
+) (_ *Candidate, result error) {
 	switch options.Operation {
-	case InstallRelease, RepairRelease, ensureRelease:
+	case InstallRelease, RepairRelease:
 		if options.Updates != AutomaticUpdates && options.Updates != ManualUpdates {
-			return nil, nil, errors.New("runtime installation requires an explicit update policy")
+			return nil, errors.New("runtime installation requires an explicit update policy")
 		}
 	case PrepareRelease:
 		if options.Updates != "" {
-			return nil, nil, errors.New("runtime preparation preserves the installed update policy")
+			return nil, errors.New("runtime preparation preserves the installed update policy")
 		}
 	default:
-		return nil, nil, errInvalidOperation
+		return nil, errInvalidOperation
 	}
 	if load == nil {
-		return nil, nil, errors.New("runtime release loader is unavailable")
+		return nil, errors.New("runtime release loader is unavailable")
 	}
 	operation, err := s.lockInstallation(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	transferred := false
 	defer func() {
@@ -134,78 +101,60 @@ func (s *Store) beginPublishedInstall(
 			return err
 		}
 		current, err = s.readSelectionRecord()
-		if m := current.manifest(); err == nil && options.Operation == ensureRelease && m != nil {
-			if err = s.ValidateRelease(*current.Release); err == nil {
-				err = s.validateEnsureSelection(*m)
-			}
-			if err == nil {
-				err = s.verifyPreparedAgent(*m, current.Release.Agent)
-			}
-		}
 		return err
 	})
 	if err != nil {
-		return nil, nil, err
-	}
-	if m := current.manifest(); options.Operation == ensureRelease && m != nil {
-		return nil, m, nil
+		return nil, err
 	}
 	if options.Operation == PrepareRelease && current.Release == nil {
-		return nil, nil, errors.New("install an authenticated runtime release before paired preparation")
+		return nil, errors.New("install an authenticated runtime release before paired preparation")
 	}
 	verified, err := load(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// The zero VerifiedRelease, the only one not built by VerifyRelease, is invalid.
 	release := verified.release
 	if err := s.ValidateRelease(release); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if s.config.Agent != nil && current.Release != nil && !reflect.DeepEqual(current.Release.Agent, release.Agent) &&
 		options.Operation != PrepareRelease && options.Operation != RepairRelease {
-		return nil, nil, errors.New("a different Agent/runtime pair requires preparation by its installation owner")
+		return nil, errors.New("a different Agent/runtime pair requires preparation by its installation owner")
 	}
 	next := selection{
 		Release:          &release,
 		AutomaticUpdates: current.AutomaticUpdates,
 	}
-	if options.Operation == InstallRelease || options.Operation == RepairRelease || options.Operation == ensureRelease {
+	if options.Operation == InstallRelease || options.Operation == RepairRelease {
 		next.AutomaticUpdates = options.Updates == AutomaticUpdates
 	}
 	if current.Release != nil {
 		changed, err := releaseChanged(*current.Release, release)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if !changed && !pending {
 			if options.Operation == PrepareRelease {
 				err = s.withLock(func() error { return s.validateRetainedSelection(current) })
-				return nil, nil, publicDamage(err)
+				return nil, publicDamage(err)
 			}
 			// Reinstalling the exact release can explicitly change consent
 			// without acquiring or executing unchanged payload bytes.
 			if current.AutomaticUpdates != next.AutomaticUpdates {
 				err = s.withLock(func() error { return s.selectLocked(next) })
 			}
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	// candidateWithOperation owns releasing operation even on failure.
 	transferred = true
 	candidate, err := s.candidateWithOperation(operation, next, options.Operation == RepairRelease)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	candidate.prepareOnly = options.Operation == PrepareRelease
-	return candidate, nil, nil
-}
-
-func (s *Store) validateEnsureSelection(m Manifest) (result error) {
-	if err := m.Validate(); err != nil {
-		return err
-	}
-	return s.validatePreparedPayload(m)
+	return candidate, nil
 }
 
 func (s *Store) validatePreparedPayload(m Manifest) (result error) {

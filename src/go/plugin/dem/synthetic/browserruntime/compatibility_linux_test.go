@@ -48,12 +48,6 @@ func TestHealthyIncompatibleSelectionRemainsManageable(t *testing.T) {
 	require.ErrorContains(t, err, "unsupported runtime execution contract 1")
 	require.ErrorIs(t, err, ErrIncompatible)
 	require.NotErrorIs(t, err, ErrDamaged)
-	_, _, err = reopened.BeginPublishedEnsure(context.Background(), func(context.Context) (VerifiedRelease, error) {
-		t.Fatal("ensure must not silently replace an incompatible installed release")
-		return VerifiedRelease{}, nil
-	})
-	require.ErrorContains(t, err, "unsupported runtime execution contract 1")
-	require.NotErrorIs(t, err, ErrDamaged)
 
 	// Ordinary replacement can inspect the old selection; repair is not needed.
 	next := installFixture(t, reopened, "current-contract")

@@ -87,11 +87,11 @@ func runSetupPlan(args []string, stdout, stderr io.Writer) error {
 	if err := validateSetupPlanPath(canonical); err != nil {
 		return err
 	}
-	// Native packaging fixes this build default. Runtime configuration may change
-	// the selected mode, but must not change who owns automatic host setup.
+	// The build default determines the delivery owner. Runtime configuration can
+	// change which runtime is selected while leaving host setup with that owner.
 	var delivery string
 	switch runtimehost.Mode(runtimehost.DefaultMode) {
-	case runtimehost.ModeManaged:
+	case runtimehost.ModeManaged, runtimehost.ModePreloaded:
 		delivery = "standalone"
 	case runtimehost.ModeNative:
 		delivery = "native-package"

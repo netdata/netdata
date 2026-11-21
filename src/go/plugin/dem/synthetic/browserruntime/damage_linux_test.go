@@ -209,20 +209,3 @@ func TestReadPreloadReportsDamageWithPreloadAdvice(t *testing.T) {
 		})
 	}
 }
-
-func TestPublishedInstallRejectsTheEnsureOperation(t *testing.T) {
-	s, _ := testStore(t)
-	candidate, err := s.BeginPublishedInstall(
-		context.Background(),
-		ReleaseInstallOptions{
-			Operation: ensureRelease,
-			Updates:   AutomaticUpdates,
-		},
-		func(context.Context) (VerifiedRelease, error) {
-			t.Fatal("rejected operation invoked release discovery")
-			return VerifiedRelease{}, nil
-		},
-	)
-	require.ErrorContains(t, err, "invalid published runtime operation")
-	require.Nil(t, candidate)
-}

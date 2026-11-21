@@ -18,13 +18,11 @@ import (
 
 const (
 	automaticUpdatesNotice = "Runtime installation permits companion downloads during Agent updates. First activation requires a DEM restart; use --manual-updates to require explicit acquisition.\n"
-	enrollmentNotice       = "First runtime enrollment acquires the matching signed release and permits paired companion downloads. Restart running DEM processes to activate the selection.\n"
 	statusNotice           = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
 	unchangedNotice        = "Selected release is unchanged. Already running processes keep their startup release until restart."
 	uninstalledNotice      = "Runtime files removed. This command does not change administrator-owned host policy; netdata-dem-runtime.sh handles high-level policy cleanup."
 	installedNotice        = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
 	preloadedNotice        = "Preload integrity is verified and bound to this final root. Browser execution has not been tested; use runtime qualify for an optional local diagnostic. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
-	alreadySelectedNotice  = "A usable runtime is already selected; no download, qualification or update policy change was performed. A new DEM process uses this selection. Running processes may require a restart; their active release was not inspected."
 )
 
 // reportFields returns the report's top-level keys in output order and its scalar values.
@@ -57,7 +55,7 @@ func reportFields(t *testing.T, stdout string) ([]string, map[string]any) {
 // qualification fails with an environment-specific setup_error.
 func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("ensure and qualification run as the nonroot service identity")
+		t.Skip("qualification runs as the nonroot service identity")
 	}
 	type expected struct {
 		keys    []string
@@ -148,18 +146,6 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 				}
 			},
 		},
-		"ensure selected": {
-			selected: true,
-			args: func(root, cache, _, _ string) []string {
-				return []string{"runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache}
-			},
-			want: func(cache, generation string) expected {
-				return expected{
-					keys:    []string{"outcome", "download_allowed", "command", "mode", "state", "cache_path", "generation", "runtime", "notice"},
-					scalars: map[string]any{"outcome": "already-selected", "download_allowed": true, "command": "ensure", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "notice": alreadySelectedNotice},
-				}
-			},
-		},
 		"install": {
 			args: func(root, cache, release, archive string) []string {
 				return []string{"runtime", "install", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
@@ -208,19 +194,6 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 				}
 			},
 		},
-		"ensure enrollment": {
-			args: func(root, cache, release, archive string) []string {
-				return []string{"runtime", "ensure", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
-			},
-			want: func(cache, generation string) expected {
-				return expected{
-					keys:      []string{"outcome", "download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "candidate", "candidate_state", "notice"},
-					scalars:   map[string]any{"outcome": "newly-selected", "download_allowed": false, "command": "ensure", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "candidate_state": "selected", "notice": installedNotice},
-					stderr:    enrollmentNotice,
-					candidate: true,
-				}
-			},
-		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var root, cache, release, archive string
@@ -236,14 +209,7 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 				require.NoError(t, err)
 				fixture = trusted.Release().Manifest
 			}
-			reported := cache
-			if strings.HasPrefix(name, "ensure") {
-				// ensure reports the canonical root it verified.
-				canonical, err := browserruntime.CanonicalRoot(cache)
-				require.NoError(t, err)
-				reported = canonical
-			}
-			want := tc.want(reported, fixture.Archive.SHA256)
+			want := tc.want(cache, fixture.Archive.SHA256)
 			args := tc.args(root, cache, release, archive)
 			if slices.Contains(args, "--release") {
 				want.scalars["release_path"] = release
