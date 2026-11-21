@@ -3,6 +3,7 @@
 """Select runtime build runners from the Agent's shared distro catalog."""
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -10,7 +11,7 @@ import tarfile
 import tempfile
 
 from bundle import read_release_info, run, validate_release_info
-from release import empty_directory, validate_inventory
+from release import empty_directory, signed_agent, validate_inventory, verified_release
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,8 +32,8 @@ def build_matrix(catalog):
 def verify_publication_receipt(args):
     """Check the small receipt from a proven successful parent publication job.
 
-    This binds lane inputs to that job; only the publisher and native consumers
-    validate payload bytes. The workflow separately checks GitHub run provenance.
+    This binds lane inputs to that job; the publisher and payload consumers
+    separately validate bytes. The workflow also checks GitHub run provenance.
     """
     expected = read_release_info(args.release_info)
     if read_release_info(args.receipt / 'release-info') != expected:
@@ -47,14 +48,20 @@ def verify_publication_receipt(args):
     return records
 
 
-def prepare_native(args):
-    """Admit one exact parent-run artifact for the existing Agent package build."""
+def paired_artifact(args):
+    """Check actual companion bytes, the frozen Agent, and the publication receipt."""
     expected = read_release_info(args.release_info)
     inventory = validate_inventory(args.artifacts, args.arch)
     if inventory['agent'] != expected:
-        raise ValueError('native artifact belongs to another Agent release')
-    if inventory != verify_publication_receipt(args)[args.arch]:
-        raise ValueError('native artifact differs from the successful publication receipt')
+        raise ValueError('runtime artifact belongs to another Agent release')
+    if args.receipt and inventory != verify_publication_receipt(args)[args.arch]:
+        raise ValueError('runtime artifact differs from the successful publication receipt')
+    return expected
+
+
+def prepare_native(args):
+    """Admit one exact parent-run artifact for the existing Agent package build."""
+    expected = paired_artifact(args)
     output = empty_directory(args.output)
     with tempfile.TemporaryDirectory(prefix='dem-native-extract-') as temporary:
         archive = Path(temporary) / 'payload.tar'
@@ -69,6 +76,25 @@ def prepare_native(args):
             native['manifest'] != manifest or manifest['platform'] != 'linux/' + args.arch or
             manifest['version'] != expected['version']):
         raise ValueError('native payload metadata differs from the exact Agent companion')
+
+
+def prepare_docker(args):
+    """Produce offline preload inputs; Docker never receives publication credentials."""
+    expected = paired_artifact(args)
+    release = verified_release(args.release_tool, args.public_key, args.release)
+    if signed_agent(release, args.arch) != expected:
+        raise ValueError('signed Docker input belongs to another Agent release')
+    manifest = json.loads((args.artifacts / 'manifest.json').read_text())
+    signed_manifest = release['manifest']
+    # The publisher adds only the immutable archive URL to the builder manifest.
+    manifest['archive']['url'] = signed_manifest['archive']['url']
+    if manifest != signed_manifest:
+        raise ValueError('signed Docker input differs from the tested companion manifest')
+    output = empty_directory(args.output)
+    archive = args.artifacts / (manifest['archive']['sha256'] + '.tar.zst')
+    for source, name in ((archive, 'runtime.tar.zst'), (args.release, 'release.json'),
+                         (args.public_key, 'release-public.gpg')):
+        shutil.copyfile(source, output / name)
 
 
 def main():
@@ -87,9 +113,22 @@ def main():
     native.add_argument('--receipt', type=Path, required=True,
                         help='successful publication receipt from the same parent run')
     native.add_argument('--output', type=Path, required=True, help='new or empty prebound payload directory')
+    docker = commands.add_parser('prepare-docker')
+    docker.add_argument('--artifacts', type=Path, required=True)
+    docker.add_argument('--arch', choices=ARCHES, required=True)
+    docker.add_argument('--release-info', type=Path, required=True)
+    trust = docker.add_mutually_exclusive_group(required=True)
+    trust.add_argument('--receipt', type=Path, help='successful publication receipt from the same parent run')
+    trust.add_argument('--candidate', action='store_true', help='unpublished CI build, with disposable signing only')
+    docker.add_argument('--release', type=Path, required=True)
+    docker.add_argument('--public-key', type=Path, required=True)
+    docker.add_argument('--release-tool', type=Path, required=True)
+    docker.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if args.command == 'prepare-native':
         prepare_native(args)
+    elif args.command == 'prepare-docker':
+        prepare_docker(args)
     elif args.command == 'verify-publication-receipt':
         verify_publication_receipt(args)
     else:
