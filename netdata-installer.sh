@@ -862,7 +862,11 @@ if [ "${DP_ENABLED}" = 1 ]; then
   DONOTSTART=1
 fi
 # CMake owns installation for both enrolled and ordinary Agents.
-if ! cmake_install "${NETDATA_BUILD_DIR}"; then
+dashboard_upgrade=0
+if [ -x "${DESTDIR:-}${NETDATA_PREFIX}/usr/sbin/netdata" ]; then
+  dashboard_upgrade=1
+fi
+if ! NETDATA_INSTALLER_DASHBOARD_UPGRADE=$dashboard_upgrade cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
 

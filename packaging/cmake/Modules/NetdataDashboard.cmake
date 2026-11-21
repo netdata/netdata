@@ -5,7 +5,7 @@
 
 include_guard()
 
-include(NetdataUtil)
+set(NETDATA_DASHBOARD_MODULE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 # Work around upstream release hiccups that ship the v3 tree under a v2 name.
 function(handle_braindead_versioning_insanity prefix)
@@ -21,23 +21,13 @@ function(handle_braindead_versioning_insanity prefix)
   endif()
 endfunction()
 
-# Bundle the dashboard code for inclusion during install.
-#
-# The tarball's layout is not known ahead of time, so the install rules are
-# generated only after extraction, by scanning the tree into a CMakeLists.txt
-# that is then pulled in with add_subdirectory().
 function(bundle_dashboard)
-  include(ExternalProject)
-
-  set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
-  set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
-  set(dashboard_bin_dir "${CMAKE_BINARY_DIR}/dashboard-bin")
   message(STATUS "Preparing local agent dashboard code")
 
   message(STATUS "  Fetching ${DASHBOARD_URL}")
   file(DOWNLOAD
        "${DASHBOARD_URL}"
-       "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
+       "${CMAKE_BINARY_DIR}/dashboard.tar.gz.part"
        TIMEOUT 180
        STATUS fetch_status)
 
@@ -49,38 +39,15 @@ function(bundle_dashboard)
     message(STATUS "  Fetching ${DASHBOARD_URL} -- Done")
   endif()
 
-  message(STATUS "  Extracting dashboard code")
-  extract_gzipped_tarball(
-    "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
-    "${dashboard_src_dir}"
-  )
-  message(STATUS "  Extracting dashboard code -- Done")
-
-  handle_braindead_versioning_insanity("${dashboard_src_prefix}")
-
-  message(STATUS "  Generating CMakeLists.txt file for dashboard code")
-  set(rules "")
-
-  subdirlist(dash_dirs "${dashboard_src_prefix}")
-
-  foreach(dir IN LISTS dash_dirs)
-    file(GLOB files
-         LIST_DIRECTORIES FALSE
-         RELATIVE "${dashboard_src_dir}"
-         "${dashboard_src_prefix}/${dir}/*")
-
-    set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/${dir})\n")
-  endforeach()
-
-  file(GLOB files
-       LIST_DIRECTORIES FALSE
-       RELATIVE "${dashboard_src_dir}"
-       "${dashboard_src_prefix}/*")
-
-  set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST})\n")
-
-  file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${rules}")
-  message(STATUS "  Generating CMakeLists.txt file for dashboard code -- Done")
-  add_subdirectory("${dashboard_src_dir}" "${dashboard_bin_dir}")
+  # Catch damaged downloads at configure time, before the installer writes live files.
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E tar tf "${CMAKE_BINARY_DIR}/dashboard.tar.gz.part"
+                  OUTPUT_QUIET RESULT_VARIABLE result)
+  if(NOT result EQUAL 0)
+    message(FATAL_ERROR "Invalid dashboard archive")
+  endif()
+  file(RENAME "${CMAKE_BINARY_DIR}/dashboard.tar.gz.part" "${CMAKE_BINARY_DIR}/dashboard.tar.gz")
+  configure_file("${NETDATA_DASHBOARD_MODULE_DIR}/NetdataInstallDashboard.cmake.in"
+                 "${CMAKE_BINARY_DIR}/install-dashboard.cmake" @ONLY)
+  install(SCRIPT "${CMAKE_BINARY_DIR}/install-dashboard.cmake" COMPONENT dashboard)
   message(STATUS "Preparing local agent dashboard code -- Done")
 endfunction()

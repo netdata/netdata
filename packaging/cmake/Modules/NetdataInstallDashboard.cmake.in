@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+include([==[@NETDATA_DASHBOARD_MODULE_DIR@/NetdataUtil.cmake]==])
+include([==[@NETDATA_DASHBOARD_MODULE_DIR@/NetdataDashboard.cmake]==])
+
+set(dashboard_build [==[@CMAKE_BINARY_DIR@]==])
+set(dashboard_archive "${dashboard_build}/dashboard.tar.gz")
+# CMake's symlink install modes need a persistent target for each release.
+set(dashboard_link_target "")
+if(NOT "$ENV{CMAKE_INSTALL_MODE}" MATCHES "^(|COPY)$")
+  file(SHA256 "${dashboard_archive}" dashboard_digest)
+  set(dashboard_link_target "${dashboard_build}/dashboard-links-${dashboard_digest}")
+endif()
+
+if(dashboard_link_target AND IS_DIRECTORY "${dashboard_link_target}")
+  set(dashboard_stage "${dashboard_link_target}")
+else()
+  string(RANDOM LENGTH 24 dashboard_nonce)
+  set(dashboard_stage "${dashboard_build}/dashboard-stage-${dashboard_nonce}")
+  if(EXISTS "${dashboard_stage}" OR IS_SYMLINK "${dashboard_stage}")
+    message(FATAL_ERROR "Dashboard staging directory already exists")
+  endif()
+  extract_gzipped_tarball("${dashboard_archive}" "${dashboard_stage}")
+  handle_braindead_versioning_insanity("${dashboard_stage}/dist/agent")
+  if(dashboard_link_target)
+    file(RENAME "${dashboard_stage}" "${dashboard_link_target}")
+    set(dashboard_stage "${dashboard_link_target}")
+  endif()
+endif()
+set(dashboard_source "${dashboard_stage}/dist/agent")
+set(dashboard_web_dest [==[@WEB_DEST@]==])
+file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/${dashboard_web_dest}"
+     TYPE DIRECTORY FILES "${dashboard_source}/")
+
+if("$ENV{NETDATA_INSTALLER_DASHBOARD_UPGRADE}" STREQUAL "1")
+  execute_process(COMMAND sh [==[@NETDATA_DASHBOARD_MODULE_DIR@/../../installer/cleanup-dashboard.sh]==]
+                  "${dashboard_source}/v3" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/" "${dashboard_web_dest}"
+                  RESULT_VARIABLE dashboard_status)
+  if(NOT dashboard_status STREQUAL "0")
+    message(WARNING "Dashboard cleanup failed: ${dashboard_status}. Continuing installation.")
+  endif()
+endif()
+if(NOT dashboard_link_target)
+  file(REMOVE_RECURSE "${dashboard_stage}")
+endif()
