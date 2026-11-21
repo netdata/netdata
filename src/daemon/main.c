@@ -1142,8 +1142,13 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
                         else if(strcmp(optarg, "cmakecache") == 0) {
+#ifdef RECORD_BUILD_ENVIRONMENT
                             print_build_info_cmake_cache();
                             return 0;
+#else
+                            fprintf(stderr, "The CMake cache is not available, this agent was built with RECORD_BUILD_ENVIRONMENT turned off.\n");
+                            return 1;
+#endif
                         }
                         else if(strcmp(optarg, "keepopenfds") == 0) {
                             // Internal dev option to skip closing inherited
