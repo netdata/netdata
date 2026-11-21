@@ -106,6 +106,7 @@ endif()
                 destination = self.install(self.configure(static=True, dem=True, bits=bits))
                 self.assert_stock(destination)
                 self.assertFalse((destination / 'usr/sbin/topology-ip-intel-downloader').exists())
+                self.assertFalse((destination / 'usr/share/doc/netdata-ip-intel-data').exists())
 
     def test_static_netflow_keeps_stock_without_dem(self):
         for bits in (32, 64):

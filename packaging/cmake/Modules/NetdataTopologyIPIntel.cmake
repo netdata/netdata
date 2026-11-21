@@ -20,8 +20,10 @@ if(ENABLE_PLUGIN_NETFLOW OR ENABLE_PLUGIN_DEM)
                 ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
                 COMPONENT ip-intel-data
                 DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
-        install(FILES "${PKG_FILES_PATH}/ip-intel-data/copyright"
-                COMPONENT ip-intel-data DESTINATION ${PKG_DOC_DEST}/netdata-ip-intel-data)
+        if(NETDATA_PACKAGE_KIND MATCHES "^(deb|rpm)$")
+            install(FILES "${PKG_FILES_PATH}/ip-intel-data/copyright"
+                    COMPONENT ip-intel-data DESTINATION ${PKG_DOC_DEST}/netdata-ip-intel-data)
+        endif()
     elseif(NETDATA_PACKAGE_KIND MATCHES "^(deb|rpm)$")
         message(FATAL_ERROR
                 "Native NetFlow and DEM packages require NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR")
