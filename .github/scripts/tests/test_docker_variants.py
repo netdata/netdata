@@ -33,24 +33,49 @@ class DockerVariantsTest(unittest.TestCase):
                                env=dict(os.environ, RELEASE=release, CHANGED=changed, GITHUB_OUTPUT=str(output)))
                 self.assertEqual(output.read_text().strip(), f'dem={selected}')
 
+    def test_common_and_dem_inputs_route_the_image_builds(self):
+        with (ROOT / '.github/workflows/docker.yml').open() as stream:
+            file_check = YAML(typ='safe').load(stream)['jobs']['file-check']
+        script = next(step['run'] for step in file_check['steps'] if step.get('id') == 'check-run')
+        for changed, expected in (
+            ({}, {'regular': 'false', 'run': 'false'}),
+            ({'DEM': 'true'}, {'regular': 'false', 'run': 'true'}),
+            ({'SOURCE_CHANGED': 'true'}, {'regular': 'true', 'run': 'true'}),
+            ({'BUILD_CHANGED': 'true'}, {'regular': 'true', 'run': 'true'}),
+            ({'RELEASE': 'true'}, {'regular': 'true', 'run': 'true'}),
+            ({'SOURCE_CHANGED': 'true', 'DEM': 'true'}, {'regular': 'true', 'run': 'true'}),
+        ):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'output'
+                env = dict(os.environ, RELEASE='false', SOURCE_CHANGED='false', BUILD_CHANGED='false', DEM='false',
+                           GITHUB_OUTPUT=str(output))
+                env.update(changed)
+                subprocess.run(['bash', '-e', '-c', script], check=True, env=env)
+                self.assertEqual(dict(line.split('=', 1) for line in output.read_text().splitlines()), expected)
+
     def test_build_and_publication_matrices(self):
         regular = ('amd64', 'armv7l', 'arm64')
-        for include_dem in ('false', 'true'):
+        for include_dem, regular_inputs, regular_arches in (
+            ('false', 'false', regular),
+            ('false', 'true', regular),
+            ('true', 'false', ('amd64', 'arm64')),
+            ('true', 'true', regular),
+        ):
             for native_only in ('0', '1'):
-                with self.subTest(include_dem=include_dem, native_only=native_only):
+                with self.subTest(include_dem=include_dem, regular_inputs=regular_inputs, native_only=native_only):
                     result = subprocess.run(
-                        [sys.executable, SCRIPTS / 'gen-matrix-docker.py', native_only, include_dem],
+                        [sys.executable, SCRIPTS / 'gen-matrix-docker.py', native_only, include_dem, regular_inputs],
                         cwd=ROOT, check=True, capture_output=True, text=True,
                     )
                     matrix = json.loads(result.stdout)
-                    expected = {'regular': regular}
+                    expected = {'regular': regular_arches}
                     if include_dem == 'true':
                         expected['dem'] = ('amd64', 'arm64')
                     actual = {row['variant']: tuple(row['arches'].split()) for row in matrix['publish']['include']}
                     self.assertEqual(expected, actual)
                     self.assertEqual([(variant, arch) for variant, arches in expected.items() for arch in arches],
                                      [(row['variant'], row['arch']) for row in matrix['build']['include']])
-                    self.assertEqual([(arch, arch in expected.get('dem', ())) for arch in regular],
+                    self.assertEqual([(arch, arch in expected.get('dem', ())) for arch in regular_arches],
                                      [(row['arch'], row['dem']) for row in matrix['test']['include']])
                     for row in matrix['build']['include']:
                         if row['variant'] == 'dem':

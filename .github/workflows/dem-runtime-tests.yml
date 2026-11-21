@@ -59,13 +59,14 @@ jobs:
               - packaging/cmake/pkg-files/deb/netdata/prerm
               - src/dem-runtime/manifest.json
               - src/dem-runtime/runtime.json
+              - src/dem-runtime/README.md
               - src/dem-runtime/package*.json
               - src/go/tools/dem-runtime-release/**
               - src/go/plugin/dem/synthetic/browserruntime/**
               - src/go/go.mod
               - src/go/go.sum
               - '!src/go/**/*_test.go'
-              - '!**/*.md'
+              - '!src/go/**/*.md'
               - '!**/metadata.yaml'
             go:
               - .github/workflows/dem-runtime-tests.yml

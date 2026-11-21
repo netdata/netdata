@@ -96,8 +96,10 @@ and attribution at `/usr/share/netdata/topology-ip-intel`.
 
 The signing key stays with the release publisher. The Docker workflow owns the single
 unpublished companion build for relevant PRs and master pushes, using the existing runtime
-builder with disposable signing keys and stock database fixtures. The release workflow
-verifies public artifacts.
+builder with disposable signing keys and stock database fixtures. Image assembly reuses
+the candidate descriptor and public key that qualified that same architecture's companion;
+only those two public files are passed in a separate, one-day CI artifact. The release
+workflow verifies public artifacts.
 
 ## Exact CI artifacts and native preparation
 

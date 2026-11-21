@@ -111,6 +111,7 @@ jobs:
             src/aclk/aclk-schemas/**/*.md
             src/crates/**/*.md
             src/go/tools/topology-ip-intel-downloader/README.md
+            src/go/tools/topology-ip-intel-downloader/stock/README.md
             src/ml/dlib/**/*.md
       - name: List all changed files in pattern
         continue-on-error: true

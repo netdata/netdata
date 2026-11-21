@@ -129,6 +129,9 @@ RUN --mount=type=bind,from=dem-inputs,source=.,target=/dem-inputs \
         /dem-inputs/topology-ip-intel/topology-ip-intel.json \
         /dem-app/usr/share/netdata/topology-ip-intel/
 
+# Global stock installation owns health files; this one belongs only in DEM images.
+RUN install -D -m 0644 src/health/health.d/dem.conf /dem-app/usr/lib/netdata/conf.d/health.d/dem.conf
+
 #####################################################################
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
@@ -183,7 +186,8 @@ COPY --from=builder --chown=0:0 --parents \
     /app/./usr/local/etc \
     /app/./etc/netdata \
     /
-COPY --from=builder --chown=${NETDATA_UID}:0 --parents \
+# Health files belong to the common install; keep the DEM file in its image only.
+COPY --from=builder --chown=${NETDATA_UID}:0 --parents --exclude='**/health.d/dem.conf' \
     /app/./usr/lib/netdata \
     /app/./var/cache/netdata \
     /app/./var/lib/netdata \

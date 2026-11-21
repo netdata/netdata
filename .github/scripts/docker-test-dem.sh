@@ -51,6 +51,7 @@ docker run --pull=never --rm --network none --read-only --user netdata --entrypo
     case "$(stat -c %a "$root")" in *00) ;; *) exit 1 ;; esac
     test -x "$2"
     test -r /usr/lib/netdata/conf.d/dem.conf
+    test -s /usr/lib/netdata/conf.d/health.d/dem.conf
     test -r /usr/libexec/netdata/netdata-dem-runtime.sh
     stock=/usr/share/netdata/topology-ip-intel
     for file in README.md topology-ip-asn.mmdb topology-ip-geo.mmdb topology-ip-intel.json; do

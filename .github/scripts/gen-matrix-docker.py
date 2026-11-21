@@ -9,12 +9,16 @@ yaml = YAML(typ='safe')
 entries = list()
 native_only = sys.argv[1] == '1'
 include_dem = sys.argv[2] == 'true'
+regular_inputs = sys.argv[3] == 'true'
 variant_matrix = []
 
 with open('.github/data/distros.yml') as f:
     data = yaml.load(f)
 
 arches = sorted(data['docker_arches'], key=data['arch_order'].index)
+# DEM-only changes need the common image only on architectures that consume it.
+if include_dem and not regular_inputs:
+    arches = [arch for arch in arches if arch in ('amd64', 'arm64')]
 for variant in ('regular', 'dem') if include_dem else ('regular',):
     variant_arches = []
     for arch in arches:
