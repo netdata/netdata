@@ -523,9 +523,8 @@ class SignedPublicationTests(unittest.TestCase):
                     args.release = other_directories['amd64'] / 'release.json'
                 elif fault == 'signature':
                     envelope = json.loads(args.release.read_bytes())
-                    body = json.loads(base64.b64decode(envelope['payload']))
-                    body['agent']['source'] = 'b' * 40
-                    envelope['payload'] = base64.b64encode(json.dumps(body).encode()).decode()
+                    other_envelope = json.loads((other_directories['amd64'] / 'release.json').read_bytes())
+                    envelope['signature'] = other_envelope['signature']
                     args.release = self.root / 'altered-release.json'
                     release.write_json(args.release, envelope)
                 else:
