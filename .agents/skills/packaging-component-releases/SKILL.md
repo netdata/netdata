@@ -85,7 +85,8 @@ using signing credentials, publishing and contacting SRE each require scope for 
   YAML syntax or reimplement GitHub scheduling and glob matching. When changing selection, exercise the actual
   selector and inspect each suite's source/data readers, including metadata, schemas and helper scripts. Include
   relevant additions, deletions and renames in the selection checks.
-- Keep CI proportional: test-only edits run their suites without rebuilding products. Browser/source assembly
+- Keep CI proportional: unit-test edits run their suites without rebuilding products. Final-image integration
+  smoke edits run against real images; measure the build cost. Browser/source assembly
   follows artifact or execution inputs. Gate public exposure and payload consumers rather than unrelated
   compilation; GitHub intermediates are build transport. Reuse the Node wire workflow with the frozen source input.
   Preserve full release smoke, focused ARM checks, same-run receipts and native inventory equality independently
