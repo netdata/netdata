@@ -89,7 +89,9 @@ using signing credentials, publishing and contacting SRE each require scope for 
   follows artifact or execution inputs. Gate public exposure and payload consumers rather than unrelated
   compilation; GitHub intermediates are build transport. Reuse the Node wire workflow with the frozen source input.
   Preserve full release smoke, focused ARM checks, same-run receipts and native inventory equality independently
-  of PR filters; measure added CI cost before expanding architecture matrices.
+  of PR filters. For the DEM Docker image, verify the receipt and the bytes consumed by the image build. Use the
+  variant and trust owners in `packaging/dem-runtime/RELEASE.md#dem-docker-image-assembly`. Measure added CI cost
+  before expanding architecture matrices.
 
 Use `.github/workflows/dem-runtime-release.yml` for job boundaries and
 `packaging/dem-runtime/RELEASE.md#local-validation-and-limits` for suite prerequisites and evidence limits.

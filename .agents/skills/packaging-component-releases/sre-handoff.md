@@ -6,9 +6,10 @@ then the installation routes and evidence. Use tables with one test per row; kee
 
 1. **Describe the operator's path.** Show the opt-in action, download source, size, installation owner, update and
    activation behavior, and removal for each supported install method. In DEM, native users install an optional
-   package. Static, Docker and source deployments explicitly provision a managed archive or preload. Native hooks
-   can restart a previously active Agent. Source/static installers and Docker/preload deployment owners coordinate
-   the matching Agent/runtime pair; the running plugin has no independent update timer.
+   package. Static and source deployments explicitly provision the runtime or use a protected preload. Native hooks
+   can restart a previously active Agent. Source/static installers coordinate the matching Agent/runtime pair, and
+   Docker DEM deployments switch the pair by replacing the image. The running plugin has no independent update timer.
+   Use `packaging/dem-runtime/RELEASE.md#dem-docker-image-assembly` for the Docker release evidence.
 2. **Map the diff to reviewers.** Point packaging/SRE to CPack metadata, maintainer scripts, installer changes,
    build matrices, signing and repository upload. Point runtime maintainers to verification, extraction, service
    identity and readiness checks. Identify the contract they share, such as the capability a package hook needs.
