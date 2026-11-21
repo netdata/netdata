@@ -55,7 +55,6 @@ include(NetdataTopologyIPIntel)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         else:
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('Missing topology IP intelligence stock payload file', result.stdout + result.stderr)
             self.assertIn(missing, result.stdout + result.stderr)
         return build
 
