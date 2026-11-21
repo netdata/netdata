@@ -896,6 +896,9 @@ Add the following to the Child's `[stream]` section:
        destination = PARENT_HOSTNAME_OR_IP:19999:SSL
    ```
 
+   The Child accepts the Parent's certificate only if a trusted CA signed it and it was issued for the hostname or IP
+   address used in `destination` (a DNS or IP subject alternative name).
+
 2. If using self-signed certificates, you may need to add:
 
    ```ini
