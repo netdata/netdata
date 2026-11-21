@@ -5,6 +5,14 @@
 - Docs: align core docs on integrations, scale, cost and ML wording ([#24862](https://github.com/netdata/netdata/issues/24862))
 - Regenerate integrations docs ([#24868](https://github.com/netdata/netdata/issues/24868))
 - Docs: publish the DEM browser runtime setup page on Learn ([#24869](https://github.com/netdata/netdata/issues/24869))
+- Dbengine: cache the instance pointer in the collect handle ([#24848](https://github.com/netdata/netdata/issues/24848))
+- Aral: remove per-operation counters from malloc/free paths ([#24852](https://github.com/netdata/netdata/issues/24852))
+- Feat(go.d/snmp): switch SNMP collectors and trap receiver to netdata/gosnmp ([#24717](https://github.com/netdata/netdata/issues/24717))
+- Regenerate integrations docs ([#24870](https://github.com/netdata/netdata/issues/24870))
+- Aclk: reject malformed Cloud replies and MQTT publishes ([#24866](https://github.com/netdata/netdata/issues/24866))
+- Libnetdata: hash worker spinlock telemetry by pointer only ([#24856](https://github.com/netdata/netdata/issues/24856))
+- Rrdlabels: take common_count locks in address order ([#24860](https://github.com/netdata/netdata/issues/24860))
+- Dyncfg: fix typo in the file rename error message ([#24871](https://github.com/netdata/netdata/issues/24871))
 
 ## [2.13.0] - 2026-11-19
 
