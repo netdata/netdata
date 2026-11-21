@@ -19,7 +19,7 @@ func testAgentRelease() AgentRelease {
 
 func TestAgentReleaseIdentity(t *testing.T) {
 	for _, version := range []string{"1", "v2.12.0", "v2.12.0-607-nightly", "0.custom_ref", strings.Repeat("A", 128)} {
-		for _, channel := range []string{"stable", "nightly", "devel"} {
+		for _, channel := range []string{"stable", "release-candidate", "nightly", "devel"} {
 			agent := testAgentRelease()
 			agent.Version, agent.Channel = version, channel
 			require.NoError(t, agent.Validate())
@@ -32,7 +32,7 @@ func TestAgentReleaseIdentity(t *testing.T) {
 			require.ErrorContains(t, agent.Validate(), "version")
 		})
 	}
-	for _, channel := range []string{"", "edge", "preview", "stable/other", "Nightly", "nightly\n"} {
+	for _, channel := range []string{"", "edge", "preview", "rc", "Release-Candidate", "stable/other", "Nightly", "nightly\n"} {
 		agent := testAgentRelease()
 		agent.Channel = channel
 		require.ErrorContains(t, agent.Validate(), "channel")

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       channel:
-        description: Agent release channel (stable, nightly or devel)
+        description: Agent release channel (stable, release-candidate, nightly or devel)
         required: true
         type: string
       publish:
@@ -24,6 +24,7 @@ permissions:
 concurrency:
   group: dem-runtime-companion-${{ inputs.publish && inputs.channel || github.run_id }}
   cancel-in-progress: false
+  queue: max # Keep every pending companion publication for a channel instead of replacing older pending runs.
 jobs:
   matrix:
     name: Select native runners from the shared distro catalog

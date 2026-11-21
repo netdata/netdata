@@ -49,7 +49,7 @@ jobs:
           if [ "$CHANNEL" = nightly ]; then
             test "$REQUESTED_VERSION" = nightly
             case "$canonical" in *-nightly) ;; *) exit 1 ;; esac
-          elif [ "$CHANNEL" = stable ]; then
+          elif [ "$CHANNEL" = stable ] || [ "$CHANNEL" = release-candidate ]; then
             test "${REQUESTED_VERSION#v}" = "${canonical#v}"
           else
             test "$CHANNEL" = devel

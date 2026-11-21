@@ -8,11 +8,20 @@ EVENT_TYPE="${3}"
 EVENT_VERSION="${4}"
 RELEASE_TEST="${5}"
 
+# Git refs cannot contain '~', so accept the package-style RC separator and store the tag form.
+# Release candidate numbers are two digits (rc01-rc99) so they also sort correctly as text.
+case "${EVENT_VERSION}" in
+    *\~rc*) EVENT_VERSION="${EVENT_VERSION%%\~rc*}-rc${EVENT_VERSION#*\~rc}" ;;
+esac
+case "${EVENT_VERSION}" in
+    *-rc[1-9]) EVENT_VERSION="${EVENT_VERSION%-rc*}-rc0${EVENT_VERSION##*-rc}" ;;
+esac
+
 ##############################################################
 # Version validation functions
 
 check_version_format() {
-    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
+    if ! echo "${EVENT_VERSION}" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
         echo "::error::The supplied version (${EVENT_VERSION}) is not a valid version string."
         return 1
     fi
@@ -26,7 +35,7 @@ patch_is_zero() {
 }
 
 minor_is_zero() {
-    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[:digit:]]+\.0';  then
+    if ! echo "${EVENT_VERSION}" | grep -qE '^v[[:digit:]]+\.0\.';  then
         echo "::error::The minor version number for a ${EVENT_TYPE} build must be 0."
         return 1
     fi
@@ -53,38 +62,69 @@ minor_matches() {
 }
 
 check_for_existing_tag() {
-    if git tag | grep -qE "^${EVENT_VERSION}$"; then
+    if git show-ref --verify --quiet "refs/tags/${EVENT_VERSION}"; then
         echo "::error::A tag for version ${EVENT_VERSION} already exists."
         return 1
     fi
 }
 
-check_newer_major_version() {
-    current="$(cut -f 1 -d '-' packaging/version | cut -f 1 -d '.' | cut -f 2 -d 'v')"
-    target="$(echo "${EVENT_VERSION}" | cut -f 1 -d '.' | cut -f 2 -d 'v')"
+check_newer_version() {
+    current="$(cut -f 1 -d '-' packaging/version)"
+    target="${EVENT_VERSION%%-*}"
 
-    if [ "${target}" -le "${current}" ]; then
+    if [ "${target}" = "${current}" ] || [ "$(printf '%s\n' "${current}" "${target}" | sort -V | tail -n 1)" != "${target}" ]; then
         echo "::error::Version ${EVENT_VERSION} is not newer than the current version."
         return 1
     fi
 }
 
-check_newer_minor_version() {
-    current="$(cut -f 1 -d '-' packaging/version | cut -f 2 -d '.')"
-    target="$(echo "${EVENT_VERSION}" | cut -f 2 -d '.')"
-
-    if [ "${target}" -le "${current}" ]; then
-        echo "::error::Version ${EVENT_VERSION} is not newer than the current version."
+# Windows maps versions to MSI ProductVersion (major.minor.build: at most 255.255.65535) and to Win32 assembly
+# versions (four fields of at most 65535). Stable patches are offset by 100 (see NetdataVersion.cmake), so the
+# last representable stable patch is 65435. Arguments: major minor build [revision].
+check_windows_version() {
+    if [ "${1}" -gt 255 ] || [ "${2}" -gt 255 ] || [ "${3}" -gt 65535 ] || [ "${4:-0}" -gt 65535 ]; then
+        echo "::error::Version ${5} maps to Windows version ${1}.${2}.${3}.${4:-0}, which exceeds the MSI limits (255.255.65535.65535)."
         return 1
     fi
 }
 
-check_newer_patch_version() {
-    current="$(cut -f 1 -d '-' packaging/version | cut -f 3 -d '.')"
-    target="$(echo "${EVENT_VERSION}" | cut -f 3 -d '.')"
+# Same check for an official release or release candidate version (vX.Y.Z or vX.Y.0-rcNN).
+check_windows_release() {
+    core="${1#v}"
+    core="${core%%-*}"
+    major="${core%%.*}"
+    minor="$(echo "${core}" | cut -f 2 -d '.')"
+    patch="${core##*.}"
+    case "${1}" in
+        *-rc*) build="$(( ${1##*-rc} ))" ;; # rc numbers are two digits, so the leading zero is not octal.
+        *) build="$(( 100 + patch ))" ;;
+    esac
+    check_windows_version "${major}" "${minor}" "${build}" 0 "${1}"
+}
 
-    if [ "${target}" -le "${current}" ]; then
-        echo "::error::Version ${EVENT_VERSION} is not newer than the current version."
+# Release tooling an existing release branch needs before its tag is pushed (see .github/RELEASING.md,
+# "Maintenance branches created before release candidates"). Pushing the tag first would leave a release that
+# its companion and artifact workflows cannot build, and the tag cannot be reused.
+#  - The companion workflows run from this (dispatching) revision but execute helpers from the tagged source.
+#  - build.yml, docker.yml and packaging.yml run from the tag itself and must accept the inputs release.yml sends.
+COMPANION_WORKFLOWS='.github/workflows/dem-runtime-release.yml .github/workflows/dem-runtime-companion-check.yml .github/workflows/dem-runtime-node-tests.yml'
+DISPATCHED_WORKFLOWS='.github/workflows/build.yml .github/workflows/docker.yml .github/workflows/packaging.yml'
+DISPATCH_INPUTS='source_sha companion_run_id'
+COMPANION_HELPERS="$(for wf in ${COMPANION_WORKFLOWS}; do git show "HEAD:${wf}" 2>/dev/null; done |
+    grep -oE '(packaging|\.github/scripts|src)/[A-Za-z0-9_./-]+\.(py|sh|json)' | sort -u)" || true
+
+check_release_tooling() {
+    missing=''
+    for path in ${COMPANION_HELPERS}; do
+        [ -e "${path}" ] || missing="${missing} ${path}"
+    done
+    for wf in ${DISPATCHED_WORKFLOWS}; do
+        for input in ${DISPATCH_INPUTS}; do
+            grep -qE "^      ${input}:" "${wf}" 2>/dev/null || missing="${missing} ${wf}(input:${input})"
+        done
+    done
+    if [ -n "${missing}" ]; then
+        echo "::error::${1} lacks release tooling that must be backported before releasing from it:${missing}. See .github/RELEASING.md."
         return 1
     fi
 }
@@ -101,8 +141,26 @@ if [ "${REPO}" != "netdata/netdata" ] && [ -z "${RELEASE_TEST}" ]; then
 elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     echo "::notice::Preparing a nightly release build."
     LAST_TAG=$(git describe --abbrev=0 --tags)
+    # The count excludes the nightly commit itself, so a nightly of the tagged commit is number 0.
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
-    NEW_VERSION="${LAST_TAG}-$((COMMITS_SINCE_RELEASE + 1))-nightly"
+    case "${LAST_TAG}" in
+        *-*)
+            # Release candidates are tagged only on release branches.
+            echo "::error::The nearest tag (${LAST_TAG}) is not a stable or development marker tag."
+            exit 1
+            ;;
+        # Nightlies after a stable tag (from before marker tags existed) follow that release.
+        v*.*.*) NEW_VERSION="${LAST_TAG}-${COMMITS_SINCE_RELEASE}-post-nightly" ;;
+        # Marker tags (vX.Y) open development of that release, so nightlies precede it.
+        *) NEW_VERSION="${LAST_TAG}-${COMMITS_SINCE_RELEASE}-nightly" ;;
+    esac
+    nightly_core="${LAST_TAG#v}"
+    case "${nightly_core}" in
+        *.*.*) nightly_build="$(( 100 + ${nightly_core##*.} ))" ;;
+        *) nightly_build=0 ;;
+    esac
+    check_windows_version "${nightly_core%%.*}" "$(echo "${nightly_core}" | cut -f 2 -d '.')" \
+        "${nightly_build}" "${COMMITS_SINCE_RELEASE}" "${NEW_VERSION}" || exit 1
     LAST_VERSION_COMMIT="$(git rev-list -1 HEAD packaging/version)"
     HEAD_COMMIT="$(git rev-parse HEAD)"
     if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then
@@ -119,71 +177,128 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
         echo "branch=master" >> "${GITHUB_OUTPUT}"
         echo "version=nightly" >> "${GITHUB_OUTPUT}"
     fi
-elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
-    echo "::notice::Preparing a patch release build."
-    check_version_format || exit 1
+elif [ "${EVENT_VERSION}" != nightly ]; then
+    case "${EVENT_TYPE}" in
+        release-candidate)
+            if ! echo "${EVENT_VERSION}" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0-rc(0[1-9]|[1-9][0-9])$'; then
+                echo '::error::Release candidates must use vMAJOR.MINOR.0-rcNN, with NN from 01 to 99 and no build metadata.'
+                exit 1
+            fi
+            ;;
+        major|minor|patch)
+            check_version_format || exit 1
+            if [ "${EVENT_TYPE}" != patch ]; then patch_is_zero || exit 1; fi
+            if [ "${EVENT_TYPE}" = major ]; then minor_is_zero || exit 1; fi
+            ;;
+        *)
+            echo '::error::Unrecognized release type.'
+            exit 1
+            ;;
+    esac
+    check_windows_release "${EVENT_VERSION}" || exit 1
     check_for_existing_tag || exit 1
-    branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
-    if ! git checkout "${branch_name}"; then
-        echo "::error::Could not find a branch for the ${branch_name}.x release series."
-        exit 1
+    series="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
+    branch_name="release-${series}"
+    new_branch=''
+    marker=''
+    build_type=release
+    if [ "${EVENT_TYPE}" = release-candidate ]; then
+        build_type=release-candidate
+        base_version="${EVENT_VERSION%-rc*}"
+        # Match the full core literally, including stable tags with build metadata.
+        if git tag | cut -d "+" -f 1 | grep -F -x -q "${base_version}"; then
+            echo "::error::A regular release of ${base_version} already exists."
+            exit 1
+        fi
+        latest_rc="$(git tag --list "${base_version}-rc*" | grep -E '^v[0-9]+\.[0-9]+\.0-rc[0-9]{2}$' | sort | tail -n 1)"
+        if [ -z "${latest_rc}" ]; then
+            if [ "${EVENT_VERSION}" != "${base_version}-rc01" ]; then
+                echo '::error::Release candidate numbering must start at rc01.'
+                exit 1
+            fi
+            if git show-ref --verify --quiet "refs/heads/${branch_name}" || git show-ref --verify --quiet "refs/remotes/origin/${branch_name}"; then
+                echo "::error::A branch named ${branch_name} already exists in the repository."
+                exit 1
+            fi
+            git checkout master
+            # A first RC starts a new release series from master. Master's latest tag is either the
+            # marker for the series under development (vX.Y) or, before marker tags existed, a stable tag.
+            master_tag="$(git describe --abbrev=0 --tags)"
+            master_core="${master_tag#v}"
+            target_core="${base_version#v}"
+            case "${master_core}" in
+                *.*.*) ;;
+                *) master_core="${master_core}.0" ;;
+            esac
+            if [ "${master_tag}" != "${series}" ] && \
+               { [ "${master_core}" = "${target_core}" ] || [ "$(printf '%s\n' "${master_core}" "${target_core}" | sort -V | tail -n 1)" != "${target_core}" ]; }; then
+                echo "::error::Version ${EVENT_VERSION} is not newer than the current development version (${master_tag})."
+                exit 1
+            fi
+            if [ "${master_core%%.*}" != "${target_core%%.*}" ]; then minor_is_zero || exit 1; fi
+            new_branch="${branch_name}"
+            marker="${series%.*}.$(( ${series##*.} + 1 ))"
+            if git show-ref --verify --quiet "refs/tags/${marker}"; then
+                echo "::error::The development marker tag ${marker} already exists."
+                exit 1
+            fi
+        elif [ "$(printf '%s\n' "${latest_rc}" "${EVENT_VERSION}" | sort | tail -n 1)" != "${EVENT_VERSION}" ]; then
+            echo "::error::Release candidate must be newer than ${latest_rc}."
+            exit 1
+        fi
     fi
-    minor_matches || exit 1
-    major_matches || exit 1
-    check_newer_patch_version || exit 1
+    if [ -z "${new_branch}" ]; then
+        if ! git checkout "${branch_name}"; then
+            echo "::error::Could not find a branch for the ${series}.x release series."
+            exit 1
+        fi
+        major_matches || exit 1
+        minor_matches || exit 1
+        check_release_tooling "${branch_name}" || exit 1
+        current_version="$(cat packaging/version)"
+        if [ "${EVENT_TYPE}" = patch ]; then
+            # A patch follows a released version of this series, never a release candidate.
+            case "${current_version}" in
+                *-*)
+                    echo "::error::A patch release requires a released ${series}.0 on ${branch_name}, but the branch is at ${current_version}."
+                    exit 1
+                    ;;
+            esac
+            check_newer_version || exit 1
+        elif [ "${EVENT_TYPE}" = release-candidate ]; then
+            # Later RCs continue the same pre-release; once a release of this series ships, the branch cannot go back.
+            case "${current_version}" in
+                "${base_version}"-rc*) ;;
+                *)
+                    echo "::error::Release candidate ${EVENT_VERSION} cannot follow ${current_version} on ${branch_name}."
+                    exit 1
+                    ;;
+            esac
+        else
+            case "$(cat packaging/version)" in
+                "${EVENT_VERSION}"-*) ;; # Same-core prerelease to final release.
+                *) check_newer_version || exit 1 ;;
+            esac
+        fi
+    fi
     echo "${EVENT_VERSION}" > packaging/version || exit 1
     # shellcheck disable=SC2129
     echo "run=true" >> "${GITHUB_OUTPUT}"
-    echo "message=Patch release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
+    echo "message=${EVENT_TYPE} release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
-    echo "type=release" >> "${GITHUB_OUTPUT}"
-    echo "channel=stable" >> "${GITHUB_OUTPUT}"
+    echo "type=${build_type}" >> "${GITHUB_OUTPUT}"
+    if [ "${build_type}" = release-candidate ]; then
+        echo "channel=release-candidate" >> "${GITHUB_OUTPUT}"
+    else
+        echo "channel=stable" >> "${GITHUB_OUTPUT}"
+    fi
     echo "branch=${branch_name}" >> "${GITHUB_OUTPUT}"
-    echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
-elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
-    echo "::notice::Preparing a minor release build."
-    check_version_format || exit 1
-    patch_is_zero || exit 1
-    major_matches || exit 1
-    check_newer_minor_version || exit 1
-    check_for_existing_tag || exit 1
-    branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
-    if [ -n "$(git branch --list "${branch_name}")" ]; then
-        echo "::error::A branch named ${branch_name} already exists in the repository."
-        exit 1
+    # A first RC creates the release branch from master and an empty marker commit on master.
+    if [ -n "${new_branch}" ]; then
+        echo "new-branch=${new_branch}" >> "${GITHUB_OUTPUT}"
+        echo "marker=${marker}" >> "${GITHUB_OUTPUT}"
     fi
-    echo "${EVENT_VERSION}" > packaging/version || exit 1
-    # shellcheck disable=SC2129
-    echo "run=true" >> "${GITHUB_OUTPUT}"
-    echo "message=Minor release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
-    echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
-    echo "type=release" >> "${GITHUB_OUTPUT}"
-    echo "channel=stable" >> "${GITHUB_OUTPUT}"
-    echo "branch=master" >> "${GITHUB_OUTPUT}"
-    echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
-    echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
-elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
-    echo "::notice::Preparing a major release build."
-    check_version_format || exit 1
-    minor_is_zero || exit 1
-    patch_is_zero || exit 1
-    check_newer_major_version || exit 1
-    check_for_existing_tag || exit 1
-    branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
-    if [ -n "$(git branch --list "${branch_name}")" ]; then
-        echo "::error::A branch named ${branch_name} already exists in the repository."
-        exit 1
-    fi
-    echo "${EVENT_VERSION}" > packaging/version || exit 1
-    # shellcheck disable=SC2129
-    echo "run=true" >> "${GITHUB_OUTPUT}"
-    echo "message=Major release ${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
-    echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
-    echo "type=release" >> "${GITHUB_OUTPUT}"
-    echo "channel=stable" >> "${GITHUB_OUTPUT}"
-    echo "branch=master" >> "${GITHUB_OUTPUT}"
-    echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
-    echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
+    echo "version=${EVENT_VERSION#v}" >> "${GITHUB_OUTPUT}"
 else
     echo '::error::Unrecognized release type or invalid version.'
     exit 1

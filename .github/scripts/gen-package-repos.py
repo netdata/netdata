@@ -2,12 +2,13 @@
 
 import sys
 
-from modules.release_versions import stable_reaches_preview
+from modules.release_versions import reaches, version_core
 
 
 def package_repos(version: str, repo: str) -> list[str]:
     repos = [repo]
-    if stable_reaches_preview(version):
+    version_core(version, stable=True)
+    if reaches(version, 'preview/latest'):
         repos.append(f'{repo}-preview')
     return repos
 

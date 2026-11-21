@@ -1,0 +1,43 @@
+---
+name: Release process tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release*.yml'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/packaging.yml'
+      - '.github/workflows/docker.yml'
+      - '.github/scripts/prepare-release-base.sh'
+      - '.github/scripts/prepare-artifacts.sh'
+      - '.github/scripts/gen-package-repos.py'
+      - '.github/scripts/gen-docker-tags.py'
+      - '.github/scripts/modules/release_versions.py'
+      - '.github/scripts/test-prepare-release-base.py'
+      - '.github/scripts/test-artifact-prefixes.py'
+      - '.github/scripts/test-gen-package-repos.py'
+      - '.github/scripts/test-gen-docker-tags.py'
+      - '.github/scripts/test-version-scheme.py'
+      - 'packaging/cmake/Modules/NetdataVersion.cmake'
+      - 'packaging/installer/netdata-updater.sh'
+      - 'packaging/generate-changelog.sh'
+      - 'packaging/generate-changelog.py'
+      - 'packaging/cliff.toml'
+      - '.github/scripts/test-generate-changelog.py'
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  release-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up git-cliff
+        uses: kenji-miyake/setup-git-cliff@2778609c643a39a2576c4bae2e493b855eb4aee8 # v2.0.1
+      - name: Validate release preparation and destinations offline
+        run: |
+          python3 .github/scripts/test-prepare-release-base.py
+          python3 .github/scripts/test-artifact-prefixes.py
+          python3 .github/scripts/test-gen-package-repos.py
+          python3 .github/scripts/test-gen-docker-tags.py
+          python3 .github/scripts/test-version-scheme.py
+          python3 .github/scripts/test-generate-changelog.py

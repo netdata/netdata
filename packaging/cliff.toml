@@ -76,8 +76,10 @@ link_parsers = [
     { pattern = "#(\\d+)", href = "https://github.com/netdata/netdata/issues/$1"},
     { pattern = "RFC(\\d+)", text = "ietf-rfc$1", href = "https://datatracker.ietf.org/doc/html/rfc$1"},
 ]
-# Include only the tags that belong to the current branch.
-use_branch_tags = true
+# Include only canonical release tags (exclude vX.Y development markers and -rcNN prereleases).
+tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
+# The generator selects exact tags and revision ranges, including releases off the current branch.
+use_branch_tags = false
 # Order releases topologically instead of chronologically.
 topo_order = false
 # Order releases topologically instead of chronologically.

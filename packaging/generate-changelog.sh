@@ -2,8 +2,6 @@
 
 set -e
 
-FIRST_TAG="v1.47.0" # Last release prior to v2.0.0
-
 SCRIPT_SOURCE="$(
     self=${0}
     while [ -L "${self}" ]
@@ -17,7 +15,4 @@ SCRIPT_SOURCE="$(
 
 cd "$(dirname "${SCRIPT_SOURCE}")/.." || exit 1
 
-git-cliff --config "$(dirname "${SCRIPT_SOURCE}")/cliff.toml" \
-          --output "$(dirname "${SCRIPT_SOURCE}")/../CHANGELOG.md" \
-          --verbose \
-          "${FIRST_TAG}..HEAD"
+exec python3 "$(dirname "${SCRIPT_SOURCE}")/generate-changelog.py" "$@"

@@ -21,6 +21,8 @@ class ReleaseInfoTests(unittest.TestCase):
         valid = f'version=v2.12.0-9-nightly\nchannel=nightly\nsource={SOURCE}\n'
         cases = {
             'stable': valid.replace('v2.12.0-9-nightly', 'v2.12.0').replace('nightly\n', 'stable\n'),
+            'release candidate': (valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc01')
+                                  .replace('nightly\n', 'release-candidate\n')),
             'nightly': valid,
             'devel': valid.replace('channel=nightly', 'channel=devel'),
             'single character version': valid.replace('v2.12.0-9-nightly', '1'),
@@ -35,6 +37,7 @@ class ReleaseInfoTests(unittest.TestCase):
             'path': valid.replace('v2.12.0-9-nightly', '../release'),
             'overlong': valid.replace('v2.12.0-9-nightly', 'v' * 129),
             'channel': valid.replace('channel=nightly', 'channel=preview'),
+            'rc alias': valid.replace('channel=nightly', 'channel=rc'),
             'short SHA': valid.replace(SOURCE, 'a' * 39),
             'uppercase SHA': valid.replace(SOURCE, 'A' * 40),
             'not hex': valid.replace(SOURCE, 'x' * 40),
@@ -44,6 +47,13 @@ class ReleaseInfoTests(unittest.TestCase):
             'injection': valid.replace('v2.12.0-9-nightly', '${INJECTED}'),
             'semicolon': valid.replace('v2.12.0-9-nightly', 'v2;injected'),
             'reordered': 'channel=nightly\nversion=v2.12.0\nsource=' + SOURCE + '\n',
+            'stable RC': valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc01').replace('nightly\n', 'stable\n'),
+            'stable nightly': valid.replace('channel=nightly', 'channel=stable'),
+            'stable metadata': valid.replace('v2.12.0-9-nightly', 'v2.12.0+build.1').replace('nightly\n', 'stable\n'),
+            'RC without suffix': (valid.replace('v2.12.0-9-nightly', 'v2.13.0')
+                                  .replace('nightly\n', 'release-candidate\n')),
+            'RC one digit': (valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc1')
+                             .replace('nightly\n', 'release-candidate\n')),
         }
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'release-info'
@@ -79,6 +89,10 @@ class ReleaseInfoTests(unittest.TestCase):
             original = path.read_bytes()
             with self.assertRaisesRegex(ValueError, 'differs'):
                 release_info.stamp(root, 'nightly', SOURCE)
+            self.assertEqual(path.read_bytes(), original)
+            # A stable version cannot be stamped as an RC (nor the reverse), and the failure leaves metadata intact.
+            with self.assertRaisesRegex(ValueError, 'does not belong'):
+                release_info.stamp(root, 'release-candidate', source)
             self.assertEqual(path.read_bytes(), original)
             expected = {'version': '0.' + source, 'channel': 'devel', 'source': source}
             self.assertEqual(release_info.stamp(root, 'devel', source), expected)
@@ -185,15 +199,16 @@ class CMakeReleaseInfoTests(unittest.TestCase):
     def test_developer_build_has_no_official_identity(self):
         result, output = self.configure()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.nightly', '', '', ''])
+        self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.post', '', '', ''])
         self.assertIn('.ReleaseVersion=', output[5])
 
     def test_official_identity_does_not_change_display_or_native_version(self):
-        for version, channel in [('v2.13.0', 'stable'), ('v2.13.0-20-nightly', 'nightly'), ('development', 'devel')]:
+        for version, channel in [('v2.13.0', 'stable'), ('v2.13.0-rc01', 'release-candidate'),
+                                 ('v2.13.0-20-nightly', 'nightly'), ('development', 'devel')]:
             with self.subTest(channel=channel):
                 result, output = self.configure(f'version={version}\nchannel={channel}\nsource={SOURCE}\n')
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.nightly', version, channel, SOURCE])
+                self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.post', version, channel, SOURCE])
                 self.assertIn('.ReleaseVersion=' + version, output[5])
                 self.assertIn('.ReleaseChannel=' + channel, output[5])
                 self.assertIn('.ReleaseRef=' + SOURCE, output[5])

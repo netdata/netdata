@@ -53,7 +53,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 project(netdata
-        VERSION "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}.${NETDATA_VERSION_TWEAK}"
+        VERSION "${NETDATA_PROJECT_VERSION}"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 include(CMakeDependentOption)

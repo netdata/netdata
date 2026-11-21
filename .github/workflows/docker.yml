@@ -32,7 +32,9 @@ env:
   DISABLE_TELEMETRY: 1
   NIGHTLY_COUNT: 4
 concurrency:
-  group: docker-${{ github.ref }}-${{ github.event_name }}
+  # Numbered release dispatches get a per-run group so a newer release never replaces a pending one; job-level
+  # queued groups serialize shared publication state. Nightlies, PR and push runs keep the shared group.
+  group: docker-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'workflow_dispatch' && inputs.version != 'nightly' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
   runtime-companion:
@@ -40,7 +42,7 @@ jobs:
     uses: ./.github/workflows/dem-runtime-release.yml
     with:
       source_sha: ${{ inputs.source_sha || github.sha }}
-      channel: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+      channel: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
       publish: true
     secrets: inherit
 
@@ -54,7 +56,7 @@ jobs:
     with:
       source_sha: ${{ inputs.source_sha || github.sha }}
       companion_run_id: ${{ inputs.companion_run_id || needs.runtime-companion.outputs.run_id }}
-      channel: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+      channel: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
       version: ${{ inputs.version }}
 
   file-check: # Check what files changed if we’re being run in a PR or on a push.
@@ -265,11 +267,12 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
@@ -303,7 +306,7 @@ jobs:
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || 'test' }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -353,6 +356,7 @@ jobs:
     outputs:
       tags: ${{ steps.tag.outputs.tags }}
       nightly: ${{ steps.tag.outputs.nightly }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
       nightly_tag: ${{ steps.tag.outputs.nightly_tag }}
       docker_tags: ${{ steps.tag.outputs.docker_tags }}
       quay_tags: ${{ steps.tag.outputs.quay_tags }}
@@ -368,12 +372,9 @@ jobs:
           ref: ${{ inputs.source_sha || github.sha }}
       - name: Generate Tags
         id: tag
-        run: |
-          if [ ${{ github.event_name }} = 'workflow_dispatch' ]; then
-            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ${{ github.event.inputs.version }}
-          else
-            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ''
-          fi
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --metadata-only
 
   build-images-docker-hub:
     name: Push Images to Docker Hub
@@ -405,11 +406,12 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -448,7 +450,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -506,6 +508,10 @@ jobs:
       - build-images-docker-hub
       - gen-tags
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-publish-docker
+      cancel-in-progress: false
+      queue: max # Keep every pending release publisher; the default single slot replaces older pending runs.
     steps:
       - name: Checkout
         id: checkout
@@ -529,12 +535,25 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Install image inspection tool
+        if: github.repository == 'netdata/netdata'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Select published image aliases
+        id: published-tags
+        if: github.repository == 'netdata/netdata'
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          REGISTRY_AUTH_FILE="${DOCKER_CONFIG:-${HOME}/.docker}/config.json" \
+            .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --registry docker
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ steps.published-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
@@ -553,6 +572,7 @@ jobs:
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
+              Select published aliases: ${{ steps.published-tags.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
               Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -592,11 +612,12 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -635,7 +656,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -694,6 +715,10 @@ jobs:
       - build-images-quay
       - gen-tags
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-publish-quay
+      cancel-in-progress: false
+      queue: max # Keep every pending release publisher; the default single slot replaces older pending runs.
     steps:
       - name: Checkout
         id: checkout
@@ -718,12 +743,25 @@ jobs:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
+      - name: Install image inspection tool
+        if: github.repository == 'netdata/netdata'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Select published image aliases
+        id: published-tags
+        if: github.repository == 'netdata/netdata'
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          REGISTRY_AUTH_FILE="${DOCKER_CONFIG:-${HOME}/.docker}/config.json" \
+            .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --registry quay
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ steps.published-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
@@ -742,6 +780,7 @@ jobs:
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
+              Select published aliases: ${{ steps.published-tags.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
               Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -781,11 +820,12 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -824,7 +864,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -883,6 +923,10 @@ jobs:
       - build-images-ghcr
       - gen-tags
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-publish-ghcr
+      cancel-in-progress: false
+      queue: max # Keep every pending release publisher; the default single slot replaces older pending runs.
     steps:
       - name: Checkout
         id: checkout
@@ -907,12 +951,25 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install image inspection tool
+        if: github.repository == 'netdata/netdata'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Select published image aliases
+        id: published-tags
+        if: github.repository == 'netdata/netdata'
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          REGISTRY_AUTH_FILE="${DOCKER_CONFIG:-${HOME}/.docker}/config.json" \
+            .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --registry ghcr
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ steps.published-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
@@ -931,6 +988,7 @@ jobs:
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
+              Select published aliases: ${{ steps.published-tags.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
               Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -959,7 +1017,7 @@ jobs:
           ref: ${{ inputs.source_sha || github.sha }}
           submodules: recursive
       - name: Trigger Helmchart PR
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && needs.gen-tags.outputs.prerelease != 'true' && github.repository == 'netdata/netdata'
         id: trigger-helmchart
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:
@@ -969,7 +1027,7 @@ jobs:
           ref: refs/heads/master
           inputs: '{"agent_version": "v${{ inputs.version }}"}'
       - name: Trigger MSI build
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && needs.gen-tags.outputs.prerelease != 'true' && github.repository == 'netdata/netdata'
         id: trigger-msi
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:

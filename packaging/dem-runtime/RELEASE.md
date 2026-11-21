@@ -117,10 +117,10 @@ storage route and signing/access configuration used by the release workflow;
 internal infrastructure details do not belong in this runbook.
 
 ```text
-dem-runtime/<stable|nightly|devel>/<Agent-version>/<amd64|arm64>/<sha256>.tar.zst
-dem-runtime/<stable|nightly|devel>/<Agent-version>/<amd64|arm64>/<sha256>.sources.tar.zst
-dem-runtime/<stable|nightly|devel>/<Agent-version>/<amd64|arm64>/release.json
-dem-runtime/<stable|nightly|devel>/<Agent-version>/<amd64|arm64>/{manifest,provenance,sbom.cdx,...}.json
+dem-runtime/<stable|release-candidate|nightly|devel>/<Agent-version>/<amd64|arm64>/<sha256>.tar.zst
+dem-runtime/<stable|release-candidate|nightly|devel>/<Agent-version>/<amd64|arm64>/<sha256>.sources.tar.zst
+dem-runtime/<stable|release-candidate|nightly|devel>/<Agent-version>/<amd64|arm64>/release.json
+dem-runtime/<stable|release-candidate|nightly|devel>/<Agent-version>/<amd64|arm64>/{manifest,provenance,sbom.cdx,...}.json
 ```
 
 Signed descriptors reference versioned bytes. Runtime acquisition always selects
@@ -222,7 +222,7 @@ require `rclone` (installed by the packaging CI job) and no external service or
 credentials. Local runs without it report an explicit skip.
 
 Tests cover identity consistency, signed staging/tampering, immutable retry,
-stable/nightly/devel paths, partial publication, public digest checks,
+stable/release-candidate/nightly/devel paths, partial publication, public digest checks,
 native transport validation and absence of an independent native uploader. GPG
 integration cases require the real tool and explicitly report missing prerequisites.
 Tests do not establish actual R2/CDN behavior, key custody, repository ingestion,

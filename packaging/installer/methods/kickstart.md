@@ -98,7 +98,7 @@ To use preview releases, pass `--release-channel=preview`. This channel includes
 Without a version pin, preview installs the latest version published to that channel.
 Native installations use the `netdata-preview` repository. Static and source builds use only preview artifacts from
 `artifacts.netdata.cloud`, with no GitHub fallback.
-You can pin a prerelease with `--install-version`, for example `--install-version 2.13.0-rc1`.
+You can pin a prerelease with `--install-version`, for example `--install-version 2.13.0-rc01`.
 
 ## Optional browser runtime for synthetic monitoring
 
