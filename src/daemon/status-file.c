@@ -20,6 +20,10 @@
 
 #define STATUS_FILENAME "status-netdata.json"
 
+// Shutdown progress records (the step netdata is in), saved without fsync so a slow disk does not delay the shutdown.
+// They live in their own file, so a power loss that empties it cannot touch the synced record in STATUS_FILENAME.
+#define STATUS_PROGRESS_FILENAME "status-netdata-progress.json"
+
 ENUM_STR_MAP_DEFINE(DAEMON_STATUS) = {
     { DAEMON_STATUS_NONE, "none"},
     { DAEMON_STATUS_INITIALIZING, "initializing"},
@@ -1182,7 +1186,7 @@ static bool daemon_status_file_close_startup_save_gate(void) {
                                __ATOMIC_RELAXED) == DAEMON_STATUS_FILE_STARTUP_SAVE_SUCCEEDED;
 }
 
-static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log, bool sync_file) {
+static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log, bool progress) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -1197,7 +1201,9 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
 
-    if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log, sync_file))
+    if(progress)
+        status_file_io_save(STATUS_PROGRESS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log, false);
+    else if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log, true))
         daemon_status_file_mark_startup_save_succeeded();
 }
 
@@ -1299,7 +1305,7 @@ static void post_status_file(struct post_status_file_thread_data *d) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false, DEDUP_RELOAD_FROM_DISK);
-        daemon_status_file_save(wb, &session_status, true, true);
+        daemon_status_file_save(wb, &session_status, true, false);
     }
     else
         nd_log(NDLS_DAEMON, NDLP_INFO, "Failed to post last status to agent-events.");
@@ -1355,6 +1361,16 @@ void daemon_status_file_init(void) {
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
     status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status, true);
+
+    // A shutdown progress record newer than the status file is the last thing the previous session saved.
+    // An unreadable one (empty after a power loss) is ignored.
+    DAEMON_STATUS_FILE *progress = callocz(1, sizeof(*progress));
+    if(status_file_io_load(STATUS_PROGRESS_FILENAME, status_file_load_and_parse, progress, false) &&
+        progress->timestamp_ut > last_session_status.timestamp_ut)
+        last_session_status = *progress;
+    freez(progress);
+    status_file_io_remove(STATUS_PROGRESS_FILENAME);
+
     daemon_status_dedup_load(false);
 
     // fill missing information on older versions of the status file
@@ -1657,7 +1673,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         daemon_status_file_session_status_writer_leave();
 
     // save it without a stack trace to be sure we will have the event
-    daemon_status_file_save(wb, ds, false, true);
+    daemon_status_file_save(wb, ds, false, false);
 
     if(!stack_trace_is_empty(ds) && !force)
         return;
@@ -1689,7 +1705,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         if(live_session_status)
             daemon_status_file_session_status_writer_leave();
 
-        daemon_status_file_save(wb, ds, false, true);
+        daemon_status_file_save(wb, ds, false, false);
     }
     else if(live_session_status)
         daemon_status_file_session_status_writer_leave();
@@ -1764,12 +1780,13 @@ void daemon_status_file_update_status(DAEMON_STATUS status) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     bool exit_started = daemon_status_file_refresh(status);
 
-    // The first EXITING save records why we exit and is synced. The ones after it are progress saves, one before
-    // every shutdown step: they only need to survive a process kill (docker stop gives 10 s, then SIGKILL), which
-    // keeps what was written in the page cache. An fsync per step costs 150-400 ms on a slow disk, enough to push a
-    // shutdown past the kill. The final EXITED save and the crash/timeout saves keep the fsync.
-    bool sync_file = status != DAEMON_STATUS_EXITING || exit_started;
-    daemon_status_file_save(wb, &session_status, true, sync_file);
+    // The first EXITING save records why we exit and goes to the status file, synced. The ones after it are progress
+    // saves, one before every shutdown step: they only need to survive a process kill (docker stop gives 10 s, then
+    // SIGKILL), which keeps what was written in the page cache. An fsync per step costs 150-400 ms on a slow disk,
+    // enough to push a shutdown past the kill, so they go unsynced to the progress file. The final EXITED save and
+    // the crash/timeout saves go to the status file, synced.
+    bool progress = status == DAEMON_STATUS_EXITING && !exit_started;
+    daemon_status_file_save(wb, &session_status, true, progress);
     errno = saved_errno;
 }
 
@@ -1881,7 +1898,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         else
             set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 
-        daemon_status_file_save(static_save_buffer, ds, false, true);
+        daemon_status_file_save(static_save_buffer, ds, false, false);
     }
 #endif // defined(OS_WINDOWS)
 #endif // HAVE_STACKTRACE
@@ -1929,7 +1946,7 @@ void daemon_status_file_shutdown_timeout(const char *step, BUFFER *trace) {
     daemon_status_file_session_status_writer_leave();
 
     static_save_buffer_init();
-    daemon_status_file_save(static_save_buffer, &session_status, false, true);
+    daemon_status_file_save(static_save_buffer, &session_status, false, false);
 
     // keep the spinlock locked, to prevent further steps updating the status
 }

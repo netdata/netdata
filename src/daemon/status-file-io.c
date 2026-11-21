@@ -76,6 +76,24 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
     errno_clear();
 }
 
+void status_file_io_remove(const char *filename) {
+    // Do not call this from signal handlers.
+
+    char path[FILENAME_MAX];
+    time_t mtime;
+
+    if(status_file_io_check(netdata_configured_varlib_dir, filename, path, sizeof(path), &mtime))
+        unlink(path);
+
+    status_file_io_fallback_dirs_update();
+    for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
+        if(status_file_io_check(status_file_io_fallback_dirs[i], filename, path, sizeof(path), &mtime))
+            unlink(path);
+    }
+
+    errno_clear();
+}
+
 bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *), void *data, bool log) {
     // Do not call this from signal handlers; it probes filesystem metadata and may log.
 
