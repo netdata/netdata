@@ -50,7 +50,13 @@ Important:
 - local/source installs should run the downloader if they want a local cache copy
 - 32-bit packaged builds still ship the staged stock payload, but do not build or install the downloader binary
 - official static builds include the stock payload for DEM/RUM even on ARMv6, where NetFlow is disabled
-- native packages keep the stock payload in `netdata-plugin-netflow`; DEM/RUM can read it without NetFlow running
+- native packages keep the stock payload in `netdata-ip-intel-data`, required by both `netdata-plugin-netflow`
+  and `netdata-plugin-dem`; installing DEM does not require the NetFlow listener
+
+Native package upgrades transfer the stock files from older `netdata-plugin-netflow` packages to the shared data
+package. Upgrade installed Netdata components together using the package manager. When downgrading to packages
+from before this split, remove `netdata-ip-intel-data` as part of the downgrade; those older NetFlow packages own
+the stock files themselves. The downloader executable and its configuration remain in `netdata-plugin-netflow`.
 
 ## Config lookup
 

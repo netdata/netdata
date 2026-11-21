@@ -45,6 +45,9 @@ unreadable policy state are reported as prerequisites; the helper does not downl
 
 ## Native DEB/RPM packages
 
+`netdata-plugin-dem` automatically installs the shared `netdata-ip-intel-data` package for RUM geographic
+enrichment. It uses the stock database without a `geoip_db` override or the NetFlow listener.
+
 Install the optional `netdata-dem-runtime` package with the system package manager. DEM never invokes the package
 manager itself, and the package owns its installation lifecycle: the low-level CLI refuses to install, update, repair
 or remove a native runtime.

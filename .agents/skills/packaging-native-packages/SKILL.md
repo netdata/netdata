@@ -82,6 +82,19 @@ its distro; a build request alone does not authorize installing packages on the 
 For repository submission, managed archives or an SRE release handoff, use
 `.agents/skills/packaging-component-releases/SKILL.md`.
 
+## Shared Data Ownership
+
+- Move a shared payload as one component, including attribution, and test the transfer from a real older package.
+  `packaging/cmake/Modules/NetdataTopologyIPIntel.cmake` owns stock installation;
+  `packaging/cmake/Modules/Packaging.cmake` owns its native dependencies. Removal of either consumer MUST leave
+  data required by the other consumer available.
+- Check emitted package headers, not just generated CPack variables. CPack RPM has no per-component license field;
+  the data-only template `packaging/cmake/pkg-files/rpm/ip-intel-data.spec.in` supplies its license while retaining
+  generated identity, conflict and file lists. A global license change would affect unrelated components.
+- Preserve the publication lane's artifact identity when splitting data. Architecture-independent payload bytes do
+  not by themselves justify all/noarch packages emitted independently by every architecture lane; check uploader
+  filenames and repository ingestion before changing that convention.
+
 ## Transaction Inputs
 
 - For a historical version, inspect the package manager's complete resolved Netdata package set, including epochs

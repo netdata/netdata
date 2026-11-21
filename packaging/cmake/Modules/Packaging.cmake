@@ -829,7 +829,7 @@ set(CPACK_RPM_PLUGIN-SCRIPTS_USER_FILELIST
 #
 
 if(ENABLE_PLUGIN_DEM)
-  set(CPACK_COMPONENT_PLUGIN-DEM_DEPENDS "netdata")
+  set(CPACK_COMPONENT_PLUGIN-DEM_DEPENDS "netdata;ip-intel-data")
   set(CPACK_COMPONENT_PLUGIN-DEM_DESCRIPTION "Experimental digital experience monitoring for the Netdata Agent")
   set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_NAME "netdata-plugin-dem")
   set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_SECTION "net")
@@ -847,7 +847,8 @@ if(ENABLE_PLUGIN_DEM)
 
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_NAME "netdata-plugin-dem")
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_SUMMARY "Experimental digital experience monitoring for the Netdata Agent")
-  set(CPACK_RPM_PLUGIN-DEM_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
+  set(CPACK_RPM_PLUGIN-DEM_PACKAGE_REQUIRES
+      "netdata = ${CPACK_PACKAGE_VERSION}, netdata-ip-intel-data = ${CPACK_RPM_PACKAGE_VERSION}")
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_PROVIDES "netdata-dem-runtime-api = 1")
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_CONFLICTS "netdata-dem-runtime < 1:0")
   if(NETDATA_RPM_PLUGIN_SUGGESTS)
@@ -1016,7 +1017,7 @@ set(CPACK_RPM_PLUGIN-OTEL_USER_FILELIST
 # netflow.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-NETFLOW_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-NETFLOW_DEPENDS "netdata;ip-intel-data")
 set(CPACK_COMPONENT_PLUGIN-NETFLOW_DESCRIPTION
 		"The NetFlow/IPFIX/sFlow flow analysis plugin for the Netdata Agent
  This plugin ingests, stores, and serves NetFlow/IPFIX/sFlow flow data for
@@ -1033,7 +1034,8 @@ set(CPACK_DEBIAN_PLUGIN-NETFLOW_DEBUGINFO_PACKAGE Off)
 
 set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_NAME "netdata-plugin-netflow")
 set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_SUMMARY "The NetFlow/IPFIX/sFlow flow analysis plugin for the Netdata Agent")
-set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
+set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES
+    "netdata = ${CPACK_PACKAGE_VERSION}, netdata-ip-intel-data = ${CPACK_RPM_PACKAGE_VERSION}")
 set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_CONFLICTS "netdata < ${CPACK_PACKAGE_VERSION}")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
@@ -1043,6 +1045,34 @@ set(CPACK_RPM_PLUGIN-NETFLOW_DEFAULT_GROUP "netdata")
 set(CPACK_RPM_PLUGIN-NETFLOW_USER_FILELIST
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/netflow-plugin"
     "%attr(0750,root,netdata) /usr/sbin/topology-ip-intel-downloader")
+
+#
+# Shared stock ASN/GEO databases for NetFlow and DEM/RUM.
+# Keep per-architecture artifacts like the native build lanes; all/noarch would
+# publish duplicate package identities from independently built/signed lanes.
+#
+
+set(CPACK_COMPONENT_IP-INTEL-DATA_DESCRIPTION
+    "Stock IP intelligence databases for Netdata NetFlow and real user monitoring")
+set(CPACK_DEBIAN_IP-INTEL-DATA_PACKAGE_NAME "netdata-ip-intel-data")
+set(CPACK_DEBIAN_IP-INTEL-DATA_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_IP-INTEL-DATA_PACKAGE_SHLIBDEPS OFF)
+set(CPACK_DEBIAN_IP-INTEL-DATA_DEBUGINFO_PACKAGE Off)
+# Both consumers require this release's data package. Coordinate older NetFlow
+# owners using the same release boundary, including stable-branch backports.
+set(CPACK_DEBIAN_IP-INTEL-DATA_PACKAGE_BREAKS "netdata-plugin-netflow (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_IP-INTEL-DATA_PACKAGE_REPLACES "netdata-plugin-netflow (<< ${CPACK_PACKAGE_VERSION})")
+
+set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_NAME "netdata-ip-intel-data")
+set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_SUMMARY "Stock IP intelligence databases for Netdata")
+# CPack has no per-component License setting. This data-only template retains
+# CPack's generated identity, conflict and file list with the payload's license.
+set(CPACK_RPM_IP-INTEL-DATA_USER_BINARY_SPECFILE "${PKG_FILES_PATH}/rpm/ip-intel-data.spec.in")
+set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_CONFLICTS "netdata-plugin-netflow < ${CPACK_RPM_PACKAGE_VERSION}")
+set(CPACK_RPM_IP-INTEL-DATA_DEBUGINFO_PACKAGE Off)
+set(CPACK_RPM_IP-INTEL-DATA_DEFAULT_USER "root")
+set(CPACK_RPM_IP-INTEL-DATA_DEFAULT_GROUP "root")
+set(CPACK_RPM_IP-INTEL-DATA_USER_FILELIST "%license /usr/share/doc/netdata-ip-intel-data/copyright")
 
 #
 # nfacct.plugin
@@ -1375,6 +1405,9 @@ if(ENABLE_PLUGIN_NFACCT)
 endif()
 if(ENABLE_PLUGIN_NETFLOW)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-netflow")
+endif()
+if((ENABLE_PLUGIN_NETFLOW OR ENABLE_PLUGIN_DEM) AND NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
+  list(APPEND CPACK_COMPONENTS_ALL "ip-intel-data")
 endif()
 if(ENABLE_PLUGIN_PERF)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-perf")

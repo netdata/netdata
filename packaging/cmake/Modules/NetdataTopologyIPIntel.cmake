@@ -3,7 +3,7 @@
 
 include_guard()
 
-if(ENABLE_PLUGIN_NETFLOW OR (STATIC_BUILD AND ENABLE_PLUGIN_DEM))
+if(ENABLE_PLUGIN_NETFLOW OR ENABLE_PLUGIN_DEM)
     if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
         set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
                 "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/README.md"
@@ -16,11 +16,17 @@ if(ENABLE_PLUGIN_NETFLOW OR (STATIC_BUILD AND ENABLE_PLUGIN_DEM))
                         "Missing topology IP intelligence stock payload file: ${stock_file}")
             endif()
         endforeach()
-        # Preserve native package ownership. Static installs include all components.
         install(FILES
                 ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
-                COMPONENT plugin-netflow
+                COMPONENT ip-intel-data
                 DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
+        if(NETDATA_PACKAGE_KIND MATCHES "^(deb|rpm)$")
+            install(FILES "${PKG_FILES_PATH}/ip-intel-data/copyright"
+                    COMPONENT ip-intel-data DESTINATION ${PKG_DOC_DEST}/netdata-ip-intel-data)
+        endif()
+    elseif(NETDATA_PACKAGE_KIND MATCHES "^(deb|rpm)$")
+        message(FATAL_ERROR
+                "Native NetFlow and DEM packages require NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR")
     else()
         message(STATUS
                 "No staged topology IP intelligence stock payload provided; "
