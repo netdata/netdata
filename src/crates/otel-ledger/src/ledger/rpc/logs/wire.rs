@@ -164,22 +164,44 @@ pub enum OtelLogsResponse {
 
 /// The `info: true` capability descriptor. The handler answers every
 /// info request with the [`Default`] value — nothing in it is dynamic.
+///
+/// Field names follow the v3 function-table contract that the MCP
+/// function registry reads (`parse_function_info` in
+/// `src/web/mcp/mcp-tools-execute-function-registry.c`): `v` marks POST
+/// support, `has_history` lets a client send timeframe parameters, and
+/// `pagination` names the column its microsecond cursor comes from.
 #[derive(Debug, Serialize)]
 pub struct InfoResponse {
+    #[serde(rename = "v")]
     version: u32,
     status: u32,
     accepted_params: Vec<&'static str>,
     required_params: Vec<&'static str>,
+    has_history: bool,
+    pagination: Pagination,
+    #[serde(rename = "type")]
+    response_type: &'static str,
     help: &'static str,
 }
 
 impl Default for InfoResponse {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 3,
             status: 200,
             accepted_params: ACCEPTED_PARAMS.to_vec(),
             required_params: vec![],
+            has_history: true,
+            pagination: Pagination {
+                enabled: true,
+                key: "anchor",
+                // The visible `timestamp` column carries microseconds, the
+                // unit MCP's cursor arithmetic expects. The hidden `cursor`
+                // column is opaque and timestamped in nanoseconds.
+                column: "timestamp",
+                units: "timestamp_usec",
+            },
+            response_type: "table",
             help: "Query and visualize OpenTelemetry logs.",
         }
     }
