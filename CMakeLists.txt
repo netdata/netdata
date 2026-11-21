@@ -302,6 +302,7 @@ include(NetdataPluginDem)
 include(NetdataIBMPlugin)
 include(NetdataPluginOTel)
 include(NetdataPluginNetflow)
+include(NetdataTopologyIPIntel)
 
 #
 # Generated config header, system files, and packaging.
