@@ -109,7 +109,7 @@ bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     return false;
 }
 
-static bool status_file_io_save_this(const char *directory, const char *filename, const uint8_t *data, size_t size) {
+static bool status_file_io_save_this(const char *directory, const char *filename, const uint8_t *data, size_t size, bool sync_file) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -199,7 +199,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Fsync to ensure data is written to disk */
-    if (fsync(fd) == -1) {
+    if (sync_file && fsync(fd) == -1) {
         close(fd);
         unlink(temp);
         return false;
@@ -227,7 +227,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     return true;
 }
 
-bool status_file_io_save(const char *filename, const void *data, size_t size, bool log) {
+bool status_file_io_save(const char *filename, const void *data, size_t size, bool log, bool sync_file) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -235,7 +235,7 @@ bool status_file_io_save(const char *filename, const void *data, size_t size, bo
 
     // Try primary directory first
     bool saved = false;
-    if (status_file_io_save_this(netdata_configured_varlib_dir, filename, data, size)) {
+    if (status_file_io_save_this(netdata_configured_varlib_dir, filename, data, size, sync_file)) {
         status_file_io_remove_obsolete(netdata_configured_varlib_dir, filename);
         saved = true;
     }
@@ -247,7 +247,7 @@ bool status_file_io_save(const char *filename, const void *data, size_t size, bo
         // Try each fallback directory until successful
         status_file_io_fallback_dirs_update();
         for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
-            if (status_file_io_save_this(status_file_io_fallback_dirs[i], filename, data, size)) {
+            if (status_file_io_save_this(status_file_io_fallback_dirs[i], filename, data, size, sync_file)) {
                 if(log)
                     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_io_fallback_dirs[i]);
 

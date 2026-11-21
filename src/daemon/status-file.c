@@ -972,8 +972,10 @@ static void dsf_capture_sqlite_unsafe_reason(void) {
         safecpy(session_status.shutdown.sqlite_unsafe, reason);
 }
 
-static void daemon_status_file_refresh(DAEMON_STATUS status) {
+// returns true when this call starts the shutdown (the first EXITING refresh)
+static bool daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
+    bool exit_started = false;
 
     daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
@@ -991,8 +993,10 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(!session_status.timings.init_started_ut)
         session_status.timings.init_started_ut = now_ut;
 
-    if(status == DAEMON_STATUS_EXITING && !session_status.timings.exit_started_ut)
+    if(status == DAEMON_STATUS_EXITING && !session_status.timings.exit_started_ut) {
         session_status.timings.exit_started_ut = now_ut;
+        exit_started = true;
+    }
 
     if(session_status.status == DAEMON_STATUS_INITIALIZING)
         session_status.timings.init = (time_t)((now_ut - session_status.timings.init_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
@@ -1107,6 +1111,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     dsf_release(session_status);
     daemon_status_file_session_status_writer_leave();
+
+    return exit_started;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1176,7 +1182,7 @@ static bool daemon_status_file_close_startup_save_gate(void) {
                                __ATOMIC_RELAXED) == DAEMON_STATUS_FILE_STARTUP_SAVE_SUCCEEDED;
 }
 
-static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
+static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log, bool sync_file) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -1191,7 +1197,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     daemon_status_file_to_json(wb, ds);
     buffer_json_finalize(wb);
 
-    if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log))
+    if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log, sync_file))
         daemon_status_file_mark_startup_save_succeeded();
 }
 
@@ -1293,7 +1299,7 @@ static void post_status_file(struct post_status_file_thread_data *d) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false, DEDUP_RELOAD_FROM_DISK);
-        daemon_status_file_save(wb, &session_status, true);
+        daemon_status_file_save(wb, &session_status, true, true);
     }
     else
         nd_log(NDLS_DAEMON, NDLP_INFO, "Failed to post last status to agent-events.");
@@ -1651,7 +1657,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         daemon_status_file_session_status_writer_leave();
 
     // save it without a stack trace to be sure we will have the event
-    daemon_status_file_save(wb, ds, false);
+    daemon_status_file_save(wb, ds, false, true);
 
     if(!stack_trace_is_empty(ds) && !force)
         return;
@@ -1683,7 +1689,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
         if(live_session_status)
             daemon_status_file_session_status_writer_leave();
 
-        daemon_status_file_save(wb, ds, false);
+        daemon_status_file_save(wb, ds, false, true);
     }
     else if(live_session_status)
         daemon_status_file_session_status_writer_leave();
@@ -1756,8 +1762,14 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 void daemon_status_file_update_status(DAEMON_STATUS status) {
     int saved_errno = errno;
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    daemon_status_file_refresh(status);
-    daemon_status_file_save(wb, &session_status, true);
+    bool exit_started = daemon_status_file_refresh(status);
+
+    // The first EXITING save records why we exit and is synced. The ones after it are progress saves, one before
+    // every shutdown step: they only need to survive a process kill (docker stop gives 10 s, then SIGKILL), which
+    // keeps what was written in the page cache. An fsync per step costs 150-400 ms on a slow disk, enough to push a
+    // shutdown past the kill. The final EXITED save and the crash/timeout saves keep the fsync.
+    bool sync_file = status != DAEMON_STATUS_EXITING || exit_started;
+    daemon_status_file_save(wb, &session_status, true, sync_file);
     errno = saved_errno;
 }
 
@@ -1869,7 +1881,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         else
             set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 
-        daemon_status_file_save(static_save_buffer, ds, false);
+        daemon_status_file_save(static_save_buffer, ds, false, true);
     }
 #endif // defined(OS_WINDOWS)
 #endif // HAVE_STACKTRACE
@@ -1917,7 +1929,7 @@ void daemon_status_file_shutdown_timeout(const char *step, BUFFER *trace) {
     daemon_status_file_session_status_writer_leave();
 
     static_save_buffer_init();
-    daemon_status_file_save(static_save_buffer, &session_status, false);
+    daemon_status_file_save(static_save_buffer, &session_status, false, true);
 
     // keep the spinlock locked, to prevent further steps updating the status
 }
