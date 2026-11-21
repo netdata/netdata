@@ -1302,9 +1302,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
     build_info_set_status(BIB_LIB_OPENSSL, true);
-#ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
-#endif
 #ifdef HAVE_CAPABILITY
     build_info_set_status(BIB_LIB_LIBCAP, true);
 #endif

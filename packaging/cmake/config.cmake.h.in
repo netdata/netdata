@@ -197,8 +197,6 @@
 
 #define NETDATA_VERSION "@NETDATA_VERSION_STRING@"
 
-#define ENABLE_JSONC 1
-
 #cmakedefine HAVE_LIBYAML
 #cmakedefine HAVE_LIBMNL
 
