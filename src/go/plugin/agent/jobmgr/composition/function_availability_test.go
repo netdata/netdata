@@ -5,6 +5,7 @@ package composition
 import (
 	"context"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -187,5 +188,124 @@ func (d *availabilityTestDiagnostics) ObserveDiagnostic(event jobmgr.DiagnosticE
 	d.sink.ObserveDiagnostic(event)
 	if strings.HasPrefix(event.Name, "Function availability ") {
 		d.events <- event
+	}
+}
+
+type handoffJob struct {
+	assemblyTestJob
+	name     string
+	ready    atomic.Bool
+	observed chan struct{}
+	resume   chan struct{}
+}
+
+func (j *handoffJob) FullName() string { return "module_" + j.name }
+func (j *handoffJob) Name() string     { return j.name }
+func (j *handoffJob) Collector() any   { return j }
+func (j *handoffJob) FunctionAvailable(method string) bool {
+	if method == "shared" && j.observed != nil {
+		close(j.observed)
+		if j.resume != nil {
+			<-j.resume
+		}
+	}
+	return j.ready.Load() && (method == "shared" || method == j.name)
+}
+
+func TestSingleTickSharedFunctionReadinessHandoff(t *testing.T) {
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	uids := lifecycle.NewUIDLedger()
+	modules := collectorapi.Registry{}
+	modules.Register("module", collectorapi.Creator{
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "shared", Aliases: []string{"alias"}}, {ID: "first"}, {ID: "second"}}
+		},
+		MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler { return &assemblyTestHandler{} },
+	})
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets: testRunSecrets(t), Generation: 7, ShutdownTimeout: time.Second, UIDs: uids, Frames: frames,
+		Modules: modules, Jobs: testRunJobServices(t), Discovery: testRunDiscoveryServices(t),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		generation.Stop()
+		require.NoError(t, generation.Wait(context.Background()))
+		closeRunTestUIDs(t, uids)
+	})
+	require.NoError(t, generation.start(context.Background()))
+	start := func(name string, ready bool) *handoffJob {
+		t.Helper()
+		job := &handoffJob{name: name}
+		job.ready.Store(ready)
+		stage := generation.functions.jobLifecycle()
+		staged, err := stage.Stage(job)
+		require.NoError(t, err)
+		id := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
+		handle, err := stage.Attach(id, staged)
+		require.NoError(t, err)
+		require.NoError(t, generation.scheduler.Register(id, job))
+		t.Cleanup(func() {
+			require.NoError(t, generation.scheduler.Unregister(id, job))
+			require.NoError(t, handle.CloseAndDrain(context.Background()))
+		})
+		require.NoError(t, handle.Publish())
+		return job
+	}
+	first, second := start("first", true), start("second", false)
+	require.NoError(t, generation.tick(t.Context(), 1))
+	require.Eventually(t, func() bool {
+		wire := output.String()
+		return strings.Contains(wire, `FUNCTION GLOBAL "module:shared"`) &&
+			strings.Contains(wire, `FUNCTION GLOBAL "alias"`) &&
+			strings.Contains(wire, `FUNCTION GLOBAL "module:first"`)
+	}, time.Second, time.Millisecond)
+	first.observed, second.observed = make(chan struct{}), make(chan struct{})
+	second.resume = make(chan struct{})
+	resume := sync.OnceFunc(func() { close(second.resume) })
+	t.Cleanup(resume)
+	startOffset := len(output.String())
+	second.ready.Store(true)
+	first.ready.Store(false)
+	require.NoError(t, generation.tick(t.Context(), 2))
+	for _, job := range []*handoffJob{first, second} {
+		select {
+		case <-job.observed:
+		case <-time.After(time.Second):
+			t.Fatalf("poll did not reach %s", job.name)
+		}
+	}
+
+	// Give the outgoing job time to settle while the incoming job is still evaluating.
+	require.Never(t, func() bool {
+		return strings.Contains(output.String()[startOffset:], "FUNCTION_DEL GLOBAL")
+	}, 30*time.Millisecond, time.Millisecond)
+	assertSelector := func(uid, want, absent string) {
+		t.Helper()
+		offset := len(output.String())
+		require.NoError(t, generation.kernel.Submit(t.Context(), jobmgr.Request{
+			UID: uid, Source: lifecycle.SourceFunction, Route: "alias", Args: []string{"info"},
+		}))
+		require.Eventually(t, func() bool {
+			return strings.Contains(output.String()[offset:], "FUNCTION_RESULT_END")
+		}, time.Second, time.Millisecond)
+		wire := output.String()[offset:]
+		require.Contains(t, wire, "FUNCTION_RESULT_BEGIN "+uid+" 200")
+		require.Contains(t, wire, `"id":"`+want+`"`)
+		require.NotContains(t, wire, `"id":"`+absent+`"`)
+	}
+	assertSelector("during-handoff", "first", "second")
+	resume()
+	require.Eventually(t, func() bool {
+		wire := output.String()[startOffset:]
+		return strings.Contains(wire, `FUNCTION_DEL GLOBAL "module:first"`) &&
+			strings.Contains(wire, `FUNCTION GLOBAL "module:second"`)
+	}, time.Second, time.Millisecond)
+	assertSelector("after-handoff", "second", "first")
+	wire := output.String()[startOffset:]
+	for _, name := range []string{"alias", "module:shared"} {
+		require.NotContains(t, wire, `FUNCTION_DEL GLOBAL "`+name+`"`)
+		require.NotContains(t, wire, `FUNCTION GLOBAL "`+name+`"`)
 	}
 }

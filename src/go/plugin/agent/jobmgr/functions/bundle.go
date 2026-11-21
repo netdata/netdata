@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"sync"
 
@@ -52,7 +53,6 @@ type functionBundle struct {
 type functionAvailabilityPoll struct {
 	attempt      jobmgr.ProcessAttempt
 	workerResult <-chan functionAvailabilityResult
-	bundle       *functionBundle
 }
 
 type functionAvailabilityResult struct {
@@ -149,7 +149,6 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 	return functionAvailabilityPoll{
 		attempt:      attempt,
 		workerResult: workerResult,
-		bundle:       fb,
 	}, nil
 }
 
@@ -361,29 +360,33 @@ func newFunctionBundle(
 		}
 	}
 	bundle := &functionBundle{
-		kind:         kind,
-		module:       module,
-		job:          job,
-		handler:      handler,
-		methods:      append([]funcapi.FunctionConfig(nil), methods...),
-		availability: make(map[string]bool, len(methods)),
-		references:   1,
-		cleanupDone:  make(chan struct{}),
+		kind:        kind,
+		module:      module,
+		job:         job,
+		handler:     handler,
+		methods:     append([]funcapi.FunctionConfig(nil), methods...),
+		references:  1,
+		cleanupDone: make(chan struct{}),
 	}
 	if kind == functionBundleAgent {
 		for _, method := range methods {
 			bundle.pollable = bundle.pollable || method.Available != nil
 		}
 	} else if callback, ok := job.Collector().(collectorapi.FunctionAvailability); ok && callback != nil {
-		bundle.pollable = true
+		// Job staging precedes runtime startup. Only a running-job poll can
+		// establish readiness for methods gated by the collector.
+		bundle.pollable = len(methods) != 0
+		return bundle, nil
 	}
-	if _, err := bundle.refreshAvailability(); err != nil {
+	initial, err := bundle.evaluateAvailability()
+	if err != nil {
 		bundle.retire()
 		return nil, joinRetainedBundleCleanup(
 			err,
 			bundle.wait(context.Background()),
 		)
 	}
+	bundle.availability = initial
 	return bundle, nil
 }
 
@@ -553,19 +556,14 @@ func (fb *functionBundle) wait(ctx context.Context) error {
 	}
 }
 
-func (fb *functionBundle) refreshAvailability() (bool, error) {
-	next, err := fb.evaluateAvailability()
-	if err != nil {
-		return false, err
-	}
-	return fb.commitAvailability(next), nil
-}
-
 func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 	if fb == nil {
 		return nil, errors.New("jobmgr Function bundle: nil availability refresh")
 	}
 	next := make(map[string]bool, len(fb.methods))
+	if fb.pollable && fb.job != nil && !fb.job.IsRunning() {
+		return next, nil
+	}
 	for _, method := range fb.methods {
 		available := true
 		var err error
@@ -592,25 +590,30 @@ func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 }
 
 func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
-	if fb == nil {
+	// Runtime exit takes effect before the failure command detaches the job.
+	if fb.job != nil && !fb.job.IsRunning() {
+		next = nil
+	} else if next == nil {
+		return false // failed or canceled observation of a live owner
+	}
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	if fb.retired || maps.Equal(fb.availability, next) {
+		return false
+	}
+	fb.availability = next
+	return true
+}
+
+// A job can exit between its last poll and a membership reconciliation.
+// Temporary callback quarantine fences dispatch independently of publication.
+func (fb *functionBundle) jobMethodReady(method string) bool {
+	if !fb.job.IsRunning() {
 		return false
 	}
 	fb.mu.Lock()
 	defer fb.mu.Unlock()
-	if fb.retired {
-		return false
-	}
-	changed := len(fb.availability) != len(next)
-	if !changed {
-		for method, available := range next {
-			if fb.availability[method] != available {
-				changed = true
-				break
-			}
-		}
-	}
-	fb.availability = next
-	return changed
+	return fb.availability[method]
 }
 
 func (fb *functionBundle) available(method string) bool {

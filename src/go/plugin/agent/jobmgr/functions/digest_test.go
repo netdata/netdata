@@ -18,7 +18,6 @@ func TestControllerGroupSignatureLayoutGolden(t *testing.T) {
 			Tags: "top", ResponseType: "table", RawRequest: true,
 			Aliases: []string{"method-alias"},
 		}},
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -30,7 +29,7 @@ func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
 		ID:         "events",
 		RawRequest: true,
 	}
-	before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{base}, nil)
+	before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{base})
 	require.NoError(t, err)
 	for name, change := range map[string]func(*funcapi.FunctionConfig){
 		"managed info":    func(method *funcapi.FunctionConfig) { method.ManagedInfo = true },
@@ -41,7 +40,7 @@ func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			method := base
 			change(&method)
-			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 			require.NoError(t, err)
 			require.NotEqual(t, before, after, "changed metadata must replace the published generation")
 		})
@@ -50,10 +49,10 @@ func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
 
 func TestControllerGroupSignatureDynamicInfo(t *testing.T) {
 	method := funcapi.FunctionConfig{ID: "events"}
-	before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+	before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 	require.NoError(t, err)
 	method.DynamicInfo = true
-	after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+	after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 	require.NoError(t, err)
 	require.NotEqual(t, before, after)
 }
@@ -70,10 +69,10 @@ func TestControllerGroupSignatureAcceptedForms(t *testing.T) {
 			method := funcapi.FunctionConfig{ID: "events", RequiredParams: []funcapi.ParamConfig{
 				{ID: "source", Options: []funcapi.ParamOption{{ID: "canonical", Aliases: []string{"ab", "c"}}}},
 			}}
-			before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 			require.NoError(t, err)
 			change(&method.RequiredParams[0])
-			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 			require.NoError(t, err)
 			require.NotEqual(t, before, after)
 		})

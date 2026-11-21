@@ -112,10 +112,10 @@ func TestControllerGroupSignatureFocusMetadata(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			method := funcapi.FunctionConfig{ID: "events", RequiredParams: functionFocusTestParams()}
-			before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 			require.NoError(t, err)
 			change(method.RequiredParams)
-			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method})
 			require.NoError(t, err)
 			assert.NotEqual(t, before, after, "a changed focus contract must replace the published generation")
 		})
