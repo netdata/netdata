@@ -46,27 +46,5 @@ if(ENABLE_PLUGIN_NETFLOW)
             COMPONENT plugin-netflow
             DESTINATION ${LIBCONFIG_DEST})
 
-    if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
-        set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/README.md"
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-asn.mmdb"
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-geo.mmdb"
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-intel.json")
-        foreach(stock_file IN LISTS TOPOLOGY_IP_INTEL_STOCK_PAYLOAD)
-            if(NOT EXISTS "${stock_file}")
-                message(FATAL_ERROR
-                        "Missing topology IP intelligence stock payload file: ${stock_file}")
-            endif()
-        endforeach()
-        install(FILES
-                ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
-                COMPONENT plugin-netflow
-                DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
-    else()
-        message(STATUS
-                "plugin-netflow: no staged topology IP intelligence stock payload provided; "
-                "skipping stock topology-ip-intel install")
-    endif()
-
     netdata_add_deb_copyright(plugin-netflow netdata-plugin-netflow)
 endif()
