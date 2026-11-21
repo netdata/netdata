@@ -126,10 +126,12 @@ packaged databases in this order:
 - `${NETDATA_CACHE_DIR}/topology-ip-intel`
 - `${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`
 
-`netdata-plugin-netflow` now ships a stock MMDB seed set under
-`${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`. Freshly downloaded data written by
-`topology-ip-intel-downloader` stays in `${NETDATA_CACHE_DIR}/topology-ip-intel` and
-overrides the stock copy automatically.
+On native installs, `netdata-ip-intel-data` owns the stock MMDBs under
+`${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`. Both `netdata-plugin-netflow` and
+`netdata-plugin-dem` require that package.
+
+Freshly downloaded data written by `topology-ip-intel-downloader` stays in
+`${NETDATA_CACHE_DIR}/topology-ip-intel` and overrides the stock copy automatically.
 
 Important:
 
