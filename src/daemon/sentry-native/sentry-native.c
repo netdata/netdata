@@ -112,7 +112,7 @@ static sentry_value_t nd_sentry_before_send(
 // sentry initialization
 
 void nd_sentry_init(void) {
-    if (!analytics_check_enabled() || sentry_initialized)
+    if (!telemetry_enabled() || sentry_initialized)
         return;
 
     // path where sentry should save stuff

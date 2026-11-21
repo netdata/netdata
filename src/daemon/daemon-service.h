@@ -16,7 +16,6 @@ typedef enum {
     SERVICE_STREAMING             = (1 << 7),
     SERVICE_STREAMING_CONNECTOR   = (1 << 8),
     SERVICE_CONTEXT               = (1 << 9),
-    SERVICE_ANALYTICS             = (1 << 10),
     SERVICE_EXPORTERS             = (1 << 11),
     SERVICE_HTTPD                 = (1 << 12),
     SERVICE_SYSTEMD               = (1 << 13),

@@ -155,7 +155,7 @@ typedef enum __attribute__((packed)) {
 static struct {
     BUILD_INFO_CATEGORY category;
     BUILD_INFO_TYPE type;
-    const char *analytics;
+    const char *feature;           // name in the /api/v1/info "buildinfo" list, when enabled
     const char *print;
     const char *json;
     bool status;
@@ -165,7 +165,7 @@ static struct {
         [BIB_PACKAGING_NETDATA_VERSION] = {
                 .category = BIC_PACKAGING,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Netdata Version",
                 .json = "version",
                 .value = "unknown",
@@ -173,7 +173,7 @@ static struct {
         [BIB_PACKAGING_INSTALL_TYPE] = {
                 .category = BIC_PACKAGING,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Installation Type",
                 .json = "type",
                 .value = "unknown",
@@ -181,7 +181,7 @@ static struct {
         [BIB_PACKAGING_ARCHITECTURE] = {
                 .category = BIC_PACKAGING,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Package Architecture",
                 .json = "arch",
                 .value = "unknown",
@@ -189,7 +189,7 @@ static struct {
         [BIB_PACKAGING_DISTRO] = {
                 .category = BIC_PACKAGING,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Package Distro",
                 .json = "distro",
                 .value = "unknown",
@@ -197,7 +197,7 @@ static struct {
         [BIB_PACKAGING_CONFIGURE_OPTIONS] = {
                 .category = BIC_PACKAGING,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Configure Options",
                 .json = "configure",
                 .value = "unknown",
@@ -205,7 +205,7 @@ static struct {
         [BIB_DIR_USER_CONFIG] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "User Configurations",
                 .json = "user_config",
                 .value = CONFIG_DIR,
@@ -213,7 +213,7 @@ static struct {
         [BIB_DIR_STOCK_CONFIG] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Stock Configurations",
                 .json = "stock_config",
                 .value = LIBCONFIG_DIR,
@@ -221,7 +221,7 @@ static struct {
         [BIB_DIR_STOCK_DATA] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Stock Data Files",
                 .json = "stock_data",
                 .value = STOCK_DATA_DIR,
@@ -229,7 +229,7 @@ static struct {
         [BIB_DIR_CACHE] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Ephemeral Databases (metrics data, metadata)",
                 .json = "ephemeral_db",
                 .value = CACHE_DIR,
@@ -237,7 +237,7 @@ static struct {
         [BIB_DIR_LIB] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Permanent Databases",
                 .json = "permanent_db",
                 .value = VARLIB_DIR,
@@ -245,7 +245,7 @@ static struct {
         [BIB_DIR_PLUGINS] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Plugins",
                 .json = "plugins",
                 .value = PLUGINS_DIR,
@@ -253,7 +253,7 @@ static struct {
         [BIB_DIR_WEB] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Static Web Files",
                 .json = "web",
                 .value = WEB_DIR,
@@ -261,7 +261,7 @@ static struct {
         [BIB_DIR_LOG] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Log Files",
                 .json = "logs",
                 .value = LOG_DIR,
@@ -269,7 +269,7 @@ static struct {
         [BIB_DIR_LOCK] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Lock Files",
                 .json = "locks",
                 .value = VARLIB_DIR "/lock",
@@ -277,7 +277,7 @@ static struct {
         [BIB_DIR_HOME] = {
                 .category = BIC_DIRECTORIES,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Home",
                 .json = "home",
                 .value = VARLIB_DIR,
@@ -285,7 +285,7 @@ static struct {
         [BIB_OS_KERNEL_NAME] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Kernel",
                 .json = "kernel",
                 .value = "unknown",
@@ -293,7 +293,7 @@ static struct {
         [BIB_OS_KERNEL_VERSION] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Kernel Version",
                 .json = "kernel_version",
                 .value = "unknown",
@@ -301,7 +301,7 @@ static struct {
         [BIB_OS_NAME] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Operating System",
                 .json = "os",
                 .value = "unknown",
@@ -309,7 +309,7 @@ static struct {
         [BIB_OS_ID] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Operating System ID",
                 .json = "id",
                 .value = "unknown",
@@ -317,7 +317,7 @@ static struct {
         [BIB_OS_ID_LIKE] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Operating System ID Like",
                 .json = "id_like",
                 .value = "unknown",
@@ -325,7 +325,7 @@ static struct {
         [BIB_OS_VERSION] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Operating System Version",
                 .json = "version",
                 .value = "unknown",
@@ -333,7 +333,7 @@ static struct {
         [BIB_OS_VERSION_ID] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Operating System Version ID",
                 .json = "version_id",
                 .value = "unknown",
@@ -341,7 +341,7 @@ static struct {
         [BIB_OS_DETECTION] = {
                 .category = BIC_OPERATING_SYSTEM,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Detection",
                 .json = "detection",
                 .value = "unknown",
@@ -349,7 +349,7 @@ static struct {
         [BIB_HW_CPU_CORES] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "CPU Cores",
                 .json = "cpu_cores",
                 .value = "unknown",
@@ -357,7 +357,7 @@ static struct {
         [BIB_HW_CPU_FREQUENCY] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "CPU Frequency",
                 .json = "cpu_frequency",
                 .value = "unknown",
@@ -365,7 +365,7 @@ static struct {
         [BIB_HW_ARCHITECTURE] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "CPU Architecture",
                 .json = "cpu_architecture",
                 .value = "unknown",
@@ -373,7 +373,7 @@ static struct {
         [BIB_HW_RAM_SIZE] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "RAM Bytes",
                 .json = "ram",
                 .value = "unknown",
@@ -381,7 +381,7 @@ static struct {
         [BIB_HW_DISK_SPACE] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Disk Capacity",
                 .json = "disk",
                 .value = "unknown",
@@ -389,7 +389,7 @@ static struct {
         [BIB_HW_VIRTUALIZATION] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Virtualization Technology",
                 .json = "virtualization",
                 .value = "unknown",
@@ -397,7 +397,7 @@ static struct {
         [BIB_HW_VIRTUALIZATION_DETECTION] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Virtualization Detection",
                 .json = "virtualization_detection",
                 .value = "unknown",
@@ -405,7 +405,7 @@ static struct {
         [BIB_CONTAINER_NAME] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container",
                 .json = "container",
                 .value = "unknown",
@@ -413,7 +413,7 @@ static struct {
         [BIB_CONTAINER_DETECTION] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Detection",
                 .json = "container_detection",
                 .value = "unknown",
@@ -421,7 +421,7 @@ static struct {
         [BIB_CONTAINER_ORCHESTRATOR] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Orchestrator",
                 .json = "orchestrator",
                 .value = "unknown",
@@ -429,7 +429,7 @@ static struct {
         [BIB_CONTAINER_OS_NAME] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Operating System",
                 .json = "os",
                 .value = "unknown",
@@ -437,7 +437,7 @@ static struct {
         [BIB_CONTAINER_OS_ID] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Operating System ID",
                 .json = "os_id",
                 .value = "unknown",
@@ -445,7 +445,7 @@ static struct {
         [BIB_CONTAINER_OS_ID_LIKE] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Operating System ID Like",
                 .json = "os_id_like",
                 .value = "unknown",
@@ -453,7 +453,7 @@ static struct {
         [BIB_CONTAINER_OS_VERSION] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Operating System Version",
                 .json = "version",
                 .value = "unknown",
@@ -461,7 +461,7 @@ static struct {
         [BIB_CONTAINER_OS_VERSION_ID] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Operating System Version ID",
                 .json = "version_id",
                 .value = "unknown",
@@ -469,7 +469,7 @@ static struct {
         [BIB_CONTAINER_OS_DETECTION] = {
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Container Operating System Detection",
                 .json = "detection",
                 .value = "unknown",
@@ -477,7 +477,7 @@ static struct {
         [BIB_FEATURE_BUILT_FOR] = {
                 .category = BIC_FEATURE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Built For",
                 .json = "built-for",
                 .value = "unknown",
@@ -485,7 +485,7 @@ static struct {
         [BIB_FEATURE_CLOUD] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = "Netdata Cloud",
+                .feature = "Netdata Cloud",
                 .print = "Netdata Cloud",
                 .json = "cloud",
                 .value = NULL,
@@ -493,7 +493,7 @@ static struct {
         [BIB_FEATURE_HEALTH] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Health (trigger alerts and send notifications)",
                 .json = "health",
                 .value = NULL,
@@ -501,7 +501,7 @@ static struct {
         [BIB_FEATURE_STREAMING] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Streaming (stream metrics to parent Netdata servers)",
                 .json = "streaming",
                 .value = NULL,
@@ -509,7 +509,7 @@ static struct {
         [BIB_FEATURE_BACKFILLING] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Back-filling (of higher database tiers)",
                 .json = "back-filling",
                 .value = NULL,
@@ -517,7 +517,7 @@ static struct {
         [BIB_FEATURE_REPLICATION] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Replication (fill the gaps of parent Netdata servers)",
                 .json = "replication",
                 .value = NULL,
@@ -525,7 +525,7 @@ static struct {
         [BIB_FEATURE_STREAMING_COMPRESSION] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = "Stream Compression",
+                .feature = "Stream Compression",
                 .print = "Streaming and Replication Compression",
                 .json = "stream-compression",
                 .value = NULL,
@@ -533,7 +533,7 @@ static struct {
         [BIB_FEATURE_CONTEXTS] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Contexts (index all active and archived metrics)",
                 .json = "contexts",
                 .value = NULL,
@@ -541,7 +541,7 @@ static struct {
         [BIB_FEATURE_TIERING] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Tiering (multiple dbs with different metrics resolution)",
                 .json = "tiering",
                 .value = TOSTRING(RRD_STORAGE_TIERS),
@@ -549,7 +549,7 @@ static struct {
         [BIB_FEATURE_ML] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
-                .analytics = "Machine Learning",
+                .feature = "Machine Learning",
                 .print = "Machine Learning",
                 .json = "ml",
                 .value = NULL,
@@ -557,7 +557,7 @@ static struct {
         [BIB_FEATURE_ALLOCATOR] = {
                 .category = BIC_FEATURE,
                 .type = BIT_STRING,
-                .analytics = "allocator",
+                .feature = "allocator",
                 .print = "Memory Allocator",
                 .json = "allocator",
                 .value = NULL,
@@ -565,7 +565,7 @@ static struct {
         [BIB_DB_SQLITE] = {
                 .category = BIC_DATABASE,
                 .type = BIT_STRING,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "sqlite",
                 .json = "sqlite",
                 .value = "unknown",
@@ -573,7 +573,7 @@ static struct {
         [BIB_DB_DBENGINE] = {
                 .category = BIC_DATABASE,
                 .type = BIT_BOOLEAN,
-                .analytics = "dbengine",
+                .feature = "dbengine",
                 .print = "dbengine (compression)",
                 .json = "dbengine",
                 .value = NULL,
@@ -581,7 +581,7 @@ static struct {
         [BIB_DB_ALLOC] = {
                 .category = BIC_DATABASE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "alloc",
                 .json = "alloc",
                 .value = NULL,
@@ -589,7 +589,7 @@ static struct {
         [BIB_DB_RAM] = {
                 .category = BIC_DATABASE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "ram",
                 .json = "ram",
                 .value = NULL,
@@ -597,7 +597,7 @@ static struct {
         [BIB_DB_NONE] = {
                 .category = BIC_DATABASE,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "none",
                 .json = "none",
                 .value = NULL,
@@ -605,7 +605,7 @@ static struct {
         [BIB_CONNECTIVITY_ACLK] = {
                 .category = BIC_CONNECTIVITY,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "ACLK (Agent-Cloud Link: MQTT over WebSockets over TLS)",
                 .json = "aclk",
                 .value = NULL,
@@ -613,7 +613,7 @@ static struct {
         [BIB_CONNECTIVITY_HTTPD_STATIC] = {
                 .category = BIC_CONNECTIVITY,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "static (Netdata internal web server)",
                 .json = "static",
                 .value = NULL,
@@ -621,7 +621,7 @@ static struct {
         [BIB_CONNECTIVITY_WEBRTC] = {
                 .category = BIC_CONNECTIVITY,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "WebRTC (experimental)",
                 .json = "webrtc",
                 .value = NULL,
@@ -629,7 +629,7 @@ static struct {
         [BIB_CONNECTIVITY_NATIVE_HTTPS] = {
                 .category = BIC_CONNECTIVITY,
                 .type = BIT_BOOLEAN,
-                .analytics = "Native HTTPS",
+                .feature = "Native HTTPS",
                 .print = "Native HTTPS (TLS Support)",
                 .json = "native-https",
                 .value = NULL,
@@ -637,7 +637,7 @@ static struct {
         [BIB_CONNECTIVITY_TLS_HOST_VERIFY] = {
                 .category = BIC_CONNECTIVITY,
                 .type = BIT_BOOLEAN,
-                .analytics = "TLS Host Verification",
+                .feature = "TLS Host Verification",
                 .print = "TLS Host Verification",
                 .json = "tls-host-verify",
                 .value = NULL,
@@ -645,7 +645,7 @@ static struct {
         [BIB_LIB_LZ4] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "LZ4 (extremely fast lossless compression algorithm)",
                 .json = "lz4",
                 .value = NULL,
@@ -653,7 +653,7 @@ static struct {
         [BIB_LIB_ZSTD] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "ZSTD (fast, lossless compression algorithm)",
                 .json = "zstd",
                 .value = NULL,
@@ -661,7 +661,7 @@ static struct {
         [BIB_LIB_ZLIB] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = "zlib",
+                .feature = "zlib",
                 .print = "zlib (lossless data-compression library)",
                 .json = "zlib",
                 .value = NULL,
@@ -669,7 +669,7 @@ static struct {
         [BIB_LIB_BROTLI] = {
             .category = BIC_LIBS,
             .type = BIT_BOOLEAN,
-            .analytics = NULL,
+            .feature = NULL,
             .print = "Brotli (generic-purpose lossless compression algorithm)",
             .json = "brotli",
             .value = NULL,
@@ -677,7 +677,7 @@ static struct {
         [BIB_LIB_PROTOBUF] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = "protobuf",
+                .feature = "protobuf",
                 .print = "protobuf (platform-neutral data serialization protocol)",
                 .json = "protobuf",
                 .value = NULL,
@@ -685,7 +685,7 @@ static struct {
         [BIB_LIB_OPENSSL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "OpenSSL (cryptography)",
                 .json = "openssl",
                 .value = NULL,
@@ -693,7 +693,7 @@ static struct {
         [BIB_LIB_LIBDATACHANNEL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "libdatachannel (stand-alone WebRTC data channels)",
                 .json = "libdatachannel",
                 .value = NULL,
@@ -701,7 +701,7 @@ static struct {
         [BIB_LIB_JSONC] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = "JSON-C",
+                .feature = "JSON-C",
                 .print = "JSON-C (lightweight JSON manipulation)",
                 .json = "jsonc",
                 .value = NULL,
@@ -709,7 +709,7 @@ static struct {
         [BIB_LIB_LIBCAP] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = "libcap",
+                .feature = "libcap",
                 .print = "libcap (Linux capabilities system operations)",
                 .json = "libcap",
                 .value = NULL,
@@ -717,7 +717,7 @@ static struct {
         [BIB_LIB_LIBCRYPTO] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
-                .analytics = "libcrypto",
+                .feature = "libcrypto",
                 .print = "libcrypto (cryptographic functions)",
                 .json = "libcrypto",
                 .value = NULL,
@@ -725,7 +725,7 @@ static struct {
         [BIB_LIB_LIBYAML] = {
             .category = BIC_LIBS,
             .type = BIT_BOOLEAN,
-            .analytics = "libyaml",
+            .feature = "libyaml",
             .print = "libyaml (library for parsing and emitting YAML)",
             .json = "libyaml",
             .value = NULL,
@@ -733,7 +733,7 @@ static struct {
         [BIB_LIB_LIBMNL] = {
             .category = BIC_LIBS,
             .type = BIT_BOOLEAN,
-            .analytics = "libmnl",
+            .feature = "libmnl",
             .print = "libmnl (library for working with netfilter)",
             .json = "libmnl",
             .value = NULL,
@@ -741,7 +741,7 @@ static struct {
         [BIB_LIB_STACKTRACE] = {
             .category = BIC_LIBS,
             .type = BIT_STRING,
-            .analytics = "stacktraces",
+            .feature = "stacktraces",
             .print = "stacktraces (library for getting stack traces)",
             .json = "stacktraces",
             .value = NULL,
@@ -749,7 +749,7 @@ static struct {
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "apps",
+                .feature = "apps",
                 .print = "apps (monitor processes)",
                 .json = "apps",
                 .value = NULL,
@@ -757,7 +757,7 @@ static struct {
         [BIB_PLUGIN_LINUX_CGROUPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "cgroups (monitor containers and VMs)",
                 .json = "cgroups",
                 .value = NULL,
@@ -765,7 +765,7 @@ static struct {
         [BIB_PLUGIN_LINUX_CGROUP_NETWORK] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "cgroup Network Tracking",
+                .feature = "cgroup Network Tracking",
                 .print = "cgroup-network (associate interfaces to CGROUPS)",
                 .json = "cgroup-network",
                 .value = NULL,
@@ -773,7 +773,7 @@ static struct {
         [BIB_PLUGIN_LINUX_PROC] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "proc (monitor Linux systems)",
                 .json = "proc",
                 .value = NULL,
@@ -781,7 +781,7 @@ static struct {
         [BIB_PLUGIN_LINUX_TC] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "tc (monitor Linux network QoS)",
                 .json = "tc",
                 .value = NULL,
@@ -789,7 +789,7 @@ static struct {
         [BIB_PLUGIN_LINUX_DISKSPACE] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "diskspace (monitor Linux mount points)",
                 .json = "diskspace",
                 .value = NULL,
@@ -797,7 +797,7 @@ static struct {
         [BIB_PLUGIN_FREEBSD] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "freebsd (monitor FreeBSD systems)",
                 .json = "freebsd",
                 .value = NULL,
@@ -805,7 +805,7 @@ static struct {
         [BIB_PLUGIN_MACOS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "macos (monitor MacOS systems)",
                 .json = "macos",
                 .value = NULL,
@@ -813,7 +813,7 @@ static struct {
         [BIB_PLUGIN_MACOS_LOGS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "MACOS-LOGS",
+                .feature = "MACOS-LOGS",
                 .print = "macos-logs (monitor macOS unified logs)",
                 .json = "macos-logs",
                 .value = NULL,
@@ -821,7 +821,7 @@ static struct {
         [BIB_PLUGIN_WINDOWS] = {
             .category = BIC_PLUGINS,
             .type = BIT_BOOLEAN,
-            .analytics = NULL,
+            .feature = NULL,
             .print = "windows (monitor Windows systems)",
             .json = "windows",
             .value = NULL,
@@ -829,7 +829,7 @@ static struct {
         [BIB_PLUGIN_STATSD] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "statsd (collect custom application metrics)",
                 .json = "statsd",
                 .value = NULL,
@@ -837,7 +837,7 @@ static struct {
         [BIB_PLUGIN_TIMEX] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "timex (check system clock synchronization)",
                 .json = "timex",
                 .value = NULL,
@@ -845,7 +845,7 @@ static struct {
         [BIB_PLUGIN_IDLEJITTER] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "idlejitter (check system latency and jitter)",
                 .json = "idlejitter",
                 .value = NULL,
@@ -853,7 +853,7 @@ static struct {
         [BIB_PLUGIN_BASH] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "bash (support shell data collection jobs - charts.d)",
                 .json = "charts.d",
                 .value = NULL,
@@ -861,7 +861,7 @@ static struct {
         [BIB_PLUGIN_DEBUGFS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "debugfs",
+                .feature = "debugfs",
                 .print = "debugfs (kernel debugging metrics)",
                 .json = "debugfs",
                 .value = NULL,
@@ -869,7 +869,7 @@ static struct {
         [BIB_PLUGIN_CUPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "CUPS",
+                .feature = "CUPS",
                 .print = "cups (monitor printers and print jobs)",
                 .json = "cups",
                 .value = NULL,
@@ -877,7 +877,7 @@ static struct {
         [BIB_PLUGIN_EBPF] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "EBPF",
+                .feature = "EBPF",
                 .print = "ebpf (monitor system calls)",
                 .json = "ebpf",
                 .value = NULL,
@@ -885,7 +885,7 @@ static struct {
         [BIB_PLUGIN_FREEIPMI] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "IPMI",
+                .feature = "IPMI",
                 .print = "freeipmi (monitor enterprise server H/W)",
                 .json = "freeipmi",
                 .value = NULL,
@@ -893,7 +893,7 @@ static struct {
         [BIB_PLUGIN_NETWORK_VIEWER] = {
             .category = BIC_PLUGINS,
             .type = BIT_BOOLEAN,
-            .analytics = "NETWORK-VIEWER",
+            .feature = "NETWORK-VIEWER",
             .print = "network-viewer (monitor TCP/UDP IPv4/6 sockets)",
             .json = "network-viewer",
             .value = NULL,
@@ -901,7 +901,7 @@ static struct {
         [BIB_PLUGIN_SYSTEMD_JOURNAL] = {
             .category = BIC_PLUGINS,
             .type = BIT_BOOLEAN,
-            .analytics = "SYSTEMD-JOURNAL",
+            .feature = "SYSTEMD-JOURNAL",
             .print = "systemd-journal (monitor journal logs)",
             .json = "systemd-journal",
             .value = NULL,
@@ -909,7 +909,7 @@ static struct {
         [BIB_PLUGIN_WINDOWS_EVENTS] = {
             .category = BIC_PLUGINS,
             .type = BIT_BOOLEAN,
-            .analytics = "WINDOWS-EVENTS",
+            .feature = "WINDOWS-EVENTS",
             .print = "windows-events (monitor Windows events)",
             .json = "windows-events",
             .value = NULL,
@@ -917,7 +917,7 @@ static struct {
         [BIB_PLUGIN_NFACCT] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "NFACCT",
+                .feature = "NFACCT",
                 .print = "nfacct (gather netfilter accounting)",
                 .json = "nfacct",
                 .value = NULL,
@@ -925,7 +925,7 @@ static struct {
         [BIB_PLUGIN_PERF] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "perf",
+                .feature = "perf",
                 .print = "perf (collect kernel performance events)",
                 .json = "perf",
                 .value = NULL,
@@ -933,7 +933,7 @@ static struct {
         [BIB_PLUGIN_SLABINFO] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "slabinfo",
+                .feature = "slabinfo",
                 .print = "slabinfo (monitor kernel object caching)",
                 .json = "slabinfo",
                 .value = NULL,
@@ -941,7 +941,7 @@ static struct {
         [BIB_PLUGIN_XEN] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "Xen",
+                .feature = "Xen",
                 .print = "Xen",
                 .json = "xen",
                 .value = NULL,
@@ -949,7 +949,7 @@ static struct {
         [BIB_PLUGIN_XEN_VBD_ERROR] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
-                .analytics = "Xen VBD Error Tracking",
+                .feature = "Xen VBD Error Tracking",
                 .print = "Xen VBD Error Tracking",
                 .json = "xen-vbd-error",
                 .value = NULL,
@@ -957,7 +957,7 @@ static struct {
         [BIB_EXPORT_MONGOC] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = "MongoDB",
+                .feature = "MongoDB",
                 .print = "MongoDB",
                 .json = "mongodb",
                 .value = NULL,
@@ -965,7 +965,7 @@ static struct {
         [BIB_EXPORT_GRAPHITE] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Graphite",
                 .json = "graphite",
                 .value = NULL,
@@ -973,7 +973,7 @@ static struct {
         [BIB_EXPORT_GRAPHITE_HTTP] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Graphite HTTP / HTTPS",
                 .json = "graphite:http",
                 .value = NULL,
@@ -981,7 +981,7 @@ static struct {
         [BIB_EXPORT_JSON] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "JSON",
                 .json = "json",
                 .value = NULL,
@@ -989,7 +989,7 @@ static struct {
         [BIB_EXPORT_JSON_HTTP] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "JSON HTTP / HTTPS",
                 .json = "json:http",
                 .value = NULL,
@@ -997,7 +997,7 @@ static struct {
         [BIB_EXPORT_OPENTSDB] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "OpenTSDB",
                 .json = "opentsdb",
                 .value = NULL,
@@ -1005,14 +1005,14 @@ static struct {
         [BIB_EXPORT_OPENTSDB_HTTP] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "OpenTSDB HTTP / HTTPS",
                 .json = "opentsdb:http",
                 .value = NULL,
         },
         [BIB_EXPORT_ALLMETRICS] = {
                 .category = BIC_EXPORTERS,
-                .analytics = NULL,
+                .feature = NULL,
                 .type = BIT_BOOLEAN,
                 .print = "All Metrics API",
                 .json = "allmetrics",
@@ -1021,7 +1021,7 @@ static struct {
         [BIB_EXPORT_SHELL] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Shell (use metrics in shell scripts)",
                 .json = "shell",
                 .value = NULL,
@@ -1029,7 +1029,7 @@ static struct {
         [BIB_EXPORT_PROMETHEUS_EXPORTER] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Prometheus (OpenMetrics) Exporter",
                 .json = "openmetrics",
                 .value = NULL,
@@ -1037,7 +1037,7 @@ static struct {
         [BIB_EXPORT_PROMETHEUS_REMOTE_WRITE] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = "Prometheus Remote Write",
+                .feature = "Prometheus Remote Write",
                 .print = "Prometheus Remote Write",
                 .json = "prom-remote-write",
                 .value = NULL,
@@ -1045,7 +1045,7 @@ static struct {
         [BIB_EXPORT_AWS_KINESIS] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = "AWS Kinesis",
+                .feature = "AWS Kinesis",
                 .print = "AWS Kinesis",
                 .json = "kinesis",
                 .value = NULL,
@@ -1053,7 +1053,7 @@ static struct {
         [BIB_EXPORT_GCP_PUBSUB] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
-                .analytics = "GCP PubSub",
+                .feature = "GCP PubSub",
                 .print = "GCP PubSub",
                 .json = "pubsub",
                 .value = NULL,
@@ -1061,7 +1061,7 @@ static struct {
         [BIB_DEVEL_TRACE_ALLOCATIONS] = {
                 .category = BIC_DEBUG_DEVEL,
                 .type = BIT_BOOLEAN,
-                .analytics = "DebugTraceAlloc",
+                .feature = "DebugTraceAlloc",
                 .print = "Trace All Netdata Allocations (with charts)",
                 .json = "trace-allocations",
                 .value = NULL,
@@ -1069,7 +1069,7 @@ static struct {
         [BIB_DEVELOPER_MODE] = {
                 .category = BIC_DEBUG_DEVEL,
                 .type = BIT_BOOLEAN,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = "Developer Mode (more runtime checks, slower)",
                 .json = "dev-mode",
                 .value = NULL,
@@ -1077,7 +1077,7 @@ static struct {
         [BIB_RUNTIME_PROFILE] = {
             .category = BIC_RUNTIME,
             .type = BIT_STRING,
-            .analytics = "ConfigProfile",
+            .feature = "ConfigProfile",
             .print = "Profile",
             .json = "profile",
             .value = NULL,
@@ -1085,7 +1085,7 @@ static struct {
         [BIB_RUNTIME_PARENT] = {
             .category = BIC_RUNTIME,
             .type = BIT_BOOLEAN,
-            .analytics = "StreamParent",
+            .feature = "StreamParent",
             .print = "Stream Parent (accept data from Children)",
             .json = "parent",
             .value = NULL,
@@ -1093,7 +1093,7 @@ static struct {
         [BIB_RUNTIME_CHILD] = {
             .category = BIC_RUNTIME,
             .type = BIT_BOOLEAN,
-            .analytics = "StreamChild",
+            .feature = "StreamChild",
             .print = "Stream Child (send data to a Parent)",
             .json = "child",
             .value = NULL,
@@ -1101,7 +1101,7 @@ static struct {
         [BIB_RUNTIME_MEM_TOTAL] = {
             .category = BIC_RUNTIME,
             .type = BIT_STRING,
-            .analytics = "TotalMemory",
+            .feature = "TotalMemory",
             .print = "Total System Memory",
             .json = "mem-total",
             .value = NULL,
@@ -1109,7 +1109,7 @@ static struct {
         [BIB_RUNTIME_MEM_AVAIL] = {
             .category = BIC_RUNTIME,
             .type = BIT_STRING,
-            .analytics = "AvailableMemory",
+            .feature = "AvailableMemory",
             .print = "Available System Memory",
             .json = "mem-available",
             .value = NULL,
@@ -1119,7 +1119,7 @@ static struct {
         [BIB_TERMINATOR] = {
                 .category = 0,
                 .type = 0,
-                .analytics = NULL,
+                .feature = NULL,
                 .print = NULL,
                 .json = NULL,
                 .value = NULL,
@@ -1748,19 +1748,19 @@ void print_build_info_json(void) {
     buffer_free(b);
 }
 
-void analytics_build_info(BUFFER *b) {
+void build_info_features(BUFFER *b) {
     populate_packaging_info();
     populate_system_info();
     populate_directories();
 
     size_t added = 0;
     for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
-        if(BUILD_INFO[i].analytics && BUILD_INFO[i].status) {
+        if(BUILD_INFO[i].feature && BUILD_INFO[i].status) {
 
             if(added)
                 buffer_strcat(b, "|");
 
-            buffer_strcat (b, BUILD_INFO[i].analytics);
+            buffer_strcat (b, BUILD_INFO[i].feature);
             added++;
         }
     }
