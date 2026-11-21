@@ -21,7 +21,7 @@ int init_json_instance(struct instance *instance)
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_json_plaintext;
-    instance->start_chart_formatting = NULL;
+    instance->start_chart_formatting = format_chart_json_plaintext;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_json_plaintext;
@@ -77,7 +77,7 @@ int init_json_http_instance(struct instance *instance)
 
     instance->start_batch_formatting = open_batch_json_http;
     instance->start_host_formatting = format_host_labels_json_plaintext;
-    instance->start_chart_formatting = NULL;
+    instance->start_chart_formatting = format_chart_json_plaintext;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_json_plaintext;
@@ -143,7 +143,9 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
     return 0;
 }
 
-static void format_dimension_json_plaintext_prefix(
+// Everything of a record that depends only on the host and the chart: from `{"prefix":"` up to and including
+// the opening quote of the dimension id. It is built once per chart and copied into every record of the chart.
+static void format_chart_json_plaintext_prefix(
     BUFFER *wb,
     const char *prefix,
     const char *hostname,
@@ -154,8 +156,6 @@ static void format_dimension_json_plaintext_prefix(
     const char *chart_context,
     const char *chart_type,
     const char *units,
-    const char *dimension_id,
-    const char *dimension_name,
     bool stored) {
     buffer_strcat(wb, "{\"prefix\":\"");
     buffer_json_strcat(wb, prefix);
@@ -178,6 +178,9 @@ static void format_dimension_json_plaintext_prefix(
     buffer_json_strcat(wb, units);
 
     buffer_strcat(wb, "\",\"id\":\"");
+}
+
+static void format_dimension_json_plaintext_id_name(BUFFER *wb, const char *dimension_id, const char *dimension_name) {
     buffer_json_strcat(wb, dimension_id);
     buffer_strcat(wb, "\",\"name\":\"");
     buffer_json_strcat(wb, dimension_name);
@@ -193,23 +196,21 @@ static bool format_dimension_stored_json_plaintext_value_is_exportable(NETDATA_D
 }
 
 /**
- * Format dimension using collected data for JSON connector
+ * Format the host and chart part of the records of a chart for JSON connectors
  *
  * @param instance an instance data structure.
- * @param rd a dimension.
+ * @param st a chart.
  * @return Always returns 0.
  */
-int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM *rd)
+int format_chart_json_plaintext(struct instance *instance, RRDSET *st)
 {
-    RRDSET *st = rd->rrdset;
+    if (!instance->chart_prefix_buffer)
+        instance->chart_prefix_buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_flush(instance->chart_prefix_buffer);
 
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
-        if (buffer_strlen((BUFFER *)instance->buffer) > 2)
-        buffer_strcat(instance->buffer, ",\n");
-    }
-
-    format_dimension_json_plaintext_prefix(
-        instance->buffer,
+    format_chart_json_plaintext_prefix(
+        instance->chart_prefix_buffer,
         instance->config.prefix,
         buffer_tostring(instance->metric_prefix_buffer),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
@@ -219,21 +220,54 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         rrdset_context(st),
         rrdset_parts_type(st),
         rrdset_units(st),
-        rrddim_id(rd),
-        rrddim_name(rd),
-        false);
+        EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) != EXPORTING_SOURCE_DATA_AS_COLLECTED);
+
+    return 0;
+}
+
+static void format_dimension_json_plaintext_record_start(struct instance *instance, RRDDIM *rd)
+{
+    BUFFER *wb = instance->buffer;
+
+    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
+        if (buffer_strlen(wb) > 2)
+            buffer_strcat(wb, ",\n");
+    }
+
+    buffer_memcat(wb, buffer_tostring(instance->chart_prefix_buffer), buffer_strlen(instance->chart_prefix_buffer));
+    format_dimension_json_plaintext_id_name(wb, rrddim_id(rd), rrddim_name(rd));
+}
+
+static void format_dimension_json_plaintext_record_end(struct instance *instance, const char *timestamp_key, time_t timestamp)
+{
+    BUFFER *wb = instance->buffer;
+
+    buffer_strcat(wb, timestamp_key);
+    buffer_print_uint64(wb, (uint64_t)timestamp);
+
+    if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP)
+        buffer_strcat(wb, "}\n");
+    else
+        buffer_strcat(wb, "}");
+}
+
+/**
+ * Format dimension using collected data for JSON connector
+ *
+ * @param instance an instance data structure.
+ * @param rd a dimension.
+ * @return Always returns 0.
+ */
+int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM *rd)
+{
+    format_dimension_json_plaintext_record_start(instance, rd);
 
     if(rrddim_is_float(rd))
         format_dimension_json_plaintext_value(instance->buffer, rrddim_last_collected_as_double(rd));
     else
-        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, (collected_number)rrddim_last_collected_raw_int(rd));
+        buffer_print_int64(instance->buffer, rrddim_last_collected_raw_int(rd));
 
-    buffer_sprintf(instance->buffer, ",\"timestamp\":%llu}",
-        (unsigned long long)rd->collector.last_collected_time.tv_sec);
-
-    if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
-        buffer_strcat(instance->buffer, "\n");
-    }
+    format_dimension_json_plaintext_record_end(instance, ",\"timestamp\":", rd->collector.last_collected_time.tv_sec);
 
     return 0;
 }
@@ -247,40 +281,15 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
  */
 int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
     time_t last_t;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     if(!format_dimension_stored_json_plaintext_value_is_exportable(value))
         return 0;
 
-    if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
-        if (buffer_strlen((BUFFER *)instance->buffer) > 2)
-            buffer_strcat(instance->buffer, ",\n");
-    }
-
-    format_dimension_json_plaintext_prefix(
-        instance->buffer,
-        instance->config.prefix,
-        buffer_tostring(instance->metric_prefix_buffer),
-        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
-        rrdset_id(st),
-        rrdset_name(st),
-        rrdset_family(st),
-        rrdset_context(st),
-        rrdset_parts_type(st),
-        rrdset_units(st),
-        rrddim_id(rd),
-        rrddim_name(rd),
-        true);
-
+    format_dimension_json_plaintext_record_start(instance, rd);
     format_dimension_json_plaintext_value(instance->buffer, value);
-    buffer_sprintf(instance->buffer, ",\"timestamp\": %llu}", (unsigned long long)last_t);
-
-    if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
-        buffer_strcat(instance->buffer, "\n");
-    }
+    format_dimension_json_plaintext_record_end(instance, ",\"timestamp\": ", last_t);
 
     return 0;
 }
@@ -338,6 +347,25 @@ void json_http_prepare_header(struct instance *instance)
     return;
 }
 
+static void json_plaintext_unittest_record_prefix(
+    BUFFER *wb,
+    const char *prefix,
+    const char *hostname,
+    const char *labels,
+    const char *chart_id,
+    const char *chart_name,
+    const char *chart_family,
+    const char *chart_context,
+    const char *chart_type,
+    const char *units,
+    const char *dimension_id,
+    const char *dimension_name,
+    bool stored) {
+    format_chart_json_plaintext_prefix(
+        wb, prefix, hostname, labels, chart_id, chart_name, chart_family, chart_context, chart_type, units, stored);
+    format_dimension_json_plaintext_id_name(wb, dimension_id, dimension_name);
+}
+
 static int json_plaintext_unittest_case(
     const char *description,
     bool stored,
@@ -353,7 +381,7 @@ static int json_plaintext_unittest_case(
     const char *dimension_name,
     const char *expected) {
     BUFFER *wb = buffer_create(0, NULL);
-    format_dimension_json_plaintext_prefix(
+    json_plaintext_unittest_record_prefix(
         wb,
         prefix,
         hostname,
@@ -431,7 +459,7 @@ static int json_plaintext_number_unittest_case(
             errors++;
         }
 
-        format_dimension_json_plaintext_prefix(
+        json_plaintext_unittest_record_prefix(
             record,
             "netdata",
             "localhost",
@@ -523,6 +551,153 @@ static int json_plaintext_transport_unittest(void) {
     return errors;
 }
 
+struct json_callbacks_unittest_dimension {
+    const char *id;
+    const char *name;
+    bool is_float;
+    int64_t int_value;
+    NETDATA_DOUBLE float_value;
+    time_t timestamp;
+};
+
+static RRDSET *json_callbacks_unittest_chart(
+    const char *id, const char *name, const char *family, const char *context, const char *type, const char *units) {
+    RRDSET *st = callocz(1, sizeof(*st));
+    st->id = string_strdupz(id);
+    st->name = string_strdupz(name);
+    st->family = string_strdupz(family);
+    st->context = string_strdupz(context);
+    st->parts.type = string_strdupz(type);
+    st->units = string_strdupz(units);
+    return st;
+}
+
+static void json_callbacks_unittest_chart_free(RRDSET *st) {
+    string_freez(st->id);
+    string_freez(st->name);
+    string_freez(st->family);
+    string_freez(st->context);
+    string_freez(st->parts.type);
+    string_freez(st->units);
+    freez(st);
+}
+
+static void json_callbacks_unittest_export_chart(
+    struct instance *instance, RRDSET *st, const struct json_callbacks_unittest_dimension *dims, size_t count) {
+    instance->start_chart_formatting(instance, st);
+
+    for(size_t i = 0; i < count; i++) {
+        RRDDIM rd = { 0 };
+        rd.rrdset = st;
+        rd.id = string_strdupz(dims[i].id);
+        rd.name = string_strdupz(dims[i].name);
+        if(dims[i].is_float) {
+            rd.collector.options |= RRDDIM_OPTION_VALUE_FLOAT;
+            rd.collector.collected.f.last_collected_value = dims[i].float_value;
+        }
+        else
+            rd.collector.collected.i.last_collected_value = (collected_number)dims[i].int_value;
+        rd.collector.last_collected_time.tv_sec = dims[i].timestamp;
+
+        instance->metric_formatting(instance, &rd);
+
+        string_freez(rd.id);
+        string_freez(rd.name);
+    }
+}
+
+// Drive the real JSON chart and collected-metric callbacks across two hosts and two charts, and compare the bytes
+// with the record format the connector has always produced.
+static int json_callbacks_unittest(EXPORTING_CONNECTOR_TYPE type) {
+    int errors = 0;
+
+    struct instance instance = { 0 };
+    instance.config.type = type;
+    instance.config.prefix = "netdata";
+    instance.config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED;
+    instance.start_chart_formatting = format_chart_json_plaintext;
+    instance.metric_formatting = format_dimension_collected_json_plaintext;
+    instance.buffer = buffer_create(0, NULL);
+    instance.metric_prefix_buffer = buffer_create(0, NULL);
+    instance.labels_buffer = buffer_create(0, NULL);
+
+    if(type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP)
+        open_batch_json_http(&instance);
+
+    // first host: labels on, one chart with three dimensions
+    buffer_strcat(instance.metric_prefix_buffer, "host\"1");
+    buffer_strcat(instance.labels_buffer, "\"labels\":{\"k\":\"v\"},");
+    RRDSET *st1 = json_callbacks_unittest_chart("a.b", "a.name", "fam", "ctx", "a", "u\"x");
+    const struct json_callbacks_unittest_dimension dims1[] = {
+        { "d1", "n1", false, INT64_MIN, 0.0, 1700000000 },
+        { "d\n2", "n2", true, 0, 2.5, 1700000001 },
+        { "d3", "n\"3", false, 42, 0.0, -1 },
+    };
+    json_callbacks_unittest_export_chart(&instance, st1, dims1, _countof(dims1));
+
+    // second host: labels off, one chart with one dimension
+    buffer_flush(instance.metric_prefix_buffer);
+    buffer_strcat(instance.metric_prefix_buffer, "host2");
+    buffer_flush(instance.labels_buffer);
+    RRDSET *st2 = json_callbacks_unittest_chart("c.d", "c.name", "fam2", "ctx2", "c", "units");
+    const struct json_callbacks_unittest_dimension dims2[] = {
+        { "e1", "m1", false, INT64_MAX, 0.0, 7 },
+    };
+    json_callbacks_unittest_export_chart(&instance, st2, dims2, _countof(dims2));
+
+    const char *sep = (type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) ? ",\n" : "";
+    const char *eol = (type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) ? "" : "\n";
+    const char *head = (type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) ? "[\n" : "";
+    const char *chart1 =
+        "{\"prefix\":\"netdata\",\"hostname\":\"host\\\"1\",\"labels\":{\"k\":\"v\"},\"chart_id\":\"a.b\","
+        "\"chart_name\":\"a.name\",\"chart_family\":\"fam\",\"chart_context\":\"ctx\",\"chart_type\":\"a\","
+        "\"units\":\"u\\\"x\",\"id\":\"";
+    const char *chart2 =
+        "{\"prefix\":\"netdata\",\"hostname\":\"host2\",\"chart_id\":\"c.d\",\"chart_name\":\"c.name\","
+        "\"chart_family\":\"fam2\",\"chart_context\":\"ctx2\",\"chart_type\":\"c\",\"units\":\"units\",\"id\":\"";
+
+    BUFFER *expected = buffer_create(0, NULL);
+    buffer_sprintf(expected,
+        "%s"
+        "%sd1\",\"name\":\"n1\",\"value\":-9223372036854775808,\"timestamp\":1700000000}%s"
+        "%s%sd\\n2\",\"name\":\"n2\",\"value\":2.5000000,\"timestamp\":1700000001}%s"
+        "%s%sd3\",\"name\":\"n\\\"3\",\"value\":42,\"timestamp\":18446744073709551615}%s"
+        "%s%se1\",\"name\":\"m1\",\"value\":9223372036854775807,\"timestamp\":7}%s",
+        head,
+        chart1, eol,
+        sep, chart1, eol,
+        sep, chart1, eol,
+        sep, chart2, eol);
+
+    if(strcmp(buffer_tostring(instance.buffer), buffer_tostring(expected)) != 0) {
+        fprintf(stderr, "exporting JSON %s callbacks output mismatch\nexpected: %s\nactual:   %s\n",
+                type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP ? "HTTP" : "plaintext",
+                buffer_tostring(expected), buffer_tostring(instance.buffer));
+        errors++;
+    }
+
+    // the stored data source uses the stored spacing in the chart part
+    instance.config.options = EXPORTING_SOURCE_DATA_AVERAGE;
+    format_chart_json_plaintext(&instance, st2);
+    if(strcmp(buffer_tostring(instance.chart_prefix_buffer),
+              "{\"prefix\":\"netdata\",\"hostname\":\"host2\",\"chart_id\":\"c.d\",\"chart_name\":\"c.name\","
+              "\"chart_family\":\"fam2\",\"chart_context\": \"ctx2\",\"chart_type\":\"c\",\"units\": \"units\","
+              "\"id\":\"") != 0) {
+        fprintf(stderr, "exporting JSON stored chart prefix mismatch\nactual:   %s\n",
+                buffer_tostring(instance.chart_prefix_buffer));
+        errors++;
+    }
+
+    buffer_free(expected);
+    json_callbacks_unittest_chart_free(st1);
+    json_callbacks_unittest_chart_free(st2);
+    buffer_free(instance.buffer);
+    buffer_free(instance.metric_prefix_buffer);
+    buffer_free(instance.labels_buffer);
+    buffer_free(instance.chart_prefix_buffer);
+    return errors;
+}
+
 int exporting_json_connector_unittest(void) {
     int errors = 0;
 
@@ -602,6 +777,8 @@ int exporting_json_connector_unittest(void) {
     }
 
     errors += json_plaintext_transport_unittest();
+    errors += json_callbacks_unittest(EXPORTING_CONNECTOR_TYPE_JSON);
+    errors += json_callbacks_unittest(EXPORTING_CONNECTOR_TYPE_JSON_HTTP);
 
     return errors;
 }
