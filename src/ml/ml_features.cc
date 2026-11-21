@@ -3,6 +3,9 @@
 #include "ml_config.h"
 #include "ml_features.h"
 
+#include <limits>
+#include <vector>
+
 static inline size_t ml_effective_smooth_n(const ml_features_t *features)
 {
     // smooth_n == 0 is normalized to an effective window of 1, preserving the
@@ -81,13 +84,10 @@ static void ml_features_lag(ml_features_t *features, std::vector<DSample> &prepr
             continue;
         }
 
+        // emplace_back() value-initializes the sample, so the rows past lag_n
+        // are zero, as ml_features_preprocess_predict() requires too.
         preprocessed_features.emplace_back();
         DSample &DS = preprocessed_features[sample_idx++];
-        // Unused rows MUST be zero, as in ml_features_preprocess_predict():
-        // emplace_back() leaves them holding whatever the reused vector
-        // storage held, and they would end up in the cluster centers.
-        DS = 0;
-        DS.set_size(features->lag_n + 1);
 
         for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
             DS(feature_idx) = features->src[idx + feature_idx];
@@ -108,12 +108,10 @@ void ml_features_preprocess_predict(ml_features_t *features, DSample &sample)
     ml_features_diff(features);
     ml_features_smooth(features);
 
-    // DSample is a fixed 6-row matrix: set_size() does not resize it and its
-    // constructor leaves the rows uninitialized. With lag_n < 5 only the first
-    // lag_n + 1 rows are written below, but the anomaly score is computed over
-    // all 6, so the rest MUST be zero.
-    sample = 0;
-    sample.set_size(features->lag_n + 1);
+    // With lag_n < 5 only the first lag_n + 1 rows are written below, but the
+    // anomaly score is computed over all 6, so the rest MUST be zero. The
+    // caller may pass a sample that already holds values.
+    sample.fill(0.0);
     for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
         sample(feature_idx) = features->src[feature_idx];
 }

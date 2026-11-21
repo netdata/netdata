@@ -191,7 +191,6 @@ include(NetdataSnappy)
 include(NetdataOpenSSL)
 include(NetdataBacktrace)
 include(NetdataSQLite)
-include(NetdataDlib)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -222,10 +221,6 @@ endif()
 # between these calls - making their order load-bearing - moved up to the
 # compiler-flags phase, so every bundled target below is instrumented and the
 # calls are free to move.
-if(ENABLE_ML)
-  netdata_bundle_dlib()
-endif()
-
 if(ENABLE_LIBBACKTRACE)
     netdata_bundle_libbacktrace()
 endif()
