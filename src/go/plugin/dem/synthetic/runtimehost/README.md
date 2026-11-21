@@ -7,7 +7,9 @@ cross-package rules are in [ARCHITECTURE](../../ARCHITECTURE.md#browser-runtime-
 
 ## Modes
 
-The mode decides who owns the runtime files. Packaging sets `DefaultMode` to `native` for DEB/RPM builds.
+The mode decides who owns the runtime files. DEB/RPM builds default to `native`. Complete DEM images default to
+`preloaded` with the bundled runtime at `/opt/netdata-dem-runtime`. Other builds default to `managed`. An explicit
+`runtime.mode` takes precedence, and the bundled path is a default only in `preloaded` mode.
 
 | Mode | Files owned by | Runner source | Pair update owner |
 |---|---|---|---|

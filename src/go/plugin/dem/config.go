@@ -85,6 +85,13 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
+	// Decode runtime settings without an inherited preload path. A second view
+	// supplies the bundled path in preloaded mode and preserves an explicit empty path.
+	type preloadConfig struct {
+		Path string `yaml:"preload_path"`
+	}
+	preload := preloadConfig{Path: cfg.Runtime.PreloadPath}
+	cfg.Runtime.PreloadPath = ""
 	// Decode the original document strictly for runtime settings, including merges
 	// and aliases, while leaving other sections opaque to this schema.
 	runtimeInput := struct {
@@ -94,14 +101,23 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {
 		return cfg, fmt.Errorf("read dem.conf runtime settings: %w", err)
 	}
-	// The other sections are decoded leniently: unknown keys are ignored.
+	// Decode the other sections and the preloaded path view leniently.
 	sections := struct {
 		History   *RetentionConfig `yaml:"history"`
 		Artifacts *RetentionConfig `yaml:"artifacts"`
 		Browser   *BrowserConfig   `yaml:"browser"`
-	}{History: &cfg.History, Artifacts: &cfg.Artifacts, Browser: &cfg.Browser}
+		Preload   *preloadConfig   `yaml:"runtime"`
+	}{
+		History:   &cfg.History,
+		Artifacts: &cfg.Artifacts,
+		Browser:   &cfg.Browser,
+		Preload:   &preload,
+	}
 	if err = yaml.Unmarshal(data, &sections); err != nil {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
+	}
+	if cfg.Runtime.Mode == runtimehost.ModePreloaded {
+		cfg.Runtime.PreloadPath = preload.Path
 	}
 	if err = cfg.History.validate(journalstore.MinHistoryBytes); err != nil {
 		return cfg, fmt.Errorf("history.%w", err)
