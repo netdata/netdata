@@ -10,7 +10,6 @@ LC_ALL=C
 export LC_ALL
 umask 077
 HOST_STATE=/var/lib/netdata-dem-runtime-host-policy
-host_docker_policy_helper=
 HOST_RUN=/run
 HOST_APPARMOR_DIR=/etc/apparmor.d
 HOST_APPARMOR_ENABLED=/sys/module/apparmor/parameters/enabled
@@ -145,7 +144,7 @@ host_lock() {
     host_publish=
     trap 'rm -rf -- "$host_tmp"; if [ -n "$host_publish" ]; then rm -f -- "$host_publish"; fi; if [ -n "$host_drain_dir" ]; then rm -rf -- "$host_drain_dir"; fi' 0
     trap 'exit 1' 1 2 3 15
-    # Stale private work directories from an interrupted operation are inert.
+    # Stale work directories and the retired Docker helper directory are inert.
     for host_entry in "$HOST_STATE"/*; do
         case "${host_entry##*/}" in lock|registrations|policies|docker-helpers|work.*) ;; *) host_die 'unknown host state entry; inspect before proceeding' ;; esac
     done
@@ -439,7 +438,8 @@ Runtime flags: --config-dir DIR --cache DIR --root DIR --release FILE --archive 
 Setup prepares an administrator-owned namespace allowance and then runs signed runtime setup as the service user.
 Agent-linked setup is for static/source builds; native Agent builds use the optional runtime package.
 It does not grant confinement or restrict eligibility to signed bytes. Automatic updates remain unprivileged.
-Docker policy operations run on the daemon host; they require no Agent and do not prove container retirement.
+Policy-only operations run on the deployment host and require no installed Agent.
+Stop every deployment using a registration before removing it.
 Stop standalone consumers and prevent concurrent administrator installs before Agent teardown.
 Protected preloads require explicit retirement before policy removal; runtime preload files are never erased here.
 To retire one prepared preload: uninstall --agent PATH --root DIR --deployments-stopped.
@@ -512,23 +512,9 @@ host_main() {
                     host_root=$host_explicit_root
                     host_path "$host_root" || host_die 'runtime root must be an absolute normalized execution-visible path with no control bytes'
                     host_kind=external; host_agent=-; host_user=-; host_plugin=-; host_config=-; host_stock=-; host_lib=-
-                    if [ -n "$host_docker_policy_helper" ]; then
-                        # Publish recovery before the first durable policy change. Docker can disappear at any time.
-                        host_directory "$HOST_STATE/docker-helpers" || host_die 'unsafe Docker recovery directory'
-                        host_recovery=$HOST_STATE/docker-helpers/$host_id
-                        if [ -e "$host_recovery" ] || [ -L "$host_recovery" ]; then
-                            host_file "$host_recovery" 600 || host_die 'unsafe Docker recovery helper'
-                        fi
-                        host_atomic "$host_docker_policy_helper" "$host_recovery" 600 || return $?
-                    fi
                     host_register ;;
                 policy-status) host_policy_status ;;
-                policy-remove)
-                    host_unregister || return $?
-                    if [ -d "$HOST_STATE/docker-helpers" ]; then
-                        host_directory "$HOST_STATE/docker-helpers" || host_die 'unsafe Docker recovery directory'
-                        rm -f -- "$HOST_STATE/docker-helpers/$host_id" && sync -f "$HOST_STATE/docker-helpers" || return $?
-                    fi ;;
+                policy-remove) host_unregister ;;
             esac
             return $? ;;
     esac
@@ -567,12 +553,4 @@ host_main() {
     esac
 }
 host_explicit_root=
-if [ "${1-}" = docker-install ]; then
-    shift
-    # Docker ships this sibling. Token retirement uses the policy helper alone.
-    # shellcheck disable=SC1091
-    . "${0%/*}/netdata-dem-docker-host.sh"
-    docker_install "$@"
-else
-    host_main "$@"
-fi
+host_main "$@"
