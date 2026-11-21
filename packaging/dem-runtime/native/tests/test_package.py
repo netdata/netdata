@@ -23,6 +23,19 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
+    def extract_package(self, package, destination, fmt):
+        destination.mkdir()
+        if fmt == 'DEB':
+            self.run_command('dpkg-deb', '--extract', package, destination)
+        else:
+            with tempfile.TemporaryFile() as archive:
+                result = subprocess.run(['rpm2cpio', str(package)], stdout=archive, stderr=subprocess.PIPE)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                archive.seek(0)
+                result = subprocess.run(['cpio', '-idm', '--quiet'], cwd=destination, stdin=archive,
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def check_package(self, fmt):
         tools = ('dpkg-deb',) if fmt == 'DEB' else ('rpmbuild', 'rpm', 'rpm2cpio', 'cpio')
         if any(not shutil.which(tool) for tool in tools):
@@ -36,7 +49,6 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
             extracted = root / 'extracted'
             (payload / 'lib').mkdir(parents=True)
-            extracted.mkdir()
             # Match stage-native permissions; only CMake-created ancestors inherit umask.
             payload.chmod(0o755)
             (payload / 'lib').chmod(0o755)
@@ -60,9 +72,9 @@ class PackageTests(unittest.TestCase):
             packages = list((build / 'packages').glob('netdata-dem-runtime*.' + fmt.lower()))
             self.assertEqual(len(packages), 1)
             package = packages[0]
+            self.extract_package(package, extracted, fmt)
             if fmt == 'DEB':
                 self.assertEqual(package.name, 'netdata-dem-runtime_2.12.0_' + arch + '.deb')
-                self.run_command('dpkg-deb', '--extract', package, extracted)
                 metadata = self.run_command('dpkg-deb', '--field', package, 'Pre-Depends')
                 self.assertEqual(self.run_command('dpkg-deb', '--field', package, 'Architecture').strip(), arch)
                 self.assertIn('netdata-dem-runtime-api (= 1)', metadata)
@@ -72,6 +84,8 @@ class PackageTests(unittest.TestCase):
                 agent = next(path for path in (build / 'packages').glob('netdata_*.deb'))
                 self.assertEqual(self.run_command('dpkg-deb', '--field', agent, 'Version').strip(), '2.12.0')
                 plugin = next((build / 'packages').glob('netdata-plugin-dem_*.deb'))
+                self.assertIn('netdata-ip-intel-data (= 2.12.0)',
+                              self.run_command('dpkg-deb', '--field', plugin, 'Depends'))
                 self.assertEqual(self.run_command('dpkg-deb', '--field', plugin, 'Breaks').strip(),
                                  'netdata-dem-runtime (<< 1:0)')
                 control = root / 'control'
@@ -87,14 +101,6 @@ class PackageTests(unittest.TestCase):
                 self.assertTrue(all(line.split()[0] == 'drwxr-xr-x' for line in directories),
                                 '\n'.join(directories))
             else:
-                archive = root / 'payload.cpio'
-                with archive.open('wb') as output:
-                    result = subprocess.run(['rpm2cpio', str(package)], stdout=output, stderr=subprocess.PIPE)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                with archive.open('rb') as source:
-                    result = subprocess.run(['cpio', '-idm', '--quiet'], cwd=extracted, stdin=source,
-                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                self.assertEqual(result.returncode, 0, result.stderr)
                 dependencies = self.run_command('rpm', '-qp', '--requires', package)
                 self.assertEqual(self.run_command('rpm', '-qp', '--qf', '%{ARCH}', package),
                                  {'amd64': 'x86_64', 'arm64': 'aarch64'}[arch])
@@ -112,6 +118,8 @@ class PackageTests(unittest.TestCase):
                 agent = next(path for path in (build / 'packages').glob('netdata-2*.rpm'))
                 self.assertEqual(self.run_command('rpm', '-qp', '--qf', '%{EPOCH}', agent), '(none)')
                 plugin = next((build / 'packages').glob('netdata-plugin-dem-*.rpm'))
+                self.assertIn('netdata-ip-intel-data = 2.12.0',
+                              self.run_command('rpm', '-qp', '--requires', plugin).splitlines())
                 self.assertIn('netdata-dem-runtime < 1:0',
                               self.run_command('rpm', '-qp', '--conflicts', plugin).splitlines())
                 ownership = self.run_command('rpm', '-qp', '--qf', '[%{FILEUSERNAME}:%{FILEGROUPNAME}\n]', package)
@@ -127,6 +135,20 @@ class PackageTests(unittest.TestCase):
                 self.assertIn('n', policy_flags)
                 listing = self.run_command('rpm', '-qpl', package)
                 self.assertNotIn('/var/lib/netdata-dem-runtime', listing)
+            stock_path = Path('usr/share/netdata/topology-ip-intel')
+            self.assertFalse((extracted / stock_path).exists())
+            data_packages = list((build / 'packages').glob('netdata-ip-intel-data*.' + fmt.lower()))
+            self.assertEqual(len(data_packages), 1)
+            data_files = root / 'data-files'
+            self.extract_package(data_packages[0], data_files, fmt)
+            self.assertEqual({path.name for path in (data_files / stock_path).iterdir()},
+                             {path.name for path in (root / 'stock').iterdir()})
+            for path in (root / 'stock').iterdir():
+                self.assertEqual((data_files / stock_path / path.name).read_bytes(), path.read_bytes())
+            for consumer in (agent, plugin):
+                consumer_files = root / consumer.name
+                self.extract_package(consumer, consumer_files, fmt)
+                self.assertFalse((consumer_files / stock_path).exists())
             policy = extracted / 'etc/apparmor.d/netdata-dem-browser'
             self.assertEqual(policy.read_bytes(), (SOURCE/'netdata-dem-browser').read_bytes())
             self.assertEqual(policy.stat().st_mode & 0o777, 0o644)
