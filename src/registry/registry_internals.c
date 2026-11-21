@@ -82,7 +82,11 @@ FILE *registry_fopen_regular(const char *filename, const char *mode) {
 // this is used as a protection against the variations of GUIDs
 int regenerate_guid(const char *guid, char *result) {
     nd_uuid_t uuid;
-    if(unlikely(uuid_parse(guid, uuid) == -1)) {
+    // uuid_parse() here is uuid_parse_flexi(), which returns 0 on success and a range of
+    // negative codes (-1 .. -7) on failure, unlike POSIX uuid_parse() that only returns -1.
+    // Comparing against -1 let every other failure fall through to uuid_unparse_lower() below,
+    // which then read the uninitialized uuid and produced a GUID from stack memory.
+    if(unlikely(uuid_parse(guid, uuid) != 0)) {
         netdata_log_info("Registry: GUID '%s' is not a valid GUID.", guid);
         return -1;
     }
