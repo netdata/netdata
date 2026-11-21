@@ -208,8 +208,17 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 // runCachestatGlobalCollector is the single collection loop for the plugin.
 // Both the global metric snapshot and the per-PID SHM publish run here
 // sequentially so that only one OS thread is needed for CGO calls.
-// store may be nil when apps/cgroups integration is disabled.
-func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *ebpfSharedMemoryStore, updateEvery int) {
+// store may be nil when apps/cgroups integration is disabled.  shouldPublish is
+// true only when cachestat owns the shared-memory segment: exactly one module
+// publishes it (see main.go), and every other module just contributes rows.
+func runCachestatGlobalCollector(
+	api *netdataapi.API,
+	handle *CachestatLegacyHandle,
+	stop <-chan struct{},
+	store *ebpfSharedMemoryStore,
+	updateEvery int,
+	shouldPublish bool,
+) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -248,9 +257,8 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
 		if store != nil {
 			publishSharedStore := func() {
-				// Cachestat is the elected publisher when it has apps/cgroup
-				// integration. Open its segment even when its own snapshot fails:
-				// dcstat/socket may still have healthy rows to publish.
+				// Open the segment even when cachestat's own snapshot fails: the
+				// other modules may still have healthy rows to publish.
 				if handle.SharedMemory == nil {
 					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
 					if perr != nil {
@@ -270,7 +278,9 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 			if err != nil {
 				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
 				store.ClearCachestatApps()
-				publishSharedStore()
+				if shouldPublish {
+					publishSharedStore()
+				}
 			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {
@@ -296,7 +306,9 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 						}
 					}
 				}
-				publishSharedStore()
+				if shouldPublish {
+					publishSharedStore()
+				}
 			}
 		}
 	}

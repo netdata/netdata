@@ -26,14 +26,19 @@ const (
 	// decision across the segment; it lives in the existing header `flags` word,
 	// so it is not a layout change.
 	ebpfgoSHMFlagFDErrors uint32 = 0x10
+	ebpfgoSHMFlagProcess  uint32 = 0x20
+	// ebpfgoSHMFlagProcessErrors is process's counterpart of
+	// ebpfgoSHMFlagFDErrors: task_err is always counted, the error charts exist
+	// only in `return` mode.
+	ebpfgoSHMFlagProcessErrors uint32 = 0x40
 )
 
 // Production POSIX names for the shared-memory segment and its semaphore.
 // Must match NETDATA_EBPFGO_INTEGRATION_NAME / NETDATA_EBPFGO_SHM_INTEGRATION_NAME
 // in apps_ebpf_shared_pid_row.h, which is what all consumer plugins open.
 const (
-	productionSHMName = "/netdata_shm_integration_ebpfgo_v6"
-	productionSEMName = "/netdata_sem_integration_ebpfgo_v6"
+	productionSHMName = "/netdata_shm_integration_ebpfgo_v7"
+	productionSEMName = "/netdata_sem_integration_ebpfgo_v7"
 )
 
 // ebpfFreshnessToken issues the synthetic `ct` stamp a module publishes for its
@@ -160,6 +165,21 @@ type ebpfSharedMemoryStore struct {
 	prevSocketData     map[uint32]ebpfSocketPublishApps // raw cumulative counters from the previous cycle
 	nextPrevSocketData map[uint32]ebpfSocketPublishApps // scratch buffer for the next prevSocketData
 
+	// ---- process ----
+	// processData holds per-interval deltas, like fdData.
+	processData  map[uint32]netdataPublishProcess
+	processIdent map[uint32]ebpfModuleIdentity
+	processPIDs  []uint32 // ascending; drives the merge
+	processPrev  map[uint32]processCounters
+	nextProcess  map[uint32]processCounters
+	// processPrevCt/nextProcessCt hold the synthetic freshness token, not the BPF `ct`.
+	processPrevCt map[uint32]uint64
+	nextProcessCt map[uint32]uint64
+	processToken  ebpfFreshnessToken
+	processMiss   map[uint32]int
+	nextProcessMs map[uint32]int
+	processStale  []uint32
+
 	activeModules uint32 // EBPFGO_SHM_FLAG_* bits set when a module writes data
 }
 
@@ -189,6 +209,14 @@ func NewEbpfSharedMemoryStore() *ebpfSharedMemoryStore {
 		nextFdCt:           make(map[uint32]uint64),
 		fdMiss:             make(map[uint32]int),
 		nextFdMs:           make(map[uint32]int),
+		processData:        make(map[uint32]netdataPublishProcess),
+		processIdent:       make(map[uint32]ebpfModuleIdentity),
+		processPrev:        make(map[uint32]processCounters),
+		nextProcess:        make(map[uint32]processCounters),
+		processPrevCt:      make(map[uint32]uint64),
+		nextProcessCt:      make(map[uint32]uint64),
+		processMiss:        make(map[uint32]int),
+		nextProcessMs:      make(map[uint32]int),
 		socketData:         make(map[uint32]ebpfSocketPublishApps),
 		prevSocketData:     make(map[uint32]ebpfSocketPublishApps),
 		nextPrevSocketData: make(map[uint32]ebpfSocketPublishApps),
@@ -274,9 +302,9 @@ func (s *ebpfSharedMemoryStore) MarkSocketInactive() {
 }
 
 // ebpfSortedPIDLists is the number of modules that contribute an ASCENDING
-// per-PID list to the row merge (cachestat, dcstat, fd).  Socket contributes a
+// per-PID list to the row merge (cachestat, dcstat, fd, process).  Socket contributes a
 // map instead and is appended separately.
-const ebpfSortedPIDLists = 3
+const ebpfSortedPIDLists = 4
 
 // mergedPIDIterator walks several ascending PID lists as one ascending sequence
 // with duplicates collapsed.  It is a value type with fixed-size arrays so the
@@ -317,14 +345,14 @@ func (it *mergedPIDIterator) next() (uint32, bool) {
 // contribution.  Must be called with s.mu held for writing.
 func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 	nextEntries := s.nextEntries[:0]
-	upper := len(s.cachestatPIDs) + len(s.dcstatPIDs) + len(s.fdPIDs) + len(s.socketData)
+	upper := len(s.cachestatPIDs) + len(s.dcstatPIDs) + len(s.fdPIDs) + len(s.processPIDs) + len(s.socketData)
 	if cap(nextEntries) < upper {
 		nextEntries = make([]ebpfPidStat, 0, upper)
 	}
 
 	// k-way merge of the ascending per-module PID lists.
 	merge := mergedPIDIterator{lists: [ebpfSortedPIDLists][]uint32{
-		s.cachestatPIDs, s.dcstatPIDs, s.fdPIDs,
+		s.cachestatPIDs, s.dcstatPIDs, s.fdPIDs, s.processPIDs,
 	}}
 	for {
 		pid, ok := merge.next()
@@ -376,6 +404,7 @@ func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 		s.cachestatIdent[pid],
 		s.dcstatIdent[pid],
 		s.fdIdent[pid],
+		s.processIdent[pid],
 	} {
 		if !ident.isEmpty() {
 			row.comm = ident.comm
@@ -387,6 +416,16 @@ func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 	row.cachestat = s.cachestatData[pid]
 	row.dc = s.dcstatData[pid]
 	row.fd = s.fdData[pid]
+	if process, ok := s.processData[pid]; ok {
+		row.process = ebpfProcessStat{
+			Ct: process.Ct, Tgid: pid, Pid: pid,
+			ExitCall: process.Exits, ReleaseCall: process.TaskClose,
+			CreateProcess: process.Forks, CreateThread: process.Clones,
+			TaskErr: process.Errors, ProcessUpdateEverySec: process.UpdateEverySec,
+		}
+		ident := s.processIdent[pid]
+		copy(row.process.Name[:], ident.comm[:])
+	}
 	row.socket = s.socketData[pid]
 
 	return row

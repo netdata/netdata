@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
-#include "cgroup_ebpfgo_fd.h"
+#include "cgroup_ebpfgo_rate.h"
 #include "cgroup_ebpfgo_shared_memory.h"
 
 #if defined(OS_LINUX)
@@ -14,79 +14,7 @@ static bool cgroup_ebpfgo_fd_snapshot_ready = false;
 // whether an older error chart continues receiving values.
 static bool cgroup_ebpfgo_fd_errors_current = false;
 
-typedef struct {
-    pid_t pid;
-    const struct cgroup *cg;
-    uint64_t ct;
-    uint64_t last_seen;
-    uint32_t fd_update_every_s;
-    uint64_t rate_until;
-    long long open_call;
-    long long close_call;
-    long long open_err;
-    long long close_err;
-} cgroup_ebpfgo_fd_pid_token_t;
-
-static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_pid_tokens;
-static size_t cgroup_ebpfgo_fd_pid_tokens_count;
-static size_t cgroup_ebpfgo_fd_pid_tokens_capacity;
-static uint64_t cgroup_ebpfgo_fd_generation;
-
-static size_t cgroup_ebpfgo_fd_token_index(pid_t pid, const struct cgroup *cg, bool *found)
-{
-    size_t left = 0;
-    size_t right = cgroup_ebpfgo_fd_pid_tokens_count;
-    while (left < right) {
-        size_t mid = left + (right - left) / 2;
-        if (cgroup_ebpfgo_fd_pid_tokens[mid].pid < pid ||
-            (cgroup_ebpfgo_fd_pid_tokens[mid].pid == pid &&
-             (uintptr_t)cgroup_ebpfgo_fd_pid_tokens[mid].cg < (uintptr_t)cg))
-            left = mid + 1;
-        else
-            right = mid;
-    }
-    *found = left < cgroup_ebpfgo_fd_pid_tokens_count &&
-             cgroup_ebpfgo_fd_pid_tokens[left].pid == pid &&
-             cgroup_ebpfgo_fd_pid_tokens[left].cg == cg;
-    return left;
-}
-
-static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_consumed_token(
-    pid_t pid, const struct cgroup *cg, uint32_t fd_update_every_s)
-{
-    bool found;
-    size_t index = cgroup_ebpfgo_fd_token_index(pid, cg, &found);
-    if (!found) {
-        if (cgroup_ebpfgo_fd_pid_tokens_count == cgroup_ebpfgo_fd_pid_tokens_capacity) {
-            size_t capacity = cgroup_ebpfgo_fd_pid_tokens_capacity ? cgroup_ebpfgo_fd_pid_tokens_capacity * 2 : 16;
-            cgroup_ebpfgo_fd_pid_tokens = reallocz(cgroup_ebpfgo_fd_pid_tokens,
-                                                   capacity * sizeof(*cgroup_ebpfgo_fd_pid_tokens));
-            cgroup_ebpfgo_fd_pid_tokens_capacity = capacity;
-        }
-        memmove(&cgroup_ebpfgo_fd_pid_tokens[index + 1], &cgroup_ebpfgo_fd_pid_tokens[index],
-                (cgroup_ebpfgo_fd_pid_tokens_count - index) * sizeof(*cgroup_ebpfgo_fd_pid_tokens));
-        cgroup_ebpfgo_fd_pid_tokens[index] = (cgroup_ebpfgo_fd_pid_token_t){.pid = pid, .cg = cg};
-        cgroup_ebpfgo_fd_pid_tokens_count++;
-    }
-    cgroup_ebpfgo_fd_pid_tokens[index].last_seen = cgroup_ebpfgo_fd_generation;
-    cgroup_ebpfgo_fd_pid_tokens[index].fd_update_every_s = fd_update_every_s;
-    return &cgroup_ebpfgo_fd_pid_tokens[index];
-}
-
-static void cgroup_ebpfgo_fd_prune_tokens(void)
-{
-    size_t write = 0;
-    for (size_t read = 0; read < cgroup_ebpfgo_fd_pid_tokens_count; read++) {
-        if (cgroup_ebpfgo_fd_token_expired(
-                cgroup_ebpfgo_fd_pid_tokens[read].last_seen,
-                cgroup_ebpfgo_fd_generation,
-                cgroup_ebpfgo_fd_pid_tokens[read].fd_update_every_s,
-                cgroup_update_every > 0 ? (uint32_t)cgroup_update_every : 1))
-            continue;
-        cgroup_ebpfgo_fd_pid_tokens[write++] = cgroup_ebpfgo_fd_pid_tokens[read];
-    }
-    cgroup_ebpfgo_fd_pid_tokens_count = write;
-}
+static cgroup_ebpfgo_rate_table_t cgroup_ebpfgo_fd_rates;
 
 void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors)
 {
@@ -94,31 +22,23 @@ void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors)
     cgroup_ebpfgo_fd_errors_current = ready && errors;
 }
 
-/* Sums this interval's file-descriptor activity for one cgroup.
+/* Sums this interval's file-descriptor rates for one cgroup.
  *
  * The SHM row already carries per-interval deltas — struct ebpf_publish_fd_stat
- * has a single counter set with no curr/prev pair — so unlike the cachestat and
- * dcstat consumers there is nothing to diff here.  cgroups.plugin ticks faster
- * than the Go publisher, so a PID only contributes when its ct is newer than the
- * token this cgroup consumed for that PID; without that gate the same delta would
- * be counted once per tick until the next publish. */
-static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
+ * has a single counter set with no curr/prev pair — so there is nothing to diff
+ * here; cgroup_ebpfgo_rate_add_pid() consumes each row once and holds its rate
+ * for the producer interval. */
+static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg, uint32_t chart_every)
 {
     cg->fd.open_call = 0;
     cg->fd.close_call = 0;
     cg->fd.open_err = 0;
     cg->fd.close_err = 0;
 
-    /* Keep the consumed ct when the cgroup momentarily has no PIDs (an empty or
-     * unreadable cgroup.procs).  Resetting it would make the next tick treat
-     * every row as unconsumed and replay the last interval, spiking the charts. */
     if (!cg->ebpf_pids_count)
         return;
 
-    long long open_call = 0;
-    long long close_call = 0;
-    long long open_err = 0;
-    long long close_err = 0;
+    long long totals[4] = {0};
 
     for (size_t i = 0; i < cg->ebpf_pids_count; i++) {
         pid_t pid = cg->ebpf_pids[i];
@@ -128,54 +48,30 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
             continue;
 
         const struct ebpf_publish_fd_stat *fd = &item->fd;
-
-        uint32_t update_every_s = fd->fd_update_every_s;
-        if (!update_every_s && cgroup_update_every > 0)
-            update_every_s = (uint32_t)cgroup_update_every;
-
-        cgroup_ebpfgo_fd_pid_token_t *token = cgroup_ebpfgo_fd_consumed_token(pid, cg, update_every_s);
-        if (fd->ct <= token->ct) {
-            if (cgroup_ebpfgo_fd_generation <= token->rate_until) {
-                open_call = cgroup_ebpfgo_fd_add_rate(open_call, token->open_call);
-                close_call = cgroup_ebpfgo_fd_add_rate(close_call, token->close_call);
-                open_err = cgroup_ebpfgo_fd_add_rate(open_err, token->open_err);
-                close_err = cgroup_ebpfgo_fd_add_rate(close_err, token->close_err);
-            }
-            continue;
-        }
-
-        token->open_call = cgroup_ebpfgo_fd_normalize_rate(fd->open_call, update_every_s);
-        token->close_call = cgroup_ebpfgo_fd_normalize_rate(fd->close_call, update_every_s);
-        token->open_err = cgroup_ebpfgo_fd_normalize_rate(fd->open_err, update_every_s);
-        token->close_err = cgroup_ebpfgo_fd_normalize_rate(fd->close_err, update_every_s);
-        uint32_t chart_every = cgroup_update_every > 0 ? (uint32_t)cgroup_update_every : 1;
-        uint32_t hold_generations = update_every_s > 0
-                                        ? (uint32_t)(((uint64_t)update_every_s + chart_every - 1) / chart_every)
-                                        : 1;
-        token->rate_until = cgroup_ebpfgo_fd_generation + (hold_generations ? hold_generations : 1) - 1;
-        open_call = cgroup_ebpfgo_fd_add_rate(open_call, token->open_call);
-        close_call = cgroup_ebpfgo_fd_add_rate(close_call, token->close_call);
-        open_err = cgroup_ebpfgo_fd_add_rate(open_err, token->open_err);
-        close_err = cgroup_ebpfgo_fd_add_rate(close_err, token->close_err);
-        token->ct = fd->ct;
+        const uint32_t deltas[] = {fd->open_call, fd->close_call, fd->open_err, fd->close_err};
+        cgroup_ebpfgo_rate_add_pid(
+            &cgroup_ebpfgo_fd_rates, pid, cg, fd->ct, fd->fd_update_every_s, chart_every,
+            deltas, _countof(deltas), totals);
     }
 
-    cg->fd.open_call = open_call;
-    cg->fd.close_call = close_call;
-    cg->fd.open_err = open_err;
-    cg->fd.close_err = close_err;
+    cg->fd.open_call = totals[0];
+    cg->fd.close_call = totals[1];
+    cg->fd.open_err = totals[2];
+    cg->fd.close_err = totals[3];
 }
 
 void cgroup_ebpfgo_fd_update_locked(void)
 {
-    cgroup_ebpfgo_fd_generation++;
+    uint32_t chart_every = cgroup_update_every > 0 ? (uint32_t)cgroup_update_every : 1;
+
+    cgroup_ebpfgo_rate_begin_cycle(&cgroup_ebpfgo_fd_rates);
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
         if (unlikely(!cg->enabled || cg->pending_renames))
             continue;
 
-        cgroup_ebpfgo_fd_sum_pids(cg);
+        cgroup_ebpfgo_fd_sum_pids(cg, chart_every);
     }
-    cgroup_ebpfgo_fd_prune_tokens();
+    cgroup_ebpfgo_rate_end_cycle(&cgroup_ebpfgo_fd_rates, chart_every);
 }
 
 void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg)
@@ -208,7 +104,7 @@ void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg)
     const char *close_err_context = is_service ? "systemd.service.fd_close_error" : "cgroup.fd_close_error";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5400;
 
-    const collected_number divisor = CGROUP_EBPFGO_FD_RATE_SCALE;
+    const collected_number divisor = CGROUP_EBPFGO_RATE_SCALE;
 
     cgroup_ebpfgo_update_single_chart(
         cg,

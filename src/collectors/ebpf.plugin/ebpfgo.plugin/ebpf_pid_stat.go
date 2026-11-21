@@ -65,6 +65,9 @@ type ebpfProcessStat struct {
 	CreateProcess uint32
 	CreateThread  uint32
 	TaskErr       uint32
+	// ProcessUpdateEverySec is the process collection interval of these deltas
+	// (v7); the cgroups consumer divides by it to publish rates.
+	ProcessUpdateEverySec uint32
 }
 
 type netdataPublishSHM struct {

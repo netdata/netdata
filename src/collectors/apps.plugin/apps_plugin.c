@@ -950,6 +950,8 @@ int main(int argc, char **argv) {
             apps_ebpf_accumulate_dcstat();
         if (apps_ebpf_fd_is_available())
             apps_ebpf_accumulate_fd();
+        if (apps_ebpf_process_is_available())
+            apps_ebpf_accumulate_process();
 #endif
 
         // after the processes were aggregated and nothing reads targets until the

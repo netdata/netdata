@@ -521,15 +521,6 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     ebpf_update_map_per_core();
 
-    enabled = inicfg_get_boolean(
-        &collector_config,
-        EBPF_PROGRAMS_SECTION,
-        ebpf_modules[EBPF_MODULE_PROCESS_IDX].info.config_name,
-        CONFIG_BOOLEAN_YES);
-    if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_cgroups);
-    }
-
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_cgroups);

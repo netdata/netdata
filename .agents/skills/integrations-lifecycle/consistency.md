@@ -84,7 +84,8 @@ the redesign touches them; `metrics.dynamic_collect_plugins` in `metadata.yaml` 
 - `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
   (`description-authoring.md`) resolve, validate, and are unique. It also pins reviewed copy by integration id
   (`REVIEWED_DESCRIPTION_TARGETS`); a change to a pinned `monitored_instance.description` MUST update its pin in
-  the same PR. The test reads the generated `integrations.js`, so run `gen_integrations.py` first; a stale
+  the same PR. The id is `<plugin_name>-<module_name>-<monitored instance name>`, so moving or renaming a pinned
+  integration (for example to another plugin) MUST move its pin to the new id. The test reads the generated `integrations.js`, so run `gen_integrations.py` first; a stale
   checkout tests the old text.
 - `integrations/tests/test_health_alerts.py` (both workflows, which also run on `src/health/health.d/**` changes): the
   alert ownership rule and its invariants (the metadata skill's `alerts-and-meta.md`, section 1; the test's `UNOWNED`

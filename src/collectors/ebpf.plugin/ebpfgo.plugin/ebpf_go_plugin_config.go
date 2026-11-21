@@ -21,6 +21,7 @@ type pluginConfigFile struct {
 	Fd                        *bool // [ebpf programs] fd key
 	Socket                    *bool // [ebpf programs] socket key
 	DNS                       *bool // [ebpf programs] dns key
+	Process                   *bool // [ebpf programs] process key
 	UpdateEvery               *int
 	AppsEnabled               *bool
 	Cgroups                   *bool
@@ -183,6 +184,14 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 					cfg.DNS = new(b)
 				}
 				found = true
+			case "process":
+				b, ok := parseConfigBool(value)
+				if !ok {
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid process %q, using default\n", path, value)
+				} else {
+					cfg.Process = new(b)
+				}
+				found = true
 			}
 			continue
 		}
@@ -277,7 +286,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			found = true
 		case "ebpf load mode":
 			// `return` is only meaningful for a module that has error charts, which
-			// today means fd alone (see collectorCommonConfig.ReturnMode); for every
+			// today means fd and process (see collectorCommonConfig.ReturnMode); for every
 			// other module it selects nothing, exactly as in the C plugin where they
 			// had no error charts either.  It is therefore NOT warned about: the
 			// [global] section of ebpf.d.conf is parsed once per module, so a warning
@@ -394,6 +403,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.DNS != nil {
 		c.DNS = other.DNS
+	}
+	if other.Process != nil {
+		c.Process = other.Process
 	}
 	if other.UpdateEvery != nil {
 		c.UpdateEvery = other.UpdateEvery
