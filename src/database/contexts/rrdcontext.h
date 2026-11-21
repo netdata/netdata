@@ -748,6 +748,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 size_t query_scope_hosts_pin(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                              RRDHOST ***hosts, struct query_versions *versions);
 void query_scope_hosts_unpin(RRDHOST **hosts, size_t count);
+int query_scope_unittest(void);
 
 typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 typedef bool (*foreach_stop_cb_t)(void *data);  // optional: true stops a scan, also over entries the scope rejects

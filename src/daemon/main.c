@@ -585,6 +585,7 @@ int netdata_main(int argc, char **argv) {
                             if (build_info_system_info_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (query_plan_unittest()) return 1;
+                            if (query_scope_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (os_socket_egress_interface_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
@@ -637,6 +638,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "alertqueuetest") == 0) {
                             unittest_running = true;
                             return alert_queue_unittest();
+                        }
+                        else if(strcmp(optarg, "queryscopetest") == 0) {
+                            unittest_running = true;
+                            return query_scope_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
