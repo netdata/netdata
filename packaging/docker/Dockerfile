@@ -48,6 +48,7 @@ RUN chmod +x netdata-installer.sh && \
    --disable-ebpf \
    --enable-plugin-otel \
    --enable-plugin-netflow \
+   --disable-plugin-dem \
    --internal-systemd-journal \
    ${EXTRA_INSTALL_OPTS} \
    --install-no-prefix / \
@@ -74,8 +75,6 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/systemd-cat-native /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
-    install -m 0755 packaging/docker/netdata-dem-docker /app/usr/libexec/netdata/netdata-dem-docker && \
-    install -m 0755 packaging/docker/netdata-dem-docker-host.sh /app/usr/libexec/netdata/netdata-dem-docker-host.sh && \
     mkdir -p /deps/etc && \
     cp -rp /deps/etc /app/usr/local/etc && \
     chmod -R o+rX /app && \
@@ -103,6 +102,32 @@ RUN mkdir -p /app/usr/sbin/ \
     find /app/var/lib/netdata /app/var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /app/var/lib/netdata /app/var/cache/netdata -type f -exec chmod 0660 {} \; && \
     chmod 0700 /app/var/lib/netdata/cloud.d
+
+# Add only the DEM component to the common Agent build. Runtime inputs come from
+# the existing companion release, through a separate BuildKit context.
+FROM builder AS dem-builder
+RUN cmake -S . -B build -DENABLE_PLUGIN_DEM=ON \
+        -DNETDATA_DEM_PRELOAD_PATH=/opt/netdata-dem-runtime && \
+    cmake --build build --target dem-plugin && \
+    DESTDIR=/dem-app cmake --install build --component plugin-dem
+
+# Seal at the final container path. Keep these private files outside /app's
+# recursive public permissions and outside the persistent Agent data volumes.
+RUN --mount=type=bind,from=dem-inputs,source=.,target=/dem-inputs \
+    install -d -m 0700 -o netdata -g netdata /opt/netdata-dem-runtime && \
+    mkdir /tmp/dem-preload-config && \
+    printf 'runtime:\n  mode: managed\n  offline_keyring: /dem-inputs/release-public.gpg\n' \
+        > /tmp/dem-preload-config/dem.conf && \
+    su -s /bin/sh -c 'exec "$0" "$@"' -- netdata \
+        /opt/netdata.git/build/dem.plugin runtime preload \
+        --config-dir /tmp/dem-preload-config --root /opt/netdata-dem-runtime \
+        --release /dem-inputs/release.json --archive /dem-inputs/runtime.tar.zst && \
+    install -d /dem-app/usr/share/netdata/topology-ip-intel && \
+    install -m 0644 /dem-inputs/topology-ip-intel/README.md \
+        /dem-inputs/topology-ip-intel/topology-ip-asn.mmdb \
+        /dem-inputs/topology-ip-intel/topology-ip-geo.mmdb \
+        /dem-inputs/topology-ip-intel/topology-ip-intel.json \
+        /dem-app/usr/share/netdata/topology-ip-intel/
 
 #####################################################################
 # This image contains preinstalled dependencies
@@ -192,3 +217,15 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
+
+FROM base AS dem
+COPY --from=dem-builder --chown=0:0 /dem-app/ /
+COPY --from=dem-builder --chown=${NETDATA_UID}:${NETDATA_GID} \
+    /opt/netdata-dem-runtime /opt/netdata-dem-runtime
+# COPY creates the destination root with default directory permissions.
+RUN chmod 0700 /opt/netdata-dem-runtime && \
+    su -s /bin/sh -c 'exec "$0" "$@"' -- netdata \
+    /usr/libexec/netdata/plugins.d/dem.plugin runtime preload-validate
+
+# Building without --target keeps the ordinary, browser-free image.
+FROM base AS regular
