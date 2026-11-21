@@ -18,7 +18,7 @@ typedef void *(*poll_events_add_callback_t)(POLLINFO *pi, nd_poll_event_t *event
 typedef void (*poll_events_del_callback_t)(POLLINFO *pi);
 typedef int (*poll_events_rcv_callback_t)(POLLINFO *pi, nd_poll_event_t *events);
 typedef int (*poll_events_snd_callback_t)(POLLINFO *pi, nd_poll_event_t *events);
-typedef void (*poll_events_tmr_callback_t)(void *timer_data);
+typedef void (*poll_events_tmr_callback_t)(POLLJOB *p, void *timer_data);
 
 struct pollinfo {
     POLLJOB *p;             // the parent
@@ -83,6 +83,7 @@ void poll_default_del_callback(POLLINFO *pi);
 void *poll_default_add_callback(POLLINFO *pi, nd_poll_event_t *events, void *data);
 
 void poll_process_remove_from_poll(POLLINFO *pi);
+void pollinfo_set_events(POLLINFO *pi, nd_poll_event_t events);
 
 POLLINFO *poll_add_fd(POLLJOB *p
                       , int fd

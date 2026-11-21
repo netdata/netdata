@@ -40,6 +40,11 @@ int os_get_fd_open_max(void) {
 }
 
 void os_close_range(int first, int last, int flags) {
+#if defined(OS_WINDOWS)
+    // Windows child processes use an explicit handle list; there is no safe
+    // portable equivalent of close_range() for arbitrary inherited handles.
+    return;
+#endif
 #if defined(HAVE_CLOSE_RANGE)
     if(close_range(first, last, flags) == 0) return;
 #endif

@@ -61,13 +61,17 @@
                 <ComponentRef Id="NetdataRoot" />
                 <ComponentRef Id="NetdataVarLib" />
                 <ComponentRef Id="NetdataVarLibNetdata" />
+                <ComponentRef Id="NetdataVarLog" />
+                <ComponentRef Id="NetdataVarLogNetdata" />
                 <ComponentRef Id="NetdataEtcGo" />
                 <ComponentRef Id="NetdataEtcHealth" />
                 <ComponentRef Id="NetdataEtcPython" />
                 <ComponentRef Id="NetdataEtcStatsd" />
+                <ComponentRef Id="NetdataEtcCustomPlugins" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <FeatureGroupRef Id="NetdataDriver" />
                 <ComponentRef Id="NetdataService" />
+                <ComponentRef Id="EditNetdataConfigShortcut" />
             </Feature>
 
             <StandardDirectory Id="ProgramFiles64Folder">
@@ -83,6 +87,9 @@
                         <Directory Id="VARLIBDIR" Name="lib">
                             <Directory Id="VARLIBDIRNETDATA" Name="netdata" />
                         </Directory>
+                        <Directory Id="VARLOGDIR" Name="log">
+                            <Directory Id="VARLOGDIRNETDATA" Name="netdata" />
+                        </Directory>
                     </Directory>
                     <Directory Id="ETCDIR" Name="etc">
                         <Directory Id="ETCDIRNETDATA" Name="netdata">
@@ -90,6 +97,7 @@
                             <Directory Id="ETCDIRNETDATAHEALTH" Name="health.d" />
                             <Directory Id="ETCDIRNETDATAPYTHON" Name="python.d" />
                             <Directory Id="ETCDIRNETDATASTATSD" Name="statsd.d" />
+                            <Directory Id="ETCDIRNETDATACUSTOMPLUGINS" Name="custom-plugins.d" />
                         </Directory>
                     </Directory>
                     <Directory Id="DEVDIR" Name="dev">
@@ -184,6 +192,10 @@
     </Package>
 
     <Fragment>
+            <StandardDirectory Id="ProgramMenuFolder">
+                <Directory Id="NetdataProgramMenuFolder" Name="Netdata" />
+            </StandardDirectory>
+
             <UI>
                 <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
                 <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service..." />
@@ -200,14 +212,23 @@
 
             <!-- All the files except for the ones we need to handle specially -->
             <ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
-                <Files Include="C:\msys64\opt\netdata\**">
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" />
+                <Files Include="@NETDATA_INSTALL_PREFIX_WIX@\**">
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata.exe" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata_manifest.xml" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata.dll" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.sys" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.inf" />
                 </Files>
             </ComponentGroup>
+
+            <Component Id="EditNetdataConfigShortcut" Directory="NetdataProgramMenuFolder" Guid="a1e5e77f-9122-44aa-b8e0-57c26f586ff1">
+                <Shortcut Id="EditNetdataConfig" Name="Edit Netdata Configuration"
+                          Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                          Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[USRLIBEXECNETDATADIR]edit-config.ps1&quot; netdata.conf -PauseOnError"
+                          WorkingDirectory="USRLIBEXECNETDATADIR" />
+                <RegistryValue Root="HKLM" Key="Software\Netdata\Installer" Name="EditConfigShortcut" Type="integer" Value="1" KeyPath="yes" />
+                <RemoveFolder Id="NetdataProgramMenuFolder" On="uninstall" />
+            </Component>
 
             <Component Id="NetdataVarCache" Directory="VARCACHEDIR" Guid="a41bc888-60d4-4d99-bb4f-da92614a8f72">
                 <CreateFolder />
@@ -218,6 +239,14 @@
             </Component>
 
             <Component Id="NetdataVarLibNetdata" Directory="VARLIBDIRNETDATA" Guid="e3a7ad51-4387-466b-b611-cf1ae8d72986">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataVarLog" Directory="VARLOGDIR" Guid="a5357a5e-743f-41a1-a038-abf442af6a9b">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataVarLogNetdata" Directory="VARLOGDIRNETDATA" Guid="0a09c924-e377-4e9d-b44b-34a80d468064">
                 <CreateFolder />
             </Component>
 
@@ -250,6 +279,10 @@
             </Component>
 
             <Component Id="NetdataEtcStatsd" Directory="ETCDIRNETDATASTATSD" Guid="5f53221b-691f-4026-8396-52c6b2ac025f">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataEtcCustomPlugins" Directory="ETCDIRNETDATACUSTOMPLUGINS" Guid="9cddfb75-cf4b-4825-8b1e-662a1a4e5ca7">
                 <CreateFolder />
             </Component>
 
@@ -290,18 +323,18 @@
 
             <!-- Install wevt manifest/dll files -->
             <ComponentGroup Id="WevtComponents" Directory="System64Folder">
-                <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+                <File Id="WevtDll" Name="wevt_netdata.dll" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata.dll">
                 </File>
 
-                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
+                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata_manifest.xml">
                 </File>
             </ComponentGroup>
 
             <!-- Install netdata driver file -->
             <FeatureGroup Id="NetdataDriver">
-                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="DRIVERDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="DRIVERDIR" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
                 </File>
-                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="INFDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
+                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="INFDIR" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
                 </File>
             </FeatureGroup>
 
@@ -320,7 +353,7 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="DllPermission" After="InstallFiles" />
+                <Custom Action="DllPermission" After="InstallFiles" Condition="NOT REMOVE" />
             </InstallExecuteSequence>
 
             <SetProperty
@@ -338,11 +371,83 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="InstallManifest" After="InstallFiles" />
+                <Custom Action="InstallManifest" After="DllPermission" Condition="NOT REMOVE" />
+            </InstallExecuteSequence>
+
+            <!-- Unregister the manifest on a pure uninstall (REMOVE="ALL").
+                 Scheduled Before="RemoveFiles" so the manifest XML is still in System32
+                 when wevtutil reads it.
+                 Return=ignore because wevtutil um fails harmlessly when nothing is registered. -->
+            <SetProperty
+                Id="UninstallManifest"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; um &quot;[System64Folder]wevt_netdata_manifest.xml&quot;"
+                Before="UninstallManifest"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="UninstallManifest"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="UninstallManifest" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+            </InstallExecuteSequence>
+
+            <!-- Remove classic registrations left by builds that predate the manifest.
+                 Classic Event Log keys named Netdata/* are distinct from ETW channels and
+                 make Event Viewer show duplicate Netdata folders. This runs after the
+                 manifest is registered so an upgrade repairs those stale entries in place. -->
+            <SetProperty
+                Id="CleanupUcrtEventLogRegistrations"
+                Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Daemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Collectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Access&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Health&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Aclk&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\NetdataWEL&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataDaemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataCollectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAccess&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataHealth&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAclk&quot; /f &amp; exit /b 0&quot;"
+                Before="CleanupUcrtEventLogRegistrations"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="CleanupUcrtEventLogRegistrations"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="CleanupUcrtEventLogRegistrations" After="InstallManifest" Condition="NOT REMOVE" />
+            </InstallExecuteSequence>
+
+            <!-- Unregister the manifest on upgrade before re-registering with the new one.
+                 Must run after InstallFiles (new manifest is on disk) but Before="DllPermission"
+                 so the sequence is: UninstallManifestUpgrade (um) → DllPermission (icacls) →
+                 InstallManifest (im). Without this ordering, InstallManifest would register
+                 the publisher first and UninstallManifestUpgrade would immediately unregister it,
+                 leaving no WINEVT channel registration and breaking the Event Viewer folder hierarchy.
+                 Provider names and GUIDs are unchanged across versions so wevtutil um with
+                 the new manifest correctly unregisters the old publisher.
+                 WiX requires a separate action identifier — a single action cannot be
+                 scheduled at two positions in the same InstallExecuteSequence. -->
+            <SetProperty
+                Id="UninstallManifestUpgrade"
+                Value="&quot;[System64Folder]wevtutil.exe&quot; um &quot;[System64Folder]wevt_netdata_manifest.xml&quot;"
+                Before="UninstallManifestUpgrade"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="UninstallManifestUpgrade"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="UninstallManifestUpgrade" Before="DllPermission" Condition="WIX_UPGRADE_DETECTED" />
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
-                <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
+                <File Id="netdata.exe" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata.exe" KeyPath="yes" />
 
                 <ServiceInstall Id="InstallService"
                                 Name="Netdata"

@@ -38,7 +38,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
                "Cannot connect to UNIX socket on path '%s'.",
                path);
 
-        close(fd);
+        sock_close(fd);
         return -1;
     }
 
@@ -102,7 +102,7 @@ typedef struct connect_attempt {
 
 static void connect_attempt_close(CONNECT_ATTEMPT *a) {
     if(a->fd != -1) {
-        close(a->fd);
+        sock_close(a->fd);
         a->fd = -1;
     }
 }
@@ -450,7 +450,7 @@ int connect_to_this_ip46(
                "Failed to restore blocking mode on the socket connected to '%s', port '%s'",
                host, service);
 
-        close(fd);
+        sock_close(fd);
         fd = -1;
         err = ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET;
     }

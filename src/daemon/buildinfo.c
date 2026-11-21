@@ -1446,18 +1446,22 @@ static void populate_system_info(void) {
         free_system_info = true;
     }
     else {
+#if !defined(OS_WINDOWS)
         bool started_spawn_server = false;
         if(!netdata_main_spawn_server) {
             started_spawn_server = true;
             netdata_main_spawn_server_init(NULL, 0, NULL);
         }
+#endif
 
         system_info = rrdhost_system_info_create();
         rrdhost_system_info_detect(system_info);
         free_system_info = true;
 
+#if !defined(OS_WINDOWS)
         if(started_spawn_server)
             netdata_main_spawn_server_cleanup();
+#endif
     }
 
     for (size_t i = 0; i < BIB_TERMINATOR; i++) {
