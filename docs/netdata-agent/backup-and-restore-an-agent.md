@@ -20,16 +20,22 @@ Users are responsible for backing up, recovering, and ensuring their data's avai
 
 When planning a Netdata Agent backup, it's essential to recognize the types of data that can be backed up, either individually or collectively:
 
-| Data type           | Description                                          | Location                                                        |
-|---------------------|------------------------------------------------------|-----------------------------------------------------------------|
-| Agent configuration | Files controlling configuration of the Netdata Agent | [config directory](/docs/netdata-agent/configuration/README.md) |
-| Metrics             | Database files                                       | /var/cache/netdata                                              |
-| Identity            | Claim token, API key and some other files            | /var/lib/netdata                                                |
+| Data type           | Description                                          | Native packages / Local builds                                 | Static builds                                                   |
+|---------------------|------------------------------------------------------|-----------------------------------------------------------------|-----------------------------------------------------------------|
+| Agent configuration | Files controlling configuration of the Netdata Agent | [config directory](/docs/netdata-agent/configuration/README.md) | [config directory](/docs/netdata-agent/configuration/README.md) |
+| Metrics             | Database files                                       | /var/cache/netdata                                              | /opt/netdata/var/cache/netdata                                  |
+| Identity            | Claim token, API key and some other files            | /var/lib/netdata                                                | /opt/netdata/var/lib/netdata                                    |
+
+:::note
+
+For Docker containers, the paths inside the container are the same as those listed under **Native packages / Local builds**.
+
+:::
 
 ## Backup and Restore Scenarios
 
 <details>
-<summary><strong>Backing up to restore data in case of a node failure</strong></summary><br/>
+<summary><strong>Backing up to restore data in case of a node failure</strong></summary>
 
 In this standard scenario, you're backing up your Netdata Agent in case of a node failure or data corruption so that the metrics and the configuration can be recovered. The purpose is not to back up/restore the application itself.
 
@@ -39,7 +45,7 @@ In this standard scenario, you're backing up your Netdata Agent in case of a nod
 graph TB
     Start("**Start Backup Process**")
     
-    Verify("**Verify Directory Paths**<br/><br/>Check that paths contain<br/>expected information<br/><br/>/etc/netdata/<br/>/var/cache/netdata<br/>/var/lib/netdata")
+    Verify("**Verify Directory Paths**<br/><br/>Check that paths contain<br/>expected information<br/>(see table above for<br/>install-type-specific paths)")
     
     Stop("**Stop Netdata Agent**<br/><br/>Recommended for<br/>Metrics/database files")
     
@@ -81,11 +87,31 @@ graph TB
 
 3. **Create a backup archive**
 
-   Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user to access all the files in the directories.
+    Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user to access all the files in the directories.
 
-   ```bash
-   sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
-   ```
+    <details>
+    <summary><strong>For Native Packages and Local Builds</strong></summary>
+
+    ```bash
+    sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
+    ```
+
+    </details>
+
+    <details>
+    <summary><strong>For Static Builds</strong></summary>
+
+    ```bash
+    sudo tar -cvpzf netdata_backup.tar.gz /opt/netdata/etc/netdata/ /opt/netdata/var/cache/netdata /opt/netdata/var/lib/netdata
+    ```
+
+    :::warning
+
+    Exclude the `.environment` and `.install-type` files from your backup to avoid breaking updates.
+
+    :::
+
+    </details>
 
    Stopping the Netdata Agent is typically necessary to back up the database files of the Netdata Agent.
 
@@ -98,11 +124,10 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 - Back up the database files
 - Restart the Netdata Agent.
 
-<br/>
 </details>
 
 <details>
-<summary><strong>Restoring Netdata</strong></summary><br/>
+<summary><strong>Restoring Netdata</strong></summary>
 
 ### Restoration Process
 
@@ -116,17 +141,16 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-start-it
    ```
 
-   :::warning
+    :::warning
 
-   **Database File Restoration**
+    **Database File Restoration**
 
-   If you’re going to restore the database files, then you should first ensure that the Metrics directory is empty.
+    If you're going to restore the database files, then you should first ensure that the Metrics directory is empty.
 
-   ```bash
-   sudo rm -Rf /var/cache/netdata
-   ```
+    - **Native packages / Local builds**: `sudo rm -Rf /var/cache/netdata`
+    - **Static builds**: `sudo rm -Rf /opt/netdata/var/cache/netdata`
 
-   :::
+    :::
 
 2. **Restore from backup archive**
 
@@ -138,5 +162,4 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 
    [Start the Netdata Agent](/docs/netdata-agent/start-stop-restart.md)
 
-<br/>
 </details>
