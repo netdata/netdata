@@ -59,7 +59,6 @@ jobs:
       run: ${{ steps.check-run.outputs.run }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
       static-native: ${{ steps.check-static.outputs.static-native }}
-      runtime: ${{ steps.check-runtime-files.outputs.any_modified }}
     steps:
       - name: Checkout
         id: checkout
@@ -123,46 +122,7 @@ jobs:
             packaging/**/*.md
             packaging/repoconfig/
             src/go/tools/topology-ip-intel-downloader/README.md
-      - name: Check runtime release and execution files
-        id: check-runtime-files
-        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
-        with:
-          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          output_renamed_files_as_deleted_and_added: true
-          files: |
-            .github/workflows/dem-runtime-release.yml
-            .github/workflows/dem-runtime-node-tests.yml
-            .github/workflows/build.yml
-            .github/workflows/packaging.yml
-            .github/workflows/docker.yml
-            .github/data/distros.yml
-            .github/scripts/prepare-release-base.sh
-            packaging/release_info.py
-            packaging/dem-runtime/**
-            packaging/installer/netdata-dem-runtime.sh
-            packaging/cmake/Modules/NetdataVersion.cmake
-            packaging/cmake/Modules/NetdataGoTools.cmake
-            packaging/cmake/Modules/Packaging.cmake
-            packaging/cmake/Modules/NetdataPluginDem.cmake
-            src/dem-runtime/**
-            src/go/cmd/demplugin/**
-            src/go/plugin/dem/**
-            src/go/plugin/go.d/pkg/ndexec/**
-            src/go/pkg/buildinfo/**
-            src/go/tools/dem-runtime-release/**
-            src/go/go.mod
-            src/go/go.sum
-            src/collectors/utils/nd-run.c
-            src/collectors/utils/nd-process-tree.*
-            src/collectors/utils/nd-file-reader.*
-            src/collectors/utils/supervisor-pipes.h
-            src/collectors/utils/exec-signals.h
-          files_ignore: |
-            **/*.md
-            **/metadata.yaml
-            **/*_test.go
-            **/test_*.py
-            **/tests/**
+            src/go/tools/topology-ip-intel-downloader/stock/README.md
       - name: Check static build files
         id: check-static-build-files
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
@@ -184,6 +144,7 @@ jobs:
             packaging/**/*.md
             packaging/repoconfig/
             src/go/tools/topology-ip-intel-downloader/README.md
+            src/go/tools/topology-ip-intel-downloader/stock/README.md
       - name: List all changed files in pattern
         continue-on-error: true
         if: github.event_name != 'workflow_dispatch'
@@ -226,15 +187,6 @@ jobs:
           else
             echo 'static-native=0' >> "${GITHUB_OUTPUT}"
           fi
-
-  runtime-companion-ci:
-    needs: file-check
-    if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.runtime == 'true'
-    uses: ./.github/workflows/dem-runtime-release.yml
-    with:
-      source_sha: ${{ github.sha }}
-      channel: devel
-      publish: false
 
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball

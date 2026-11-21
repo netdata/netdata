@@ -25,12 +25,11 @@ import (
 
 // runRuntimeCommand runs `dem.plugin runtime <command> [flags]`; args start
 // after "runtime". main routes these commands before cli.Parse, so they never
-// enter the plugin protocol. --cancel-on-stdin-close borrows input as a private
-// control channel; the caller retains ownership of input.
-func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) error {
+// enter the plugin protocol.
+func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		return errors.New(
-			"usage: dem.plugin runtime {ensure|install|update|fetch|prepare|activate|rollback|repair|uninstall|preload|status|qualify|setup-plan} [flags]",
+			"usage: dem.plugin runtime {install|update|fetch|prepare|activate|rollback|repair|uninstall|preload|status|qualify|setup-plan} [flags]",
 		)
 	}
 	command, flags := args[0], args[1:]
@@ -43,8 +42,8 @@ func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdou
 		return runNativeCommand(ctx, command, flags, stdout, stderr)
 	}
 	switch command {
-	case "ensure", "install", "update", "fetch", "prepare", "activate", "rollback", "repair", "uninstall", "preload", "preload-validate", "status", "qualify":
-		return runAdminCommand(ctx, command, flags, input, stdout, stderr)
+	case "install", "update", "fetch", "prepare", "activate", "rollback", "repair", "uninstall", "preload", "preload-validate", "status", "qualify":
+		return runAdminCommand(ctx, command, flags, stdout, stderr)
 	default:
 		return fmt.Errorf("unknown runtime command %q", command)
 	}
@@ -56,7 +55,6 @@ func runAdminCommand(
 	ctx context.Context,
 	command string,
 	args []string,
-	input *os.File,
 	stdout, stderr io.Writer,
 ) error {
 	f, err := parseAdminFlags(command, args, stderr)
@@ -68,20 +66,6 @@ func runAdminCommand(
 	}
 	if command == "update" {
 		return errors.New(runtimeUpdateGuidance)
-	}
-	if err := f.validateEnsureOnly(command); err != nil {
-		return err
-	}
-	if f.cancelOnInputClose {
-		if input == nil {
-			return errors.New("--cancel-on-stdin-close requires a private stdin control channel")
-		}
-		var finish func()
-		ctx, finish, err = runtimeInputContext(ctx, input)
-		if err != nil {
-			return err
-		}
-		defer finish()
 	}
 	if err := f.validate(command); err != nil {
 		return err
@@ -134,18 +118,16 @@ func runAdminCommand(
 }
 
 type adminFlags struct {
-	configDir          string
-	expectedRoot       string
-	cancelOnInputClose bool
-	release            string
-	manualUpdates      bool
-	cache              string
-	root               string
-	archive            string
-	allowDownload      bool
-	output             string
-	keyring            string
-	preparedOnly       bool
+	configDir     string
+	release       string
+	manualUpdates bool
+	cache         string
+	root          string
+	archive       string
+	allowDownload bool
+	output        string
+	keyring       string
+	preparedOnly  bool
 }
 
 const runtimeUpdateGuidance = "Runtime updates belong to the Agent installation owner. Update or reinstall the Agent through its installer, package manager or deployment workflow to acquire its matching runtime; runtime update does not change runtime storage."
@@ -158,18 +140,6 @@ func parseAdminFlags(command string, args []string, stderr io.Writer) (adminFlag
 		flags.Usage = func() { fmt.Fprintln(stderr, runtimeUpdateGuidance) }
 	}
 	flags.StringVar(&f.configDir, "config-dir", "", "directory containing administrator dem.conf")
-	flags.StringVar(
-		&f.expectedRoot,
-		"expected-root",
-		"",
-		"require this canonical managed root before ensure mutates storage",
-	)
-	flags.BoolVar(
-		&f.cancelOnInputClose,
-		"cancel-on-stdin-close",
-		false,
-		"cancel ensure cooperatively when its private stdin control channel closes",
-	)
 	flags.StringVar(&f.release, "release", "", "local signed release descriptor; otherwise use this Agent's configured release URL")
 	flags.BoolVar(
 		&f.manualUpdates,
@@ -198,24 +168,9 @@ func parseAdminFlags(command string, args []string, stderr io.Writer) (adminFlag
 	return f, nil
 }
 
-// validateEnsureOnly checks the ensure-only flags, which precede every other
-// check because ensure arms its stdin control channel next.
-func (f adminFlags) validateEnsureOnly(command string) error {
-	if command != "ensure" && (f.expectedRoot != "" || f.cancelOnInputClose) {
-		return errors.New("--expected-root and --cancel-on-stdin-close are only valid for ensure")
-	}
-	if f.expectedRoot != "" {
-		return validateSetupPlanPath(f.expectedRoot)
-	}
-	return nil
-}
-
 func (f adminFlags) validate(command string) error {
 	if f.preparedOnly && command != "rollback" {
 		return errors.New("--prepared-only is only valid for rollback")
-	}
-	if command == "ensure" && os.Geteuid() == 0 {
-		return errors.New("runtime ensure must run as the nonroot DEM service account")
 	}
 	if f.configDir != "" && !filepath.IsAbs(f.configDir) {
 		return errors.New("--config-dir must be absolute")
@@ -228,13 +183,13 @@ func (f adminFlags) validate(command string) error {
 			return errors.New("--release must be absolute")
 		}
 		if (f.archive != "") == f.allowDownload {
-			return errors.New("provide either --archive or --allow-download for ensure/install/fetch/prepare/repair/preload")
+			return errors.New("provide either --archive or --allow-download for install/fetch/prepare/repair/preload")
 		}
 		if f.archive != "" && f.release == "" {
 			return errors.New("offline archive requires an absolute --release path")
 		}
 	} else if f.release != "" || f.archive != "" || f.allowDownload {
-		return errors.New("--release, --archive and --allow-download are only valid for ensure/install/fetch/prepare/repair/preload")
+		return errors.New("--release, --archive and --allow-download are only valid for install/fetch/prepare/repair/preload")
 	}
 	if command == "fetch" {
 		if !filepath.IsAbs(f.output) || f.cache != "" {
@@ -265,7 +220,7 @@ func (f adminFlags) validate(command string) error {
 // preparesCandidate reports whether the command acquires and verifies a release.
 func preparesCandidate(command string) bool {
 	switch command {
-	case "ensure", "install", "fetch", "prepare", "repair", "preload":
+	case "install", "fetch", "prepare", "repair", "preload":
 		return true
 	}
 	return false
@@ -327,13 +282,9 @@ func (r *runtimeCommandReport) selectedInstallation(status browserruntime.Status
 	}
 }
 
-// writeReport records a command failure in the report and prints it. It owns
-// the failed ensure outcome, including a close failure after a selection.
+// writeReport records a command failure in the report and prints it.
 func writeReport(stdout io.Writer, report runtimeCommandReport, err error) error {
 	if err != nil {
-		if report.Command == "ensure" {
-			report.Outcome = "failed"
-		}
 		report.SetupError = err.Error()
 	}
 	encoder := json.NewEncoder(stdout)

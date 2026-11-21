@@ -62,11 +62,6 @@ func TestManagedExactPairKeepsPinnedOldConsumers(t *testing.T) {
 	compatible, err := newStore.AcquireSelected()
 	require.NoError(t, err, "execution compatibility is independent of installation pairing")
 	require.NoError(t, compatible.Close())
-	_, _, err = newStore.BeginPublishedEnsure(ctx, func(context.Context) (VerifiedRelease, error) {
-		t.Fatal("ensure must not hide a required paired update")
-		return VerifiedRelease{}, nil
-	})
-	require.ErrorIs(t, err, ErrIncompatible)
 
 	candidate, err := newStore.BeginPublishedInstall(ctx,
 		ReleaseInstallOptions{Operation: InstallRelease, Updates: ManualUpdates},
@@ -153,7 +148,7 @@ func TestPreloadChecksAgentPairWithoutChangingPersistedRecordShape(t *testing.T)
 	require.NotContains(t, string(record), "\"agent\"", "old preload reader retains its existing record schema")
 }
 
-func TestEnsureChecksPreparedPairWithoutFetching(t *testing.T) {
+func TestUnchangedPreparationChecksRetainedPair(t *testing.T) {
 	agent := pairFixture("v2.12.0")
 	release, archive := pairedBundleFixture(t, agent, pairInfoFixture(agent))
 	s, _ := testStore(t)
@@ -163,10 +158,9 @@ func TestEnsureChecksPreparedPairWithoutFetching(t *testing.T) {
 	wrong.Source = strings.Repeat("b", 40)
 	require.NoError(t, os.Chmod(path, 0600))
 	require.NoError(t, os.WriteFile(path, pairInfoFixture(wrong), 0600))
-	_, _, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (VerifiedRelease, error) {
-		t.Fatal("ensure must inspect the existing payload without fetching")
-		return VerifiedRelease{}, nil
-	})
+	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: PrepareRelease},
+		func(context.Context) (VerifiedRelease, error) { return verifyFixture(t, release) })
+	require.Nil(t, candidate)
 	require.ErrorIs(t, err, ErrDamaged)
 }
 

@@ -259,10 +259,13 @@ class HostPolicyTests(unittest.TestCase):
         self.assertEqual(len(self.registrations()), 2)
 
     def test_policy_only_shared_setup_status_and_last_removal(self):
-        self.assertOK(self.prepare())
-        self.assertOK(self.prepare())
-        self.assertOK(self.prepare('docker-two'))
+        path = '/opt/netdata-dem-runtime'
+        self.assertOK(self.prepare(path=path))
+        self.assertOK(self.prepare(path=path))
+        self.assertOK(self.prepare('docker-two', path))
         self.assertEqual(len(self.profiles()), 1)
+        self.assertIn('"/opt/netdata-dem-runtime/generations/*/chrome" flags=(unconfined)',
+                      self.profiles()[0].read_text())
         self.assertEqual(len(self.registrations()), 2)
         self.assertEqual(self.calls('netdata'), [])
         self.assertEqual(self.calls('dem.plugin'), [])
@@ -276,7 +279,19 @@ class HostPolicyTests(unittest.TestCase):
         self.assertEqual(self.registrations(), [])
         self.assertEqual((self.root / 'aa-profiles').read_text(), 'unrelated (enforce)\n')
 
-    def test_docker_root_is_literal_execution_path_not_host_path(self):
+    def test_policy_does_not_use_or_erase_retired_docker_helper(self):
+        self.state.mkdir(mode=0o700)
+        helpers = self.state / 'docker-helpers'
+        helpers.mkdir(mode=0o700)
+        cached = helpers / 'deployment-docker-one'
+        cached.write_bytes(b'#!/bin/sh\nexit 99\n')
+        cached.chmod(0o600)
+        self.assertOK(self.prepare())
+        self.assertOK(self.invoke('policy-status', '--deployment', 'docker-one'))
+        self.assertOK(self.remove())
+        self.assertEqual(cached.read_bytes(), b'#!/bin/sh\nexit 99\n')
+
+    def test_policy_root_is_literal_execution_path(self):
         path = '/absent/space "quote" *?[ab]{x}@{HOME}^\\literal/exec'
         self.assertOK(self.prepare(path=path))
         source = self.profiles()[0].read_text()

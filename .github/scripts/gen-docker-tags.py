@@ -9,7 +9,6 @@ from typing import Final
 
 from modules.release_versions import stable_reaches_preview, version_core
 
-github_event: Final = sys.argv[1]
 version: Final = sys.argv[2]
 
 REPO: Final = 'netdata/netdata'
@@ -22,21 +21,11 @@ REPOS: Final = {
 NIGHTLY_TAG: Final = 'edge'
 
 
-tags = {
-    k: [] for k in REPOS.keys()
-}
-
-nightly = False
-
 match version:
     case '':
-        for h in REPOS.keys():
-            tags[h] = [f'{REPOS[h]}:test']
+        versions = ['test']
     case 'nightly':
-        for h in REPOS.keys():
-            tags[h] = [f'{REPOS[h]}:{t}' for t in (NIGHTLY_TAG, 'latest')]
-
-        nightly = True
+        versions = [NIGHTLY_TAG, 'latest']
     case _:
         version_core(version)
         if '-' in version.split('+', 1)[0]:
@@ -53,21 +42,18 @@ match version:
             if stable_reaches_preview(version):
                 versions.append('preview')
 
-        for h in REPOS.keys():
-            tags[h] = [f'{REPOS[h]}:{t}' for t in versions]
-
-all_tags = [x for y in tags.values() for x in y]
-
-
 def write_output(name: str, value: str) -> None:
     with open(os.getenv('GITHUB_OUTPUT'), 'a') as f:
         f.write(f'{name}={value}\n')
 
 
-write_output('tags', ','.join(all_tags))
-write_output('nightly', '1' if nightly else '0')
-write_output('nightly_tag', NIGHTLY_TAG)
+write_output('nightly', '1' if version == 'nightly' else '0')
+for suffix, prefix in (('', ''), ('-dem', 'dem_')):
+    write_output(f'{prefix}nightly_tag', NIGHTLY_TAG + suffix)
+    write_output(f'{prefix}tags', ','.join(
+        f'{repo}:{tag}{suffix}' for repo in REPOS.values() for tag in versions
+    ))
 
-for h in REPOS.keys():
-    write_output(f'{h}_tags', ','.join(tags[h]))
-    write_output(f'{h}_repo', REPOS[h])
+for registry, repo in REPOS.items():
+    write_output(f'{registry}_tags', ','.join(f'{repo}:{tag}' for tag in versions))
+    write_output(f'{registry}_repo', repo)

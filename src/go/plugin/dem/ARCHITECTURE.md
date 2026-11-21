@@ -1191,12 +1191,11 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
   claim is reserved. Contained structural configuration validation still runs before a malformed binding can become a
   named-dependency waiter. Packages: `collector/internal/syntheticjob`, `runtimehost`.
 - **Fixed readiness.** Readiness reads the fixed process state: there is no import polling or installation-driven
-  readiness notification. Installation owners prepare and select the next pair after drainage; no runtime updater
-  service runs inside DEM. Packages: `runtimehost`, `browserruntime`.
+  readiness notification. Installation owners control updates and activation. DEM has no runtime updater service. Packages: `runtimehost`, `browserruntime`.
 - **A use per execution.** The runner acquires a use (`BeginUse`) before inspecting runtime files, passes its completion
   handle to `nd-run`, and releases it after supervised drainage and local reader joins. Packages: `runner`,
   `browserruntime`.
-- **Explicit installation.** CLI install, update, ensure, repair and preload verify and prepare authenticated artifacts
+- **Explicit installation.** CLI install, prepare, repair and preload verify and prepare authenticated artifacts
   without starting Node or a browser. Installation accepts only a `VerifiedRelease`. Explicit `runtime qualify` runs
   the contract checks, sandboxed journey and Lighthouse audit against the installed release, with supervised drainage;
   its calling account and environment are reported and its failure does not undo installation. Release CI runs browser
@@ -1210,7 +1209,7 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
   bind those bytes to the execution contract. The configured URL can change the source, not relax installation pairing.
   Execution checks contract/platform compatibility and payload integrity/provenance without comparing plugin release
   stamps. This same rule permits ordinary development builds to use an installed compatible runtime; no bypass exists.
-  Published Agent updates acquire the exact companion only for enrolled installations. Unstamped source updates
+  Source/static updates on released builds acquire the exact companion only for enrolled installations. Unstamped source updates
   validate and retain the installed runtime before replacement and restart, without acquiring bytes or changing
   selection, consent or recovery records. Native package dependencies
   bind the final versions, while helper capabilities separately cover pre-unpack/pre-erasure hooks. Packages:
@@ -1220,10 +1219,9 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
   Beginning B→C replaces the recovery point with B; older A may retire, including on failed attempts. Unchanged preparation verifies the existing runtime without replacing the recovery point.
   Repeated recovery restores B without walking back through older pairs.
   Reimport after an older binary's GC requires the installation owner to supply authenticated inputs again.
-  Source/static owners stage authenticated inputs temporarily and use normal Agent installation/repair; they do not
-  snapshot or restore Agent executable files. Docker/preload owners retain their image/configuration/root artifacts. The CLI reads
-  persisted recovery state without claiming another process's active identity. Packages: `browserruntime`,
-  `cmd/demplugin`, `packaging/installer`, `packaging/docker`.
+  Source/static owners stage authenticated inputs temporarily and use normal Agent installation/repair. The CLI reads
+  persisted runtime recovery state without claiming another process's active identity. Packages: `browserruntime`,
+  `cmd/demplugin`, `packaging/installer`.
 - **Maintenance is not monitoring.** Startup and hourly maintenance retire unprotected old releases independently of
   enabled monitors. Maintenance and CLI errors never become website observations or invalidate a usable runtime.
   Packages: `runtimehost`, `cmd/demplugin`.
@@ -1234,6 +1232,11 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
 - **Preloads are borrowed.** A sealed preload is private, service-account-owned and outside managed retirement; managed
   operations refuse its root. Replacing one needs every consumer stopped and a DEM restart. Packages: `browserruntime`,
   `runtimehost`.
+- **DEM Docker image.** The DEM image seals the authenticated portable bundle at `/opt/netdata-dem-runtime`
+  during the image build and validates it as the service account. The build defaults to preloaded mode at that path,
+  outside the Agent volumes. Explicit configuration takes precedence. Image replacement switches the Agent, DEM
+  plugin and bundled runtime together. The image also supplies stock GeoIP data. Packages: `packaging/docker`,
+  `runtimehost`, `browserruntime`.
 - **No component paths.** The runtime is one signed release; independent Node, Chromium or adapter paths
   are unsupported. Packages: `browserruntime`, `src/dem-runtime`.
 - **Shutdown order.** The command closes the host and store only after jobs and contained configuration work have

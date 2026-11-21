@@ -43,8 +43,7 @@ it does not change selection, acquisition consent or recovery records, or execut
   NUL and the exact JSON bytes. The release tool uses the existing package GPG signer.
 - **Verification.** Verification runs inside Go and requires SHA-256 or stronger signatures from a currently valid,
   unrevoked signing key. The envelope cannot supply keys or a key-discovery URL. `VerifyRelease` returns a
-  `VerifiedRelease`, the only release type that `BeginPublishedInstall` and `BeginPublishedEnsure` accept; its zero
-  value is refused.
+  `VerifiedRelease`, the only release type accepted by `BeginPublishedInstall`, which rejects its zero value.
 - **What is signed.** The signed release includes the entire `Manifest`, including layout, extraction bounds and
   interpreter-binding instructions, and the source archive's HTTPS URL, digest and size. Signing only the executable
   archive digest would not authenticate the instructions used to prepare it.
@@ -74,10 +73,9 @@ it does not change selection, acquisition consent or recovery records, or execut
 - **Binding.** Preparation binds only authenticated interpreter slots to the final generation, generates the private
   browser wrapper/font configuration and verifies the bound layout: plain parents, the entrypoint, and owner-executable
   executables in the preparing account's staging. Retained and preloaded generations also compare the authenticated
-  interpreter slots and generated configuration with their expected bound bytes, using bounded reads. Ensure checks
-  a selected generation the same way. Native admission
-  applies the same layout check but requires a group or other execute bit: root owns package files and the non-root
-  service runs them.
+  interpreter slots and generated configuration with their expected bound bytes, using bounded reads. Native admission
+  applies the same layout check and requires a group or other execute bit so the nonroot service can execute the
+  root-owned package files.
 - **Publishing.** Preparation syncs staging before publishing. A prepared generation must never be relocated.
 - **Workspace.** The store reserves archive plus expanded workspace before opening the source.
 - **Downloads.** Explicit downloads use HTTPS with a 60-second network inactivity timeout; continuing network progress
@@ -89,7 +87,7 @@ it does not change selection, acquisition consent or recovery records, or execut
   `--allow-download` remains an online operation. Both routes verify identical archive bounds and digests.
 - **Where keys are not used.** Key lookup is not part of execution, status or native package operation, and an update
   lookup failure preserves the installed selection.
-- **Qualification.** Ordinary CLI install, update, ensure, repair and preload verify and prepare artifacts without
+- **Qualification.** CLI install, prepare, repair and preload verify and prepare artifacts without
   executing Node or a browser. `runtime qualify` is an optional diagnostic against the installed release; it runs real
   contract checks, a sandboxed journey and Lighthouse, and reports the caller's account, environment and drainage.
   Its failure does not undo installation. The runtime process has no background release updater or download schedule.
