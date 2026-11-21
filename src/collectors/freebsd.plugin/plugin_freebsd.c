@@ -68,12 +68,15 @@ static struct freebsd_module {
     // ipfw metrics
     {.name = "ipfw",                    .dim = "ipfw",            .enabled = 1, .func = do_ipfw},
 
+    // pf metrics
+    {.name = "pf",                      .dim = "pf",              .enabled = 1, .func = do_pf},
+
     // the terminator of this array
     {.name = NULL, .dim = NULL, .enabled = 0, .func = NULL}
 };
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 33
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 33
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 37
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 37
 #endif
 
 static void freebsd_main_cleanup(void *pptr)

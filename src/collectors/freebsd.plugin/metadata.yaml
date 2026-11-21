@@ -2787,6 +2787,201 @@ modules:
                 - name: a dimension per dynamic rule
   - meta:
       plugin_name: freebsd.plugin
+      module_name: pf
+      monitored_instance:
+        name: pf
+        description: "Monitor the pf packet filter on FreeBSD, pfSense and OPNsense: state table, packet reasons, limit events, source tracking and per-interface pass/block counters."
+        link: "https://man.freebsd.org/cgi/man.cgi?query=pf&sektion=4"
+        categories:
+          - data-collection.networking
+        icon_filename: "firewall.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - pf
+        - firewall
+        - packet filter
+        - opnsense
+        - pfsense
+    overview:
+      data_collection:
+        metrics_description: "Collect pf(4) global status (the data `pfctl -s info -v` shows) and per-interface counters (the data `pfctl -s Interfaces -v` shows)."
+        method_description: "The plugin opens `/dev/pf` read-only and uses the `DIOCGETSTATUSNV` and `DIOCIGETIFACES` ioctls. Counter names are taken from the running kernel, so dimension names match what `pfctl` prints on that system; dimension IDs replace spaces and dashes with underscores (for example `bad_offset`, `max_states_per_rule`)."
+      supported_platforms:
+        include:
+          - FreeBSD
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: "The `netdata` user needs read access to `/dev/pf`. On OPNsense `/dev/pf` is owned by group `proxy` with mode `0660`, so add the `netdata` user to that group. On stock FreeBSD `/dev/pf` is `root:wheel` mode `0600`; grant access with a devfs rule (see Prerequisites)."
+      default_behavior:
+        auto_detection:
+          description: "The module is enabled by default. It disables itself at startup when `/dev/pf` does not exist (pf is not loaded) or cannot be opened, logging the reason once."
+        limits:
+          description: "Interface groups (`all`, `enc`, `openvpn`, ...), interfaces marked `set skip` and interfaces matching `disable interfaces matching` get no per-interface charts."
+        performance_impact:
+          description: "Two ioctls per collection cycle. The state table itself is not walked, so the cost does not grow with the number of states."
+    setup:
+      prerequisites:
+        list:
+          - title: Grant the netdata user read access to /dev/pf
+            description: |
+              OPNsense (`/dev/pf` is `root:proxy 0660`):
+
+              ```bash
+              pw groupmod proxy -m netdata
+              service netdata restart
+              ```
+
+              Stock FreeBSD (`/dev/pf` is `root:wheel 0600`): add a rule to `/etc/devfs.conf` and apply it.
+
+              ```text
+              own     pf      root:netdata
+              perm    pf      0640
+              ```
+
+              ```bash
+              service devfs restart
+              service netdata restart
+              ```
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:pf]"
+          description: "The netdata main configuration file. The whole module is turned on or off with `pf = yes|no` in the `[plugin:freebsd]` section."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: state table
+              description: Enable or disable the state table entries metric.
+              default_value: yes
+              required: false
+            - name: state table operations
+              description: Enable or disable the state table operations metric.
+              default_value: yes
+              required: false
+            - name: packet counters
+              description: Enable or disable the packets by reason metric.
+              default_value: yes
+              required: false
+            - name: limit counters
+              description: Enable or disable the limit events metric.
+              default_value: yes
+              required: false
+            - name: source nodes
+              description: Enable or disable the source tracking nodes metric.
+              default_value: yes
+              required: false
+            - name: source node operations
+              description: Enable or disable the source node operations metric.
+              default_value: yes
+              required: false
+            - name: interface packets
+              description: Enable or disable per-interface packet metrics.
+              default_value: yes
+              required: false
+            - name: interface traffic
+              description: Enable or disable per-interface traffic metrics.
+              default_value: yes
+              required: false
+            - name: disable interfaces matching
+              description: Space-separated simple patterns of interfaces that get no per-interface charts.
+              default_value: "lo* pflog* pfsync* usbus*"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list:
+          - name: No pf charts and "cannot open /dev/pf" in the logs
+            description: "The `netdata` user cannot read `/dev/pf`. Apply the permission change in Prerequisites and restart Netdata."
+          - name: No pf charts and "pf(4) is not loaded" in the logs
+            description: "pf is not loaded on this host. Load it (`kldload pf`, or `pf_enable=\"YES\"` in `/etc/rc.conf`) and restart Netdata."
+          - name: pf charts stop updating
+            description: "Global pf charts show gaps while pf is disabled (`pfctl -d`), because its counters are frozen. They resume when pf is enabled again."
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the pf packet filter as a whole."
+          labels: []
+          metrics:
+            - name: pf.states
+              description: pf State Table Entries
+              unit: "states"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: halfopen
+            - name: pf.state_operations
+              description: pf State Table Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per state operation counter reported by the kernel (searches, inserts, removals)
+            - name: pf.packets
+              description: pf Packets by Reason
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per reason counter reported by the kernel (match, bad-offset, fragment, short, normalize, memory, ...)
+            - name: pf.limits
+              description: pf Limit Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per limit counter reported by the kernel (max states per rule, max-src-states, max-src-nodes, ...)
+            - name: pf.source_nodes
+              description: pf Source Tracking Nodes
+              unit: "nodes"
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: pf.source_node_operations
+              description: pf Source Node Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per source node operation counter reported by the kernel (searches, inserts, removals)
+        - name: network interface
+          description: "These metrics refer to a network interface as seen by pf. IPv4 and IPv6 are summed."
+          labels:
+            - name: device
+              description: Interface name.
+          metrics:
+            - name: pf.interface_packets
+              description: pf Interface Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: in_pass
+                - name: in_block
+                - name: out_pass
+                - name: out_block
+            - name: pf.interface_traffic
+              description: pf Interface Traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: in_pass
+                - name: in_block
+                - name: out_pass
+                - name: out_block
+  - meta:
+      plugin_name: freebsd.plugin
       module_name: getifaddrs
       monitored_instance:
         name: getifaddrs

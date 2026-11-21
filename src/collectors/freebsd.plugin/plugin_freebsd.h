@@ -51,6 +51,7 @@ int do_kern_devstat(int update_every, usec_t dt);
 int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt);
 int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt);
 int do_ipfw(int update_every, usec_t dt);
+int do_pf(int update_every, usec_t dt);
 
 // metrics that need to be shared among data collectors
 extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;

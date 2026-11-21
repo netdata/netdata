@@ -214,6 +214,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${OS_MACOS}>:${IOKIT};${FOUNDATION}>"
+        "$<$<BOOL:${OS_FREEBSD}>:nv>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         PkgConfig::CURL
