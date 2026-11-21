@@ -11,7 +11,6 @@ static inline void stream_sender_add_host_variable_to_buffer(BUFFER *wb, const R
         , rrdvar2number(rva)
     );
 
-    netdata_log_debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rva), rrdvar2number(rva));
 }
 
 void stream_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
@@ -45,6 +44,5 @@ void stream_sender_send_custom_host_variables(RRDHOST *host) {
         (void)ret;
         sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
-        netdata_log_debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
     }
 }

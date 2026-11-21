@@ -80,9 +80,6 @@ void netdata_conf_backwards_compatibility(void) {
     inicfg_move(&netdata_config, CONFIG_SECTION_REGISTRY,    "registry db directory",
                 CONFIG_SECTION_DIRECTORIES, "registry");
 
-    inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL, "debug log",
-                CONFIG_SECTION_LOGS,   "debug");
-
     inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL, "error log",
                 CONFIG_SECTION_LOGS,   "error");
 
@@ -97,9 +94,6 @@ void netdata_conf_backwards_compatibility(void) {
 
     inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL, "errors to trigger flood protection",
                 CONFIG_SECTION_LOGS,   "errors to trigger flood protection");
-
-    inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL, "debug flags",
-                CONFIG_SECTION_LOGS,   "debug flags");
 
     inicfg_move(&netdata_config, CONFIG_SECTION_GLOBAL,   "TZ environment variable",
                 CONFIG_SECTION_ENV_VARS, "TZ");

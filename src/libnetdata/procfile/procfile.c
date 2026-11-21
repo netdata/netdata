@@ -88,11 +88,9 @@ char *procfile_filename(procfile *ff) {
 // An array of words
 
 static inline void procfile_words_add(procfile *ff, char *str) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
     if(unlikely(fw->len == fw->size)) {
-        // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding words");
         size_t minimum = PFWORDS_INCREASE_STEP;
         size_t optimal = fw->size / 2;
         size_t wanted = (optimal > minimum)?optimal:minimum;
@@ -108,7 +106,6 @@ static inline void procfile_words_add(procfile *ff, char *str) {
 
 NEVERNULL
 static inline pfwords *procfile_words_create(size_t size) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   initializing words");
 
     pfwords *new = mallocz(sizeof(pfwords) + size * sizeof(char *));
     new->len = 0;
@@ -117,12 +114,10 @@ static inline pfwords *procfile_words_create(size_t size) {
 }
 
 static inline void procfile_words_reset(pfwords *fw) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   resetting words");
     fw->len = 0;
 }
 
 static inline void procfile_words_free(pfwords *fw) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   freeing words");
 
     freez(fw);
 }
@@ -133,11 +128,9 @@ static inline void procfile_words_free(pfwords *fw) {
 
 NEVERNULL
 static inline size_t *procfile_lines_add(procfile *ff) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
     if(unlikely(fl->len == fl->size)) {
-        // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding lines");
         size_t minimum = PFLINES_INCREASE_STEP;
         size_t optimal = fl->size / 2;
         size_t wanted = (optimal > minimum)?optimal:minimum;
@@ -157,7 +150,6 @@ static inline size_t *procfile_lines_add(procfile *ff) {
 
 NEVERNULL
 static inline pflines *procfile_lines_create(size_t size) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   initializing lines");
 
     pflines *new = mallocz(sizeof(pflines) + size * sizeof(ffline));
     new->len = 0;
@@ -166,13 +158,11 @@ static inline pflines *procfile_lines_create(size_t size) {
 }
 
 static inline void procfile_lines_reset(pflines *fl) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   resetting lines");
 
     fl->len = 0;
 }
 
 static inline void procfile_lines_free(pflines *fl) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   freeing lines");
 
     freez(fl);
 }
@@ -197,7 +187,6 @@ static procfile *procfile_readall_file_too_large(procfile *ff) {
 void procfile_close(procfile *ff) {
     if(unlikely(!ff)) return;
 
-    netdata_log_debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", procfile_filename(ff));
 
     freez(ff->filename);
     procfile_lines_free(ff->lines);
@@ -209,7 +198,6 @@ void procfile_close(procfile *ff) {
 
 NOINLINE
 static void procfile_parser(procfile *ff) {
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
 
     char  *s = ff->data                 // our current position
         , *e = &ff->data[ff->len]       // the terminating null
@@ -259,7 +247,6 @@ static void procfile_parser(procfile *ff) {
             (*line_words)++;
             t = ++s;
 
-            // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   ended line %d with %d words", l, ff->lines->lines[l].words);
 
             line_words = procfile_lines_add(ff);
         }
@@ -334,7 +321,6 @@ static void procfile_parser(procfile *ff) {
 procfile *procfile_readall(procfile *ff) {
     if(!ff) return NULL;
 
-    // netdata_log_debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
@@ -384,7 +370,6 @@ procfile *procfile_readall(procfile *ff) {
             if(unlikely(wanted > available))
                 wanted = available;
 
-            netdata_log_debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s' by %zu bytes.", procfile_filename(ff), wanted);
             ff = reallocz(ff, sizeof(procfile) + ff->size + wanted);
             ff->size += wanted;
             ff->stats.memory += wanted;
@@ -459,7 +444,6 @@ procfile *procfile_readall(procfile *ff) {
 
     ff->stats.total_read_bytes += ff->len;
 
-    // netdata_log_debug(D_PROCFILE, "File '%s' updated.", ff->filename);
     return ff;
 }
 
@@ -537,7 +521,6 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
 }
 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
-    netdata_log_debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
     int fd = open(filename, procfile_open_flags, 0666);
     if(unlikely(fd == -1)) {
@@ -578,7 +561,6 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 
     procfile_set_separators(ff, separators);
 
-    netdata_log_debug(D_PROCFILE, "File '%s' opened.", filename);
     return ff;
 }
 
@@ -611,27 +593,4 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     if(likely(separators)) procfile_set_separators(ff, separators);
 
     return ff;
-}
-
-// ----------------------------------------------------------------------------
-// example parsing of procfile data
-
-void procfile_print(procfile *ff) {
-    size_t lines = procfile_lines(ff), l;
-    char *s;
-    (void)s;
-
-    netdata_log_debug(D_PROCFILE, "File '%s' with %zu lines and %zu words", procfile_filename(ff), ff->lines->len, ff->words->len);
-
-    for(l = 0; likely(l < lines) ;l++) {
-        size_t words = procfile_linewords(ff, l);
-
-        netdata_log_debug(D_PROCFILE, " line %zu starts at word %zu and has %zu words", l, (size_t)ff->lines->lines[l].first, (size_t)ff->lines->lines[l].words);
-
-        size_t w;
-        for(w = 0; likely(w < words) ;w++) {
-            s = procfile_lineword(ff, l, w);
-            netdata_log_debug(D_PROCFILE, "     [%zu.%zu] '%s'", l, w, s);
-        }
-    }
 }

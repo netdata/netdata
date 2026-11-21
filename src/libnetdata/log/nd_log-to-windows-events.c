@@ -85,7 +85,6 @@ static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
         [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,//
         [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,    //
         [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,    //
-        [NDLS_DEBUG]        = NULL,                             // used, linked to NDLS_DAEMON
 };
 
 bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
@@ -201,7 +200,6 @@ static bool etw_register_provider(void) {
     etw_set_source_meta(&nd_log.sources[NDLS_HEALTH], CHANNEL_HEALTH, &ED_HEALTH_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_ACLK], CHANNEL_ACLK, &ED_ACLK_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_UNSET], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
-    etw_set_source_meta(&nd_log.sources[NDLS_DEBUG], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
 
     DWORD wait_start = GetTickCount();
     while(true) {
@@ -233,7 +231,7 @@ bool nd_log_init_windows(void) {
             !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, MC_DAEMON_ERR_MESSAGE_ONLY) ||
             !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_USER, MC_ACCESS_WARN_ACCESS_USER) ||
             !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, MC_HEALTH_CRIT_ALERT_TRANSITION) ||
-            !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, MC_DEBUG_ALERT_ACCESS_FORWARDER_USER))
+            !check_event_id(NDLS_HEALTH, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, MC_HEALTH_ALERT_ACCESS_FORWARDER_USER))
        return false;
 
 #if defined(HAVE_ETW)
@@ -480,7 +478,6 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     MESSAGE_ID messageID;
     switch (source->source) {
         default:
-        case NDLS_DEBUG:
         case NDLS_DAEMON:
         case NDLS_COLLECTORS:
             messageID = MSGID_MESSAGE_ONLY;

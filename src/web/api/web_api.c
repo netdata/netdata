@@ -67,16 +67,12 @@ int data_query_response_begin(struct web_client *w, DATA_QUERY_JSONP *jp, DATASO
 
     if(jp->outFileName && *jp->outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", jp->outFileName);
-        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, jp->outFileName);
     }
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(jp->responseHandler == NULL)
             jp->responseHandler = "google.visualization.Query.setResponse";
 
-        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
-                          w->id, jp->google_version, jp->google_reqId, jp->google_sig, jp->google_out, jp->responseHandler, jp->outFileName
-        );
 
         buffer_sprintf(
             w->response.data,

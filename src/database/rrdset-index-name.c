@@ -18,13 +18,6 @@ STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *ty
     strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
     if(rrdset_index_find_name(host, new_name)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_RRD_CALLS)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, string2str(identity.hostname));
-            rrdhost_identity_release(&identity);
-        }
-#endif
         if(!strcmp(chart_full_id, full_name) && (!current_name || !*current_name)) {
             unsigned i = 1;
 
@@ -63,7 +56,6 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     RRDHOST *host = st->rrdhost;
 
-    netdata_log_debug(D_RRD_CALLS, "rrdset_reset_name() old: '%s', new: '%s'", rrdset_name(st), name);
 
     STRING *name_string = rrdset_fix_name(host, rrdset_id(st), rrdset_parts_type(st), string2str(st->name), name);
     if(!name_string) return 0;

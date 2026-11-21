@@ -932,7 +932,6 @@ static void cgroup_read_pids_current(struct pids *pids) {
 }
 
 static inline void read_cgroup(struct cgroup *cg) {
-    netdata_log_debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
     if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
         cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
         cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
@@ -961,7 +960,6 @@ static inline void read_cgroup(struct cgroup *cg) {
 }
 
 static inline void read_all_discovered_cgroups(struct cgroup *root) {
-    netdata_log_debug(D_CGROUP, "reading metrics for all cgroups");
 
     struct cgroup *cg;
     for (cg = root; cg; cg = cg->next) {
@@ -1027,7 +1025,6 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         } else {
             cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0), NULL);
         }
-        netdata_log_debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
         return;
 
 cpu_limits2_err:

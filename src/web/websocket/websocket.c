@@ -86,7 +86,6 @@ static struct websocket_server ws_server = (struct websocket_server){
 
 // Initialize WebSocket subsystem
 void websocket_initialize(void) {
-    // debug_flags |= D_WEBSOCKET;
 
     // Initialize thread system
     websocket_threads_init();
@@ -188,7 +187,6 @@ bool websocket_client_register(WS_CLIENT *wsc) {
     int added = WS_CLIENTS_SET(&ws_server.clients, wsc->id, wsc);
     if (added) {
         ws_server.active_clients++;
-        websocket_debug(wsc, "WebSocket client registered, total clients: %zu", ws_server.active_clients);
     }
     
     spinlock_unlock(&ws_server.spinlock);
@@ -209,7 +207,6 @@ void websocket_client_unregister(WS_CLIENT *wsc) {
         if (ws_server.active_clients > 0)
             ws_server.active_clients--;
         
-        websocket_debug(wsc,"WebSocket client unregistered, total clients: %zu", ws_server.active_clients);
     }
     
     spinlock_unlock(&ws_server.spinlock);

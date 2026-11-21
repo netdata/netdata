@@ -490,7 +490,7 @@ void *pluginsd_main(void *ptr) {
     if (*ipmi_path)
         netdata_log_info("PLUGINSD: using '%s' for IPMI; other IPMI plugin candidates are suppressed until restart", ipmi_path);
     else
-        netdata_log_debug(D_PLUGINSD, "no enabled IPMI plugin selected; restart Netdata after installing or enabling one");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "PLUGINSD: no enabled IPMI plugin selected; restart Netdata after installing or enabling one");
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
@@ -519,14 +519,12 @@ void *pluginsd_main(void *ptr) {
                 if (unlikely(!service_running(SERVICE_COLLECTORS)))
                     break;
 
-                netdata_log_debug(D_PLUGINSD, "examining file '%s'", file->d_name);
 
                 if (unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0))
                     continue;
 
                 char pluginname[CONFIG_MAX_NAME + 1];
                 if(!is_plugin(pluginname, sizeof(pluginname), file->d_name)) {
-                    netdata_log_debug(D_PLUGINSD, "file '%s' does not look like a plugin", file->d_name);
                     continue;
                 }
 
@@ -535,21 +533,17 @@ void *pluginsd_main(void *ptr) {
 
                 // Skip any obsolete plugins.
                 if(is_obsolete_plugin(pluginname)) {
-                    // log info level first time, debug level afterwards.
+                    // log it only the first time
                     static bool logged_obsolete = false;
                     if(!logged_obsolete) {
                         logged_obsolete = true;
                         netdata_log_info("skipping obsolete plugin '%s'; the current agent already provides its function", file->d_name);
-                    }
-                    else {
-                        netdata_log_debug(D_PLUGINSD, "skipping obsolete plugin '%s'", file->d_name);
                     }
                     continue;
                 }
 
                 int enabled = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
                 if (unlikely(!enabled)) {
-                    netdata_log_debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
                     continue;
                 }
 
@@ -563,11 +557,9 @@ void *pluginsd_main(void *ptr) {
 
                 if(cd) {
                     if (likely(plugin_is_running(cd))) {
-                        netdata_log_debug(D_PLUGINSD, "plugin '%s' is already running", string2str(cd->filename));
                         continue;
                     }
                     else if(cd->unsafe.thread) {
-                        netdata_log_debug(D_PLUGINSD, "plugin '%s' gave up", string2str(cd->filename));
                         nd_thread_signal_cancel(cd->unsafe.thread);
                         nd_thread_join(cd->unsafe.thread);
                         cd->unsafe.thread = NULL;

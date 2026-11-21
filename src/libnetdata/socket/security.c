@@ -535,22 +535,6 @@ NETDATA_SSL_HANDSHAKE_RESULT netdata_ssl_accept_nonblocking(NETDATA_SSL *ssl) {
 }
 
 /**
- * Info Callback
- *
- * Function used as callback for the OpenSSL Library
- *
- * @param ssl a pointer to the SSL structure of the client
- * @param where the variable with the flags set.
- * @param ret the return of the caller
- */
-static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
-    (void)ssl;
-    if (where & SSL_CB_ALERT) {
-        netdata_log_debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
-    }
-}
-
-/**
  * OpenSSL Library
  *
  * Starts the openssl library for the Netdata.
@@ -694,12 +678,10 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
     }
 
 	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
-    SSL_CTX_set_info_callback(ctx, netdata_ssl_info_callback);
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_095)
 	SSL_CTX_set_verify_depth(ctx,1);
 #endif
-    netdata_log_debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
 
     SSL_CTX_set_mode(ctx, mode);
 

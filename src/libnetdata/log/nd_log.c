@@ -9,7 +9,6 @@
 #include "../stacktrace/stacktrace.h"
 
 const char *program_name = "";
-uint64_t debug_flags = 0;
 int aclklog_enabled = 0;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -447,7 +446,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 
     source = nd_log_validate_source(source);
 
-    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
+    if (priority > nd_log.sources[source].min_priority)
         return;
 
     va_list args;
@@ -469,7 +468,7 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
     source = nd_log_validate_source(source);
 
-    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
+    if (priority > nd_log.sources[source].min_priority)
         return;
 
     if(erl->sleep_ut)

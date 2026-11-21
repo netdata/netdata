@@ -39,7 +39,6 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 */
     }
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
     char person_guid[UUID_STR_LEN] = "";
     if(w->auth.registry_person_guid[0])
@@ -69,7 +68,6 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
         uint32_t hash = simple_hash(name);
 

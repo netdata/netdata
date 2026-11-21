@@ -227,7 +227,6 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     char *udir = filename_from_path_entry_strdupz(user_path, entry);
     char *sdir = filename_from_path_entry_strdupz(stock_path, entry);
 
-    netdata_log_debug(D_HEALTH, "CONFIG traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
 
     DIR *dir = opendir(udir);
     if (!dir) {
@@ -241,7 +240,6 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                     (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
                 ) {
-                    netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config directory '%s/%s'", udir, de->d_name);
                     continue;
                 }
 
@@ -256,20 +254,17 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 if(path_entry_is_file(udir, de->d_name) &&
                     len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                     char *filename = filename_from_path_entry_strdupz(udir, de->d_name);
-                    netdata_log_debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
                     callback(filename, data, false);
                     freez(filename);
                     continue;
                 }
             }
 
-            netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
         }
 
         closedir(dir);
     }
 
-    netdata_log_debug(D_HEALTH, "CONFIG traversing stock config directory '%s', user config directory '%s'", sdir, udir);
 
     dir = opendir(sdir);
     if (!dir) {
@@ -284,7 +279,6 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                         (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                         (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
                     ) {
-                        netdata_log_debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
                         continue;
                     }
 
@@ -304,7 +298,6 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     if(path_entry_is_file(sdir, de->d_name) && !path_entry_is_file(udir, de->d_name) &&
                         len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                         char *filename = filename_from_path_entry_strdupz(sdir, de->d_name);
-                        netdata_log_debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
                         callback(filename, data, true);
                         freez(filename);
                         continue;
@@ -312,13 +305,11 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
                 }
 
-                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
             }
         }
         closedir(dir);
     }
 
-    netdata_log_debug(D_HEALTH, "CONFIG done traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
 
     freez(udir);
     freez(sdir);

@@ -1355,15 +1355,11 @@ int run_test(struct test *test)
     if(test->feed2)
         rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);
 
-    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
-
     // feed it with the test data
     time_t time_now = 0, time_start = now_realtime_sec();
     unsigned long c;
     collected_number last = 0;
     for(c = 0; c < test->feed_entries; c++) {
-        if(debug_flags) fprintf(stderr, "\n\n");
-
         if(c) {
             time_now += test->feed[c].microseconds;
             fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " NETDATA_DOUBLE_FORMAT
@@ -3712,7 +3708,6 @@ int unit_test(long delay, long shift)
     char name[101];
     snprintfz(name, sizeof(name) - 1, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
-    //debug_flags = 0xffffffff;
     default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
     nd_profile.update_every = 1;
 
@@ -3723,8 +3718,6 @@ int unit_test(long delay, long shift)
 
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1, 1
                                          , RRDSET_TYPE_LINE);
-    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
-
     RRDDIM *rdabs = NULL;
     RRDDIM *rdinc = NULL;
     RRDDIM *rdabst = NULL;

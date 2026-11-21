@@ -4,7 +4,6 @@
 #include "../queries/tg-expression.h"
 
 int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
-    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;
     BUFFER *dimensions = NULL;
@@ -39,7 +38,6 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty

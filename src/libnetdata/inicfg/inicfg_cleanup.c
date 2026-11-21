@@ -7,7 +7,6 @@ void inicfg_section_destroy_non_loaded(struct config *root, const char *section)
     struct config_section *sect;
     struct config_option *opt;
 
-    netdata_log_debug(D_CONFIG, "Destroying section '%s'.", section);
 
     APPCONFIG_LOCK(root);
     sect = inicfg_section_find(root, section);

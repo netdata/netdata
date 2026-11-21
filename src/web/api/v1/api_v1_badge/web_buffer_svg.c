@@ -914,7 +914,6 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty
@@ -1116,17 +1115,6 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         }
     }
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
-          , w->id
-          , chart
-          , alarm?alarm:""
-          , (dimensions)?buffer_tostring(dimensions):""
-          , after
-          , before
-          , points
-          , group
-          , options
-    );
 
     if(rc) {
         if (refresh > 0) {

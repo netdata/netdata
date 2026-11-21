@@ -88,9 +88,6 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 // if separators == NULL, the last separators are used
 procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags);
 
-// example walk-through a procfile parsed file
-void procfile_print(procfile *ff);
-
 void procfile_set_quotes(procfile *ff, const char *quotes);
 void procfile_set_open_close(procfile *ff, const char *open, const char *close);
 

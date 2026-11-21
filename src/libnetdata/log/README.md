@@ -113,7 +113,7 @@ For `wel` these are mapped to `Informational`, `Warning`, `Error`.
     logs to trigger flood protection = 1000    # Number of logs to trigger protection
     logs flood protection period = 1m          # Time window for flood protection
     facility = daemon                          # Syslog facility (when using syslog)
-    level = info                               # Minimum log level (daemon/collector only)
+    level = info                               # Minimum log level (all logs)
     
     # Per-source configuration
     daemon = journal                           # Daemon logs to systemd journal

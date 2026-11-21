@@ -67,8 +67,6 @@ pub struct NetdataEnv {
     /// `/proc`, `/sys`, and similar paths live; netflow-plugin uses it to
     /// prefix host filesystem reads.
     pub host_prefix: Option<String>,
-    /// `NETDATA_DEBUG_FLAGS`: the agent's debug-flags bitmap, usually hex.
-    pub debug_flags: Option<String>,
     /// `NETDATA_UPDATE_EVERY`: the agent's chart update interval in seconds —
     /// its internal clock; updating charts more often is pointless.
     pub update_every: Option<u64>,
@@ -183,7 +181,6 @@ impl NetdataEnv {
             lib_dir: env::var("NETDATA_LIB_DIR").ok().map(PathBuf::from),
             log_dir: env::var("NETDATA_LOG_DIR").ok().map(PathBuf::from),
             host_prefix: env::var("NETDATA_HOST_PREFIX").ok(),
-            debug_flags: env::var("NETDATA_DEBUG_FLAGS").ok(),
             update_every: env::var("NETDATA_UPDATE_EVERY")
                 .ok()
                 .and_then(|s| s.parse().ok()),
