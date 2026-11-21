@@ -34,7 +34,8 @@ type methodGeneration struct {
 	methods map[string]funcapi.FunctionConfig // method configs by method ID
 	bundles map[string]*functionBundle        // stable handler bundles by job name; agent uses ""
 
-	cleanupOnce sync.Once // releases this generation's bundle references once
+	selectorMu  *sync.RWMutex // shared with module poll commits for multi-job gated methods
+	cleanupOnce sync.Once     // releases this generation's bundle references once
 }
 
 func newMethodGeneration(
@@ -288,10 +289,16 @@ func (mg *methodGeneration) resolveTarget(
 
 func (mg *methodGeneration) availableJobNames(methodID string) []string {
 	names := make([]string, 0, len(mg.bundles))
+	if mg.selectorMu != nil {
+		mg.selectorMu.RLock()
+	}
 	for name, bundle := range mg.bundles {
-		if bundle.job != nil && bundle.job.IsRunning() && bundle.available(methodID) {
+		if bundle.job != nil && bundle.available(methodID) && bundle.job.IsRunning() {
 			names = append(names, name)
 		}
+	}
+	if mg.selectorMu != nil {
+		mg.selectorMu.RUnlock()
 	}
 	slices.Sort(names)
 	return names
