@@ -242,15 +242,15 @@ To adjust them for one site, use normal Netdata health configuration with the `_
 
 ## Browser runtime
 
-Journey and Lighthouse jobs need a separately installed browser runtime: one signed bundle with its own Node, Chromium,
-Playwright and Lighthouse. RUM does not. Enabling a browser job never downloads it; without it, browser jobs wait and
-report no website failures. Restart the Agent after first setup. Subsequent updates keep the runtime and Agent at the
-same release; native and source/static installation owners coordinate activation, while Docker/preload deployments
-retain explicit control of switching.
+Journey and Lighthouse jobs use a browser runtime that includes Node, Chromium, Playwright and Lighthouse.
+RUM works without a browser runtime. For Docker, choose a [DEM image](/packaging/docker/README.md#enable-dem-in-docker)
+with the matching runtime included. To update the pair, pull a newer DEM image and recreate the container.
 
-[Browser runtime host setup](/packaging/installer/DEM-RUNTIME.md) covers installation for native packages, static and
-source installations, Docker and protected preloads, plus paired updates/recovery and the `dem.plugin runtime` command
-reference.
+For other deployments, install the matching runtime and restart the Agent after manual setup. Enabling a browser job
+never downloads the runtime. Jobs wait for a runtime and report no website failures while it is unavailable.
+
+[Browser runtime host setup](/packaging/installer/DEM-RUNTIME.md) covers installation, host policy, updates and the
+`dem.plugin runtime` commands.
 
 ## Further reading
 

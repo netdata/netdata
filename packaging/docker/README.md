@@ -50,20 +50,7 @@ Both methods create a [volume](https://docs.docker.com/storage/volumes/) for Net
 _within the container_ at `/etc/netdata`.
 See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
 
-DEM journeys and Lighthouse require a browser runtime. For local, rootful Docker on Linux, start the container
-with the configuration below, including persistent storage at `/var/lib/netdata` and, on AppArmor hosts,
-`--security-opt apparmor=unconfined`. Release images default to the signed runtime for their exact Agent identity and
-architecture; `runtime.release_url` in `dem.conf` can override it. Then run this command on the daemon host:
-
-```sh
-sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata
-```
-
-Keep the Agent running while kickstart downloads and verifies the runtime. After the command succeeds,
-run `docker restart netdata` to activate it. Replace `netdata` with your container name.
-Later image updates must switch the matching runtime selection and pinned image together. RUM works without the
-runtime. For paired updates, optional local qualification, rootless, nested or remote deployments, and removal,
-see [Docker browser runtime setup](/packaging/installer/DEM-RUNTIME.md#docker-host-preparation).
+To run Real User Monitoring (RUM), browser journeys or Lighthouse, choose a [DEM image](#enable-dem-in-docker).
 
 :::info If you remove `pid: host`
 If you choose **not** to use `pid: host`, you **must** add [`--init`](https://docs.docker.com/reference/cli/docker/container/run/#init) (or [`init: true`](https://docs.docker.com/reference/compose-file/services/#init) in Compose).
@@ -551,9 +538,37 @@ The official `netdata/netdata` Docker image provides the following named tags:
 
 Minor and major version tags update with each matching release. For example, if `v1.40.1` is published, the `v1.40` tag moves from `v1.40.0` to `v1.40.1`.
 
+## Enable DEM in Docker
+
+Use a `-dem` image on Linux amd64 or arm64 to run Real User Monitoring (RUM), browser journeys and Lighthouse.
+For example, use `netdata/netdata:stable-dem` with `docker run` or set it as the Compose service's `image`.
+`edge-dem`, `latest-dem` and version tags such as `vX.Y.Z-dem` follow the tag rules above. Regular tags omit
+DEM, including its plugin and browser runtime.
+
+The DEM image includes the Agent, DEM plugin, matching browser runtime and the stock GeoIP database.
+Use the [recommended container configuration](#recommended-way) and preserve the ordinary configuration, state and
+cache volumes. Mount the host's machine ID at `/host/etc/machine-id` to preserve host identity for DEM history.
+Check that the source file exists before adding the mount:
+
+```text
+/etc/machine-id:/host/etc/machine-id:ro
+```
+
+For browser jobs on a local rootful Docker daemon, use the recommended network, PID and capability settings and
+Docker's default seccomp profile. Use `apparmor=unconfined` on AppArmor hosts and prepare a launcher allowance on
+hosts that restrict unprivileged user namespaces. Keep Chromium's sandbox enabled.
+[Prepare the Docker host for browser jobs](/packaging/installer/DEM-RUNTIME.md#docker-host-preparation).
+
+If you already run DEM in Docker, [pull the DEM image and recreate the container](#update-your-netdata-docker-container).
+The image provides a preloaded runtime. Remove the old `runtime` configuration from `dem.conf` if you want
+the image defaults. For RUM, continue with [receiver setup](/src/go/plugin/dem/collector/receiver/integrations/rum_receiver.md).
+
 ## Update your Netdata Docker container
 
-Docker containers do not auto-update. To update, you pull a new image and recreate the container.
+Docker containers do not auto-update. To update, pull a new image and recreate the container.
+For DEM, use the corresponding `-dem` tag throughout. Pulling and recreating updates the Agent and bundled
+browser runtime together. To restore that pair, recreate with the previous pinned DEM image. Check that your
+saved configuration and data are compatible with the previous Agent before downgrading.
 
 :::important
 
