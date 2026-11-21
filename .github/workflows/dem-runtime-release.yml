@@ -207,7 +207,7 @@ jobs:
             ${{ runner.temp }}/smoke-release.json
             ${{ runner.temp }}/smoke-public.gpg
           overwrite: true
-          retention-days: 1
+          retention-days: 30
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

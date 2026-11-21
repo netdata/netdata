@@ -98,7 +98,7 @@ The signing key stays with the release publisher. The Docker workflow owns the s
 unpublished companion build for relevant PRs and master pushes, using the existing runtime
 builder with disposable signing keys and stock database fixtures. Image assembly reuses
 the candidate descriptor and public key that qualified that same architecture's companion;
-only those two public files are passed in a separate, one-day CI artifact. The release
+only those two public files are passed in a separate CI artifact retained as long as the runtime bytes. The release
 workflow verifies public artifacts.
 
 ## Exact CI artifacts and native preparation
