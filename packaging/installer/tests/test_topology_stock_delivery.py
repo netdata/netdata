@@ -120,7 +120,8 @@ endif()
                     destination = self.install(build, 'ip-intel-data')
                     self.assert_stock(destination)
                     copyright_file = destination / 'usr/share/doc/netdata-ip-intel-data/copyright'
-                    self.assertEqual(copyright_file.exists(), kind == 'deb')
+                    self.assertEqual(copyright_file.read_bytes(),
+                                     (ROOT / 'packaging/cmake/pkg-files/ip-intel-data/copyright').read_bytes())
                     self.assertFalse((destination / 'usr/sbin/topology-ip-intel-downloader').exists())
                     for component in ('plugin-netflow', 'plugin-dem', 'netdata'):
                         self.assertFalse((self.install(build, component) / STOCK_DEST).exists())

@@ -1065,11 +1065,14 @@ set(CPACK_DEBIAN_IP-INTEL-DATA_PACKAGE_REPLACES "netdata-plugin-netflow (<< ${CP
 
 set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_NAME "netdata-ip-intel-data")
 set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_SUMMARY "Stock IP intelligence databases for Netdata")
-set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_LICENSE "GPLv3+ and CC-BY-4.0")
+# CPack has no per-component License setting. This data-only template retains
+# CPack's generated identity, conflict and file list with the payload's license.
+set(CPACK_RPM_IP-INTEL-DATA_USER_BINARY_SPECFILE "${PKG_FILES_PATH}/rpm/ip-intel-data.spec.in")
 set(CPACK_RPM_IP-INTEL-DATA_PACKAGE_CONFLICTS "netdata-plugin-netflow < ${CPACK_RPM_PACKAGE_VERSION}")
 set(CPACK_RPM_IP-INTEL-DATA_DEBUGINFO_PACKAGE Off)
 set(CPACK_RPM_IP-INTEL-DATA_DEFAULT_USER "root")
 set(CPACK_RPM_IP-INTEL-DATA_DEFAULT_GROUP "root")
+set(CPACK_RPM_IP-INTEL-DATA_USER_FILELIST "%license /usr/share/doc/netdata-ip-intel-data/copyright")
 
 #
 # nfacct.plugin

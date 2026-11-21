@@ -134,7 +134,29 @@ check_topology_ip_intel_stock() {
       printf "ERROR: missing packaged topology IP intelligence payload file: %s\n" "${path}"
       exit 1
     fi
+    case "${DISTRO}" in
+      debian | ubuntu)
+        owner=$(dpkg-query -S "${path}") || exit 1
+        owner=${owner%: *}
+        ;;
+      *) owner=$(rpm -qf --queryformat '%{NAME}\n' "${path}") || exit 1 ;;
+    esac
+    if [ "${owner}" != netdata-ip-intel-data ]; then
+      printf "ERROR: unexpected stock data owner for %s: %s\n" "${path}" "${owner}"
+      exit 1
+    fi
   done
+
+  case "${DISTRO}" in
+    debian | ubuntu) ;;
+    *)
+      license=$(rpm -q --queryformat '%{LICENSE}' netdata-ip-intel-data) || exit 1
+      case "${license}" in
+        *CC-BY-4.0*) ;;
+        *) printf "ERROR: stock data RPM omits its CC-BY-4.0 license\n"; exit 1 ;;
+      esac
+      ;;
+  esac
 
   if [ -e "${stock_root}/topology-ip-country.mmdb" ]; then
     printf "ERROR: obsolete packaged topology IP intelligence file still present: %s\n" \
