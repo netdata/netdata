@@ -642,7 +642,6 @@ int main(int argc, char **argv) {
 
     nd_thread_tag_set("macos-logs.plugin");
     nd_log_initialize_for_external_plugins("macos-logs.plugin");
-    netdata_threads_init_for_external_plugins(0);
 
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 

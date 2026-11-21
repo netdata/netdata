@@ -78,32 +78,39 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
 #endif
 }
 
-static size_t default_stacksize = 8ULL * 1024 * 1024; // default is 8MiB
-
-static void netdata_conf_stack_size(void) {
+void netdata_conf_section_global_stack_size(void) {
     FUNCTION_RUN_ONCE();
 
-    // initialize thread - this is required before the first nd_thread_create()
-    default_stacksize = netdata_threads_init();
+    uint64_t stack_size = inicfg_get_size_bytes(
+        &netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", ND_THREAD_STACK_SIZE_DEFAULT);
 
-    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-    if (default_stacksize < 1 * 1024 * 1024)
-        default_stacksize = 1 * 1024 * 1024;
-
-    // Let the user override the default stack size
-    default_stacksize = inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize);
-
-    netdata_threads_set_stack_size(default_stacksize);
-
+    nd_thread_set_stack_size(stack_size);
 }
 
-void netdata_conf_reset_stack_size(void) {
-    netdata_threads_set_stack_size(default_stacksize);
+// libuv sizes the stacks of its own thread pool, independently of nd_thread_stack_size()
+#define LIBUV_WORKER_THREAD_STACK_SIZE (8ULL * 1024 * 1024)
+
+static uint64_t libuv_worker_thread_stack_size(void) {
+    // libuv 1.45+ gives its pool threads a fixed 8 MiB stack (src/threadpool.c)
+    if(uv_version() >= 0x012d00)
+        return LIBUV_WORKER_THREAD_STACK_SIZE;
+
+#if defined(OS_LINUX) || defined(OS_MACOS)
+    // older libuv uses a finite RLIMIT_STACK, rounded down to a page (src/unix/thread.c thread_stack_size())
+    struct rlimit rl;
+    if(getrlimit(RLIMIT_STACK, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY) {
+        uint64_t size = (uint64_t)rl.rlim_cur - (uint64_t)rl.rlim_cur % os_get_system_page_size();
+        if(size >= 8192 && size >= (uint64_t)PTHREAD_STACK_MIN)
+            return size;
+    }
+#endif
+
+    // otherwise the platform default applies (2 MiB on Linux, pthread or executable defaults elsewhere):
+    // budget the 8 MiB of recent libuv, an overestimate on Linux
+    return LIBUV_WORKER_THREAD_STACK_SIZE;
 }
 
 void libuv_initialize(void) {
-    netdata_conf_stack_size();
-
     // libuv worker threads need to limited by the amount of memory the system has,
     // otherwise the system may refuse to create that many threads.
 
@@ -117,7 +124,7 @@ void libuv_initialize(void) {
         uint64_t mem_for_threads2 = mem.ram_available_bytes / 10;
         uint64_t mem_for_threads = MIN(mem_for_threads1, mem_for_threads2);
 
-        int max_allowed_threads = (int)HOWMANY(mem_for_threads, default_stacksize);
+        int max_allowed_threads = (int)HOWMANY(mem_for_threads, libuv_worker_thread_stack_size());
         if(max_allowed_threads < MIN_LIBUV_WORKER_THREADS)
             max_allowed_threads = MIN_LIBUV_WORKER_THREADS;
 
