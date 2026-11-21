@@ -168,6 +168,11 @@ pub enum OtelLogsResponse {
 pub struct InfoResponse {
     version: u32,
     status: u32,
+    has_history: bool,
+    /// The netdata Functions protocol version, wired as `v`: always 3,
+    /// same as the data responses.
+    #[serde(rename = "v")]
+    protocol_version: u32,
     accepted_params: Vec<&'static str>,
     required_params: Vec<&'static str>,
     help: &'static str,
@@ -178,6 +183,8 @@ impl Default for InfoResponse {
         Self {
             version: 1,
             status: 200,
+            has_history: true,
+            protocol_version: 3,
             accepted_params: ACCEPTED_PARAMS.to_vec(),
             required_params: vec![],
             help: "Query and visualize OpenTelemetry logs.",
