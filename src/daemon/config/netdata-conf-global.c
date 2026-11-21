@@ -110,7 +110,7 @@ void libuv_initialize(void) {
     // our original target
     libuv_worker_threads = (int)netdata_conf_cpus() * 6;
 
-    OS_SYSTEM_MEMORY mem = os_system_memory(true);
+    OS_SYSTEM_MEMORY mem = os_system_memory();
     if(OS_SYSTEM_MEMORY_OK(mem)) {
         // we have memory information
         uint64_t mem_for_threads1 = mem.ram_total_bytes / 20;
