@@ -151,6 +151,92 @@ func TestRuntimeConfigOverrides(t *testing.T) {
 	assert.Equal(t, 0, loaded.Runtime.PreviousRetentionDays)
 }
 
+func TestLoadConfigImageRuntimeDefaults(t *testing.T) {
+	const imagePath = "/opt/netdata-dem-runtime"
+	mode, path := runtimehost.DefaultMode, runtimehost.DefaultPreloadPath
+	t.Cleanup(func() { runtimehost.DefaultMode, runtimehost.DefaultPreloadPath = mode, path })
+	runtimehost.DefaultMode, runtimehost.DefaultPreloadPath = string(runtimehost.ModePreloaded), imagePath
+
+	t.Run("no dem.conf", func(t *testing.T) {
+		cfg, err := LoadConfig(multipath.New(t.TempDir()))
+		require.NoError(t, err)
+		assert.Equal(t, runtimehost.ModePreloaded, cfg.Runtime.Mode)
+		assert.Equal(t, imagePath, cfg.Runtime.PreloadPath)
+	})
+	for name, tc := range map[string]struct {
+		body string
+		mode runtimehost.Mode
+		path string
+		err  string
+	}{
+		"omitted runtime": {
+			body: "history: {days: 14}",
+			mode: runtimehost.ModePreloaded,
+			path: imagePath,
+		},
+		"null runtime": {
+			body: "runtime:\n  # mode: managed",
+			mode: runtimehost.ModePreloaded,
+			path: imagePath,
+		},
+		"partial runtime": {
+			body: "runtime: {max_bytes: 2048}",
+			mode: runtimehost.ModePreloaded,
+			path: imagePath,
+		},
+		"explicit preload": {
+			body: "runtime: {mode: preloaded}",
+			mode: runtimehost.ModePreloaded,
+			path: imagePath,
+		},
+		"explicit managed": {
+			body: "runtime: {mode: managed}",
+			mode: runtimehost.ModeManaged,
+		},
+		"explicit native": {
+			body: "runtime: {mode: native}",
+			mode: runtimehost.ModeNative,
+		},
+		"custom path": {
+			body: "runtime: {preload_path: /custom}",
+			mode: runtimehost.ModePreloaded,
+			path: "/custom",
+		},
+		"explicit empty": {
+			body: "runtime: {preload_path: ''}",
+			mode: runtimehost.ModePreloaded,
+		},
+		"explicit null": {
+			body: "runtime: {preload_path: null}",
+			mode: runtimehost.ModePreloaded,
+		},
+		"aliased path": {
+			body: "path: &path /custom\nruntime: {<<: {preload_path: *path}}",
+			mode: runtimehost.ModePreloaded,
+			path: "/custom",
+		},
+		"conflicting path": {
+			body: "runtime: {mode: managed, preload_path: " + imagePath + "}",
+			err:  "runtime.preload_path requires mode: preloaded",
+		},
+		"conflicting cache": {
+			body: "runtime: {cache_path: /custom}",
+			err:  "runtime.cache_path is only valid in managed mode",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := loadConfigText(t, tc.body)
+			if tc.err != "" {
+				require.ErrorContains(t, err, tc.err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.mode, cfg.Runtime.Mode)
+			assert.Equal(t, tc.path, cfg.Runtime.PreloadPath)
+		})
+	}
+}
+
 func TestRuntimeConfigRejectsAmbiguousAndInvalidPolicy(t *testing.T) {
 	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501", "release_url: http://example.invalid/latest", "release_url: https://user:pass@example.invalid/latest", "release_url: https://example.invalid/latest#fragment", "offline_keyring: relative.gpg"} {
 		t.Run(body, func(t *testing.T) {

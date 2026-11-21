@@ -139,7 +139,9 @@ If you installed Netdata with any optional parameters, such as `--install-prefix
 <details>
 <summary><strong>Docker (OCI)</strong></summary><br/>
 
-Docker-based installations are updated by pulling a new image and recreating the container. Persistent volumes preserve your configuration and metrics data across updates.
+Update a Docker installation by pulling a new image and recreating the container. Persistent volumes preserve
+configuration and metrics. If you use DEM, pull the corresponding `-dem` tag to update the Agent, DEM plugin
+and browser runtime together.
 
 For detailed instructions, see [Update your Netdata Docker container](/packaging/docker/README.md#update-your-netdata-docker-container).
 

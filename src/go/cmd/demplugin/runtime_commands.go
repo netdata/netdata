@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
@@ -110,20 +109,6 @@ func runManagedCommand(
 	if err != nil {
 		return err
 	}
-	if command == "ensure" {
-		canonical, err := browserruntime.CanonicalRoot(storeConfig.Path)
-		if err != nil {
-			return err
-		}
-		if f.expectedRoot != "" && canonical != filepath.Clean(f.expectedRoot) {
-			return fmt.Errorf(
-				"configured canonical runtime root %q differs from --expected-root %q; no runtime storage changed",
-				canonical,
-				f.expectedRoot,
-			)
-		}
-		storeConfig.Path = canonical
-	}
 	report.CachePath = storeConfig.Path
 	if err := ctx.Err(); err != nil {
 		return err
@@ -158,14 +143,12 @@ func runManagedCommand(
 			report.Notice = "Pending preparation canceled, if present. The installation owner must ensure the selected runtime matches the Agent before restarting."
 		} else {
 			err = store.RollbackPair(ctx)
-			report.Notice = "Previous runtime selected. Restore its matching Agent before restarting; this command does not restore Agent files or images."
+			report.Notice = "Previous runtime selected. Restore its matching Agent through its installation owner before restarting."
 		}
 		status, _ := report.inventory(store)
 		report.selectedInstallation(status)
 	case "qualify":
 		err = qualifySelected(ctx, store, report)
-	case "ensure":
-		err = ensureRuntime(ctx, store, load, f.archive, report, stderr)
 	case "preload":
 		err = preloadRuntime(ctx, store, storeConfig.Path, load, f.archive, report)
 	default:
@@ -228,50 +211,6 @@ func qualifyInstalled(ctx context.Context, source runner.Source, report *runtime
 	}
 	report.State = "qualified"
 	return nil
-}
-
-// ensureRuntime enrolls a runtime only when none is selected; a usable selection
-// is reported without download or qualification. ensure never reports store
-// inventory.
-func ensureRuntime(
-	ctx context.Context,
-	store *browserruntime.Store,
-	load releaseLoader,
-	archive string,
-	report *runtimeCommandReport,
-	stderr io.Writer,
-) error {
-	candidate, selected, err := store.BeginPublishedEnsure(
-		ctx,
-		func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
-			fmt.Fprintln(
-				stderr,
-				"First runtime enrollment acquires the matching signed release and permits paired companion downloads. Restart running DEM processes to activate the selection.",
-			)
-			return load(ctx)
-		},
-	)
-	if err != nil {
-		return err
-	}
-	if selected != nil {
-		report.setRuntime(selected.Identity())
-		report.State = "installed"
-		report.Outcome = "already-selected"
-		report.Notice = "A usable runtime is already selected; no download, qualification or update policy change was performed. A new DEM process uses this selection. Running processes may require a restart; their active release was not inspected."
-		return nil
-	}
-	if candidate == nil {
-		// A recorded release always comes back as the selection, so ensure never
-		// sees the unchanged-release result.
-		return errors.New("runtime ensure began neither a candidate nor a selection")
-	}
-	err = selectCandidate(ctx, candidate, archive, report)
-	if err == nil {
-		report.Outcome = "newly-selected"
-		report.setRuntime(candidate.Manifest().Identity())
-	}
-	return closeUnlessUndrained(err, candidate)
 }
 
 // installRuntime installs, updates or repairs the selection. Its report shows
@@ -345,7 +284,7 @@ func installCandidate(
 }
 
 // releaseOperation names the store operation of the commands that install a
-// published release; ensure and preload have their own entry points.
+// published release; preload has its own entry point.
 func releaseOperation(command string) (browserruntime.ReleaseOperation, error) {
 	switch command {
 	case "install":

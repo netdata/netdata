@@ -460,6 +460,93 @@ class SignedPublicationTests(unittest.TestCase):
                                remote='s3:bucket')
         return args, digest, source_hash
 
+    def test_docker_inputs_reuse_authenticated_bytes_for_both_channels_and_architectures(self):
+        import ci
+        for channel, version in (('stable', 'v1.2.3'), ('nightly', 'v1.2.3-1-nightly')):
+            publication, digest, _ = self.fixture(channel, version)
+            release.stage(publication)
+            _, directories = release.publication(publication)
+            receipt = self.root / ('receipt-' + channel)
+            receipt.mkdir()
+            for arch in ci.ARCHES:
+                artifact = publication.artifacts / ('dem-runtime-' + arch)
+                shutil.copyfile(artifact / 'artifacts.json', receipt / (arch + '.json'))
+            shutil.copyfile(artifact / 'release-info', receipt / 'release-info')
+            for arch in ci.ARCHES:
+                with self.subTest(channel=channel, arch=arch):
+                    artifact = publication.artifacts / ('dem-runtime-' + arch)
+                    args = SimpleNamespace(artifacts=artifact, arch=arch, receipt=receipt,
+                                           release_info=receipt / 'release-info', release_tool=publication.release_tool,
+                                           release=directories[arch] / 'release.json', public_key=self.public,
+                                           output=self.root / (channel + '-' + arch + '-docker'))
+                    ci.prepare_docker(args)
+                    self.assertEqual({p.name: p.read_bytes() for p in args.output.iterdir()}, {
+                        'runtime.tar.zst': (artifact / (digest + '.tar.zst')).read_bytes(),
+                        'release.json': args.release.read_bytes(),
+                        'release-public.gpg': self.public.read_bytes(),
+                    })
+
+    def test_docker_inputs_reject_artifact_receipt_and_signed_descriptor_substitution(self):
+        import ci
+        publication, digest, _ = self.fixture()
+        release.stage(publication)
+        _, directories = release.publication(publication)
+        other, _, _ = self.fixture('nightly', 'v1.2.3-1-nightly')
+        release.stage(other)
+        _, other_directories = release.publication(other)
+        artifact = publication.artifacts / 'dem-runtime-amd64'
+        receipt = self.root / 'receipt'
+        receipt.mkdir()
+        for arch in ci.ARCHES:
+            shutil.copyfile(publication.artifacts / ('dem-runtime-' + arch) / 'artifacts.json',
+                            receipt / (arch + '.json'))
+        shutil.copyfile(artifact / 'release-info', receipt / 'release-info')
+        archive = artifact / (digest + '.tar.zst')
+        archive_bytes = archive.read_bytes()
+        receipt_path = receipt / 'amd64.json'
+        receipt_bytes = receipt_path.read_bytes()
+        for fault in ('archive', 'receipt', 'signed-architecture', 'signed-pair', 'signature', 'manifest'):
+            with self.subTest(fault=fault):
+                args = SimpleNamespace(artifacts=artifact, arch='amd64', receipt=receipt,
+                                       release_info=receipt / 'release-info', release_tool=publication.release_tool,
+                                       release=directories['amd64'] / 'release.json', public_key=self.public,
+                                       output=self.root / ('rejected-' + fault))
+                if fault == 'archive':
+                    archive.write_bytes(archive_bytes + b'changed')
+                elif fault == 'receipt':
+                    record = json.loads(receipt_bytes)
+                    record['files']['manifest.json']['bytes'] += 1
+                    release.write_json(receipt_path, record)
+                elif fault == 'signed-architecture':
+                    args.release = directories['arm64'] / 'release.json'
+                elif fault == 'signed-pair':
+                    args.release = other_directories['amd64'] / 'release.json'
+                elif fault == 'signature':
+                    envelope = json.loads(args.release.read_bytes())
+                    body = json.loads(base64.b64decode(envelope['payload']))
+                    body['agent']['source'] = 'b' * 40
+                    envelope['payload'] = base64.b64encode(json.dumps(body).encode()).decode()
+                    args.release = self.root / 'altered-release.json'
+                    release.write_json(args.release, envelope)
+                else:
+                    # Even a correctly signed descriptor must describe the tested manifest.
+                    original = json.loads((artifact / 'manifest.json').read_bytes())
+                    changed = json.loads(json.dumps(original))
+                    changed['layout']['entrypoint'] = 'runner/other.mjs'
+                    release.write_json(artifact / 'manifest.json', changed)
+                    inventory = json.loads((artifact / 'artifacts.json').read_bytes())
+                    inventory['files']['manifest.json'] = {
+                        'sha256': release.sha256(artifact / 'manifest.json'),
+                        'bytes': (artifact / 'manifest.json').stat().st_size,
+                    }
+                    release.write_json(artifact / 'artifacts.json', inventory)
+                    release.write_json(receipt_path, inventory)
+                with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                    ci.prepare_docker(args)
+                self.assertFalse(args.output.exists())
+                archive.write_bytes(archive_bytes)
+                receipt_path.write_bytes(receipt_bytes)
+
     def test_two_platform_staging_authenticates_every_field_and_rejects_tampering(self):
         args, digest, source_hash = self.fixture()
         release.stage(args)
