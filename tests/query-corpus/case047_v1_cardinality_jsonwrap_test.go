@@ -6,7 +6,6 @@ import (
 	"math"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/tests/query-corpus/daemon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
@@ -19,6 +18,10 @@ import (
 // metric's chart, label and last collected value, and the "remaining N
 // dimensions" column, which has no single metric behind it, carries null.
 // Without a limit each column carries its own metric (control).
+//
+// Each scope runs on its own daemon: on an engine with the over-read the
+// folded query aborts an AddressSanitizer build, and that must not take the
+// shared corpus daemon or the other scopes down with it.
 func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 	const contract = "CASE-047/v1-jsonwrap-arrays-after-fold"
 	for _, component := range []string{"no-limit", "limit-3", "limit-1"} {
@@ -29,7 +32,9 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 
 	// two charts of one context, constant collected values: a metric's
 	// contribution is its value x rows and its last collected value is its
-	// value, so the fold order and every expected entry follow from here
+	// value, so the fold order and every expected entry follow from here.
+	// a3 ranks between b3 and b2, so the two kept columns of limit-3 come
+	// from different charts and carry different chart ids and labels.
 	type metric struct {
 		chart, side string
 		value       int
@@ -37,14 +42,14 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 	metrics := map[string]metric{
 		"a1": {"case047.left", "left", 1},
 		"a2": {"case047.left", "left", 2},
-		"a3": {"case047.left", "left", 3},
+		"a3": {"case047.left", "left", 25},
 		"b1": {"case047.right", "right", 10},
 		"b2": {"case047.right", "right", 20},
 		"b3": {"case047.right", "right", 30},
 	}
 	const rows = 20
 
-	conn := connect(t, host, guid(13300), stream.CapsLive)
+	charts := make([]fixture.Chart, 0, 2)
 	for _, side := range []struct{ chart, side string }{{"case047.left", "left"}, {"case047.right", "right"}} {
 		ch := fixture.Chart{
 			ID: side.chart, Title: "v1 cardinality", Units: "units", Family: "fixture",
@@ -62,21 +67,38 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 			}
 			ch.Dimensions = append(ch.Dimensions, d)
 		}
-		ch.Define(conn)
-		ch.PushLive(conn)
+		charts = append(charts, ch)
 	}
-	if err := conn.Flush(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := td.WaitRetention(host, context, fixture.T0+1, fixture.T0+rows, 15*time.Second); err != nil {
-		t.Fatal(err)
+
+	// start a daemon for one scope, push both charts on one connection
+	// (kept open: latest_values is the last value the collector stored) and
+	// settle each chart, since one chart alone satisfies context retention
+	start := func(t *testing.T) *daemon.Daemon {
+		t.Helper()
+		dd := startDedicatedStorageDaemon(t, daemon.Options{})
+		conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{
+			Hostname: host, MachineGUID: guid(13300),
+		}, stream.CapsLive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = conn.Close() })
+		for _, ch := range charts {
+			ch.Define(conn)
+			ch.PushLive(conn)
+		}
+		if err := conn.Flush(); err != nil {
+			t.Fatal(err)
+		}
+		waitChartsRetentionOn(t, dd, host, charts...)
+		return dd
 	}
 
 	type column struct {
 		chart, side any // string or nil
 		latest      any // float64 or nil
 	}
-	query := func(t *testing.T, limit int) map[string]column {
+	query := func(t *testing.T, dd *daemon.Daemon, limit int) map[string]column {
 		t.Helper()
 		params := daemon.DataParams(context, fixture.T0, fixture.T0+rows, rows)
 		for _, key := range []string{"scope_contexts", "time_group", "time_group_options", "group_by", "aggregation"} {
@@ -90,7 +112,7 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 		if limit > 0 {
 			params.Set("cardinality_limit", strconv.Itoa(limit))
 		}
-		doc, err := td.HostJSON(host, "api/v1/data", params)
+		doc, err := dd.HostJSON(host, "api/v1/data", params)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -157,15 +179,15 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 		for id := range metrics {
 			want[id] = own(id)
 		}
-		assert(t, query(t, 0), want)
+		assert(t, query(t, start(t), 0), want)
 	})
 
 	t.Run("limit-3", func(t *testing.T) {
 		trackContractComponent(t, contract, "limit-3")
-		// contributions b3 > b2 > b1 > a3 > a2 > a1: b3 and b2 kept, four folded
-		assert(t, query(t, 3), map[string]column{
+		// contributions b3 > a3 > b2 > b1 > a2 > a1: b3 and a3 kept, four folded
+		assert(t, query(t, start(t), 3), map[string]column{
 			"b3":                     own("b3"),
-			"b2":                     own("b2"),
+			"a3":                     own("a3"),
 			"remaining 4 dimensions": {},
 		})
 	})
@@ -173,7 +195,7 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 	t.Run("limit-1", func(t *testing.T) {
 		trackContractComponent(t, contract, "limit-1")
 		// nothing kept: one column holding all six metrics
-		assert(t, query(t, 1), map[string]column{
+		assert(t, query(t, start(t), 1), map[string]column{
 			"remaining 6 dimensions": {},
 		})
 	})
