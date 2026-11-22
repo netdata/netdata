@@ -1815,5 +1815,9 @@
       "des/single-plan-control",
       "des/skipped-successor"
     ]
+  },
+  {
+    "name": "CASE-046/details-as-after-fold",
+    "proves": "with options=details every grouped metric's \"as\" names the result dimension it is aggregated into: after a cardinality fold kept metrics keep their own dimension name and folded metrics name the \"remaining N dimensions\" bucket, with a no-limit control"
   }
 ]
