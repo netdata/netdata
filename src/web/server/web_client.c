@@ -864,8 +864,15 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     //we search for the position where we have " HTTP/", because it finishes the user request
     char *request_line_end = s;
-    while(request_line_end < request_end && *request_line_end && *request_line_end != '\r')
+    while(request_line_end < request_end && *request_line_end && *request_line_end != '\r' && *request_line_end != '\n')
         request_line_end++;
+
+    // a CR or LF that is not part of the terminating CRLF (RFC 9112 2.2) would stay in the request target,
+    // which is echoed as received into the Location header of the HTTPS redirect
+    if(request_line_end < request_end &&
+       (*request_line_end == '\n' ||
+        (*request_line_end == '\r' && request_line_end + 1 < request_end && request_line_end[1] != '\n')))
+        return http_request_malformed_header(w);
 
     s = url_find_protocol(s, request_line_end);
 
