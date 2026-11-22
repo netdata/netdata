@@ -267,15 +267,14 @@ typedef struct _query_metric {
     STORAGE_POINT query_points;
 
     struct {
-        uint32_t slot;
-        uint32_t first_slot;
-        STRING *id;
-        STRING *name;
-        STRING *units;
+        uint32_t slot;          // the dimension of the returned RRDR (QUERY_METRIC_NOT_GROUPED_SLOT when dropped)
+        uint32_t first_slot;    // the dimension of the first group-by pass
     } grouped_as;
 
     usec_t duration_ut;
 } QUERY_METRIC;
+
+#define QUERY_METRIC_NOT_GROUPED_SLOT UINT32_MAX
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 #define MAX_QUERY_GROUP_BY_PASSES 2
