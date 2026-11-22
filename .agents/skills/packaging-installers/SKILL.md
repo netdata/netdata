@@ -62,6 +62,10 @@ run the installation procedures in linked operator docs. Action boundaries remai
   removal/reinstallation. Check configuration/history and ordinary monitoring as well as the optional component.
   A successful installer exit or active service is not sufficient: run a fresh workload through the installed
   service account, and inspect errors during the observation window instead of waiting only for eventual success.
+- For plugin shutdown/drain checks, reproduce the deployment's signal delivery. `systemctl stop` can signal the
+  whole control group and hide a defect in Agent-owned child cleanup; Docker normally signals the main process.
+  Prove queued data was absent before stopping and persisted before the next periodic flush, then verify it after
+  restart. Record child exit disposition separately from data retention.
 - Preserve the target's security policy while diagnosing failures. Record actual process credentials, confinement
   and sandbox evidence when making those claims; evidence distinctions are owned by
   `.agents/skills/packaging-component-releases/sre-handoff.md#packaging-review-and-first-publication`.
