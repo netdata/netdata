@@ -149,8 +149,8 @@ There is no updater log and no coredump metadata on Windows.
 
 | Path | Holds | Notes |
 |---|---|---|
-| `status-file.json` | The daemon status file: last exit reason and cause, signal, fault address, a fatal object with file/function/line/message/errno, stack traces, restart and crash counts, plus database, memory and disk state | The single most valuable crash artifact. POSIX picks the newest of several trusted locations and excludes shared temporary directories; Windows reads one fixed path |
-| `status-progress.json` | The shutdown progress record: the same format, saved without fsync at each shutdown step, so the last step the shutdown watcher recorded lives here. Of the shutdown saves, `status-file.json` keeps the first one (made before any step), then the final `exited` save or a crash, fatal or timeout record | Removed at the next start. Use it only when both records parse, their `ephemeral_id` values are equal and non-zero, and the status file is neither `exited` nor an abnormal exit (any `EXIT_REASON_ABNORMAL` bit, e.g. crash, fatal, out of memory, shutdown timeout) - the agent applies the same rule. After a power loss it may be missing, older or unparsable; empty copies are not collected. Agents that predate this file keep the step in `status-file.json` |
+| `status-file.json` | The daemon status file: last exit reason and cause, signal, fault address, a fatal object with file/function/line/message/errno, stack traces, restart and crash counts, plus database, memory and disk state | The single most valuable crash artifact. POSIX picks the newest non-empty copy among several trusted locations and excludes shared temporary directories; Windows picks the newest non-empty copy of the state and cache directories |
+| `status-progress.json` | The shutdown progress record: the status file format, saved without fsync at each shutdown step | Usable only under the rules below |
 | `state-tree.txt` | POSIX: aggregate file count and byte total only, because a state filename can itself be a live credential. Windows: a listing with bearer-token filenames withheld and counted | The POSIX form is strictly stricter |
 | `cloud-state.txt` / `claimed-id.txt` | The claim id only. POSIX captures a listing plus the id; Windows copies the id file | The claim token and private key are never collected |
 | `db-disk-usage.txt` | Per-tier disk usage and database file sizes. POSIX additionally reports corruption sentinels | Read against the effective config, not against expectations |
@@ -159,6 +159,19 @@ There is no updater log and no coredump metadata on Windows.
 | `dyncfg/` | Configs created or modified through the UI or API | POSIX only. **Absent on Windows**, so UI-created jobs and UI-edited alerts are invisible there |
 | `snmp-diagnostics-status.txt` | Always present; states whether SNMP evidence was requested and what happened | Hand SNMP questions to `triage-snmp-diagnostics` |
 | `snmp-diagnostics/` | The opt-in, **unsanitized** SNMP store | Owned by `triage-snmp-diagnostics` |
+
+**Shutdown progress record (`status-progress.json`).**
+
+- Holds the last shutdown step the shutdown watcher recorded. Of the shutdown saves, `status-file.json` keeps only
+  the first one (made before any step), then the final `exited` save or a crash, fatal or timeout record.
+- Use it instead of `status-file.json` only when all of these hold - the agent applies the same rule at startup:
+  - both records parse;
+  - their `ephemeral_id` values are equal and non-zero;
+  - the status file is not `exited`;
+  - the status file has no `EXIT_REASON_ABNORMAL` bit (e.g. crash, fatal, out of memory, shutdown timeout).
+- The agent removes it at the next start, so it is absent after any later restart.
+- After a power loss it may be missing, older or unparsable. Empty copies are not collected.
+- Agents that predate this file keep the step in `status-file.json`.
 
 **go.d job state is not in this area.** go.d stopped writing job state to disk when its job manager
 moved to a single-owner command kernel; it now lives in the dynamic configuration tree, captured in the

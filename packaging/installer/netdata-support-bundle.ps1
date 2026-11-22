@@ -1133,14 +1133,17 @@ if (Test-Path $LogDir) {
 # ============================================================================
 Show-Info 'collecting: state'
 Collect-SnmpDiagnostics
-$StatusFile = Join-Path $LibDir 'status-netdata.json'
-if (Test-Path $StatusFile) {
+# the agent writes these to the first writable of the state and cache dirs; the newest non-empty copy is the last record
+function Get-NewestStatusFile([string]$Name) {
+    @((Join-Path $LibDir $Name), (Join-Path $CacheDir $Name)) |
+        Where-Object { (Test-Path $_ -PathType Leaf) -and (Get-Item $_).Length -gt 0 -and -not ((Get-Item $_).Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+        Sort-Object { (Get-Item $_).LastWriteTimeUtc } -Descending | Select-Object -First 1
+}
+$StatusFile = Get-NewestStatusFile 'status-netdata.json'
+if ($StatusFile) {
     Save-File '06-state\status-file.json' 'Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)' $StatusFile
 }
-# the agent writes it to the first writable of these; the newest one is the last record
-$ProgressFile = @((Join-Path $LibDir 'status-netdata-progress.json'), (Join-Path $CacheDir 'status-netdata-progress.json')) |
-    Where-Object { (Test-Path $_ -PathType Leaf) -and (Get-Item $_).Length -gt 0 -and -not ((Get-Item $_).Attributes -band [IO.FileAttributes]::ReparsePoint) } |
-    Sort-Object { (Get-Item $_).LastWriteTimeUtc } -Descending | Select-Object -First 1
+$ProgressFile = Get-NewestStatusFile 'status-netdata-progress.json'
 if ($ProgressFile) {
     Save-File '06-state\status-progress.json' 'Daemon shutdown progress record: the step the agent was in when its shutdown was cut short (removed at startup)' $ProgressFile
 }
