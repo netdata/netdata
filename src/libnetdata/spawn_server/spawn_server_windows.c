@@ -522,4 +522,9 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return map_status_code_to_signal(exit_code);
 }
 
+// Output-draining shutdown is implemented by the nofork backend.
+int spawn_server_exec_shutdown(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms) {
+    return spawn_server_exec_kill(server, si, timeout_ms);
+}
+
 #endif

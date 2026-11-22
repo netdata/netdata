@@ -176,7 +176,7 @@ static void pluginsd_worker_thread(void *arg) {
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
                rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, count);
 
-        int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
+        int worker_ret_code = spawn_popen_shutdown(cd->unsafe.pi, 3 * MSEC_PER_SEC);
         cd->unsafe.pi = NULL;
 
         if (retry && worker_ret_code != -1)
@@ -207,7 +207,7 @@ static void pluginsd_worker_thread(void *arg) {
     spinlock_unlock(&cd->unsafe.spinlock);
 
     if (pi)
-        spawn_popen_kill(pi, 3 * MSEC_PER_SEC);
+        spawn_popen_shutdown(pi, 3 * MSEC_PER_SEC);
 
     worker_unregister();
 }

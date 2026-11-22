@@ -218,14 +218,23 @@ SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms,
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
-int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
+static int spawn_popen_terminate(POPEN_INSTANCE *pi, int timeout_ms, bool drain_output) {
     if(!pi) return -1;
 
     spawn_popen_close_files(pi);
-    int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si, timeout_ms);
+    int status = drain_output ? spawn_server_exec_shutdown(netdata_main_spawn_server, pi->si, timeout_ms)
+                              : spawn_server_exec_kill(netdata_main_spawn_server, pi->si, timeout_ms);
     int rc = spawn_popen_status_rc(status, pi->strict_status);
     freez(pi);
     return rc;
+}
+
+int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
+    return spawn_popen_terminate(pi, timeout_ms, false);
+}
+
+int spawn_popen_shutdown(POPEN_INSTANCE *pi, int timeout_ms) {
+    return spawn_popen_terminate(pi, timeout_ms, true);
 }
 
 pid_t spawn_popen_pid(POPEN_INSTANCE *pi) {

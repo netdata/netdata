@@ -50,6 +50,9 @@ pid_t spawn_server_pid(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
+// Protocol shutdown: nofork closes stdin and drains/discards stdout within the existing kill
+// deadlines. Other backends retain their kill behavior. The caller must have stopped reading stdout.
+int spawn_server_exec_shutdown(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
 typedef enum __attribute__((packed)) {
