@@ -35,8 +35,9 @@ That is unclean termination - the agent never got to update the file. The summar
 explicitly.
 
 A kill during shutdown (for example `docker stop` past its grace period): the status file says
-exiting but holds only the first shutdown save; the step reached is in the shutdown progress record
-(see `./bundle-map.md`, persistent state).
+exiting but holds only the first shutdown save, which names no step; the last step saved is in the shutdown
+progress record when it passes the checks in `./bundle-map.md` (persistent state). A kill before the first
+step leaves no step at all.
 
 ## Resource use
 
