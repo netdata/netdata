@@ -3,7 +3,6 @@
 package corpus
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -207,5 +206,5 @@ func sameLatest(got, want any) bool {
 	}
 	g, ok := got.(float64)
 	w, _ := want.(float64)
-	return ok && math.Abs(g-w) < 1e-9
+	return ok && g == w
 }
