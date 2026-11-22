@@ -1136,8 +1136,10 @@ Collect-SnmpDiagnostics
 # the agent writes these to the first writable of the state and cache dirs; the newest non-empty copy is the last record
 function Get-NewestStatusFile([string]$Name) {
     @((Join-Path $LibDir $Name), (Join-Path $CacheDir $Name)) |
-        Where-Object { (Test-Path $_ -PathType Leaf) -and (Get-Item $_).Length -gt 0 -and -not ((Get-Item $_).Attributes -band [IO.FileAttributes]::ReparsePoint) } |
-        Sort-Object { (Get-Item $_).LastWriteTimeUtc } -Descending | Select-Object -First 1
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        ForEach-Object { Get-Item -LiteralPath $_ -Force } |
+        Where-Object { $_.Length -gt 0 -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+        Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
 }
 $StatusFile = Get-NewestStatusFile 'status-netdata.json'
 if ($StatusFile) {

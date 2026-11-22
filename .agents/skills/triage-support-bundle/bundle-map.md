@@ -169,7 +169,8 @@ There is no updater log and no coredump metadata on Windows.
   - their `ephemeral_id` values are equal and non-zero;
   - the status file is not `exited`;
   - the status file has no `EXIT_REASON_ABNORMAL` bit (e.g. crash, fatal, out of memory, shutdown timeout).
-- The agent removes it at the next start, so it is absent after any later restart.
+- The agent tries to remove it at the next start and ignores a failed delete; the `ephemeral_id` check rejects a
+  copy left behind.
 - After a power loss it may be missing, older or unparsable. Empty copies are not collected.
 - Agents that predate this file keep the step in `status-file.json`.
 
