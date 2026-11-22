@@ -10,7 +10,6 @@ import (
 
 	"github.com/netdata/netdata/tests/query-corpus/daemon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
-	"github.com/netdata/netdata/tests/query-corpus/stream"
 )
 
 // TestCase046CardinalityDetailsAs: with options=details every grouped metric
@@ -19,21 +18,13 @@ import (
 // name and folded ones name the "remaining N dimensions" bucket. Without a
 // limit, each metric names its own dimension (control).
 func TestCase046CardinalityDetailsAs(t *testing.T) {
-	trackContract(t, "CASE-046/details-as-after-fold")
+	const contract = "CASE-046/details-as-after-fold"
+	for _, component := range []string{"no-limit", "limit-4"} {
+		registerContractComponent(t, contract, component)
+	}
 
 	const host, context = "case046-card", "fixture.case046_card"
-	const dims = 6
-	ch := fixture.Chart{
-		ID: context, Title: "cardinality details", Units: "units", Family: "fixture",
-		Context: context, UpdateEvery: 1,
-	}
-	for k := 1; k <= dims; k++ {
-		d := fixture.Dimension{ID: fmt.Sprintf("d%d", k)}
-		for i := 1; i <= 20; i++ {
-			d.Points = append(d.Points, fixture.Point{T: fixture.T0 + int64(i), Collected: strconv.Itoa(k), Flags: stream.FlagNotAnomalous})
-		}
-		ch.Dimensions = append(ch.Dimensions, d)
-	}
+	ch := cardinalityChart(context, "cardinality details")
 	pushLiveBurst(t, host, guid(13200), ch)
 	if _, err := td.WaitRetention(host, context, fixture.T0+1, fixture.T0+20, 15*time.Second); err != nil {
 		t.Fatal(err)
@@ -58,14 +49,16 @@ func TestCase046CardinalityDetailsAs(t *testing.T) {
 	}
 
 	t.Run("no-limit", func(t *testing.T) {
+		trackContractComponent(t, contract, "no-limit")
 		want := map[string]string{}
-		for k := 1; k <= dims; k++ {
+		for k := 1; k <= cardinalityDims; k++ {
 			want[fmt.Sprintf("d%d", k)] = fmt.Sprintf("d%d", k)
 		}
 		assertGroupedAs(t, query(t, 0), want)
 	})
 
 	t.Run("limit-4", func(t *testing.T) {
+		trackContractComponent(t, contract, "limit-4")
 		// contributions d6 > d5 > ... > d1: d6, d5, d4 kept; d1..d3 folded
 		const folded = "remaining 3 dimensions"
 		want := map[string]string{

@@ -271,6 +271,27 @@ func TestLayer8NonzeroAllZero(t *testing.T) {
 	}
 }
 
+// cardinalityDims is the dimension count of cardinalityChart.
+const cardinalityDims = 6
+
+// cardinalityChart builds the cardinality fold fixture: dimensions d1..d6
+// collect the constant k over T0+1..T0+20, so d6 > d5 > ... > d1 by
+// contribution and every limit's kept and folded sets follow from k.
+func cardinalityChart(context, title string) fixture.Chart {
+	ch := fixture.Chart{
+		ID: context, Title: title, Units: "units", Family: "fixture",
+		Context: context, UpdateEvery: 1,
+	}
+	for k := 1; k <= cardinalityDims; k++ {
+		d := fixture.Dimension{ID: fmt.Sprintf("d%d", k)}
+		for i := 1; i <= 20; i++ {
+			d.Points = append(d.Points, fixture.Point{T: fixture.T0 + int64(i), Collected: strconv.Itoa(k), Flags: stream.FlagNotAnomalous})
+		}
+		ch.Dimensions = append(ch.Dimensions, d)
+	}
+	return ch
+}
+
 // TestLayer8CardinalityLimit pins the fold: top limit-1 dimensions by
 // |view sum| survive, the rest fold into "remaining X dimensions" whose
 // per-row value is the SUM of the folded values.
@@ -278,18 +299,7 @@ func TestLayer8CardinalityLimit(t *testing.T) {
 	trackContract(t, "L8/cardinality-limit")
 
 	const context = "fixture.l8card"
-	const dims = 6
-	ch := fixture.Chart{
-		ID: context, Title: "cardinality", Units: "units", Family: "fixture",
-		Context: context, UpdateEvery: 1,
-	}
-	for k := 1; k <= dims; k++ {
-		d := fixture.Dimension{ID: fmt.Sprintf("d%d", k)}
-		for i := 1; i <= 20; i++ {
-			d.Points = append(d.Points, fixture.Point{T: fixture.T0 + int64(i), Collected: strconv.Itoa(k), Flags: stream.FlagNotAnomalous})
-		}
-		ch.Dimensions = append(ch.Dimensions, d)
-	}
+	ch := cardinalityChart(context, "cardinality")
 	pushLiveBurst(t, "l8-card", guid(94), ch)
 	if _, err := td.WaitRetention("l8-card", ch.Context, fixture.T0+1, fixture.T0+20, 15*time.Second); err != nil {
 		t.Fatal(err)

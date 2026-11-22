@@ -20,7 +20,10 @@ import (
 // dimensions" column, which has no single metric behind it, carries null.
 // Without a limit each column carries its own metric (control).
 func TestCase047V1CardinalityJsonwrap(t *testing.T) {
-	trackContract(t, "CASE-047/v1-jsonwrap-arrays-after-fold")
+	const contract = "CASE-047/v1-jsonwrap-arrays-after-fold"
+	for _, component := range []string{"no-limit", "limit-3", "limit-1"} {
+		registerContractComponent(t, contract, component)
+	}
 
 	const host, context, labelKey = "case047-v1card", "fixture.case047_v1card", "case047_side"
 
@@ -149,6 +152,7 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 	}
 
 	t.Run("no-limit", func(t *testing.T) {
+		trackContractComponent(t, contract, "no-limit")
 		want := map[string]column{}
 		for id := range metrics {
 			want[id] = own(id)
@@ -157,6 +161,7 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 	})
 
 	t.Run("limit-3", func(t *testing.T) {
+		trackContractComponent(t, contract, "limit-3")
 		// contributions b3 > b2 > b1 > a3 > a2 > a1: b3 and b2 kept, four folded
 		assert(t, query(t, 3), map[string]column{
 			"b3":                     own("b3"),
@@ -166,6 +171,7 @@ func TestCase047V1CardinalityJsonwrap(t *testing.T) {
 	})
 
 	t.Run("limit-1", func(t *testing.T) {
+		trackContractComponent(t, contract, "limit-1")
 		// nothing kept: one column holding all six metrics
 		assert(t, query(t, 1), map[string]column{
 			"remaining 6 dimensions": {},
