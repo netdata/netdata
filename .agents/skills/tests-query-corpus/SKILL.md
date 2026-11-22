@@ -237,7 +237,10 @@ its test as the regression guard and records `FixedBy: "#PR"`.
   range; ranges used by loops (e.g. soak attempts) reserve their whole
   span.
 - **Settle discipline**: after pushing, block on `td.WaitRetention(...)`
-  before querying. Ordinary helpers keep the connection open through
+  before querying. A context with several charts MUST settle per chart:
+  `WaitRetention` checks only the context-wide bounds, which the first
+  stored chart satisfies; use `waitChartsRetention` (`waitChartsRetentionOn`
+  for a dedicated daemon). Ordinary helpers keep the connection open through
   assertions to isolate storage/query checks from teardown timing. CASE-015
   deliberately closes immediately and guards the #23118 delivered-data
   drain guarantee; immediate close is no longer documented as data loss.
@@ -362,7 +365,10 @@ states what it takes:
   strings, unless the check IS a byte-pin.
 - The default shared daemon serves most tests. Tests that need isolation,
   rotation, or restarts boot dedicated daemons; never restart or reconfigure
-  the default shared daemon from an unrelated test.
+  the default shared daemon from an unrelated test. A case whose query
+  crashes the daemon before its fix lands (e.g. an ASAN abort) MUST run each
+  crashing scope on a dedicated daemon, or every later test reports
+  connection failures instead of its verdict.
 - After system library upgrades, rebuild `build/netdata` before blaming a
   test failure on the suite.
 - IDE diagnostics on the Go files can be stale; `go vet ./...` is the
