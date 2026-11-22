@@ -1488,7 +1488,8 @@ newest_status_file() {
     _status_candidates="$_status_candidates /run/$1 /var/run/$1"
   fi
   for sf in $_status_candidates; do
-    if [ ! -f "$sf" ] || [ ! -r "$sf" ] || [ -h "$sf" ]; then continue; fi
+    # Skip empty copies: a power loss can leave one, and the agent ignores them too.
+    if [ ! -f "$sf" ] || [ ! -r "$sf" ] || [ -h "$sf" ] || [ ! -s "$sf" ]; then continue; fi
     # shellcheck disable=SC3013  # supported by dash, BusyBox, bash and FreeBSD sh
     if [ -z "$_newest" ] || [ "$sf" -nt "$_newest" ]; then _newest="$sf"; fi
   done
