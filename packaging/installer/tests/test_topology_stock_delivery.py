@@ -59,7 +59,9 @@ if(TEST_METADATA)
               RPM_PLUGIN-DEM_PACKAGE_REQUIRES RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES
               RPM_IP-INTEL-DATA_PACKAGE_CONFLICTS RPM_IP-INTEL-DATA_PACKAGE_REQUIRES
               RPM_IP-INTEL-DATA_PACKAGE_OBSOLETES RPM_IP-INTEL-DATA_PACKAGE_REQUIRES_PRE
-              RPM_IP-INTEL-DATA_DEFAULT_USER RPM_IP-INTEL-DATA_DEFAULT_GROUP)
+              RPM_IP-INTEL-DATA_DEFAULT_USER RPM_IP-INTEL-DATA_DEFAULT_GROUP
+              DEBIAN_PLUGIN-NETFLOW_PACKAGE_CONTROL_EXTRA
+              RPM_PLUGIN-NETFLOW_POST_UNINSTALL_SCRIPT_FILE)
     file(APPEND "${CMAKE_BINARY_DIR}/package-properties" "${key}=${CPACK_${key}}\\n")
   endforeach()
 endif()
@@ -172,6 +174,68 @@ endif()
                     self.assertEqual(props[f'RPM_IP-INTEL-DATA_PACKAGE_{relationship}'], '')
                 for field in ('USER', 'GROUP'):
                     self.assertEqual(props[f'RPM_IP-INTEL-DATA_DEFAULT_{field}'], 'root')
+
+    def removal_hook(self, kind):
+        build = self.configure(netflow=True, kind=kind, metadata=True)
+        props = dict(line.split('=', 1) for line in (build / 'package-properties').read_text().splitlines())
+        if kind == 'deb':
+            paths = props['DEBIAN_PLUGIN-NETFLOW_PACKAGE_CONTROL_EXTRA'].split(';')
+            hooks = [Path(path) for path in paths if Path(path).name == 'postrm']
+            self.assertEqual(len(hooks), 1, 'NetFlow must register a final-removal hook')
+            hook = hooks[0]
+        else:
+            path = props['RPM_PLUGIN-NETFLOW_POST_UNINSTALL_SCRIPT_FILE']
+            self.assertTrue(path, 'NetFlow must register a final-erasure hook')
+            hook = Path(path)
+        # Run the shipped hook with an isolated live-systemd directory and service helper.
+        live = build / 'systemd'
+        live.mkdir()
+        script = build / 'removal-hook'
+        script.write_text(hook.read_text().replace('/run/systemd/system', str(live)))
+        tools = build / 'tools'
+        tools.mkdir()
+        helper = tools / ('deb-systemd-invoke' if kind == 'deb' else 'systemctl')
+        helper.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALLS"\nexit "${SERVICE_STATUS:-0}"\n')
+        helper.chmod(0o755)
+        return script, live, tools, helper
+
+    def invoke_removal(self, script, tools, phase, *, root='', helper_status=0):
+        calls = tools.parent / 'calls'
+        calls.write_text('')
+        env = dict(os.environ, PATH=str(tools), CALLS=str(calls), DPKG_ROOT=root,
+                   SERVICE_STATUS=str(helper_status))
+        result = subprocess.run(['/bin/sh', str(script), phase], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return calls.read_text().splitlines()
+
+    def test_netflow_removal_restarts_only_at_final_removal(self):
+        for kind, final, inactive in (
+            ('deb', 'remove', ('purge', 'upgrade', 'failed-upgrade', 'abort-install', 'abort-upgrade', 'disappear')),
+            ('rpm', '0', ('1', '2')),
+        ):
+            with self.subTest(kind=kind):
+                script, _, tools, _ = self.removal_hook(kind)
+                self.assertEqual(self.invoke_removal(script, tools, final), ['try-restart netdata.service'])
+                for phase in inactive:
+                    with self.subTest(phase=phase):
+                        self.assertEqual(self.invoke_removal(script, tools, phase), [])
+                # A failed service action must not leave the package half-removed.
+                self.assertEqual(self.invoke_removal(script, tools, final, helper_status=1),
+                                 ['try-restart netdata.service'])
+
+    def test_netflow_removal_skips_non_systemd_and_missing_helpers(self):
+        for kind, final in (('deb', 'remove'), ('rpm', '0')):
+            with self.subTest(kind=kind):
+                script, live, tools, helper = self.removal_hook(kind)
+                live.rmdir()
+                self.assertEqual(self.invoke_removal(script, tools, final), [])
+                live.mkdir()
+                helper.unlink()
+                self.assertEqual(self.invoke_removal(script, tools, final), [])
+
+    def test_netflow_removal_does_not_control_host_from_dpkg_root(self):
+        script, _, tools, _ = self.removal_hook('deb')
+        self.assertEqual(self.invoke_removal(script, tools, 'remove', root='/target'), [])
 
     def test_package_registry_tracks_stock_production(self):
         for netflow, dem, staged in ((True, False, True), (False, True, True),
