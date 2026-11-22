@@ -13,6 +13,19 @@
 - Libnetdata: hash worker spinlock telemetry by pointer only ([#24856](https://github.com/netdata/netdata/issues/24856))
 - Rrdlabels: take common_count locks in address order ([#24860](https://github.com/netdata/netdata/issues/24860))
 - Dyncfg: fix typo in the file rename error message ([#24871](https://github.com/netdata/netdata/issues/24871))
+- Fix(go/jobmgr): publish job-backed Functions only while ready ([#24878](https://github.com/netdata/netdata/issues/24878))
+- Build: fall back to cups-config when pkg-config gives no CUPS libraries ([#24876](https://github.com/netdata/netdata/issues/24876))
+- Feat(packaging): ship complete DEM Docker images ([#24883](https://github.com/netdata/netdata/issues/24883))
+- Fix(packaging): ship shared GeoIP data for static RUM ([#24880](https://github.com/netdata/netdata/issues/24880))
+- Regenerate integrations docs ([#24886](https://github.com/netdata/netdata/issues/24886))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.11.2 to 1.12.0 in /src/go ([#24889](https://github.com/netdata/netdata/issues/24889))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.18 to 1.33.19 in /src/go ([#24890](https://github.com/netdata/netdata/issues/24890))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.114.10 to 1.115.0 in /src/go ([#24891](https://github.com/netdata/netdata/issues/24891))
+- Build(deps): bump github.com/tidwall/gjson from 1.20.3 to 1.20.4 in /src/go ([#24893](https://github.com/netdata/netdata/issues/24893))
+- Build(deps): bump github.com/go-sql-driver/mysql from 1.10.1 to 1.10.2 in /src/go ([#24894](https://github.com/netdata/netdata/issues/24894))
+- Build(deps): bump golang.org/x/net from 0.62.0 to 0.63.0 in /src/go ([#24895](https://github.com/netdata/netdata/issues/24895))
+- Build(deps): bump github.com/catonetworks/cato-go-sdk from 1.1.4 to 1.2.0 in /src/go ([#24896](https://github.com/netdata/netdata/issues/24896))
+- Feat(packaging): share IP intelligence data between NetFlow and DEM ([#24887](https://github.com/netdata/netdata/issues/24887))
 
 ## [2.13.0] - 2026-11-19
 
