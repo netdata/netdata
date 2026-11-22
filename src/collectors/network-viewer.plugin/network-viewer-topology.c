@@ -1189,7 +1189,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         topology_strncpy(username, sizeof(username), n->win_username);
 #endif
 
-    if(local_ip[0] && !topology_ip_is_unspecified(local_ip)) {
+    if(local_ip[0] && !topology_ip_is_unspecified(local_ip) && !dictionary_get(ctx->local_ips, local_ip)) {
         bool present = true;
         dictionary_set(ctx->local_ips, local_ip, &present, sizeof(present));
     }
@@ -1877,6 +1877,8 @@ typedef struct {
     NV_TOPOLOGY_V1_CORRELATION_TABLE correlation_claims;
     NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_ACTOR_LABEL) labels;        // by the label dedup key
 } NV_TOPOLOGY_V1_PAYLOAD;
+
+// The table macros evaluate `t` several times: pass a plain pointer, never an expression with side effects.
 
 // Append a zeroed row and evaluate to its address.
 #define NV_TOPOLOGY_V1_TABLE_APPEND(t) \
