@@ -48,6 +48,13 @@ option(USE_LTO "Attempt to use LTO when building. Defaults to being enabled if s
 unset(_nd_hardening_default)
 unset(_nd_lto_default)
 
+# Build otel-plugin and netflow-plugin at the same time instead of one after the
+# other (NetdataRust.cmake). It roughly doubles the peak memory of the Rust part
+# of the build, so AUTO enables it only when the build has enough memory.
+set(USE_PARALLEL_RUST_BUILDS AUTO CACHE STRING
+    "Build the Rust plugins in parallel: AUTO (when the build host has at least 15 GiB of memory), ON or OFF")
+set_property(CACHE USE_PARALLEL_RUST_BUILDS PROPERTY STRINGS AUTO ON OFF)
+
 option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
 mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
 

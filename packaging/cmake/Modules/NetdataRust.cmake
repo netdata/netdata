@@ -6,6 +6,57 @@
 
 include_guard()
 
+# Memory available to this build, in MiB: the host's RAM, or a smaller cgroup
+# memory limit on this process (a container or a systemd scope), whichever is
+# lower. Checks the process's own cgroup and its ancestors (cgroup v2 and the v1
+# memory controller), plus the root of a cgroup namespace, where a container's
+# limit shows. Without a readable limit, the host's RAM is the answer.
+function(_netdata_build_memory_mib out_mib out_source)
+    cmake_host_system_information(RESULT _mib QUERY TOTAL_PHYSICAL_MEMORY)
+    set(_source "host RAM")
+
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND EXISTS "/proc/self/cgroup")
+        set(_files "/sys/fs/cgroup/memory.max" "/sys/fs/cgroup/memory/memory.limit_in_bytes")
+        file(STRINGS "/proc/self/cgroup" _lines)
+        foreach(_line IN LISTS _lines)
+            if(_line MATCHES "^0::(/.*)$")
+                set(_root "/sys/fs/cgroup")
+                set(_leaf "memory.max")
+                set(_path "${CMAKE_MATCH_1}")
+            elseif(_line MATCHES "^[0-9]+:([^:]*,)?memory(,[^:]*)?:(/.*)$")
+                set(_root "/sys/fs/cgroup/memory")
+                set(_leaf "memory.limit_in_bytes")
+                set(_path "${CMAKE_MATCH_3}")
+            else()
+                continue()
+            endif()
+
+            while(NOT _path STREQUAL "/" AND NOT _path STREQUAL "")
+                list(APPEND _files "${_root}${_path}/${_leaf}")
+                get_filename_component(_path "${_path}" DIRECTORY)
+            endwhile()
+        endforeach()
+
+        foreach(_file IN LISTS _files)
+            if(EXISTS "${_file}")
+                file(READ "${_file}" _limit)
+                string(STRIP "${_limit}" _limit)
+                # cgroup v2 writes "max" for no limit; v1 a huge byte count.
+                if(_limit MATCHES "^[0-9]+$")
+                    math(EXPR _limit_mib "${_limit} / 1048576")
+                    if(_limit_mib LESS _mib)
+                        set(_mib ${_limit_mib})
+                        set(_source "the cgroup limit in ${_file}")
+                    endif()
+                endif()
+            endif()
+        endforeach()
+    endif()
+
+    set(${out_mib} ${_mib} PARENT_SCOPE)
+    set(${out_source} "${_source}" PARENT_SCOPE)
+endfunction()
+
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
     # Check for the toolchain before fetching Corrosion: without this, a missing
     # rustc surfaces as an error deep inside Corrosion's FindRust with no hint of
@@ -48,12 +99,13 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     FetchContent_Declare(
         Corrosion
         GIT_REPOSITORY https://github.com/netdata/corrosion.git
-        GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
+        GIT_TAG 4c900bca29e31ec0be09da977424291f9e8e9138 # stable/v0.5 + parallel-cargo-builds
     )
     FetchContent_MakeAvailable(Corrosion)
 
     # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/
-    # (see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
+    # (build/, or build-<target>/ per target with ISOLATE_CARGO_TARGET_DIRS;
+    # see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
     # ninja clean removes it.  If a future Corrosion version changes this
     # path, this line must be updated to match.
     set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/cargo")
@@ -71,10 +123,48 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     if(ENABLE_PLUGIN_NETFLOW)
         list(APPEND _WORKSPACE_CRATES netflow-plugin)
     endif()
+    # otel-plugin and netflow-plugin build one after the other by default: each
+    # cargo build runs in Ninja's console pool, and both share one cargo target
+    # directory, which cargo locks for the whole build. Removing both lets them
+    # build at the same time, at the cost of compiling the shared dependencies
+    # twice and roughly doubling the peak memory of the Rust part of the build.
+    set(_nd_rust_parallel_args "")
+    if(ENABLE_PLUGIN_OTEL AND ENABLE_PLUGIN_NETFLOW)
+        if(USE_PARALLEL_RUST_BUILDS STREQUAL "AUTO")
+            _netdata_build_memory_mib(_nd_build_memory_mib _nd_build_memory_source)
+            # 15 GiB rather than 16: a 16 GB machine reports about 15.6 GiB.
+            if(_nd_build_memory_mib GREATER_EQUAL 15360)
+                set(_nd_rust_parallel ON)
+            else()
+                set(_nd_rust_parallel OFF)
+            endif()
+            set(_nd_rust_parallel_reason "AUTO: ${_nd_build_memory_mib} MiB of ${_nd_build_memory_source}, needs 15360")
+            unset(_nd_build_memory_mib)
+            unset(_nd_build_memory_source)
+        elseif(USE_PARALLEL_RUST_BUILDS)
+            set(_nd_rust_parallel ON)
+            set(_nd_rust_parallel_reason "USE_PARALLEL_RUST_BUILDS=${USE_PARALLEL_RUST_BUILDS}")
+        else()
+            set(_nd_rust_parallel OFF)
+            set(_nd_rust_parallel_reason "USE_PARALLEL_RUST_BUILDS=${USE_PARALLEL_RUST_BUILDS}")
+        endif()
+
+        if(_nd_rust_parallel)
+            set(_nd_rust_parallel_args NO_USES_TERMINAL ISOLATE_CARGO_TARGET_DIRS)
+            message(STATUS "Building the Rust plugins in parallel (${_nd_rust_parallel_reason})")
+        else()
+            message(STATUS "Building the Rust plugins one after the other (${_nd_rust_parallel_reason})")
+        endif()
+        unset(_nd_rust_parallel)
+        unset(_nd_rust_parallel_reason)
+    endif()
+
     if(_WORKSPACE_CRATES)
         corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES ${_WORKSPACE_CRATES})
+                               CRATES ${_WORKSPACE_CRATES}
+                               ${_nd_rust_parallel_args})
     endif()
+    unset(_nd_rust_parallel_args)
 
     # Cargo links the Rust executables through the bare compiler driver, so CMAKE_EXE_LINKER_FLAGS never reach those
     # links. When the build asks for the Cortex-A53 erratum workarounds (static aarch64), have the linker apply them to
