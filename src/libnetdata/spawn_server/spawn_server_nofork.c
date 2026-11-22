@@ -1647,7 +1647,9 @@ static int spawn_server_wait_status(int sock, int timeout_ms, bool cancellable) 
     }
 }
 
-static SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait_internal(SPAWN_SERVER *server, SPAWN_INSTANCE *instance,
+static int spawn_server_exec_wait_internal(SPAWN_INSTANCE *instance, bool keep_on_error);
+
+static SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait_internal(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance,
                                                                  int timeout_ms, int *status, bool cancellable) {
     if(!instance) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
@@ -1680,8 +1682,11 @@ static SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait_internal(SPAWN_SERVER 
         return SPAWN_TIMEDWAIT_ERROR;
     }
 
-    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
-    int st = spawn_server_exec_wait(server, instance);
+    // EOF is also readable. Terminal cleanup must retain the child when no valid exit report
+    // exists, so the remaining signal sequence still runs if the spawn server has died.
+    int st = spawn_server_exec_wait_internal(instance, !cancellable);
+    if(st == -1 && !cancellable)
+        return SPAWN_TIMEDWAIT_ERROR;
     if(status) *status = st;
     return SPAWN_TIMEDWAIT_EXITED;
 }
@@ -1690,7 +1695,7 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     return spawn_server_exec_timedwait_internal(server, instance, timeout_ms, status, true);
 }
 
-int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+static int spawn_server_exec_wait_internal(SPAWN_INSTANCE *instance, bool keep_on_error) {
     int rc = -1;
 
     // close the child pipes, to make it exit
@@ -1699,7 +1704,9 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     // get the result
     struct status_report sr = { 0 };
-    if(read(instance->sock, &sr, sizeof(sr)) != sizeof(sr))
+    ssize_t bytes = keep_on_error ? recv(instance->sock, &sr, sizeof(sr), MSG_DONTWAIT)
+                                 : read(instance->sock, &sr, sizeof(sr));
+    if(bytes != sizeof(sr))
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN PARENT: failed to read final status report for child %d, request %zu",
             instance->child_pid, instance->request_id);
@@ -1724,9 +1731,16 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         }
     }
 
+    if(rc == -1 && keep_on_error)
+        return rc;
+
     instance->child_pid = 0;
     spawn_server_exec_destroy(instance);
     return rc;
+}
+
+int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    return spawn_server_exec_wait_internal(instance, false);
 }
 
 // NOTE on pid safety: the legacy single-process kills below can hit a recycled pid. Our spawn server reaps

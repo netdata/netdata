@@ -1052,8 +1052,13 @@ static int plugin_shutdown_drain(const char *mode) {
             return 82;
     }
     else {
-        while(!shutdown_term_received || strcmp(mode, "ignore") == 0)
+        usec_t deadline = now_monotonic_usec() + 10 * USEC_PER_SEC;
+        while(!shutdown_term_received || strcmp(mode, "ignore") == 0 || strcmp(mode, "server-gone") == 0) {
+            // Bound the orphan fixture even when the cleanup under test fails.
+            if(strcmp(mode, "server-gone") == 0 && now_monotonic_usec() >= deadline)
+                return 82;
             sleep_usec(10 * USEC_PER_MS);
+        }
     }
 
     // Model a child flushing buffered work after EOF or SIGTERM.
@@ -1110,6 +1115,40 @@ static void test_cancelled_shutdown(SPAWN_SERVER *server, const char *argv0) {
                        test.normal_wait_cancelled, test.cancellation_preserved);
                 exit(1);
             }
+        }
+    }
+}
+
+static void test_cancelled_shutdown_without_server(int argc, const char **argv) {
+    for(size_t grace = 0; grace < 2; grace++) {
+        SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "shutdown", NULL, argc, argv);
+        int witness[2];
+        if(!server || pipe(witness) != 0) exit(1);
+        const char *args[] = { argv[0], "plugin-shutdown-drain", "server-gone", NULL };
+        SPAWN_INSTANCE *si = spawn_server_exec(server, witness[1], 0, args, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+        close(witness[1]);
+        if(!si) exit(1);
+        struct pollfd output = { .fd = spawn_server_instance_read_fd(si), .events = POLLIN };
+        char ready;
+        if(poll(&output, 1, 5000) <= 0 || read(output.fd, &ready, 1) != 1 || ready != 'R') exit(1);
+
+        pid_t server_pid = spawn_server_pid(server);
+        if(kill(server_pid, SIGKILL) != 0 || waitpid(server_pid, NULL, 0) != server_pid) exit(1);
+        server->server_pid = 0; // Already reaped; destruction must not signal this PID again.
+        SHUTDOWN_TEST test = { .server = server, .instance = si, .grace_ms = grace ? 100 : 0, .status = -1 };
+        ND_THREAD *worker = nd_thread_create("SHUTDOWN_TEST", NETDATA_THREAD_OPTIONS_ALL,
+                                             test_cancelled_shutdown_worker, &test);
+        if(!worker || nd_thread_join(worker) != 0) exit(1);
+
+        // Only the exact child owns the remaining stderr writer. EOF proves it stopped,
+        // without relying on an orphan's PID still identifying the same process.
+        struct pollfd exited = { .fd = witness[0], .events = POLLIN };
+        bool stopped = poll(&exited, 1, 1000) > 0 && read(witness[0], &ready, 1) == 0;
+        close(witness[0]);
+        spawn_server_destroy(server);
+        if(!stopped || !test.normal_wait_cancelled || !test.cancellation_preserved || test.elapsed > 6 * USEC_PER_SEC) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cancelled shutdown left a child after server exit (grace=%zu)", grace);
+            exit(1);
         }
     }
 }
@@ -1293,6 +1332,11 @@ int main(int argc, const char **argv) {
     test_cancelled_shutdown(server, argv[0]);
 #endif
     spawn_server_destroy(server);
+
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    fprintf(stderr, "\n\nTESTING cancelled shutdown after spawn server exit\n\n");
+    test_cancelled_shutdown_without_server(argc, argv);
+#endif
 
 #if !defined(OS_WINDOWS)
     fprintf(stderr, "\n\nTESTING callback signal lifecycle\n\n");
