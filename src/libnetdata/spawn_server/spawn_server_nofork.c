@@ -1762,6 +1762,8 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 // Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
 // process that reaps is the one that signals. Opt-in group requests already use this ownership;
 // the legacy single-process mode retains its existing race.
+// A failed status channel skips grace and may lose buffered output. Do not add an unobserved delay
+// before signalling the legacy PID; safe grace after server failure needs stable child identity.
 static int spawn_server_exec_kill_internal(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, bool drain_output) {
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(!drain_output && instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }

@@ -52,6 +52,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
 // Protocol shutdown: nofork closes stdin and drains/discards stdout within the existing kill
 // deadlines. Other backends retain their kill behavior. The caller must have stopped reading stdout.
+// If the spawn server fails, graceful draining is not guaranteed: legacy cleanup escalates immediately;
+// owned-group cleanup cannot guarantee termination without its server and does not signal a cached PGID.
 int spawn_server_exec_shutdown(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
