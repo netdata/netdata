@@ -54,6 +54,11 @@ unset(_nd_lto_default)
 set(USE_PARALLEL_RUST_BUILDS AUTO CACHE STRING
     "Build the Rust plugins in parallel: AUTO (when the build host has at least 15 GiB of memory), ON or OFF")
 set_property(CACHE USE_PARALLEL_RUST_BUILDS PROPERTY STRINGS AUTO ON OFF)
+string(TOUPPER "${USE_PARALLEL_RUST_BUILDS}" _nd_parallel_rust_builds)
+if(NOT _nd_parallel_rust_builds MATCHES "^(AUTO|ON|OFF|TRUE|FALSE|YES|NO|1|0)$")
+  message(FATAL_ERROR "USE_PARALLEL_RUST_BUILDS must be AUTO, ON or OFF, not '${USE_PARALLEL_RUST_BUILDS}'")
+endif()
+unset(_nd_parallel_rust_builds)
 
 option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
 mark_as_advanced(ENABLE_ADDRESS_SANITIZER)

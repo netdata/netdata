@@ -8,35 +8,59 @@ include_guard()
 
 # Memory available to this build, in MiB: the host's RAM, or a smaller cgroup
 # memory limit on this process (a container or a systemd scope), whichever is
-# lower. Checks the process's own cgroup and its ancestors (cgroup v2 and the v1
-# memory controller), plus the root of a cgroup namespace, where a container's
-# limit shows. Without a readable limit, the host's RAM is the answer.
+# lower. Checks the process's own cgroup and every ancestor visible to it, in
+# the cgroup v2 hierarchy and the v1 memory hierarchy, wherever /proc/self/mountinfo
+# says they are mounted. Without a readable limit, the host's RAM is the answer.
 function(_netdata_build_memory_mib out_mib out_source)
     cmake_host_system_information(RESULT _mib QUERY TOTAL_PHYSICAL_MEMORY)
     set(_source "host RAM")
 
-    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND EXISTS "/proc/self/cgroup")
-        set(_files "/sys/fs/cgroup/memory.max" "/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND EXISTS "/proc/self/cgroup" AND EXISTS "/proc/self/mountinfo")
         file(STRINGS "/proc/self/cgroup" _lines)
         foreach(_line IN LISTS _lines)
             if(_line MATCHES "^0::(/.*)$")
-                set(_root "/sys/fs/cgroup")
-                set(_leaf "memory.max")
-                set(_path "${CMAKE_MATCH_1}")
+                set(_cgroup_v2 "${CMAKE_MATCH_1}")
             elseif(_line MATCHES "^[0-9]+:([^:]*,)?memory(,[^:]*)?:(/.*)$")
-                set(_root "/sys/fs/cgroup/memory")
+                set(_cgroup_v1 "${CMAKE_MATCH_3}")
+            endif()
+        endforeach()
+
+        set(_files "")
+        file(STRINGS "/proc/self/mountinfo" _mounts)
+        foreach(_mount IN LISTS _mounts)
+            # Fields 4 and 5: the cgroup mounted there and the mount point.
+            if(DEFINED _cgroup_v2 AND _mount MATCHES "^[^ ]+ [^ ]+ [^ ]+ ([^ ]+) ([^ ]+) .* - cgroup2 ")
+                set(_cgroup "${_cgroup_v2}")
+                set(_leaf "memory.max")
+            elseif(DEFINED _cgroup_v1 AND _mount MATCHES "^[^ ]+ [^ ]+ [^ ]+ ([^ ]+) ([^ ]+) .* - cgroup [^ ]+ (.*,)?memory(,.*)?$")
+                set(_cgroup "${_cgroup_v1}")
                 set(_leaf "memory.limit_in_bytes")
-                set(_path "${CMAKE_MATCH_3}")
             else()
                 continue()
             endif()
+            set(_mount_root "${CMAKE_MATCH_1}")
+            set(_mount_point "${CMAKE_MATCH_2}")
 
-            while(NOT _path STREQUAL "/" AND NOT _path STREQUAL "")
-                list(APPEND _files "${_root}${_path}/${_leaf}")
-                get_filename_component(_path "${_path}" DIRECTORY)
+            # Only the part of the process's cgroup path below the mounted cgroup is visible here.
+            if(_mount_root STREQUAL "/")
+                set(_rel "${_cgroup}")
+            else()
+                string(FIND "${_cgroup}/" "${_mount_root}/" _pos)
+                if(NOT _pos EQUAL 0)
+                    continue()
+                endif()
+                string(LENGTH "${_mount_root}" _len)
+                string(SUBSTRING "${_cgroup}" ${_len} -1 _rel)
+            endif()
+
+            while(NOT _rel STREQUAL "" AND NOT _rel STREQUAL "/")
+                list(APPEND _files "${_mount_point}${_rel}/${_leaf}")
+                get_filename_component(_rel "${_rel}" DIRECTORY)
             endwhile()
+            list(APPEND _files "${_mount_point}/${_leaf}")
         endforeach()
 
+        list(REMOVE_DUPLICATES _files)
         foreach(_file IN LISTS _files)
             if(EXISTS "${_file}")
                 file(READ "${_file}" _limit)
@@ -99,7 +123,7 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     FetchContent_Declare(
         Corrosion
         GIT_REPOSITORY https://github.com/netdata/corrosion.git
-        GIT_TAG 4c900bca29e31ec0be09da977424291f9e8e9138 # stable/v0.5 + parallel-cargo-builds
+        GIT_TAG f23459775a9fe2157fa3a9100c2bcbaaf326d870 # stable/v0.5 + parallel-cargo-builds
     )
     FetchContent_MakeAvailable(Corrosion)
 
@@ -130,7 +154,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     # twice and roughly doubling the peak memory of the Rust part of the build.
     set(_nd_rust_parallel_args "")
     if(ENABLE_PLUGIN_OTEL AND ENABLE_PLUGIN_NETFLOW)
-        if(USE_PARALLEL_RUST_BUILDS STREQUAL "AUTO")
+        string(TOUPPER "${USE_PARALLEL_RUST_BUILDS}" _nd_rust_parallel_mode)
+        if(_nd_rust_parallel_mode STREQUAL "AUTO")
             _netdata_build_memory_mib(_nd_build_memory_mib _nd_build_memory_source)
             # 15 GiB rather than 16: a 16 GB machine reports about 15.6 GiB.
             if(_nd_build_memory_mib GREATER_EQUAL 15360)
@@ -156,6 +181,7 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
             message(STATUS "Building the Rust plugins one after the other (${_nd_rust_parallel_reason})")
         endif()
         unset(_nd_rust_parallel)
+        unset(_nd_rust_parallel_mode)
         unset(_nd_rust_parallel_reason)
     endif()
 
