@@ -376,10 +376,11 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     // Spawn the process
     errno_clear();
     if (!CreateProcess(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT, env_block, NULL, &si.StartupInfo, &pi)) {
+        DWORD err = GetLastError();
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
-               instance->request_id, command);
+               "SPAWN PARENT: cannot CreateProcess() (err %lu) for request No %zu, command: %s",
+               (unsigned long)err, instance->request_id, command);
         if(env_block)
             FreeEnvironmentStrings(env_block);
         goto cleanup;
