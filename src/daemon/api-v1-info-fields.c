@@ -124,8 +124,10 @@ void info_fields_notification_methods_main(void *ptr) {
     buffer_sprintf(cmd, "exec '%s' dump_methods", quoted);
 
     POPEN_INSTANCE *pi = spawn_popen_run(buffer_tostring(cmd));
-    if(!pi)
+    if(!pi) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "Cannot start %s dump_methods.", script);
         return;
+    }
 
     CLEAN_BUFFER *out = buffer_create(1000, NULL);
     usec_t deadline_ut = now_monotonic_usec() + (usec_t)NOTIFICATION_METHODS_TIMEOUT_MS * USEC_PER_MS;
@@ -142,7 +144,13 @@ void info_fields_notification_methods_main(void *ptr) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING, "%s dump_methods exited with code %d.", script, code);
             return;
         }
-        r = (w == SPAWN_TIMEDWAIT_RUNNING) ? PROBE_READ_TIMEOUT : PROBE_READ_ERROR;
+        // RUNNING means the deadline passed, or (nofork backend) the thread was cancelled
+        if(w != SPAWN_TIMEDWAIT_RUNNING)
+            r = PROBE_READ_ERROR;
+        else if(nd_thread_signaled_to_cancel())
+            r = PROBE_READ_CANCELLED;
+        else
+            r = PROBE_READ_TIMEOUT;
     }
 
     if(r == PROBE_READ_TIMEOUT)

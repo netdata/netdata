@@ -116,6 +116,8 @@ touch /usr/local/etc/netdata/.opt-out-from-anonymous-statistics
 
 This method works for all installation types including FreeBSD, manual, offline, and macOS installations. The file simply needs to exist—the content doesn't matter.
 
+The Agent reads this file at startup, so restart Netdata after creating or removing it.
+
 :::
 
 </details>
