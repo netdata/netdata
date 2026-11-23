@@ -22,9 +22,9 @@ function(netdata_fixup_system_processor)
   )
 
   if(return_code EQUAL 0)
-    # Keep only the machine part of the triple. Stripping the trailing newline
-    # matters: consumers that interpolate CMAKE_SYSTEM_PROCESSOR into a
-    # delimiter-anchored regex (dlib does) never match a value that ends in one.
+    # Keep only the machine part of the triple. The trailing newline must be
+    # stripped too: a regex that matches CMAKE_SYSTEM_PROCESSOR against
+    # delimiters fails when the value ends in a newline.
     string(REGEX REPLACE "-.*$" "" output_data "${output_data}")
     set(CMAKE_SYSTEM_PROCESSOR "${output_data}" PARENT_SCOPE)
   else()

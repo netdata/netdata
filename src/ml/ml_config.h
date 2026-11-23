@@ -5,6 +5,10 @@
 
 #include "ml_worker.h"
 
+#include <atomic>
+#include <string>
+#include <vector>
+
 typedef struct {
     int enable_anomaly_detection;
 

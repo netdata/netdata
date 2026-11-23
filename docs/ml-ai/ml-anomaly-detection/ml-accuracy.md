@@ -8,7 +8,7 @@ This document is an analysis of Netdata's machine learning approach to anomaly d
 
 Netdata's anomaly detection system operates on the following principles:
 
-- **Algorithm**: Unsupervised k-means clustering (k=2) implemented via the dlib library
+- **Algorithm**: Unsupervised k-means clustering (k=2), implemented in the Agent itself
 - **Architecture**: 18 models per metric, each trained on 6-hour windows staggered at 3-hour intervals
 - **Decision mechanism**: Unanimous consensus required across all models
 - **Computational model**: Edge-based processing on each monitored host

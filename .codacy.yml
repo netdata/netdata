@@ -8,7 +8,6 @@ exclude_paths:
   - aclk/tests/**
   - src/libnetdata/libjudy/**
   - src/database/sqlite/sqlite3.c
-  - src/ml/dlib/**
   - build/**
   - build_external/**
   - packaging/**
