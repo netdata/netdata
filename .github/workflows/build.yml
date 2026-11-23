@@ -981,6 +981,32 @@ jobs:
         env:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
+      - name: Check installed plugin access as netdata
+        id: plugin-access
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo -u netdata bash -e <<'CHECK'
+          cd /opt/netdata/usr/libexec/netdata/plugins.d
+          shopt -s nullglob
+          plugins=(*.plugin *-plugin *_plugin)
+          if (( ${#plugins[@]} == 0 )); then
+            echo "No installed plugins found in $PWD" >&2
+            exit 1
+          fi
+          for plugin in "${plugins[@]}"; do
+            if [[ ! -f "$plugin" || ! -x "$plugin" ]]; then
+              stat -Lc 'netdata cannot execute %n (mode %a, UID:GID %u:%g)' -- "$plugin" >&2
+              exit 1
+            fi
+          done
+          if [[ -f scripts.d.plugin ]]; then
+            ownership=$(stat -Lc '%U:%G %a' scripts.d.plugin)
+            if [[ "$ownership" != 'root:netdata 750' ]]; then
+              echo "Expected root:netdata 750 on scripts.d.plugin, found $ownership" >&2
+              exit 1
+            fi
+          fi
+          CHECK
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -994,6 +1020,7 @@ jobs:
               Checkout:  ${{ steps.checkout.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Verify artifacts: ${{ steps.verify.outcome }}
+              Installed plugin access: ${{ steps.plugin-access.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

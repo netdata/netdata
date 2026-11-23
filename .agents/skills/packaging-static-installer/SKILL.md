@@ -100,6 +100,9 @@ Source files: `packaging/makeself/build-static.sh`, `packaging/makeself/build.sh
   selected privilege checks. `packaging/makeself/jobs/81-netdata-runtime-check.sh` supplies the install prefix and
   architecture-specific `NETDATA_SKIP_LIBEXEC_PARTS`. New required plugins MUST be checked against these owners;
   presence checks MUST NOT be duplicated in job80.
+- `artifact-verification-static` in `.github/workflows/build.yml` checks **installed plugin access** as the
+  local `netdata` user. Builder-side checks can pass when the archive still carries the
+  builder's group ID. See `packaging/makeself/README.md#state-permissions-during-updates`.
 - **Feature opt-outs:** a source installer flag does not prove the official static pipeline permits that binary to
   be absent. Trace the actual build flags and runtime skip policy before changing validation. A linkage scan can
   pass with a missing plugin while the following runtime job correctly fails.

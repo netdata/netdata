@@ -42,6 +42,10 @@ apply; an update is not a general recursive permission repair. Modes or owners c
 automatically restored: recovery requires the affected application's intended permissions, which the installer cannot
 infer from the current state.
 
+On fresh installs, the archive can be extracted before the local `netdata` group exists. The installer assigns
+`scripts.d.plugin` to `root:netdata` on install and update so the Agent can execute it at mode `0750` even when the
+local group ID differs from the one in the archive.
+
 The isolated regression suite exercises both directory-setup paths and actual makeself archive overlays:
 
 ```sh
