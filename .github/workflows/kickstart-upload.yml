@@ -1,5 +1,5 @@
 ---
-# Upload the kickstart script to the repo server
+# Upload the kickstart script to the repo servers and R2
 name: Upload Kickstart Script
 on:
   push:
@@ -37,6 +37,24 @@ jobs:
       - name: Upload to packages2.netdata.cloud
         id: upload-packages2
         run: rsync -vp packaging/installer/kickstart.sh netdatabot@packages2.netdata.cloud:/home/netdatabot/incoming/kickstart.sh
+      - name: Install Rclone
+        id: install-rclone
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: |
+          sudo apt-get update || exit 1
+          sudo apt-get install -y rclone || exit 1
+      - name: Upload to R2
+        id: upload-r2
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        run: |
+          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" --include '/kickstart.sh' packaging/installer/ s3:netdata-agent-repository/
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -45,11 +63,13 @@ jobs:
           SLACK_TITLE: 'Kickstart upload failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Failed to upload updated kickstart script to repo server.
+              ${{ github.repository }}: Failed to upload updated kickstart script to repo servers and R2.
               Checkout: ${{ steps.checkout.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Upload to packages.netdata.cloud: ${{ steps.upload-primary.outcome }}
               Upload to packages2.netdata.cloud: ${{ steps.upload-packages2.outcome }}
+              Install Rclone: ${{ steps.install-rclone.outcome }}
+              Upload to R2: ${{ steps.upload-r2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

@@ -52,7 +52,6 @@ FORUM_URL="https://community.netdata.cloud/"
 INSTALL_DOC_URL="https://learn.netdata.cloud/docs/install-the-netdata-agent/one-line-installer-for-all-linux-systems"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
-RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
 STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
 PREVIEW_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/preview"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
@@ -913,25 +912,50 @@ download() {
   fatal "${ERROR_F0003}" F0003
 }
 
+# Prints the newest published version (without the leading 'v') of the given
+# major version in the given channel, 'NONE' if there is no such release, or
+# an empty string if the lookup itself failed.
+#
+# Per-major version files are only published for non-nightly channels, so fall
+# back to the channel-wide latest version and accept it only if it matches.
 get_actual_version() {
-    major="${1}"
-    channel="${2}"
-    url="${RELEASE_INFO_URL}/${channel}/${major}"
-    old_pwd="${PWD}"
-    set_tmpdir
-    cd "${old_pwd}" || true
-    tmp_file="${tmpdir}/version-info"
+  major="${1}"
+  channel="${2}"
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || true
+  tmp_file="${tmpdir}/version-info"
 
-    if check_for_remote_file "${RELEASE_INFO_URL}"; then
-        if check_for_remote_file "${url}"; then
-            download "${url}" "${tmp_file}"
-            cat "${tmp_file}"
-        else
-            echo "NONE"
-        fi
-    else
-        echo ""
+  for version_url in "${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/${major}/Version" \
+                     "${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/latest/Version"; do
+    check_for_remote_file "${version_url}"
+    check_ret="${?}"
+
+    if [ "${check_ret}" -eq 1 ]; then
+      continue
+    elif [ "${check_ret}" -ne 0 ]; then
+      echo ""
+      return
     fi
+
+    # Reading the version file is read-only, so it is also done for dry runs.
+    if ! download "${version_url}" "${tmp_file}" force; then
+      echo ""
+      return
+    fi
+
+    # 'read' trims the surrounding whitespace; a missing trailing newline is fine.
+    found_version=""
+    read -r found_version < "${tmp_file}" || true
+    found_version="${found_version#v}"
+
+    if [ "${found_version%%.*}" = "${major}" ]; then
+      echo "${found_version}"
+      return
+    fi
+  done
+
+  echo "NONE"
 }
 
 get_redirect() {
@@ -3071,13 +3095,22 @@ handle_major_version() {
     return
   fi
 
-  actual_version="$(get_actual_version "v${INSTALL_MAJOR_VERSION}" "${RELEASE_CHANNEL}")"
+  # Accept both '2' and 'v2'.
+  major_version="${INSTALL_MAJOR_VERSION#v}"
+
+  case "${major_version}" in
+    ""|*[!0-9]*)
+      fatal "Invalid major version '${INSTALL_MAJOR_VERSION}'. It must be a number, for example '2' or 'v2'." F0534
+      ;;
+  esac
+
+  actual_version="$(get_actual_version "${major_version}" "${SELECTED_RELEASE_CHANNEL}")"
 
   if [ -z "${actual_version}" ]; then
     if [ "${INTERACTIVE}" -eq 0 ]; then
-      fatal "Could not determine the lastest releaase in channel '${RELEASE_CHANNEL}' with major version '${INSTALL_MAJOR_VERSION}'" F0517
+      fatal "Could not determine the latest release in channel '${SELECTED_RELEASE_CHANNEL}' with major version '${major_version}'" F0517
     else
-      if confirm "Unable to determine the correct version to install for major version '${INSTALL_MAJOR_VERSION}'. ${CONTINUE_INSTALL_PROMPT}"; then
+      if confirm "Unable to determine the correct version to install for major version '${major_version}'. ${CONTINUE_INSTALL_PROMPT}"; then
         progress "User requested continuing the install with the latest version."
       else
         fatal "Cancelling installation at user request." F0518
@@ -3085,9 +3118,9 @@ handle_major_version() {
     fi
   elif [ "${actual_version}" = 'NONE' ]; then
     if [ "${INTERACTIVE}" -eq 0 ]; then
-      warning "No releases with major version '${INSTALL_MAJOR_VERSION}' have been published. Continuing the install with the latest version instead."
+      warning "No releases with major version '${major_version}' have been published. Continuing the install with the latest version instead."
     else
-      if confirm "No releases with major version '${INSTALL_MAJOR_VERSION}' have been published. ${CONTINUE_INSTALL_PROMPT}"; then
+      if confirm "No releases with major version '${major_version}' have been published. ${CONTINUE_INSTALL_PROMPT}"; then
         progress "User requested continuing the install with the latest version."
       else
         fatal "Cancelling installation at user request." F0519
