@@ -13,7 +13,7 @@ For lightweight devices, keep a recovery buffer in RAM. Set these values in the 
     retention = 1024
 ```
 
-`retention = 1024` keeps 1,024 samples per dimension. At five-minute collection, this covers about 3.6 days; at ten-minute collection, about 7.1 days. Size this window for the outages your devices encounter; each chart's own interval determines its coverage.
+`retention = 1024` asks for 1,024 samples per dimension. At five-minute collection, this covers about 3.6 days; at ten-minute collection, about 7.1 days. Size this window for the outages your devices encounter; each chart's own interval determines its coverage. It is a target, not an exact window: samples are released in whole pages, so a chart can keep more, and when the system runs low on memory the oldest pages are released early, so it can keep less.
 
 Enable replication in the Parent's API-key section of `stream.conf`:
 

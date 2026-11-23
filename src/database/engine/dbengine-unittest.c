@@ -749,11 +749,13 @@ static size_t in_memory_test_query(RRDDIM *rd, time_t start_s, time_t end_s, tim
         if(storage_point_is_gap(sp))
             continue;
 
-        NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)(sp.end_time_s - base_s + 1), SN_DEFAULT_FLAGS));
+        // every second has its own point, in order: a point returned twice or skipped is an error
+        time_t expected_s = start_s + (time_t)points;
+        NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)(expected_s - base_s + 1), SN_DEFAULT_FLAGS));
         // not ==: on 32-bit x86 the expected value is computed with the x87 extended precision (0.99999... for 1)
-        if(sp.count != 1 || !considered_equal_ndd(sp.sum, expected)) {
-            fprintf(stderr, " >>> DBENGINE: in memory, %s: point at %jd is %f (count %u), expected %f\n",
-                    what, (intmax_t)sp.end_time_s, sp.sum, sp.count, expected);
+        if(sp.end_time_s != expected_s || sp.count != 1 || !considered_equal_ndd(sp.sum, expected)) {
+            fprintf(stderr, " >>> DBENGINE: in memory, %s: point at %jd is %f (count %u), expected %f at %jd\n",
+                    what, (intmax_t)sp.end_time_s, sp.sum, sp.count, expected, (intmax_t)expected_s);
             errors++;
         }
         points++;
@@ -764,6 +766,81 @@ static size_t in_memory_test_query(RRDDIM *rd, time_t start_s, time_t end_s, tim
     if(points != expected_points) {
         fprintf(stderr, " >>> DBENGINE: in memory, %s: %zu points, expected %zu\n", what, points, expected_points);
         errors++;
+    }
+
+    return errors;
+}
+
+// a range with no data left: the query returns only gaps
+static size_t in_memory_test_query_empty(RRDDIM *rd, time_t start_s, time_t end_s, const char *what) {
+    size_t points = 0;
+    struct storage_engine_query_handle seqh = { 0 };
+    unittest_storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &seqh, start_s, end_s, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    while(!unittest_storage_engine_query_is_finished(&seqh)) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        if(!storage_point_is_gap(sp))
+            points++;
+    }
+    unittest_storage_engine_query_finalize(&seqh);
+
+    if(points) {
+        fprintf(stderr, " >>> DBENGINE: in memory, %s: %zu points, expected none\n", what, points);
+        return 1;
+    }
+
+    return 0;
+}
+
+// a closed page is packed: its data is one exact-size allocation, smaller than the first gorilla buffer
+static size_t in_memory_test_packed(struct rrdengine_instance *ctx, RRDDIM *rd, time_t start_s) {
+    PGC_PAGE *page = pgc_page_get_and_acquire(ram_cache, (Word_t)ctx, (Word_t)rd->uuid, start_s, PGC_SEARCH_EXACT);
+    if(!page) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the page at %jd is not in the cache\n", (intmax_t)start_s);
+        return 1;
+    }
+
+    size_t errors = 0;
+    PGD *pgd = pgc_page_data(page);
+    if(pgd == PGD_EMPTY || pgd_buffer_memory_footprint(pgd) >= RRDENG_GORILLA_32BIT_BUFFER_SIZE) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the page at %jd was not packed (%u bytes)\n",
+                (intmax_t)start_s, pgd == PGD_EMPTY ? 0 : pgd_buffer_memory_footprint(pgd));
+        errors++;
+    }
+
+    pgc_page_release(ram_cache, page);
+    return errors;
+}
+
+// the page size histograms of the in-memory cache count each page of a queue once, in one size
+static size_t in_memory_test_histograms(const char *what) {
+    struct pgc_statistics stats = pgc_get_statistics(ram_cache);
+    size_t errors = 0;
+
+    static const struct { size_t queue; const char *name; } queues[] = {
+        { PGC_QUEUE_HOT, "hot" },
+        { PGC_QUEUE_CLEAN, "clean" },
+    };
+
+    for(size_t q = 0; q < _countof(queues); q++) {
+        struct pgc_queue_statistics *qs = &stats.queues[queues[q].queue];
+        size_t total = 0;
+        for(size_t i = 0; i < PGC_SIZE_HISTOGRAM_ENTRIES; i++) {
+            size_t count = qs->size_histogram.array[i].count;
+            if(count > qs->entries) {
+                fprintf(stderr, " >>> DBENGINE: in memory, %s: the %s size histogram counts %zu pages up to %zu bytes, "
+                                "the queue has %zu\n",
+                        what, queues[q].name, count, qs->size_histogram.array[i].upto, (size_t)qs->entries);
+                errors++;
+            }
+            total += count;
+        }
+
+        if(total != qs->entries) {
+            fprintf(stderr, " >>> DBENGINE: in memory, %s: the %s size histogram counts %zu pages, the queue has %zu\n",
+                    what, queues[q].name, total, (size_t)qs->entries);
+            errors++;
+        }
     }
 
     return errors;
@@ -940,8 +1017,11 @@ static size_t test_dbengine_in_memory(void) {
 
     const time_t last_s = base_s + 3 * IN_MEMORY_TEST_PAGE_POINTS - 1;
 
-    // 1. the closed (packed) pages read back what was stored
+    // 1. the closed pages are packed, read back what was stored, and are counted once in the size histograms
+    for(size_t p = 0; p < 3; p++)
+        errors += in_memory_test_packed(ctx, rd, base_s + (time_t)(p * IN_MEMORY_TEST_PAGE_POINTS));
     errors += in_memory_test_query(rd, base_s, last_s, base_s, "after packing");
+    errors += in_memory_test_histograms("after packing");
 
     // 2. the middle page is lost (as the out of memory protection would do): the oldest page stays queryable and
     //    the metric's retention still starts at it
@@ -960,6 +1040,8 @@ static size_t test_dbengine_in_memory(void) {
     }
     errors += in_memory_test_query(rd, base_s, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1, base_s, "oldest page after a newer page was lost");
     errors += in_memory_test_query(rd, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS, last_s, base_s, "newest page after a middle page was lost");
+    errors += in_memory_test_query_empty(rd, base_s + IN_MEMORY_TEST_PAGE_POINTS, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS - 1,
+                                         "the middle page after it was lost");
 
     // 3. the retention: at last_s + 1000 points, the oldest page is out of it and the newest is not; the retention
     //    then starts at the newest page, the oldest one that remains

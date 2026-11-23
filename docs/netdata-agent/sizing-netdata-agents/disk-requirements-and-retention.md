@@ -83,7 +83,7 @@ Child and Parent storage are independent:
 
 ## `ram`
 
-`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In this mode, metric samples exist only in memory, and only while they’re collected.
+`ram` mode can help when Netdata shouldn’t write metric samples to disk. In this mode, metric samples exist only in memory, and only while they’re collected. Netdata can still write its metadata database and logs to disk.
 
 When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The samples kept in memory cache the collected data for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
 
