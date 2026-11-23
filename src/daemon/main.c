@@ -525,6 +525,7 @@ int netdata_main(int argc, char **argv) {
 
                             // first: its drain joins every exited thread, so run it before other tests start threads
                             if (threads_unittest()) return 1;
+                            if (os_system_memory_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_registry_cookie_unittest()) return 1;
@@ -1382,6 +1383,12 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("plugins spawn server");
 
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("system memory sampler");
+
+    // after the forks above: a thread started before them would not exist in this process
+    os_system_memory_sampler_start();
 
 #ifdef ENABLE_SENTRY
     // ----------------------------------------------------------------------------------------------------------------

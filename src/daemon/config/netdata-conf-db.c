@@ -142,7 +142,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // out of memory protection and use all ram for caches
 
     dbengine_out_of_memory_protection = 0; // will be calculated below
-    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    OS_SYSTEM_MEMORY sm = os_system_memory();
     if(OS_SYSTEM_MEMORY_OK(sm) && sm.ram_total_bytes > sm.ram_available_bytes) {
         // calculate the default out of memory protection size
         uint64_t keep_free = sm.ram_total_bytes / 10;

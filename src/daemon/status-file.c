@@ -1057,7 +1057,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(status != DAEMON_STATUS_NONE)
         session_status.status = status;
 
-    session_status.memory = os_system_memory(true);
+    session_status.memory = os_system_memory();
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
     session_status.system_cpus = os_get_system_cpus();
     

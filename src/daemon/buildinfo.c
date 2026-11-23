@@ -1550,7 +1550,7 @@ static void populate_packaging_info() {
     build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
     build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
 
-    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    OS_SYSTEM_MEMORY sm = os_system_memory();
     if(OS_SYSTEM_MEMORY_OK(sm)) {
         char buf[1024];
         snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);

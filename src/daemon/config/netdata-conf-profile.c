@@ -36,7 +36,7 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
 
     ND_PROFILE def_profile = ND_PROFILE_NONE;
 
-    OS_SYSTEM_MEMORY mem = os_system_memory(true);
+    OS_SYSTEM_MEMORY mem = os_system_memory();
     size_t cpus = os_get_system_cpus_uncached();
 
     if(cpus <= 1 || (OS_SYSTEM_MEMORY_OK(mem) && mem.ram_total_bytes < 1ULL * 1024 * 1024 * 1024))
