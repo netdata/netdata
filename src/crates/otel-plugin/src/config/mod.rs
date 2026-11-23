@@ -35,104 +35,6 @@ use metrics::MetricsOverride;
 use receivers::{DeprecatedEndpointOverride, ReceiversOverride};
 use signal::{AuthOverride, RemoteStorageOverride, SignalOverride};
 
-/// Standard-install fallback when the agent's log directory is unknown.
-const LEGACY_DEFAULT_JOURNAL_DIR: &str = "/var/log/netdata/otel/v1";
-
-/// Resolve the read-only journal directory of the former otel plugin.
-/// The former schema's `logs.journal_dir` does not exist in the
-/// current [`PluginConfig`], so this reads it in place from the user otel.yaml
-/// (then stock) with its own deliberately tolerant probe. The main parsers
-/// report or refuse the keys they do not know, but this probe ignores them:
-/// it must extract the one still-valid key from whatever file it finds. The
-/// viewer never writes here.
-///
-/// The default mirrors the former plugin's `@logdir_POST@/otel/v1`: the agent's
-/// log directory (`NETDATA_LOG_DIR`) plus `otel/v1`, so custom install prefixes
-/// and in-place upgrades resolve correctly. It falls back to the standard
-/// `/var/log/netdata/otel/v1` only when `NETDATA_LOG_DIR` is unset.
-pub fn resolve_legacy_journal_dir() -> PathBuf {
-    const CONFIG_FILENAME: &str = "otel.yaml";
-
-    // I/O shell: read the candidate files (user first, then stock), skipping any
-    // that don't exist or can't be read. The pure `pick_journal_dir` decides.
-    let mut candidates: Vec<(PathBuf, String)> = Vec::new();
-    for dir_var in ["NETDATA_USER_CONFIG_DIR", "NETDATA_STOCK_CONFIG_DIR"] {
-        if let Ok(dir) = std::env::var(dir_var) {
-            let path = Path::new(&dir).join(CONFIG_FILENAME);
-            if let Ok(contents) = std::fs::read_to_string(&path) {
-                candidates.push((path, contents));
-            }
-        }
-    }
-    if let Some(dir) = pick_journal_dir(candidates.iter().map(|(p, c)| (p.as_path(), c.as_str()))) {
-        return dir;
-    }
-
-    // The former plugin's templated `@logdir_POST@/otel/v1` layout; standard
-    // service installs report `NETDATA_LOG_DIR=/var/log/netdata`.
-    if let Ok(log_dir) = std::env::var("NETDATA_LOG_DIR") {
-        return Path::new(&log_dir).join("otel").join("v1");
-    }
-
-    PathBuf::from(LEGACY_DEFAULT_JOURNAL_DIR)
-}
-
-/// Pure core of legacy-journal-dir resolution: return the first
-/// `logs.journal_dir` override among candidate file contents, in precedence
-/// order.
-///
-/// A malformed candidate is logged and skipped rather than aborting — a syntax
-/// error in one file must not silently hide a valid override in a later one (or
-/// mask it behind the default). Returns `None` when no candidate carries the field.
-fn pick_journal_dir<'a>(
-    candidates: impl IntoIterator<Item = (&'a Path, &'a str)>,
-) -> Option<PathBuf> {
-    for (path, contents) in candidates {
-        match journal_dir_from_yaml(contents) {
-            Ok(Some(dir)) => {
-                tracing::info!(
-                    "resolved former otel journal_dir from {}: {}",
-                    path.display(),
-                    dir.display()
-                );
-                return Some(dir);
-            }
-            Ok(None) => {}
-            Err(e) => {
-                tracing::warn!(
-                    "could not parse {} while resolving the former otel journal_dir; \
-                     ignoring it and continuing: {e}",
-                    path.display()
-                );
-            }
-        }
-    }
-    None
-}
-
-/// Extract `logs.journal_dir` from a (possibly former-schema) otel.yaml.
-///
-/// Returns `Ok(None)` when the file parses but carries no override, and `Err`
-/// when the YAML is malformed (the caller warns and falls back rather than
-/// silently using the default). Unknown fields are ignored by these
-/// probe-local structs, with no report, because the probe's whole job is
-/// extracting one key from a possibly former-schema file.
-fn journal_dir_from_yaml(contents: &str) -> Result<Option<PathBuf>, serde_yaml::Error> {
-    #[derive(Deserialize)]
-    struct Probe {
-        #[serde(default)]
-        logs: Option<LogsProbe>,
-    }
-    #[derive(Deserialize)]
-    struct LogsProbe {
-        #[serde(default)]
-        journal_dir: Option<PathBuf>,
-    }
-
-    let probe: Probe = serde_yaml::from_str(contents)?;
-    Ok(probe.logs.and_then(|logs| logs.journal_dir))
-}
-
 /// A config file identified by its path.
 ///
 /// Bundles the path with the "read + parse, naming the file in any error" logic
@@ -290,16 +192,12 @@ impl ConfigResolver {
                     tracing::warn!("configuration: {source}: {guide}");
                 }
                 overrides.fold_deprecated_endpoint(&source);
-                overrides
-                    .validate()
-                    .with_context(|| format!("parsing {source}"))?;
                 apply_overrides(&mut config, &overrides);
                 log_config("user", &config);
             }
         }
 
         if self.env.has_any() {
-            self.env.validate()?;
             apply_overrides(&mut config, &self.env);
         }
 
@@ -566,26 +464,8 @@ impl ConfigOverride {
         }
     }
 
-    /// Reject overrides that parse but are not valid in their position.
-    /// `journal_dir` (the former plugin's read-only journal location) is a
-    /// logs-only key; there are no legacy traces journals to point at.
-    fn validate(&self) -> Result<()> {
-        if self
-            .traces
-            .as_ref()
-            .is_some_and(|t| t.journal_dir.is_some())
-        {
-            anyhow::bail!(
-                "traces.journal_dir is not a valid option: journal_dir points at the \
-                 former plugin's log journals and is only accepted under 'logs:'"
-            );
-        }
-        Ok(())
-    }
-
     /// True when any section is set. [`ConfigResolver::resolve`] gates the env
-    /// layer on it, so a snapshot with no recognized variables neither applies
-    /// nor triggers layer validation.
+    /// layer on it, so a snapshot with no recognized variables does not apply.
     fn has_any(&self) -> bool {
         self.receivers.is_some()
             || self.metrics.is_some()
@@ -1555,15 +1435,17 @@ logs:
             serde_json::to_value(&config).unwrap(),
             serde_json::to_value(resolved_stock()).unwrap()
         );
-        // Each former key is named like any unknown key (journal_dir is
-        // still a valid key and is not reported) ...
-        for key in ["logs.size_of_journal_file", "logs.number_of_journal_files"] {
+        // Each former key is named like any unknown key ...
+        for key in [
+            "logs.journal_dir",
+            "logs.size_of_journal_file",
+            "logs.number_of_journal_files",
+        ] {
             assert!(
                 logs.contains(&format!("{key} is not a known option")),
                 "{logs}"
             );
         }
-        assert!(!logs.contains("logs.journal_dir is not"), "{logs}");
         // ... and the guide is logged once, as a warning that names the file.
         assert_eq!(
             logs.matches("former (experimental) otel.yaml schema")
@@ -1580,23 +1462,27 @@ logs:
             "{logs}"
         );
         assert!(logs.contains("ignores these options"), "{logs}");
-        assert!(logs.contains("Old logs remain queryable"), "{logs}");
+        assert!(logs.contains("journal files stay on disk"), "{logs}");
     }
 
     #[test]
-    fn journal_dir_accepted_under_logs_only() {
-        // Valid current key: points the read-only legacy viewer at the former
-        // plugin's journals. Parsed (so it is not reported as an unknown key)
-        // but not merged (the value is consumed by resolve_legacy_journal_dir
-        // reading the raw file).
-        resolve_with_user("logs:\n  journal_dir: /var/log/netdata/otel/v1\n").unwrap();
-
-        let err =
-            resolve_with_user("traces:\n  journal_dir: /var/log/netdata/otel/v1\n").unwrap_err();
-        assert!(
-            format!("{err:#}").contains("traces.journal_dir is not a valid option"),
-            "{err:#}"
-        );
+    fn journal_dir_is_an_ordinary_unknown_key() {
+        // It pointed the removed legacy-logs viewer at the former plugin's
+        // journals. Nothing treats it specially any more, under either signal,
+        // and alone it does not bring the migration guide.
+        for section in ["logs", "traces"] {
+            let (config, logs) = capture_logs(|| {
+                resolve_with_user(&format!(
+                    "{section}:\n  journal_dir: /var/log/netdata/otel/v1\n"
+                ))
+            });
+            config.unwrap();
+            assert!(
+                logs.contains(&format!("{section}.journal_dir is not a known option")),
+                "{logs}"
+            );
+            assert!(!logs.contains("former (experimental)"), "{logs}");
+        }
     }
 
     #[test]
@@ -2438,80 +2324,6 @@ logs:
         );
         let config = ConfigResolver::from_stock(stock).with_user(user).resolve();
         assert!(config.is_err());
-    }
-
-    // -- Legacy journal_dir resolution (former-schema otel.yaml parsing) --
-    //
-    // `journal_dir_from_yaml` tests cover per-file extraction; `pick_journal_dir`
-    // tests cover candidate precedence (user before stock, malformed skipped).
-    // The remaining env/filesystem wiring (which dirs, NETDATA_LOG_DIR, the hard
-    // default) lives in the thin `resolve_legacy_journal_dir` shell and is E2E-covered.
-
-    #[test]
-    fn journal_dir_from_yaml_reads_former_field() {
-        let dir = journal_dir_from_yaml("logs:\n  journal_dir: /var/log/netdata/otel/v1\n")
-            .expect("valid yaml parses");
-        assert_eq!(dir.as_deref(), Some(Path::new("/var/log/netdata/otel/v1")));
-    }
-
-    #[test]
-    fn journal_dir_from_yaml_tolerates_superset_schema() {
-        // Former-schema fields (journal_dir plus the old wal/index subtrees)
-        // are unknown to the probe; they must not prevent extraction.
-        let yaml =
-            "logs:\n  journal_dir: /data/otel/v1\n  wal:\n    dir: /x\n  index:\n    dir: /y\n";
-        let dir = journal_dir_from_yaml(yaml).expect("valid yaml parses");
-        assert_eq!(dir.as_deref(), Some(Path::new("/data/otel/v1")));
-    }
-
-    #[test]
-    fn journal_dir_from_yaml_none_when_absent() {
-        // A logs section without journal_dir, no logs section at all, or an
-        // empty file → no override.
-        assert_eq!(
-            journal_dir_from_yaml("logs:\n  wal:\n    dir: /x\n").unwrap(),
-            None
-        );
-        assert_eq!(
-            journal_dir_from_yaml("endpoint:\n  path: x\n").unwrap(),
-            None
-        );
-        assert_eq!(journal_dir_from_yaml("").unwrap(), None);
-    }
-
-    #[test]
-    fn journal_dir_from_yaml_errors_on_malformed() {
-        // A syntax error must surface as Err so the caller warns instead of
-        // silently falling back to the default (which would hide a user override).
-        assert!(journal_dir_from_yaml("logs:\n  journal_dir: [unterminated\n").is_err());
-    }
-
-    #[test]
-    fn pick_journal_dir_prefers_earlier_candidate() {
-        let dir = pick_journal_dir([
-            (Path::new("user"), "logs:\n  journal_dir: /from/user\n"),
-            (Path::new("stock"), "logs:\n  journal_dir: /from/stock\n"),
-        ]);
-        assert_eq!(dir.as_deref(), Some(Path::new("/from/user")));
-    }
-
-    #[test]
-    fn pick_journal_dir_skips_absent_and_malformed() {
-        // First has no journal_dir; second is malformed (warn + skip); third wins.
-        let dir = pick_journal_dir([
-            (Path::new("a"), "logs:\n  wal:\n    dir: /x\n"),
-            (Path::new("b"), "logs:\n  journal_dir: [unterminated\n"),
-            (Path::new("c"), "logs:\n  journal_dir: /good\n"),
-        ]);
-        assert_eq!(dir.as_deref(), Some(Path::new("/good")));
-    }
-
-    #[test]
-    fn pick_journal_dir_none_when_no_candidate_has_field() {
-        assert_eq!(
-            pick_journal_dir([(Path::new("a"), "endpoint:\n  path: x\n")]),
-            None
-        );
     }
 
     // -- The shipped stock file --

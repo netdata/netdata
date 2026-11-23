@@ -407,7 +407,9 @@ modules:
               By default, the plugin rejects a span that started more than 24 hours ago or ends more than 10 minutes in the future; a span without an end time is judged by its start. The Collector logs a `Partial success response` warning for rejected spans, and the plugin logs a warning in the Agent journal. Check the clock of the instrumented application's host, how old the backfilled spans are, the Collector log, and the Agent journal.
           - name: Logs written by the previous OpenTelemetry plugin are not visible
             description: |
-              The plugin ignores a removed `logs` option from the previous `otel.yaml` layout and uses its default values for logs storage. It logs a warning with a migration guide in the Agent journal. Replace the removed options with a partial configuration based on the current stock file. If the former file set a custom `logs.journal_dir`, keep it: it is the only former `logs` option still accepted, and the plugin uses it only to locate the former plugin's read-only journals.
+              The plugin does not show the logs that the previous OpenTelemetry plugin stored. The journal files of the previous plugin stay on the disk, by default in `/var/log/netdata/otel/v1`. The current plugin does not read them and does not delete them. Delete that directory when you do not need the files. You can also delete `/var/cache/netdata/otel-legacy-logs`, if it is there.
+
+              The plugin ignores a removed `logs` option from the previous `otel.yaml` layout and uses its default values for logs storage. It logs a warning with a migration guide in the Agent journal. Replace the removed options with a partial configuration based on the current stock file.
     metrics:
       folding:
         title: Metrics

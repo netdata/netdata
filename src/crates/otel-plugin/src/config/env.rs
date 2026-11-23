@@ -355,9 +355,6 @@ impl SignalOverride {
                 None
             },
             ingest: if ingest.has_any() { Some(ingest) } else { None },
-            // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
-            // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
-            journal_dir: None,
         })
     }
 }

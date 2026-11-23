@@ -13,13 +13,10 @@
 //! this module hands them the key mapping. The former keys themselves are
 //! unknown keys now: the plugin ignores them and runs on its defaults, and
 //! the guide is logged as a warning (`ConfigResolver::resolve`, mod.rs).
-//! `logs.journal_dir` is the one former key that is still valid (read-only
-//! pointer to the old journals; see `resolve_legacy_journal_dir`).
 
 /// The former `logs:` keys that no longer exist, each mapped to its
 /// replacement key (or a `removed` note). One table drives both detection
-/// and the mapping printed in the guide. `journal_dir` is absent: it is
-/// still a valid key.
+/// and the mapping printed in the guide.
 const FORMER_LOGS_KEYS: [(&str, &str); 7] = [
     (
         "size_of_journal_file",
@@ -78,10 +75,10 @@ pub(super) fn former_schema_guidance(contents: &str) -> Option<String> {
         guide.push_str(&format!("  {old:<26}-> {new}\n"));
     }
     guide.push_str(
-        "  journal_dir               -> still valid under logs: (read-only; keeps old logs queryable)\n\
-         See the stock otel.yaml for the current schema and defaults. If you never \
-         customized this file, delete it or re-copy it from stock. Old logs remain \
-         queryable either way",
+        "See the stock otel.yaml for the current schema and defaults. If you never \
+         customized this file, delete it or re-copy it from stock. Logs that the \
+         former plugin wrote are no longer shown; its journal files stay on disk \
+         until you delete them",
     );
     Some(guide)
 }
@@ -117,11 +114,11 @@ logs:
         assert!(guide.contains("size_of_journal_file      -> logs.rotation.default.max_file_size"));
         assert!(guide.contains("number_of_journal_files   -> logs.retention.default.max_files"));
         assert!(guide.contains("store_otlp_json           -> removed (no replacement)"));
-        // The former keys are ignored, values must be re-decided, journal_dir
-        // stays valid, old logs stay queryable.
+        // The former keys are ignored, values must be re-decided, the old
+        // files stay.
         assert!(guide.contains("ignores these options"));
         assert!(guide.contains("re-decide each one"));
-        assert!(guide.contains("journal_dir               -> still valid"));
+        assert!(guide.contains("journal files stay on disk"));
         assert!(guide.contains("delete it or re-copy it from stock"));
     }
 
@@ -136,13 +133,6 @@ logs:
     #[test]
     fn current_schema_is_not_flagged() {
         let yaml = "logs:\n  rotation:\n    default:\n      max_file_size: \"25MB\"\n";
-        assert!(former_schema_guidance(yaml).is_none());
-    }
-
-    #[test]
-    fn journal_dir_alone_is_not_former_schema() {
-        // journal_dir is a valid current key; its presence must not trigger the guide.
-        let yaml = "logs:\n  journal_dir: /var/log/netdata/otel/v1\n";
         assert!(former_schema_guidance(yaml).is_none());
     }
 

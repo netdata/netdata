@@ -13,7 +13,6 @@
 //! by the parse call, not refused here (`parse_yaml` in `mod.rs`).
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use bytesize::ByteSize;
@@ -40,15 +39,6 @@ pub(super) struct SignalOverride {
     pub(super) catalog: Option<CatalogOverride>,
     #[serde(default)]
     pub(super) ingest: Option<IngestOverride>,
-    /// Where the former plugin's journal files live, for the read-only
-    /// legacy-logs viewer. Declared so the parse call does not report it as
-    /// an unknown key; valid under `logs:` only — `traces.journal_dir` is
-    /// rejected at resolve by `ConfigOverride::validate` (mod.rs). Never
-    /// merged: the value is consumed by `resolve_legacy_journal_dir`
-    /// re-reading the raw file, and no env var exists for it (`env.rs`
-    /// leaves it `None`).
-    #[serde(default)]
-    pub(super) journal_dir: Option<PathBuf>,
 }
 
 /// Partial [`otel_bridge::config::CatalogTuning`] (its dir is derived, not configured).
@@ -113,7 +103,7 @@ impl AuthOverride {
 }
 
 impl SignalOverride {
-    /// True when the override sets anything, `journal_dir` included. `env.rs`
+    /// True when the override sets anything. `env.rs`
     /// collapses a section this returns `false` for back to `None`, so every
     /// field must be listed — a missed one silently drops a parsed override.
     pub(super) fn has_any(&self) -> bool {
@@ -123,7 +113,6 @@ impl SignalOverride {
             || self.retention.is_some()
             || self.catalog.as_ref().is_some_and(|c| c.has_any())
             || self.ingest.as_ref().is_some_and(|i| i.has_any())
-            || self.journal_dir.is_some()
     }
 }
 
@@ -157,7 +146,7 @@ impl IngestOverride {
 /// Merge `o` into `config` field-wise: a `Some` replaces the current value,
 /// `None` keeps whatever stock or an earlier layer supplied. `apply_overrides`
 /// (`mod.rs`) calls this once per layer for each signal — user first, env last,
-/// so env wins. `journal_dir` is never merged (see its field doc).
+/// so env wins.
 pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
     if let Some(v) = o.crc_enabled {
         config.crc_enabled = v;

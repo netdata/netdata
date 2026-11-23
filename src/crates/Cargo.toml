@@ -20,7 +20,6 @@ members = [
     "otel-ingestor",
     "otel-job-scheduler",
     "otel-ledger",
-    "otel-legacy-logs",
     "otel-plugin",
     "otel-service-map",
 
@@ -85,7 +84,6 @@ otel-derived-metrics = { path = "otel-derived-metrics" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-job-scheduler = { path = "otel-job-scheduler" }
 otel-ledger = { path = "otel-ledger" }
-otel-legacy-logs = { path = "otel-legacy-logs" }
 otel-service-map = { path = "otel-service-map" }
 
 # Internal crates: OTel storage, indexing and query.

@@ -43,17 +43,15 @@ def test_syslog_identifier_mapping():
     assert journal.syslog_identifier("supervisor") == "otel-plugin"
     assert journal.syslog_identifier("ledger") == "otel-plugin/ledger"
     assert journal.syslog_identifier("ingestor") == "otel-plugin/ingestor"
-    assert journal.syslog_identifier("legacy-logs") == "otel-plugin/legacy-logs"
 
 
 # ── resolve_pid (monkeypatched process tree) ──────────────────
 
-# A fake netdata(100) -> otel-plugin supervisor(200) -> workers(201/202/203).
+# A fake netdata(100) -> otel-plugin supervisor(200) -> workers(201/202).
 _FAKE_CMDLINES = {
     200: ["/x/otel-plugin", "1"],  # supervisor: netdata passes update_every as argv[1]
     201: ["/x/otel-plugin", "worker", "ledger", "--socket", "/t/l.sock"],
     202: ["/x/otel-plugin", "worker", "ingestor", "--socket", "/t/i.sock"],
-    203: ["/x/otel-plugin", "worker", "legacy-logs", "--socket", "/t/g.sock"],
 }
 
 
@@ -76,7 +74,6 @@ def test_resolve_pid_supervisor(fake_tree):
 def test_resolve_pid_workers(fake_tree):
     assert journal.resolve_pid(100, "ledger") == 201
     assert journal.resolve_pid(100, "ingestor") == 202
-    assert journal.resolve_pid(100, "legacy-logs") == 203
 
 
 def test_resolve_pid_worker_not_found(monkeypatch):

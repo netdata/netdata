@@ -37,12 +37,12 @@ def test_runtime_dir_is_inside_the_run_dir():
 
 
 def test_runtime_socket_paths_limit_the_id_length(monkeypatch):
-    # "/h/opt/netdata-mcp/run/" + id + "/run/otel-plugin/legacy-logs-4194304.sock"
-    # is 64 + len(id) bytes, so ids up to 43 chars fit the 107-byte limit.
+    # "/h/opt/netdata-mcp/run/" + id + "/run/otel-plugin/ingestor-4194304.sock"
+    # is 61 + len(id) bytes, so ids up to 46 chars fit the 107-byte limit.
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: Path("/h")))
-    runtime.check_runtime_socket_paths("x" * 43)
+    runtime.check_runtime_socket_paths("x" * 46)
     with pytest.raises(ValueError, match="1 chars too long"):
-        runtime.check_runtime_socket_paths("x" * 44)
+        runtime.check_runtime_socket_paths("x" * 47)
 
 
 def test_install_bin_path():
@@ -253,20 +253,6 @@ def test_free_port_except_gives_up_instead_of_spinning(monkeypatch):
         runtime.free_port_except({5000}, attempts=3)
 
 
-def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):
-    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # A unique sentinel (not the plugin's default journal dir) so the assertion
-    # can't be accidentally satisfied by a default.
-    sentinel = "/srv/legacy-otel-fixture/v1"
-    cfg = _cfg({"logs": {"journal_dir": sentinel}})
-    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-j", otel=cfg)
-    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    # journal_dir lands at logs.journal_dir for the read-only legacy viewer...
-    assert doc["logs"]["journal_dir"] == sentinel
-    # ...and base_dir stays pinned under the run dir (never the journal dir)
-    assert doc["base_dir"] == str(rd / "lib" / "otel")
-
-
 def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     cfg = _cfg({
@@ -294,7 +280,7 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
 def test_generate_runtime_otel_tunes_traces_only(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # Mirror of the logs-only test: tuning only traces emits a traces section and
-    # NO logs section (no logs knobs, no journal_dir) — proves the symmetry.
+    # NO logs section — proves the symmetry.
     cfg = _cfg({"traces": {"rotation": {"default": {"max_entries": 5}}, "retention": {"default": {"max_files": 1}}}})
     rd, _conf, _otlp, _http = runtime.generate_runtime("agent-traces-only", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())

@@ -155,7 +155,7 @@ class RunLogs(BaseModel):
 class AgentLogs(BaseModel):
     agent_id: str
     component: str = Field(
-        description="Which part of the agent: daemon | supervisor | ledger | ingestor | legacy-logs."
+        description="Which part of the agent: daemon | supervisor | ledger | ingestor."
     )
     syslog_identifier: str = Field(
         description="systemd SYSLOG_IDENTIFIER the query was scoped to (e.g. 'netdata', 'otel-plugin', 'otel-plugin/ledger')."

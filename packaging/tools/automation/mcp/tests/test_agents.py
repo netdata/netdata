@@ -59,9 +59,9 @@ def test_declare_rejects_unsafe_agent_id():
 def test_declare_rejects_id_too_long_for_socket_paths(monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: Path("/h")))
     reg = AgentRegistry()
-    assert reg.declare("x" * 43, "/wt", "debug").agent_id == "x" * 43
+    assert reg.declare("x" * 46, "/wt", "debug").agent_id == "x" * 46
     with pytest.raises(ValueError):
-        reg.declare("x" * 44, "/wt", "debug")
+        reg.declare("x" * 47, "/wt", "debug")
 
 
 def test_get_unknown_returns_none():

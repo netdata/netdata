@@ -52,9 +52,9 @@ def run_dir(agent_id: str) -> Path:
 
 
 # The longest socket path netdata creates under NETDATA_RUN_DIR is the otel
-# plugin's legacy-logs worker socket, named after the supervisor's pid (Linux
+# plugin's ingestor worker socket, named after the supervisor's pid (Linux
 # pid_max is at most 4194304, 7 digits). A Unix socket path holds 107 bytes.
-_LONGEST_RUNTIME_SOCKET = "otel-plugin/legacy-logs-4194304.sock"
+_LONGEST_RUNTIME_SOCKET = "otel-plugin/ingestor-4194304.sock"
 _UNIX_SOCKET_PATH_MAX = 107
 
 
