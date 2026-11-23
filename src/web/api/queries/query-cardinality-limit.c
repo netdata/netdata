@@ -401,7 +401,26 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         }
     }
 
+    // re-point the grouped metrics to the dimensions of the reduced RRDR:
+    // kept dimensions move to their new index, folded ones to the remaining
+    // bucket, and dimensions dropped by the reduction (not queried) to none
+    uint32_t *new_slot = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal(r->d, sizeof(*new_slot), "RRDR cardinality slots"));
+
+    for (size_t d = 0; d < r->d; d++)
+        new_slot[d] = QUERY_METRIC_NOT_GROUPED_SLOT;
+
+    for (size_t i = 0; i < queried_count; i++)
+        new_slot[sorted_dims[i].dim_idx] = (uint32_t)(i < kept_dimensions ? i : kept_dimensions);
+
+    for (size_t m = 0; m < qt->query.used; m++) {
+        QUERY_METRIC *qm = query_metric(qt, m);
+        if (qm->status & RRDR_DIMENSION_GROUPED)
+            qm->grouped_as.slot = qm->grouped_as.slot < r->d ? new_slot[qm->grouped_as.slot] : QUERY_METRIC_NOT_GROUPED_SLOT;
+    }
+
     // Cleanup
+    onewayalloc_freez(owa, new_slot);
     onewayalloc_freez(owa, contributions);
     onewayalloc_freez(owa, sorted_dims);
 
