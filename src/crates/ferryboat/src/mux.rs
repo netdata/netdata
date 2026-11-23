@@ -22,7 +22,7 @@
 //!
 //! Consumers: re-exported at the crate root, but used only inside ferryboat
 //! (crate doc examples, tests/integration.rs). The plugin crates
-//! (otel-ingestor, otel-ledger, file-lifecycle, otel-legacy-logs, and the
+//! (otel-ingestor, otel-ledger, file-lifecycle, and the
 //! otel-plugin supervisor) drive [`Connection`] and
 //! [`Listener`](crate::Listener) directly instead.
 

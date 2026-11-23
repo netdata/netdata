@@ -15,17 +15,11 @@
 //!   (src/libnetdata/functions_evloop/functions_evloop.c); the Rust protocol
 //!   crate has no message variant for that action.
 //!
-//! Parsing is strict here (`from_name` rejects unknown words), while the
-//! agent's C parser defaults missing, empty or unknown words to `none` — a
-//! misspelled word passes the agent but fails schema/JSON parsing.
-//!
-//! `from_slice`, `Default` and `FromStr` have no callers outside this
-//! file's tests; the file-level allow(dead_code) keeps them, as in the
-//! sibling dyncfg_* vocabulary modules.
+//! `Default` has no callers outside this file's tests; the file-level
+//! allow(dead_code) keeps it, as in the sibling dyncfg_* vocabulary modules.
 #![allow(dead_code)]
 
 use std::fmt;
-use std::str::FromStr;
 
 /// The lifecycle state of a dyncfg configuration entry, as carried in
 /// [`ConfigDeclaration::status`](crate::ConfigDeclaration::status) and by
@@ -74,28 +68,6 @@ impl DynCfgStatus {
             Self::Incomplete => "incomplete",
         }
     }
-
-    /// Strict inverse of `name()`: exact lowercase match, no trimming, None
-    /// for unknown words.
-    pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "none" => Some(Self::None),
-            "accepted" => Some(Self::Accepted),
-            "running" => Some(Self::Running),
-            "failed" => Some(Self::Failed),
-            "disabled" => Some(Self::Disabled),
-            "orphan" => Some(Self::Orphan),
-            "incomplete" => Some(Self::Incomplete),
-            _ => None,
-        }
-    }
-
-    /// `from_name` over UTF-8 bytes, trimming surrounding whitespace first;
-    /// None for invalid UTF-8 or unknown words.
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        let s = std::str::from_utf8(bytes).ok()?.trim();
-        Self::from_name(s)
-    }
 }
 
 impl Default for DynCfgStatus {
@@ -111,16 +83,6 @@ impl fmt::Display for DynCfgStatus {
     /// pluginsd `CONFIG` line.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
-    }
-}
-
-impl FromStr for DynCfgStatus {
-    type Err = ();
-
-    /// `str::parse` support, delegating to `from_name`; failures carry no
-    /// detail (`Err(())`).
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_name(s).ok_or(())
     }
 }
 
@@ -140,61 +102,10 @@ mod tests {
     }
 
     #[test]
-    fn test_from_name() {
-        assert_eq!(DynCfgStatus::from_name("none"), Some(DynCfgStatus::None));
-        assert_eq!(
-            DynCfgStatus::from_name("accepted"),
-            Some(DynCfgStatus::Accepted)
-        );
-        assert_eq!(
-            DynCfgStatus::from_name("running"),
-            Some(DynCfgStatus::Running)
-        );
-        assert_eq!(
-            DynCfgStatus::from_name("failed"),
-            Some(DynCfgStatus::Failed)
-        );
-        assert_eq!(
-            DynCfgStatus::from_name("disabled"),
-            Some(DynCfgStatus::Disabled)
-        );
-        assert_eq!(
-            DynCfgStatus::from_name("orphan"),
-            Some(DynCfgStatus::Orphan)
-        );
-        assert_eq!(
-            DynCfgStatus::from_name("incomplete"),
-            Some(DynCfgStatus::Incomplete)
-        );
-        assert_eq!(DynCfgStatus::from_name("invalid"), None);
-    }
-
-    #[test]
-    fn test_from_slice() {
-        assert_eq!(
-            DynCfgStatus::from_slice(b"running"),
-            Some(DynCfgStatus::Running)
-        );
-        assert_eq!(
-            DynCfgStatus::from_slice(b"  failed  "),
-            Some(DynCfgStatus::Failed)
-        );
-        assert_eq!(DynCfgStatus::from_slice(b"invalid"), None);
-        assert_eq!(DynCfgStatus::from_slice(&[0xFF, 0xFE]), None); // Invalid UTF-8
-    }
-
-    #[test]
     fn test_display() {
         assert_eq!(format!("{}", DynCfgStatus::None), "none");
         assert_eq!(format!("{}", DynCfgStatus::Accepted), "accepted");
         assert_eq!(format!("{}", DynCfgStatus::Running), "running");
-    }
-
-    #[test]
-    fn test_from_str() {
-        assert_eq!("none".parse::<DynCfgStatus>(), Ok(DynCfgStatus::None));
-        assert_eq!("running".parse::<DynCfgStatus>(), Ok(DynCfgStatus::Running));
-        assert_eq!("invalid".parse::<DynCfgStatus>(), Err(()));
     }
 
     #[test]

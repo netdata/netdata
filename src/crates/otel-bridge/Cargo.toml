@@ -19,13 +19,10 @@ tokio-util = { workspace = true, features = ["rt"] }
 
 async-trait = { workspace = true }
 bytesize = { workspace = true }
-futures = { workspace = true }
 humantime-serde = { workspace = true }
 tracing = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
-uuid = { workspace = true, features = ["serde"] }
 file-registry = { workspace = true }
 
 [dev-dependencies]

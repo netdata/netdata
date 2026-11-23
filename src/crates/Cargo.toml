@@ -202,7 +202,6 @@ zstd = "0.13"
 # in-code idents are journal_sdk_*.
 journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.8.1" }
 journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.8.1" }
-journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.8.1" }
 journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.8.1" }
 journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.8.1" }
 journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.8.1" }

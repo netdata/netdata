@@ -39,8 +39,7 @@
 //! against_roaring.rs) replays random op sequences against roaring.
 //!
 //! Features: `roaring` (the bridges above), `serde` (derives on both
-//! descriptors — sfst embeds them in on-disk structs), `allocative`
-//! (declared, unused in src).
+//! descriptors — sfst embeds them in on-disk structs).
 //!
 //! Consumers (grep-verified): `sfst` is the only real dependency — on-disk
 //! log-index bitmaps as `treight::Bitmap`, set ops native, no roaring

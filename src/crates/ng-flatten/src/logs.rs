@@ -315,7 +315,7 @@ fn try_parse_json_body(s: &str) -> Option<AnyValue> {
 ///
 /// Object keys keep `serde_json`'s `Map` order: insertion order when any crate
 /// in the build graph enables `preserve_order` (`otel-ingestor`, `otel-ledger`,
-/// `journal-function`, `netflow-plugin` do), else sorted. Key order MUST NOT be relied on for
+/// `netflow-plugin` do), else sorted. Key order MUST NOT be relied on for
 /// frame byte-stability; column identity is unaffected (nodes intern by path +
 /// kind, independent of entry order).
 fn json_to_any_value(value: serde_json::Value) -> AnyValue {

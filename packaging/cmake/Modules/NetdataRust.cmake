@@ -99,11 +99,6 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
       # during codegen ("rustc-LLVM ERROR: out of memory"). Override Cargo's
       # release profile so the otel-plugin build stays within budget.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # The `io-uring` crate (a transitive dependency) provides no prebuilt
-        # bindings for 32-bit arches. The dependency is compile-time only -
-        # foyer's io-uring engine is never used - so its arch check is safe
-        # to skip.
-        corrosion_add_target_rustflags(otel-plugin --cfg=io_uring_skip_arch_check)
         corrosion_set_env_vars(
                 otel-plugin
                 "CARGO_PROFILE_RELEASE_DEBUG=0"
@@ -119,13 +114,10 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
               "NETDATA_BUILD_LIB_DIR=${VARLIB_DIR}"
               "NETDATA_BUILD_STOCK_DATA_DIR=${STOCK_DATA_DIR}")
 
-      # The io-uring situation from the otel-plugin block above applies here
-      # too: compile-time-only dependency, no prebuilt 32-bit bindings.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
-        # The workspace release profile still propagates fat LTO, single-codegen-unit,
+        # The workspace release profile propagates fat LTO, single-codegen-unit,
         # and debuginfo settings through Rust dependencies on 32-bit builds. Override
-        # Cargo's release profile too so the entire dependency graph stays linkable.
+        # Cargo's release profile so the entire dependency graph stays linkable.
         list(APPEND NETFLOW_PLUGIN_ENV_VARS
                 "CARGO_PROFILE_RELEASE_DEBUG=0"
                 "CARGO_PROFILE_RELEASE_LTO=off"
