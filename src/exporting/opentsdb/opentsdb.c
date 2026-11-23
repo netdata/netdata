@@ -27,7 +27,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_opentsdb_telnet;
-    instance->start_chart_formatting = NULL;
+    instance->start_chart_formatting = format_chart_opentsdb;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_opentsdb_telnet;
@@ -81,7 +81,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->start_batch_formatting = open_batch_json_http;
     instance->start_host_formatting = format_host_labels_opentsdb_http;
-    instance->start_chart_formatting = NULL;
+    instance->start_chart_formatting = format_chart_opentsdb;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_opentsdb_http;
@@ -185,15 +185,27 @@ static void buffer_strcat_opentsdb_telnet_value(BUFFER *wb, const char *src) {
     buffer_overflow_check(wb);
 }
 
-static void format_opentsdb_telnet_prefix(
-    BUFFER *wb,
-    const char *prefix,
-    const char *chart_name,
-    const char *dimension_name,
-    unsigned long long timestamp) {
+// The part of a record that depends only on the chart: "put <prefix>.<chart>.".
+static void format_opentsdb_telnet_chart_prefix(BUFFER *wb, const char *prefix, const char *chart_name) {
     buffer_strcat(wb, "put ");
     buffer_strcat_opentsdb_telnet_value(wb, prefix);
-    buffer_sprintf(wb, ".%s.%s %llu ", chart_name, dimension_name, timestamp);
+    buffer_putc(wb, '.');
+    buffer_strcat(wb, chart_name);
+    buffer_putc(wb, '.');
+}
+
+// Everything of a record up to the value: the chart part, the dimension and the timestamp.
+static void format_opentsdb_telnet_record_start(
+    BUFFER *wb,
+    BUFFER *chart_prefix,
+    const char *dimension_name,
+    size_t dimension_len,
+    time_t timestamp) {
+    buffer_memcat(wb, buffer_tostring(chart_prefix), buffer_strlen(chart_prefix));
+    buffer_memcat(wb, dimension_name, dimension_len);
+    buffer_putc(wb, ' ');
+    buffer_print_uint64(wb, (uint64_t)timestamp);
+    buffer_putc(wb, ' ');
 }
 
 static void format_opentsdb_telnet_host(BUFFER *wb, const char *hostname) {
@@ -201,8 +213,8 @@ static void format_opentsdb_telnet_host(BUFFER *wb, const char *hostname) {
     buffer_strcat_opentsdb_telnet_value(wb, hostname);
 }
 
-static void format_opentsdb_telnet_suffix(BUFFER *wb, const char *host_and_labels) {
-    buffer_strcat(wb, host_and_labels);
+static void format_opentsdb_telnet_suffix(BUFFER *wb, BUFFER *host_and_labels) {
+    buffer_memcat(wb, buffer_tostring(host_and_labels), buffer_strlen(host_and_labels));
     buffer_putc(wb, '\n');
 }
 
@@ -210,27 +222,79 @@ static bool opentsdb_value_is_exportable(NETDATA_DOUBLE value) {
     return netdata_double_isnumber(value);
 }
 
-static bool format_opentsdb_telnet_metric(
-    struct instance *instance,
-    const char *prefix,
-    const char *chart_name,
-    const char *dimension_name,
-    unsigned long long timestamp,
-    bool value_is_float,
-    NETDATA_DOUBLE value,
-    collected_number integer_value) {
-    if(value_is_float && !opentsdb_value_is_exportable(value))
-        return false;
-
-    BUFFER *wb = instance->buffer;
-    format_opentsdb_telnet_prefix(wb, prefix, chart_name, dimension_name, timestamp);
-
+static void opentsdb_value_print(BUFFER *wb, bool value_is_float, NETDATA_DOUBLE value, int64_t integer_value) {
     if(value_is_float)
         buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, value);
     else
-        buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, integer_value);
+        buffer_print_int64(wb, integer_value);
+}
 
-    format_opentsdb_telnet_suffix(wb, buffer_tostring(instance->labels_buffer));
+/**
+ * Start a chart for OpenTSDB connectors
+ *
+ * The chart part of the records is the same for all dimensions of a chart. It is built once, by the first record
+ * the chart writes, and reused for the rest: a chart whose values are all skipped reads none of its metadata.
+ *
+ * @param instance an instance data structure.
+ * @param st a chart.
+ * @return Always returns 0.
+ */
+int format_chart_opentsdb(struct instance *instance, RRDSET *st __maybe_unused)
+{
+    if (instance->chart_prefix_buffer)
+        buffer_flush(instance->chart_prefix_buffer);
+
+    return 0;
+}
+
+// Returns the chart part of the records, building it if this is the first record the chart writes.
+static BUFFER *opentsdb_chart_prefix(
+    struct instance *instance, RRDSET *st, void (*format)(BUFFER *wb, const char *prefix, const char *chart_name))
+{
+    if (!instance->chart_prefix_buffer)
+        instance->chart_prefix_buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+
+    BUFFER *chart_prefix = instance->chart_prefix_buffer;
+    if (!buffer_strlen(chart_prefix)) {
+        char chart_name[RRD_ID_LENGTH_MAX + 1];
+        exporting_name_copy(
+            chart_name,
+            (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
+            RRD_ID_LENGTH_MAX);
+
+        format(chart_prefix, instance->config.prefix, chart_name);
+    }
+
+    return chart_prefix;
+}
+
+static size_t opentsdb_dimension_name_copy(struct instance *instance, RRDDIM *rd, char *dst)
+{
+    return exporting_name_copy(
+        dst,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
+        RRD_ID_LENGTH_MAX);
+}
+
+static bool format_opentsdb_telnet_metric(
+    struct instance *instance,
+    RRDDIM *rd,
+    time_t timestamp,
+    bool value_is_float,
+    NETDATA_DOUBLE value,
+    int64_t integer_value) {
+    if(value_is_float && !opentsdb_value_is_exportable(value))
+        return false;
+
+    BUFFER *chart_prefix = opentsdb_chart_prefix(instance, rd->rrdset, format_opentsdb_telnet_chart_prefix);
+
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    size_t dimension_len = opentsdb_dimension_name_copy(instance, rd, dimension_name);
+
+    BUFFER *wb = instance->buffer;
+    format_opentsdb_telnet_record_start(wb, chart_prefix, dimension_name, dimension_len, timestamp);
+    opentsdb_value_print(wb, value_is_float, value, integer_value);
+    format_opentsdb_telnet_suffix(wb, instance->labels_buffer);
     return true;
 }
 
@@ -273,40 +337,12 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
  */
 int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
-    char chart_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        RRD_ID_LENGTH_MAX);
-
-    char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-        RRD_ID_LENGTH_MAX);
-
     if(rrddim_is_float(rd))
         format_opentsdb_telnet_metric(
-            instance,
-            instance->config.prefix,
-            chart_name,
-            dimension_name,
-            (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            true,
-            rrddim_last_collected_as_double(rd),
-            0);
+            instance, rd, rd->collector.last_collected_time.tv_sec, true, rrddim_last_collected_as_double(rd), 0);
     else
         format_opentsdb_telnet_metric(
-            instance,
-            instance->config.prefix,
-            chart_name,
-            dimension_name,
-            (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            false,
-            0.0,
-            (collected_number)rrddim_last_collected_raw_int(rd));
+            instance, rd, rd->collector.last_collected_time.tv_sec, false, 0.0, rrddim_last_collected_raw_int(rd));
 
     return 0;
 }
@@ -320,33 +356,9 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
  */
 int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
-    char chart_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        RRD_ID_LENGTH_MAX);
-
-    char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-        RRD_ID_LENGTH_MAX);
-
     time_t last_t = 0;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
-
-    format_opentsdb_telnet_metric(
-        instance,
-        instance->config.prefix,
-        chart_name,
-        dimension_name,
-        (unsigned long long)last_t,
-        true,
-        value,
-        0);
-
+    format_opentsdb_telnet_metric(instance, rd, last_t, true, value, 0);
     return 0;
 }
 
@@ -375,8 +387,19 @@ void opentsdb_http_prepare_header(struct instance *instance)
     return;
 }
 
+// The tags of a record are the same for all records of a host: `,"tags":{"host":"<hostname>"<labels>}}`.
+static void format_opentsdb_http_tags_open(BUFFER *wb, const char *hostname) {
+    buffer_strcat(wb, ",\"tags\":{\"host\":\"");
+    buffer_json_strcat(wb, hostname);
+    buffer_strcat(wb, "\"");
+}
+
+static void format_opentsdb_http_tags_close(BUFFER *wb) {
+    buffer_strcat(wb, "}}");
+}
+
 /**
- * Format host labels for OpenTSDB HTTP connector
+ * Format the record tags (host and labels) for OpenTSDB HTTP connector
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
@@ -387,61 +410,52 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
-    if (!instance->metric_prefix_buffer)
-        instance->metric_prefix_buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
-    else
-        buffer_flush(instance->metric_prefix_buffer);
-
     if (host == localhost)
-        buffer_strcat(instance->metric_prefix_buffer, instance->config.hostname);
+        format_opentsdb_http_tags_open(instance->labels_buffer, instance->config.hostname);
     else {
         RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-        buffer_strcat(instance->metric_prefix_buffer, string2str(identity.hostname));
+        format_opentsdb_http_tags_open(instance->labels_buffer, string2str(identity.hostname));
         rrdhost_identity_release(&identity);
     }
 
-    if (unlikely(!sending_labels_configured(instance)))
-        return 0;
+    if (sending_labels_configured(instance))
+        rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ",", ":", "\"", "",
+                            exporting_labels_filter_callback, instance,
+                            NULL, sanitize_opentsdb_label_value);
 
-    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ",", ":", "\"", "",
-                        exporting_labels_filter_callback, instance,
-                        NULL, sanitize_opentsdb_label_value);
+    format_opentsdb_http_tags_close(instance->labels_buffer);
     return 0;
 }
 
-static void format_opentsdb_http_prefix(
-    BUFFER *wb,
-    const char *prefix,
-    const char *chart_name,
-    const char *dimension_name,
-    unsigned long long timestamp) {
+// The part of a record that depends only on the chart: `{"metric":"<prefix>.<chart>.`.
+static void format_opentsdb_http_chart_prefix(BUFFER *wb, const char *prefix, const char *chart_name) {
     buffer_strcat(wb, "{\"metric\":\"");
     buffer_json_strcat(wb, prefix);
     buffer_putc(wb, '.');
     buffer_json_strcat(wb, chart_name);
     buffer_putc(wb, '.');
-    buffer_json_strcat(wb, dimension_name);
-    buffer_sprintf(wb, "\",\"timestamp\":%llu,\"value\":", timestamp);
 }
 
-static void format_opentsdb_http_suffix(BUFFER *wb, const char *hostname, const char *labels) {
-    buffer_strcat(wb, ",\"tags\":{\"host\":\"");
-    buffer_json_strcat(wb, hostname);
-    buffer_strcat(wb, "\"");
-    buffer_strcat(wb, labels);
-    buffer_strcat(wb, "}}");
+// Everything of a record up to the value: the chart part, the dimension and the timestamp.
+static void format_opentsdb_http_record_start(
+    BUFFER *wb,
+    BUFFER *chart_prefix,
+    const char *dimension_name,
+    time_t timestamp) {
+    buffer_memcat(wb, buffer_tostring(chart_prefix), buffer_strlen(chart_prefix));
+    buffer_json_strcat(wb, dimension_name);
+    buffer_strcat(wb, "\",\"timestamp\":");
+    buffer_print_uint64(wb, (uint64_t)timestamp);
+    buffer_strcat(wb, ",\"value\":");
 }
 
 static bool format_opentsdb_http_metric(
     struct instance *instance,
-    const char *hostname,
-    const char *prefix,
-    const char *chart_name,
-    const char *dimension_name,
-    unsigned long long timestamp,
+    RRDDIM *rd,
+    time_t timestamp,
     bool value_is_float,
     NETDATA_DOUBLE value,
-    collected_number integer_value) {
+    int64_t integer_value) {
     if(value_is_float && !opentsdb_value_is_exportable(value))
         return false;
 
@@ -449,17 +463,15 @@ static bool format_opentsdb_http_metric(
     if(buffer_strlen(wb) > 2)
         buffer_strcat(wb, ",\n");
 
-    format_opentsdb_http_prefix(wb, prefix, chart_name, dimension_name, timestamp);
+    BUFFER *chart_prefix = opentsdb_chart_prefix(instance, rd->rrdset, format_opentsdb_http_chart_prefix);
 
-    if(value_is_float)
-        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, value);
-    else
-        buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, integer_value);
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    opentsdb_dimension_name_copy(instance, rd, dimension_name);
 
-    format_opentsdb_http_suffix(
-        wb,
-        hostname,
-        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
+    format_opentsdb_http_record_start(wb, chart_prefix, dimension_name, timestamp);
+    opentsdb_value_print(wb, value_is_float, value, integer_value);
+    if(instance->labels_buffer)
+        buffer_memcat(wb, buffer_tostring(instance->labels_buffer), buffer_strlen(instance->labels_buffer));
     return true;
 }
 
@@ -472,42 +484,12 @@ static bool format_opentsdb_http_metric(
  */
 int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
-    char chart_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        RRD_ID_LENGTH_MAX);
-
-    char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-        RRD_ID_LENGTH_MAX);
-
     if(rrddim_is_float(rd))
         format_opentsdb_http_metric(
-            instance,
-            buffer_tostring(instance->metric_prefix_buffer),
-            instance->config.prefix,
-            chart_name,
-            dimension_name,
-            (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            true,
-            rrddim_last_collected_as_double(rd),
-            0);
+            instance, rd, rd->collector.last_collected_time.tv_sec, true, rrddim_last_collected_as_double(rd), 0);
     else
         format_opentsdb_http_metric(
-            instance,
-            buffer_tostring(instance->metric_prefix_buffer),
-            instance->config.prefix,
-            chart_name,
-            dimension_name,
-            (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            false,
-            0.0,
-            (collected_number)rrddim_last_collected_raw_int(rd));
+            instance, rd, rd->collector.last_collected_time.tv_sec, false, 0.0, rrddim_last_collected_raw_int(rd));
 
     return 0;
 }
@@ -521,35 +503,81 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
  */
 int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
-    char chart_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        RRD_ID_LENGTH_MAX);
-
-    char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-        RRD_ID_LENGTH_MAX);
-
     time_t last_t = 0;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
-
-    format_opentsdb_http_metric(
-        instance,
-        buffer_tostring(instance->metric_prefix_buffer),
-        instance->config.prefix,
-        chart_name,
-        dimension_name,
-        (unsigned long long)last_t,
-        true,
-        value,
-        0);
-
+    format_opentsdb_http_metric(instance, rd, last_t, true, value, 0);
     return 0;
+}
+
+// The record writers composed the way the metric callbacks compose them, for names given as strings.
+static void opentsdb_http_unittest_prefix(
+    BUFFER *wb, const char *prefix, const char *chart_name, const char *dimension_name, time_t timestamp) {
+    BUFFER *chart_prefix = buffer_create(0, NULL);
+    format_opentsdb_http_chart_prefix(chart_prefix, prefix, chart_name);
+    format_opentsdb_http_record_start(wb, chart_prefix, dimension_name, timestamp);
+    buffer_free(chart_prefix);
+}
+
+static void opentsdb_http_unittest_suffix(BUFFER *wb, const char *hostname, const char *labels) {
+    format_opentsdb_http_tags_open(wb, hostname);
+    buffer_strcat(wb, labels);
+    format_opentsdb_http_tags_close(wb);
+}
+
+static void opentsdb_telnet_unittest_prefix(
+    BUFFER *wb, const char *prefix, const char *chart_name, const char *dimension_name, time_t timestamp) {
+    BUFFER *chart_prefix = buffer_create(0, NULL);
+    format_opentsdb_telnet_chart_prefix(chart_prefix, prefix, chart_name);
+    format_opentsdb_telnet_record_start(wb, chart_prefix, dimension_name, strlen(dimension_name), timestamp);
+    buffer_free(chart_prefix);
+}
+
+static void opentsdb_telnet_unittest_suffix(BUFFER *wb, const char *host_and_labels) {
+    buffer_strcat(wb, host_and_labels);
+    buffer_putc(wb, '\n');
+}
+
+// A chart and a dimension for driving the record writers. A NULL name leaves it unset, which makes the connector
+// fall back to the id.
+static RRDSET *opentsdb_unittest_chart(const char *id, const char *name) {
+    RRDSET *st = callocz(1, sizeof(*st));
+    st->id = string_strdupz(id);
+    st->name = name ? string_strdupz(name) : NULL;
+    return st;
+}
+
+static void opentsdb_unittest_chart_free(RRDSET *st) {
+    string_freez(st->id);
+    string_freez(st->name);
+    freez(st);
+}
+
+static RRDDIM *opentsdb_unittest_dimension(RRDSET *st, const char *id, const char *name) {
+    RRDDIM *rd = callocz(1, sizeof(*rd));
+    rd->rrdset = st;
+    rd->id = string_strdupz(id);
+    rd->name = name ? string_strdupz(name) : NULL;
+    return rd;
+}
+
+static void opentsdb_unittest_dimension_free(RRDDIM *rd) {
+    string_freez(rd->id);
+    string_freez(rd->name);
+    freez(rd);
+}
+
+static bool opentsdb_unittest_metric(
+    struct instance *instance, bool http, const char *chart_id, const char *dimension_id, time_t timestamp,
+    bool value_is_float, NETDATA_DOUBLE value, int64_t integer_value) {
+    RRDSET *st = opentsdb_unittest_chart(chart_id, NULL);
+    RRDDIM *rd = opentsdb_unittest_dimension(st, dimension_id, NULL);
+    format_chart_opentsdb(instance, st);
+    bool written = http ?
+        format_opentsdb_http_metric(instance, rd, timestamp, value_is_float, value, integer_value) :
+        format_opentsdb_telnet_metric(instance, rd, timestamp, value_is_float, value, integer_value);
+    opentsdb_unittest_dimension_free(rd);
+    opentsdb_unittest_chart_free(st);
+    return written;
 }
 
 static int opentsdb_http_unittest_case(
@@ -560,9 +588,9 @@ static int opentsdb_http_unittest_case(
     const char *hostname,
     const char *expected) {
     BUFFER *wb = buffer_create(0, NULL);
-    format_opentsdb_http_prefix(wb, prefix, chart_name, dimension_name, 42);
+    opentsdb_http_unittest_prefix(wb, prefix, chart_name, dimension_name, 42);
     buffer_strcat(wb, "1.5");
-    format_opentsdb_http_suffix(wb, hostname, ",\"label\":\"value\"");
+    opentsdb_http_unittest_suffix(wb, hostname, ",\"label\":\"value\"");
 
     int errors = 0;
     if(strcmp(buffer_tostring(wb), expected) != 0) {
@@ -632,24 +660,19 @@ static int opentsdb_number_unittest(void) {
         buffer_strcat(http, "[\n");
         buffer_strcat(expected_http, "[\n");
 
+        BUFFER *http_tags = buffer_create(0, NULL);
+        opentsdb_http_unittest_suffix(http_tags, "localhost", "");
         struct instance http_instance = {
-            .config.hostname = "localhost",
+            .config.prefix = "netdata",
             .buffer = http,
+            .labels_buffer = http_tags,
         };
-        bool http_record = format_opentsdb_http_metric(
-            &http_instance,
-            "localhost",
-            "netdata",
-            "chart.name",
-            "dimension.name",
-            42,
-            true,
-            number_cases[i].value,
-            0);
+        bool http_record = opentsdb_unittest_metric(
+            &http_instance, true, "chart.name", "dimension.name", 42, true, number_cases[i].value, 0);
         if(number_cases[i].expect_record) {
-            format_opentsdb_http_prefix(expected_http, "netdata", "chart.name", "dimension.name", 42);
+            opentsdb_http_unittest_prefix(expected_http, "netdata", "chart.name", "dimension.name", 42);
             buffer_sprintf(expected_http, NETDATA_DOUBLE_FORMAT, number_cases[i].value);
-            format_opentsdb_http_suffix(expected_http, "localhost", "");
+            opentsdb_http_unittest_suffix(expected_http, "localhost", "");
         }
 
         if(http_record != number_cases[i].expect_record ||
@@ -663,6 +686,8 @@ static int opentsdb_number_unittest(void) {
             errors++;
         }
 
+        buffer_free(http_instance.chart_prefix_buffer);
+        buffer_free(http_tags);
         buffer_free(expected_http);
         buffer_free(http);
 
@@ -674,22 +699,16 @@ static int opentsdb_number_unittest(void) {
         BUFFER *telnet_labels = buffer_create(0, NULL);
         buffer_strcat(telnet_labels, " host=localhost label=value");
         struct instance telnet_instance = {
+            .config.prefix = "netdata",
             .buffer = telnet,
             .labels_buffer = telnet_labels,
         };
-        bool telnet_record = format_opentsdb_telnet_metric(
-            &telnet_instance,
-            "netdata",
-            "chart.name",
-            "dimension.name",
-            42,
-            true,
-            number_cases[i].value,
-            0);
+        bool telnet_record = opentsdb_unittest_metric(
+            &telnet_instance, false, "chart.name", "dimension.name", 42, true, number_cases[i].value, 0);
         if(number_cases[i].expect_record) {
-            format_opentsdb_telnet_prefix(expected_telnet, "netdata", "chart.name", "dimension.name", 42);
+            opentsdb_telnet_unittest_prefix(expected_telnet, "netdata", "chart.name", "dimension.name", 42);
             buffer_sprintf(expected_telnet, NETDATA_DOUBLE_FORMAT, number_cases[i].value);
-            format_opentsdb_telnet_suffix(expected_telnet, " host=localhost label=value");
+            opentsdb_telnet_unittest_suffix(expected_telnet, " host=localhost label=value");
         }
 
         if(telnet_record != number_cases[i].expect_record ||
@@ -703,6 +722,7 @@ static int opentsdb_number_unittest(void) {
             errors++;
         }
 
+        buffer_free(telnet_instance.chart_prefix_buffer);
         buffer_free(expected_telnet);
         buffer_free(telnet_labels);
         buffer_free(telnet);
@@ -710,29 +730,29 @@ static int opentsdb_number_unittest(void) {
 
     BUFFER *http_batch = buffer_create(0, NULL);
     buffer_strcat(http_batch, "[\n");
+    BUFFER *http_tags = buffer_create(0, NULL);
+    opentsdb_http_unittest_suffix(http_tags, "localhost", "");
     struct instance http_instance = {
-        .config.hostname = "localhost",
+        .config.prefix = "netdata",
         .buffer = http_batch,
+        .labels_buffer = http_tags,
     };
-    bool first_record = format_opentsdb_http_metric(
-        &http_instance, "localhost", "netdata", "chart", "first", 42, true, 1.5, 0);
+    bool first_record = opentsdb_unittest_metric(&http_instance, true, "chart", "first", 42, true, 1.5, 0);
     size_t before_omission = buffer_strlen(http_batch);
-    bool omitted_record = format_opentsdb_http_metric(
-        &http_instance, "localhost", "netdata", "chart", "omitted", 42, true, INFINITY, 0);
+    bool omitted_record = opentsdb_unittest_metric(&http_instance, true, "chart", "omitted", 42, true, INFINITY, 0);
     size_t after_omission = buffer_strlen(http_batch);
-    bool second_record = format_opentsdb_http_metric(
-        &http_instance, "localhost", "netdata", "chart", "second", 42, true, -2.5, 0);
+    bool second_record = opentsdb_unittest_metric(&http_instance, true, "chart", "second", 42, true, -2.5, 0);
     buffer_strcat(http_batch, "\n]\n");
 
     BUFFER *expected_batch = buffer_create(0, NULL);
     buffer_strcat(expected_batch, "[\n");
-    format_opentsdb_http_prefix(expected_batch, "netdata", "chart", "first", 42);
+    opentsdb_http_unittest_prefix(expected_batch, "netdata", "chart", "first", 42);
     buffer_sprintf(expected_batch, NETDATA_DOUBLE_FORMAT, (NETDATA_DOUBLE)1.5);
-    format_opentsdb_http_suffix(expected_batch, "localhost", "");
+    opentsdb_http_unittest_suffix(expected_batch, "localhost", "");
     buffer_strcat(expected_batch, ",\n");
-    format_opentsdb_http_prefix(expected_batch, "netdata", "chart", "second", 42);
+    opentsdb_http_unittest_prefix(expected_batch, "netdata", "chart", "second", 42);
     buffer_sprintf(expected_batch, NETDATA_DOUBLE_FORMAT, (NETDATA_DOUBLE)-2.5);
-    format_opentsdb_http_suffix(expected_batch, "localhost", "");
+    opentsdb_http_unittest_suffix(expected_batch, "localhost", "");
     buffer_strcat(expected_batch, "\n]\n");
 
     if(!first_record || omitted_record || !second_record || after_omission != before_omission ||
@@ -745,29 +765,205 @@ static int opentsdb_number_unittest(void) {
         errors++;
     }
 
+    buffer_free(http_instance.chart_prefix_buffer);
     buffer_free(expected_batch);
     buffer_free(http_batch);
 
     BUFFER *integers = buffer_create(0, NULL);
     buffer_strcat(integers, "[\n");
     struct instance integer_instance = {
-        .config.hostname = "localhost",
+        .config.prefix = "netdata",
         .buffer = integers,
+        .labels_buffer = http_tags,
     };
-    bool integer_record = format_opentsdb_http_metric(
-        &integer_instance, "localhost", "netdata", "chart", "integer", 42, false, NAN, INT64_MIN);
+    bool integer_record = opentsdb_unittest_metric(
+        &integer_instance, true, "chart", "integer", 42, false, NAN, INT64_MIN);
     BUFFER *expected_integers = buffer_create(0, NULL);
     buffer_strcat(expected_integers, "[\n");
-    format_opentsdb_http_prefix(expected_integers, "netdata", "chart", "integer", 42);
+    opentsdb_http_unittest_prefix(expected_integers, "netdata", "chart", "integer", 42);
     buffer_sprintf(expected_integers, COLLECTED_NUMBER_FORMAT, (collected_number)INT64_MIN);
-    format_opentsdb_http_suffix(expected_integers, "localhost", "");
+    opentsdb_http_unittest_suffix(expected_integers, "localhost", "");
     if(!integer_record || strcmp(buffer_tostring(integers), buffer_tostring(expected_integers)) != 0) {
         fprintf(stderr, "OpenTSDB collected integer output changed\n");
         errors++;
     }
+    buffer_free(integer_instance.chart_prefix_buffer);
     buffer_free(expected_integers);
     buffer_free(integers);
+    buffer_free(http_tags);
 
+    return errors;
+}
+
+static void opentsdb_unittest_collected(
+    struct instance *instance, RRDSET *st, const char *id, const char *name,
+    bool is_float, int64_t int_value, NETDATA_DOUBLE float_value, time_t timestamp) {
+    RRDDIM *rd = opentsdb_unittest_dimension(st, id, name);
+    if(is_float) {
+        rd->collector.options |= RRDDIM_OPTION_VALUE_FLOAT;
+        rd->collector.collected.f.last_collected_value = float_value;
+    }
+    else
+        rd->collector.collected.i.last_collected_value = (collected_number)int_value;
+    rd->collector.last_collected_time.tv_sec = timestamp;
+
+    instance->metric_formatting(instance, rd);
+    opentsdb_unittest_dimension_free(rd);
+}
+
+static RRDHOST *opentsdb_unittest_host(const char *hostname, const char *label, RRDLABEL_SRC label_source) {
+    RRDHOST *host = callocz(1, sizeof(*host));
+    spinlock_init(&host->rrdhost_update_lock);
+    host->hostname = string_strdupz(hostname);
+    host->program_name = string_strdupz("netdata");
+    host->program_version = string_strdupz("1");
+    host->rrdlabels = rrdlabels_create();
+    rrdlabels_add(host->rrdlabels, "label", label, label_source);
+    return host;
+}
+
+static void opentsdb_unittest_host_free(RRDHOST *host) {
+    rrdlabels_destroy(host->rrdlabels);
+    string_freez(host->hostname);
+    string_freez(host->program_name);
+    string_freez(host->program_version);
+    freez(host);
+}
+
+// Drive the real host, chart and metric callbacks across two hosts and four charts, on the collected and the stored
+// paths, and compare the bytes with the record format the connector has always produced.
+static int opentsdb_callbacks_unittest(bool http) {
+    int errors = 0;
+    const char *type = http ? "HTTP" : "Telnet";
+
+    struct instance instance = { 0 };
+    instance.config.type = http ? EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP : EXPORTING_CONNECTOR_TYPE_OPENTSDB;
+    instance.config.prefix = "netdata";
+    instance.config.options =
+        EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES | EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance.start_host_formatting = http ? format_host_labels_opentsdb_http : format_host_labels_opentsdb_telnet;
+    instance.start_chart_formatting = format_chart_opentsdb;
+    instance.metric_formatting =
+        http ? format_dimension_collected_opentsdb_http : format_dimension_collected_opentsdb_telnet;
+    instance.end_host_formatting = flush_host_labels;
+    instance.buffer = buffer_create(0, NULL);
+    if(http)
+        open_batch_json_http(&instance);
+
+    // first host: one configured label, names on
+    RRDHOST *host1 = opentsdb_unittest_host("host \"1\"", "v a", RRDLABEL_SRC_CONFIG);
+    instance.start_host_formatting(&instance, host1);
+    RRDSET *st1 = opentsdb_unittest_chart("a.b", "a name");
+    instance.start_chart_formatting(&instance, st1);
+    opentsdb_unittest_collected(&instance, st1, "d1", "n 1", false, INT64_MIN, 0.0, 1700000000);
+    opentsdb_unittest_collected(&instance, st1, "d2", "n2", true, 0, 2.5, 1700000001);
+    opentsdb_unittest_collected(&instance, st1, "d3", NULL, false, 42, 0.0, -1);
+    opentsdb_unittest_collected(&instance, st1, "d4", "n4", true, 0, NAN, 1700000003);
+    instance.end_host_formatting(&instance, host1);
+
+    // second host: its only label is filtered out, names off
+    instance.config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    RRDHOST *host2 = opentsdb_unittest_host("host2", "auto", RRDLABEL_SRC_AUTO);
+    instance.start_host_formatting(&instance, host2);
+    RRDSET *st2 = opentsdb_unittest_chart("c.d", "c name");
+    instance.start_chart_formatting(&instance, st2);
+    opentsdb_unittest_collected(&instance, st2, "e1", "m1", false, INT64_MAX, 0.0, 7);
+
+    const char *expected = http ?
+        "[\n"
+        "{\"metric\":\"netdata.a_name.n_1\",\"timestamp\":1700000000,\"value\":-9223372036854775808,"
+        "\"tags\":{\"host\":\"host \\\"1\\\"\",\"label\":\"v_a\"}},\n"
+        "{\"metric\":\"netdata.a_name.n2\",\"timestamp\":1700000001,\"value\":2.5000000,"
+        "\"tags\":{\"host\":\"host \\\"1\\\"\",\"label\":\"v_a\"}},\n"
+        "{\"metric\":\"netdata.a_name.d3\",\"timestamp\":18446744073709551615,\"value\":42,"
+        "\"tags\":{\"host\":\"host \\\"1\\\"\",\"label\":\"v_a\"}},\n"
+        "{\"metric\":\"netdata.c.d.e1\",\"timestamp\":7,\"value\":9223372036854775807,"
+        "\"tags\":{\"host\":\"host2\"}}" :
+        "put netdata.a_name.n_1 1700000000 -9223372036854775808 host=host_\"1\" label=v_a\n"
+        "put netdata.a_name.n2 1700000001 2.5000000 host=host_\"1\" label=v_a\n"
+        "put netdata.a_name.d3 18446744073709551615 42 host=host_\"1\" label=v_a\n"
+        "put netdata.c.d.e1 7 9223372036854775807 host=host2 \n";
+    if(strcmp(buffer_tostring(instance.buffer), expected) != 0) {
+        fprintf(stderr, "OpenTSDB %s callbacks output mismatch\nexpected: %s\nactual:   %s\n",
+                type, expected, buffer_tostring(instance.buffer));
+        errors++;
+    }
+
+    // stored data source: a skipped (NaN or infinite) value writes nothing and does not build the chart part
+    buffer_flush(instance.buffer);
+    if(http)
+        open_batch_json_http(&instance);
+    instance.config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance.metric_formatting = http ? format_dimension_stored_opentsdb_http : format_dimension_stored_opentsdb_telnet;
+    size_t empty = buffer_strlen((BUFFER *)instance.buffer);
+
+    RRDSET *st3 = opentsdb_unittest_chart("e.f", "e name");
+    instance.start_chart_formatting(&instance, st3);
+    RRDDIM *rd = opentsdb_unittest_dimension(st3, "g1", NULL);
+    if(http)
+        format_opentsdb_http_metric(&instance, rd, 10, true, NAN, 0);
+    else
+        format_opentsdb_telnet_metric(&instance, rd, 10, true, -INFINITY, 0);
+    opentsdb_unittest_dimension_free(rd);
+    if(buffer_strlen(instance.chart_prefix_buffer) || buffer_strlen((BUFFER *)instance.buffer) != empty) {
+        fprintf(stderr, "OpenTSDB %s stored: a skipped value wrote bytes or built the chart part\n", type);
+        errors++;
+    }
+
+    const struct {
+        const char *id;
+        NETDATA_DOUBLE value;
+        time_t last_t;
+    } stored[] = {
+        { "g2", -1.25, 0 },
+        { "g3", NAN, 12 },
+        { "g4", 3.0, -1 },
+    };
+    for(size_t i = 0; i < _countof(stored); i++) {
+        rd = opentsdb_unittest_dimension(st3, stored[i].id, NULL);
+        if(http)
+            format_opentsdb_http_metric(&instance, rd, stored[i].last_t, true, stored[i].value, 0);
+        else
+            format_opentsdb_telnet_metric(&instance, rd, stored[i].last_t, true, stored[i].value, 0);
+        opentsdb_unittest_dimension_free(rd);
+    }
+
+    // a chart whose values are all skipped writes nothing
+    instance.start_chart_formatting(&instance, st2);
+    rd = opentsdb_unittest_dimension(st2, "e1", NULL);
+    if(http)
+        format_opentsdb_http_metric(&instance, rd, 14, true, INFINITY, 0);
+    else
+        format_opentsdb_telnet_metric(&instance, rd, 14, true, NAN, 0);
+    opentsdb_unittest_dimension_free(rd);
+
+    expected = http ?
+        "[\n"
+        "{\"metric\":\"netdata.e.f.g2\",\"timestamp\":0,\"value\":-1.2500000,\"tags\":{\"host\":\"host2\"}},\n"
+        "{\"metric\":\"netdata.e.f.g4\",\"timestamp\":18446744073709551615,\"value\":3.0000000,"
+        "\"tags\":{\"host\":\"host2\"}}" :
+        "put netdata.e.f.g2 0 -1.2500000 host=host2 \n"
+        "put netdata.e.f.g4 18446744073709551615 3.0000000 host=host2 \n";
+    if(strcmp(buffer_tostring(instance.buffer), expected) != 0 || buffer_strlen(instance.chart_prefix_buffer)) {
+        fprintf(stderr, "OpenTSDB %s stored records mismatch\nexpected: %s\nactual:   %s\n",
+                type, expected, buffer_tostring(instance.buffer));
+        errors++;
+    }
+
+    instance.end_host_formatting(&instance, host2);
+    if(buffer_strlen(instance.labels_buffer)) {
+        fprintf(stderr, "OpenTSDB %s host tags survived the end of the host\n", type);
+        errors++;
+    }
+
+    opentsdb_unittest_chart_free(st1);
+    opentsdb_unittest_chart_free(st2);
+    opentsdb_unittest_chart_free(st3);
+    opentsdb_unittest_host_free(host1);
+    opentsdb_unittest_host_free(host2);
+    buffer_free(instance.buffer);
+    buffer_free(instance.labels_buffer);
+    buffer_free(instance.chart_prefix_buffer);
     return errors;
 }
 
@@ -793,6 +989,8 @@ int exporting_opentsdb_http_unittest(void) {
         "\"value\":1.5,\"tags\":{\"host\":\"host\\r\\\"\\\\name\",\"label\":\"value\"}}");
 
     errors += opentsdb_number_unittest();
+    errors += opentsdb_callbacks_unittest(true);
+    errors += opentsdb_callbacks_unittest(false);
 
     return errors;
 }
@@ -808,9 +1006,9 @@ static int opentsdb_telnet_unittest_case(
     buffer_strcat(host_and_labels, labels);
 
     BUFFER *wb = buffer_create(0, NULL);
-    format_opentsdb_telnet_prefix(wb, prefix, "chart.name", "dimension.name", 42);
+    opentsdb_telnet_unittest_prefix(wb, prefix, "chart.name", "dimension.name", 42);
     buffer_strcat(wb, "1.5");
-    format_opentsdb_telnet_suffix(wb, buffer_tostring(host_and_labels));
+    opentsdb_telnet_unittest_suffix(wb, buffer_tostring(host_and_labels));
 
     int errors = 0;
     if(strcmp(buffer_tostring(wb), expected) != 0) {
@@ -928,9 +1126,9 @@ int exporting_opentsdb_telnet_unittest(void) {
     format_opentsdb_telnet_host(host_and_labels, long_hostname);
 
     BUFFER *wb = buffer_create(0, NULL);
-    format_opentsdb_telnet_prefix(wb, long_prefix, "chart.name", "dimension.name", 42);
+    opentsdb_telnet_unittest_prefix(wb, long_prefix, "chart.name", "dimension.name", 42);
     buffer_strcat(wb, "1.5");
-    format_opentsdb_telnet_suffix(wb, buffer_tostring(host_and_labels));
+    opentsdb_telnet_unittest_suffix(wb, buffer_tostring(host_and_labels));
 
     const size_t expected_length = strlen("put ") + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=") +
                                    strlen(long_hostname) + 1;
