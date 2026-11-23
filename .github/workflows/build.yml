@@ -999,13 +999,17 @@ jobs:
               exit 1
             fi
           done
-          if [[ -f scripts.d.plugin ]]; then
-            ownership=$(stat -Lc '%U:%G %a' scripts.d.plugin)
-            if [[ "$ownership" != 'root:netdata 750' ]]; then
-              echo "Expected root:netdata 750 on scripts.d.plugin, found $ownership" >&2
-              exit 1
+          check_plugin_permissions() {
+            local plugin=$1 expected="root:netdata $2" actual
+            [[ -f "$plugin" ]] || return 0
+            actual=$(stat -Lc '%U:%G %a' -- "$plugin")
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Expected $expected on $plugin, found $actual" >&2
+              return 1
             fi
-          fi
+          }
+          check_plugin_permissions scripts.d.plugin 750
+          check_plugin_permissions dem.plugin 755
           CHECK
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
