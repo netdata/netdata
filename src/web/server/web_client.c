@@ -348,8 +348,8 @@ static int append_slash_to_url_and_redirect(struct web_client *w) {
     // from being read as a URL scheme (RFC 3986, section 4.2).
     //
     // When the URL as received already ends in a slash ("/v3%3F/"), its last
-    // component is empty: appending a slash cannot change the decoded path,
-    // so the redirected request would be redirected again, forever.
+    // component is empty: appending a slash does not change the decoded path,
+    // so a browser following the redirect is redirected again, in a loop.
 
     const char *b = buffer_tostring(w->url_as_received);
     const char *q = strchr(b, '?');
