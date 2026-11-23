@@ -2125,16 +2125,11 @@ static void topology_v1_enrich_process_actor_from_cache(
     NV_TOPOLOGY_V1_ACTOR *actor,
     uint32_t pid,
     uint64_t starttime,
-    uid_t uid,
+    const NV_TOPOLOGY_CONTAINER_FIELDS *fields,
     bool fill_actor_fields)
 {
     if(!pid)
         return;
-
-    // Snapshot again with the actor's own process name as the fallback: with no starttime the
-    // snapshot is not cached and the fallback decides container_name.
-    NV_TOPOLOGY_CONTAINER_FIELDS fields = { 0 };
-    topology_container_fields_snapshot(ctx, pid, starttime, uid, actor->process, &fields);
 
     bool have_cached = false;
     NV_APPS_LOOKUP_FIELDS cached;
@@ -2143,23 +2138,23 @@ static void topology_v1_enrich_process_actor_from_cache(
         have_cached = true;
 
     if(fill_actor_fields)
-        actor->container = fields;
+        actor->container = *fields;
 
-    topology_v1_add_actor_label(payload, actor_index, "cgroup_status", fields.cgroup_status, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "cgroup_path", fields.cgroup_path, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "cgroup_name", fields.cgroup_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "cgroup_status", fields->cgroup_status, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "cgroup_path", fields->cgroup_path, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "cgroup_name", fields->cgroup_name, "attribute");
     if(!(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER &&
-         strcmp(actor->container.container_name, fields.container_name) == 0))
-        topology_v1_add_actor_label(payload, actor_index, "container_name", fields.container_name, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "orchestrator", fields.orchestrator, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "k8s_pod_name", fields.k8s_pod_name, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "k8s_namespace", fields.k8s_namespace, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "k8s_workload", fields.k8s_workload, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "docker_container_name", fields.docker_container_name, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "docker_image", fields.docker_image, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "systemd_unit_name", fields.systemd_unit_name, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "systemd_unit_kind", fields.systemd_unit_kind, "attribute");
-    topology_v1_add_actor_label(payload, actor_index, "actor_kind", fields.actor_kind, "attribute");
+         strcmp(actor->container.container_name, fields->container_name) == 0))
+        topology_v1_add_actor_label(payload, actor_index, "container_name", fields->container_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "orchestrator", fields->orchestrator, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "k8s_pod_name", fields->k8s_pod_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "k8s_namespace", fields->k8s_namespace, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "k8s_workload", fields->k8s_workload, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "docker_container_name", fields->docker_container_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "docker_image", fields->docker_image, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "systemd_unit_name", fields->systemd_unit_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "systemd_unit_kind", fields->systemd_unit_kind, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "actor_kind", fields->actor_kind, "attribute");
 
     if(have_cached) {
         for(uint16_t i = 0; i < cached.cgroup_label_count; i++) {
@@ -2284,7 +2279,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
                     topology_strncpy(actor->local_address_space, sizeof(actor->local_address_space), pa->local_address_space);
                     topology_strncpy(actor->cmdline, sizeof(actor->cmdline), pa->cmdline);
                     topology_v1_enrich_process_actor_from_cache(
-                        ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, true);
+                        ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, &container_fields, true);
                     actor->pid = (uint64_t)pa->pid;
                     actor->ppid = (uint64_t)pa->ppid;
                     actor->uid = (uint64_t)pa->uid;
@@ -2321,7 +2316,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
         }
         else
             topology_v1_enrich_process_actor_from_cache(
-                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, false);
+                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, &container_fields, false);
 
         const char *pid_label_kind = group_by == NV_TOPOLOGY_GROUP_BY_PID ? "identity" : "attribute";
         if(group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
@@ -2338,7 +2333,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
 
         if(created && group_by != NV_TOPOLOGY_GROUP_BY_PID)
             topology_v1_enrich_process_actor_from_cache(
-                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, false);
+                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, &container_fields, false);
     }
     dfe_done(pa);
 

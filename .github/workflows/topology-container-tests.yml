@@ -51,6 +51,7 @@ env:
     local-sockets-namespaces-test
     network-viewer-apps-lookup-client-test
     network-viewer-topology-containers-test
+    network-viewer-topology-actors-test
 
 jobs:
   unit-tests:

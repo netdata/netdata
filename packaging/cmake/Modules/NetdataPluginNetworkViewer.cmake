@@ -138,6 +138,19 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                         src/collectors/common-cgroups/cgroup-topology-rules.c
                         src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
                 target_link_libraries(network-viewer-topology-containers-test libnetdata)
+
+                add_executable(network-viewer-topology-actors-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_actors.c
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
+                target_compile_options(network-viewer-topology-actors-test PRIVATE
+                                       "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+                target_include_directories(network-viewer-topology-actors-test PRIVATE
+                                           "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+                target_link_libraries(network-viewer-topology-actors-test libnetdata
+                                      "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
         endif()
 
         netdata_add_deb_copyright(plugin-network-viewer netdata-plugin-network-viewer)
