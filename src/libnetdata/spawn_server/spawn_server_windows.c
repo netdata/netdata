@@ -171,6 +171,42 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
 //    }
 //}
 
+// Each child runs in a job of its own. An MSYS exec() starts a new Windows process, so a plugin is
+// usually a chain of processes (sh -> bash -> ...), and only the job reaches all of them. The job is
+// killed when its last handle closes, which also takes the children down when the agent dies.
+static HANDLE spawn_server_job_create(void) {
+    HANDLE job = CreateJobObject(NULL, NULL);
+    if(!job)
+        return NULL;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { 0 };
+    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if(!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
+        DWORD err = GetLastError();
+        CloseHandle(job);
+        SetLastError(err);
+        return NULL;
+    }
+
+    return job;
+}
+
+// The child has exited. Whatever it left running in the background outlives it, as on the other
+// platforms: drop the kill-on-close limit before closing the job. A kill has terminated the job already.
+static void spawn_server_job_release(SPAWN_INSTANCE *si) {
+    if(!si->job_handle)
+        return;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { 0 };
+    if(!SetInformationJobObject(si->job_handle, JobObjectExtendedLimitInformation, &info, sizeof(info)))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "SPAWN PARENT: cannot release the job of request No %zu (err %lu), its remaining processes will be killed",
+               si->request_id, (unsigned long)GetLastError());
+
+    CloseHandle(si->job_handle);
+    si->job_handle = NULL;
+}
+
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
@@ -183,6 +219,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         return NULL;
 
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 }, pipe_stderr[2] = { -1, -1 };
+    HANDLE job = NULL;
 
     errno_clear();
 
@@ -227,6 +264,14 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Failed to set blocking I/O on pipes for request No %zu, command: %s",
                instance->request_id, command);
+        goto cleanup;
+    }
+
+    job = spawn_server_job_create();
+    if(!job) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot create a job object (err %lu) for request No %zu, command: %s",
+               (unsigned long)GetLastError(), instance->request_id, command);
         goto cleanup;
     }
 
@@ -281,7 +326,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // Spawn the process
     errno_clear();
-    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, env_block, NULL, &si, &pi)) {
+    // suspended, so that it cannot start anything before it is in the job
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, CREATE_SUSPENDED, env_block, NULL, &si, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
@@ -293,14 +339,25 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     FreeEnvironmentStrings(env_block);
 
+    // end of the critical section
+    spinlock_unlock(&spinlock);
+
     // When we create a process with the CreateProcess function, it returns two handles:
     // - one for the process (pi.hProcess) and
     // - one for the primary thread of the new process (pi.hThread).
     // Both of these handles need to be explicitly closed when they are no longer needed.
+    // The thread handle is needed once more, to resume the process after it joins its job.
+    if (!AssignProcessToJobObject(job, pi.hProcess) || ResumeThread(pi.hThread) == (DWORD)-1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: cannot start the process in its job (err %lu) for request No %zu, command: %s",
+               (unsigned long)GetLastError(), instance->request_id, command);
+        TerminateProcess(pi.hProcess, STATUS_CONTROL_C_EXIT);
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        goto cleanup;
+    }
     CloseHandle(pi.hThread);
-
-    // end of the critical section
-    spinlock_unlock(&spinlock);
 
     // Close unused pipe ends
     close(pipe_stdin[PIPE_READ]); pipe_stdin[PIPE_READ] = -1;
@@ -311,6 +368,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     instance->dwProcessId = pi.dwProcessId;
     instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
     instance->process_handle = pi.hProcess;
+    instance->job_handle = job;
 
     // Convert handles to POSIX file descriptors
     instance->write_fd = pipe_stdin[PIPE_WRITE];
@@ -330,6 +388,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     return instance;
 
     cleanup:
+    if (job) CloseHandle(job);
     if (pipe_stdin[PIPE_READ] >= 0) close(pipe_stdin[PIPE_READ]);
     if (pipe_stdin[PIPE_WRITE] >= 0) close(pipe_stdin[PIPE_WRITE]);
     if (pipe_stdout[PIPE_READ] >= 0) close(pipe_stdout[PIPE_READ]);
@@ -366,33 +425,6 @@ static char* GetErrorString(DWORD errorCode) {
     }
 
     return NULL;
-}
-
-static void TerminateChildProcesses(SPAWN_INSTANCE *si) {
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE)
-        return;
-
-    PROCESSENTRY32 pe;
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(hSnapshot, &pe)) {
-        do {
-            if (pe.th32ParentProcessID == si->dwProcessId) {
-                HANDLE hChildProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
-                if (hChildProcess) {
-                    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                           "SPAWN PARENT: killing subprocess %u of request No %zu, pid %d (winpid %u)",
-                           pe.th32ProcessID, si->request_id, (int)si->child_pid, si->dwProcessId);
-
-                    TerminateProcess(hChildProcess, STATUS_CONTROL_C_EXIT);
-                    CloseHandle(hChildProcess);
-                }
-            }
-        } while (Process32Next(hSnapshot, &pe));
-    }
-
-    CloseHandle(hSnapshot);
 }
 
 int map_status_code_to_signal(DWORD status_code) {
@@ -450,14 +482,19 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
                si->request_id, (int)si->child_pid, si->dwProcessId);
 
+    // terminate the child and everything it started
     errno_clear();
-    if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
+    if(TerminateJobObject(si->job_handle, STATUS_CONTROL_C_EXIT) == 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated",
-               si->request_id, (int)si->child_pid, si->dwProcessId);
+               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated with its job (err %lu)",
+               si->request_id, (int)si->child_pid, si->dwProcessId, (unsigned long)GetLastError());
 
-    errno_clear();
-    TerminateChildProcesses(si);
+        // at least the child itself, so that the wait below does not block forever
+        if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated (err %lu)",
+                   si->request_id, (int)si->child_pid, si->dwProcessId, (unsigned long)GetLastError());
+    }
 
     spawn_server_release_stderr_fd(server, si);
 
@@ -505,6 +542,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     DWORD exit_code = -1;
     GetExitCodeProcess(si->process_handle, &exit_code);
     CloseHandle(si->process_handle);
+    spawn_server_job_release(si);
 
     char *err = GetErrorString(exit_code);
 
