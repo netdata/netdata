@@ -191,20 +191,59 @@ static HANDLE spawn_server_job_create(void) {
     return job;
 }
 
-// The child has exited. Whatever it left running in the background outlives it, as on the other
-// platforms: drop the kill-on-close limit before closing the job. A kill has terminated the job already.
-static void spawn_server_job_release(SPAWN_INSTANCE *si) {
+// Closing the job kills whatever still runs in it, unless keep_descendants: a child that exited by itself
+// leaves its background processes running, as on the other platforms.
+static void spawn_server_job_close(SPAWN_INSTANCE *si, bool keep_descendants) {
     if(!si->job_handle)
         return;
 
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { 0 };
-    if(!SetInformationJobObject(si->job_handle, JobObjectExtendedLimitInformation, &info, sizeof(info)))
+    if(keep_descendants &&
+       !SetInformationJobObject(si->job_handle, JobObjectExtendedLimitInformation, &info, sizeof(info)))
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "SPAWN PARENT: cannot release the job of request No %zu (err %lu), its remaining processes will be killed",
                si->request_id, (unsigned long)GetLastError());
 
     CloseHandle(si->job_handle);
     si->job_handle = NULL;
+}
+
+#ifndef PROC_THREAD_ATTRIBUTE_JOB_LIST
+#define PROC_THREAD_ATTRIBUTE_JOB_LIST 0x0002000D
+#endif
+
+// CreateProcess() puts the process in the job before it runs (Windows 10 / Server 2016 and later), so
+// there is no moment when it, or anything it starts, is outside the job.
+static LPPROC_THREAD_ATTRIBUTE_LIST spawn_server_job_attributes(HANDLE *job) {
+    SIZE_T size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &size);
+
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = mallocz(size);
+    if(!InitializeProcThreadAttributeList(attrs, 1, 0, &size)) {
+        DWORD err = GetLastError();
+        freez(attrs);
+        SetLastError(err);
+        return NULL;
+    }
+
+    if(!UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST, job, sizeof(*job), NULL, NULL)) {
+        DWORD err = GetLastError();
+        DeleteProcThreadAttributeList(attrs);
+        freez(attrs);
+        SetLastError(err);
+        return NULL;
+    }
+
+    return attrs;
+}
+
+static void spawn_server_job_attributes_free(LPPROC_THREAD_ATTRIBUTE_LIST *attrs) {
+    if(!*attrs)
+        return;
+
+    DeleteProcThreadAttributeList(*attrs);
+    freez(*attrs);
+    *attrs = NULL;
 }
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
@@ -220,6 +259,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 }, pipe_stderr[2] = { -1, -1 };
     HANDLE job = NULL;
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = NULL;
 
     errno_clear();
 
@@ -275,6 +315,14 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         goto cleanup;
     }
 
+    attrs = spawn_server_job_attributes(&job);
+    if(!attrs) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot set the job of the process (err %lu) for request No %zu, command: %s",
+               (unsigned long)GetLastError(), instance->request_id, command);
+        goto cleanup;
+    }
+
     // do not run multiple times this section
     // to prevent handles leaking
     spinlock_lock(&spinlock);
@@ -304,14 +352,15 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     }
 
     // Set up the STARTUPINFO structure
-    STARTUPINFO si;
+    STARTUPINFOEX si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = stdin_read_handle;
-    si.hStdOutput = stdout_write_handle;
-    si.hStdError = stderr_write_handle;
+    si.StartupInfo.cb = sizeof(si);
+    si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    si.StartupInfo.hStdInput = stdin_read_handle;
+    si.StartupInfo.hStdOutput = stdout_write_handle;
+    si.StartupInfo.hStdError = stderr_write_handle;
+    si.lpAttributeList = attrs;
 
     // Retrieve the current environment block
     char* env_block = GetEnvironmentStrings();
@@ -326,8 +375,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // Spawn the process
     errno_clear();
-    // suspended, so that it cannot start anything before it is in the job
-    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, CREATE_SUSPENDED, env_block, NULL, &si, &pi)) {
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT, env_block, NULL, &si.StartupInfo, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
@@ -339,25 +387,16 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     FreeEnvironmentStrings(env_block);
 
-    // end of the critical section
-    spinlock_unlock(&spinlock);
-
     // When we create a process with the CreateProcess function, it returns two handles:
     // - one for the process (pi.hProcess) and
     // - one for the primary thread of the new process (pi.hThread).
     // Both of these handles need to be explicitly closed when they are no longer needed.
-    // The thread handle is needed once more, to resume the process after it joins its job.
-    if (!AssignProcessToJobObject(job, pi.hProcess) || ResumeThread(pi.hThread) == (DWORD)-1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: cannot start the process in its job (err %lu) for request No %zu, command: %s",
-               (unsigned long)GetLastError(), instance->request_id, command);
-        TerminateProcess(pi.hProcess, STATUS_CONTROL_C_EXIT);
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        CloseHandle(pi.hThread);
-        CloseHandle(pi.hProcess);
-        goto cleanup;
-    }
     CloseHandle(pi.hThread);
+
+    // end of the critical section
+    spinlock_unlock(&spinlock);
+
+    spawn_server_job_attributes_free(&attrs);
 
     // Close unused pipe ends
     close(pipe_stdin[PIPE_READ]); pipe_stdin[PIPE_READ] = -1;
@@ -388,6 +427,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     return instance;
 
     cleanup:
+    spawn_server_job_attributes_free(&attrs);
     if (job) CloseHandle(job);
     if (pipe_stdin[PIPE_READ] >= 0) close(pipe_stdin[PIPE_READ]);
     if (pipe_stdin[PIPE_WRITE] >= 0) close(pipe_stdin[PIPE_WRITE]);
@@ -467,6 +507,8 @@ int map_status_code_to_signal(DWORD status_code) {
     }
 }
 
+static int spawn_server_exec_reap(SPAWN_SERVER *server, SPAWN_INSTANCE *si, bool killed);
+
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
     // this gives some warnings at the spawn-tester, but it is generally better
     // to have them, to avoid abnormal shutdown of the plugins
@@ -482,23 +524,16 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
                si->request_id, (int)si->child_pid, si->dwProcessId);
 
-    // terminate the child and everything it started
+    // terminate the child and everything it started; if this fails, closing the job in reap does it
     errno_clear();
-    if(TerminateJobObject(si->job_handle, STATUS_CONTROL_C_EXIT) == 0) {
+    if(TerminateJobObject(si->job_handle, STATUS_CONTROL_C_EXIT) == 0)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated with its job (err %lu)",
+               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated (err %lu)",
                si->request_id, (int)si->child_pid, si->dwProcessId, (unsigned long)GetLastError());
-
-        // at least the child itself, so that the wait below does not block forever
-        if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated (err %lu)",
-                   si->request_id, (int)si->child_pid, si->dwProcessId, (unsigned long)GetLastError());
-    }
 
     spawn_server_release_stderr_fd(server, si);
 
-    return spawn_server_exec_wait(server, si);
+    return spawn_server_exec_reap(server, si, true);
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
@@ -532,17 +567,24 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
-int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
+// After a kill, the job is closed before the wait: closing it kills whatever the kill missed, so the wait
+// cannot block on it and nothing in the job survives.
+static int spawn_server_exec_reap(SPAWN_SERVER *server, SPAWN_INSTANCE *si, bool killed) {
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
+    if(killed)
+        spawn_server_job_close(si, false);
+
     // wait for the process to end
-    WaitForSingleObject(si->process_handle, INFINITE);
+    DWORD wait_rc = WaitForSingleObject(si->process_handle, INFINITE);
 
     DWORD exit_code = -1;
     GetExitCodeProcess(si->process_handle, &exit_code);
     CloseHandle(si->process_handle);
-    spawn_server_job_release(si);
+
+    // keep its background processes only when we know the child exited by itself
+    spawn_server_job_close(si, wait_rc == WAIT_OBJECT_0);
 
     char *err = GetErrorString(exit_code);
 
@@ -558,6 +600,10 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     freez(si);
     return map_status_code_to_signal(exit_code);
+}
+
+int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
+    return spawn_server_exec_reap(server, si, false);
 }
 
 #endif
