@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # network-viewer: the socket and container topology collector, and its
-# two test binaries.
+# three test binaries.
 #
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
@@ -10,7 +10,7 @@
 # next to the per-OS list(APPEND) block that assembles them. They sit above
 # the guard, so they are defined unconditionally.
 #
-# The two test targets sit inside the plugin's own guard, so they stay with
+# The three test targets sit inside the plugin's own guard, so they stay with
 # it rather than moving to NetdataTests.cmake.
 #
 # The i386 fat-LTO workaround below reaches out to judy, libnetdata, netipc
