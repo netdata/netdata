@@ -1815,5 +1815,22 @@
       "des/single-plan-control",
       "des/skipped-successor"
     ]
+  },
+  {
+    "name": "CASE-046/details-as-after-fold",
+    "proves": "with options=details every grouped metric's \"as\" names the result dimension it is aggregated into: after a cardinality fold kept metrics keep their own dimension name and folded metrics name the \"remaining N dimensions\" bucket, with a no-limit control",
+    "components": [
+      "no-limit",
+      "limit-4"
+    ]
+  },
+  {
+    "name": "CASE-047/v1-jsonwrap-arrays-after-fold",
+    "proves": "the v1 jsonwrap arrays chart_ids, chart_labels[key] and latest_values stay parallel to dimension_ids: after a cardinality fold kept columns carry their own metric's chart, label and last collected value and the \"remaining N dimensions\" column carries null, with a no-limit control",
+    "components": [
+      "no-limit",
+      "limit-3",
+      "limit-1"
+    ]
   }
 ]
