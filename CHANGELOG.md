@@ -26,6 +26,10 @@
 - Build(deps): bump golang.org/x/net from 0.62.0 to 0.63.0 in /src/go ([#24895](https://github.com/netdata/netdata/issues/24895))
 - Build(deps): bump github.com/catonetworks/cato-go-sdk from 1.1.4 to 1.2.0 in /src/go ([#24896](https://github.com/netdata/netdata/issues/24896))
 - Feat(packaging): share IP intelligence data between NetFlow and DEM ([#24887](https://github.com/netdata/netdata/issues/24887))
+- Libnetdata: stop forcing inlining of the buffer JSON helpers ([#24882](https://github.com/netdata/netdata/issues/24882))
+- Build: add -rdynamic only when a stack trace backend can use it ([#24823](https://github.com/netdata/netdata/issues/24823))
+- Build: run git describe only when the source directory is a checkout ([#24764](https://github.com/netdata/netdata/issues/24764))
+- Fix(web): reject a bare LF or CR in the HTTP request line ([#24783](https://github.com/netdata/netdata/issues/24783))
 
 ## [2.13.0] - 2026-11-19
 
