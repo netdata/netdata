@@ -37,7 +37,7 @@ int init_aws_kinesis_instance(struct instance *instance)
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_json_plaintext;
-    instance->start_chart_formatting = NULL;
+    instance->start_chart_formatting = format_chart_json_plaintext;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_json_plaintext;
