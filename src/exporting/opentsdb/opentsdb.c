@@ -214,7 +214,8 @@ static void format_opentsdb_telnet_host(BUFFER *wb, const char *hostname) {
 }
 
 static void format_opentsdb_telnet_suffix(BUFFER *wb, BUFFER *host_and_labels) {
-    buffer_memcat(wb, buffer_tostring(host_and_labels), buffer_strlen(host_and_labels));
+    if(host_and_labels)
+        buffer_memcat(wb, buffer_tostring(host_and_labels), buffer_strlen(host_and_labels));
     buffer_putc(wb, '\n');
 }
 
@@ -856,6 +857,9 @@ static int opentsdb_callbacks_unittest(bool http) {
     RRDSET *st1 = opentsdb_unittest_chart("a.b", "a name");
     instance.start_chart_formatting(&instance, st1);
     opentsdb_unittest_collected(&instance, st1, "d1", "n 1", false, INT64_MIN, 0.0, 1700000000);
+    // the chart part is built once per chart: a rename during the chart's pass reaches the next pass only
+    string_freez(st1->name);
+    st1->name = string_strdupz("renamed");
     opentsdb_unittest_collected(&instance, st1, "d2", "n2", true, 0, 2.5, 1700000001);
     opentsdb_unittest_collected(&instance, st1, "d3", NULL, false, 42, 0.0, -1);
     opentsdb_unittest_collected(&instance, st1, "d4", "n4", true, 0, NAN, 1700000003);

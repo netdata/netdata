@@ -519,6 +519,9 @@ static int graphite_callbacks_unittest(void) {
     RRDSET *st1 = graphite_unittest_chart("a.b", "a name");
     instance.start_chart_formatting(&instance, st1);
     graphite_unittest_dimension(&instance, st1, "d1", "n 1", false, INT64_MIN, 0.0, 1700000000);
+    // the chart part is built once per chart: a rename during the chart's pass reaches the next pass only
+    string_freez(st1->name);
+    st1->name = string_strdupz("renamed");
     graphite_unittest_dimension(&instance, st1, "d2", "n2", true, 0, 2.5, 1700000001);
     graphite_unittest_dimension(&instance, st1, "d3", NULL, false, 42, 0.0, -1);
 
