@@ -1,6 +1,8 @@
 //! Core of the `ng-ingest` receiver: flatten one OTLP export request and append it
 //! as one WAL frame in the flattened-frame format (see `ng-flatten`).
 
+pub mod host;
+
 use anyhow::Context as _;
 use file_registry::{ByteSize, MonotonicClock, TimestampNs};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;

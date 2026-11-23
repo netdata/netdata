@@ -10,9 +10,6 @@
 //!   <cmds> <view_access> <edit_access>`, printed lowercase via `Display` by
 //!   the netdata-plugin-protocol encoder and parsed by pluginsd_config
 //!   (src/plugins.d/pluginsd_dyncfg.c) through `dyncfg_source_type2id`.
-//! - `configDeclaration` JSON: the `sourceType` string, read by
-//!   types::config and emitted by netdata-plugin-schema, which also accepts
-//!   it as the `x-config-source-type` schema attribute.
 //!
 //! Parsing is strict here (`from_name` rejects unknown words), while the
 //! agent's C parser defaults unknown or empty words to `internal` — a
@@ -48,9 +45,7 @@ pub enum DynCfgSourceType {
 
 impl DynCfgSourceType {
     /// The canonical lowercase vocabulary word for this value: what
-    /// `Display` prints into the `CONFIG` line and what
-    /// netdata-plugin-schema writes into the `sourceType` field of a
-    /// `configDeclaration`.
+    /// `Display` prints into the `CONFIG` line.
     pub fn name(&self) -> &'static str {
         match self {
             Self::Internal => "internal",
@@ -62,9 +57,7 @@ impl DynCfgSourceType {
     }
 
     /// Strict inverse of `name()`: exact lowercase match, no trimming, None
-    /// for unknown words. Used by the `configDeclaration` parser in
-    /// types::config and by netdata-plugin-schema's `x-config-*` attribute
-    /// reader.
+    /// for unknown words.
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "internal" => Some(Self::Internal),

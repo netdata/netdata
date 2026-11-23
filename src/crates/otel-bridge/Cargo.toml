@@ -11,7 +11,6 @@ workspace = true
 # Local crates
 netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
-netdata-plugin-schema = { workspace = true }
 netdata-plugin-types = { workspace = true }
 
 # Async runtime and tokio utilities
@@ -23,7 +22,6 @@ bytesize = { workspace = true }
 futures = { workspace = true }
 humantime-serde = { workspace = true }
 tracing = { workspace = true }
-schemars = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

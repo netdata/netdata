@@ -14,9 +14,6 @@
 //!   emit via `functions_evloop_dyncfg_status`
 //!   (src/libnetdata/functions_evloop/functions_evloop.c); the Rust protocol
 //!   crate has no message variant for that action.
-//! - `configDeclaration` JSON: the `status` string, read by types::config and
-//!   emitted by netdata-plugin-schema, which also accepts it as the
-//!   `x-config-status` schema attribute.
 //!
 //! Parsing is strict here (`from_name` rejects unknown words), while the
 //! agent's C parser defaults missing, empty or unknown words to `none` — a
@@ -65,9 +62,7 @@ pub enum DynCfgStatus {
 
 impl DynCfgStatus {
     /// The canonical lowercase vocabulary word for this value: what
-    /// `Display` prints into the `CONFIG` line and what
-    /// netdata-plugin-schema writes into the `status` field of a
-    /// `configDeclaration`.
+    /// `Display` prints into the `CONFIG` line.
     pub fn name(&self) -> &'static str {
         match self {
             Self::None => "none",
@@ -81,9 +76,7 @@ impl DynCfgStatus {
     }
 
     /// Strict inverse of `name()`: exact lowercase match, no trimming, None
-    /// for unknown words. Used by the `configDeclaration` parser in
-    /// types::config and by netdata-plugin-schema's `x-config-*` attribute
-    /// reader.
+    /// for unknown words.
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "none" => Some(Self::None),
