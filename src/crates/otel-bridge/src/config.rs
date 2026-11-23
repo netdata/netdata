@@ -16,8 +16,11 @@
 //! tuning; positions are derived — [`PluginConfig::lifecycle_for`] yields each
 //! signal's `{base_dir}/{signal}/...` subtree as the [`LifecycleConfig`] the
 //! file-lifecycle substrate consumes, while remote storage and auth are
-//! process-global. Every YAML section rejects unknown keys, so a typo in a
-//! config file refuses startup instead of silently keeping defaults. A
+//! process-global. A key these types do not know is refused in the stock
+//! file and reported, then ignored, in the user file: the rule belongs to the
+//! parse call (`parse_yaml`, otel-plugin's config module), which is why the
+//! two entry types the user file shares ([`RotationEntry`],
+//! [`RetentionEntry`]) carry no `deny_unknown_fields`. A
 //! malformed rotation/retention policy is rejected at deserialize, so a
 //! resolved value is always complete and [`RotationPolicy::resolve`] /
 //! [`RetentionPolicy::resolve`] cannot fail.
@@ -614,9 +617,9 @@ pub struct WalConfig {
 
 /// A rotation policy entry. All fields are optional so that per-tenant
 /// entries can override only specific values from the `"default"` entry.
-/// Tenant names are open map keys; the fields inside an entry are strict.
+/// Tenant names are open map keys; an unknown field inside an entry is
+/// reported by the parse call (see the module docs).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct RotationEntry {
     /// Max bytes per data file before it rotates.
     #[serde(default, with = "opt_bytesize")]
@@ -877,9 +880,9 @@ impl From<RotationPolicy> for HashMap<String, RotationEntry> {
 
 /// A retention policy entry. All fields are optional so that per-tenant
 /// entries can override only specific values from the `"default"` entry.
-/// Tenant names are open map keys; the fields inside an entry are strict.
+/// Tenant names are open map keys; an unknown field inside an entry is
+/// reported by the parse call (see the module docs).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct RetentionEntry {
     /// Max SFST files kept per tenant.
     #[serde(default)]

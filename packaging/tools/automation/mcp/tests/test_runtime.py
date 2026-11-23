@@ -473,8 +473,8 @@ def test_generate_runtime_otel_extra_yaml_rejects_invalid_yaml(tmp_path, monkeyp
 
 def test_generate_runtime_otel_extra_yaml_passes_unknown_keys(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # Unknown keys pass through untouched — feeding the plugin's strict-config
-    # refuse-to-start path is a supported test.
+    # Unknown keys pass through untouched — feeding the plugin's warn-and-ignore
+    # path for them is a supported test.
     cfg = _cfg(extra_yaml="some_future_option: true\n")
     rd, _conf, _otlp, _http = runtime.generate_runtime("agent-unk", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())

@@ -7,12 +7,14 @@
 //! tuning. Values parse like the YAML layer's overrides: integers and byte
 //! sizes (`"2GiB"`) via `FromStr`, durations (`"2 hours"`) via `humantime`.
 //!
-//! Resolution is snapshot-based and strict: the environment is scanned once,
-//! [`ConfigOverride::from_map`] resolves the snapshot, and a
-//! `NETDATA_OTEL_CFG_*` name no consumer recognizes aborts startup — the same
-//! deny-unknown contract as the YAML parser, so a typo cannot silently leave
-//! a setting at its stock default. Only `load_config` (`mod.rs`) consumes
-//! this module; the workers receive the merged effective config over IPC.
+//! Resolution is snapshot-based: the environment is scanned once and
+//! [`ConfigOverride::from_map`] resolves the snapshot. A `NETDATA_OTEL_CFG_*`
+//! name no consumer recognizes is ignored with a warning — the same rule as
+//! an unknown key of the user file (`parse_yaml`, `mod.rs`): a typo must not
+//! stop ingestion, and the warning is the sign that a setting stayed at its
+//! default. A value that does not parse is still an error. Only `load_config`
+//! (`mod.rs`) consumes this module; the workers receive the merged effective
+//! config over IPC.
 //!
 //! `otel_bridge::config` here is the `otel-bridge` crate, whose
 //! `RotationEntry`/`RetentionEntry` shapes the per-signal values fill.
@@ -36,9 +38,9 @@ use super::signal::{
 /// A snapshot of the `NETDATA_OTEL_CFG_*` environment (name → raw value).
 /// Injecting the map instead of reading `std::env` inline keeps config
 /// resolution unit-testable. Values stay `OsString`: UTF-8 is checked only
-/// when a value is read ([`get_env`]). Every name in the snapshot must be
-/// recognized ([`EnvReader`]) — an unknown name is fatal before its value
-/// matters.
+/// when a value is read ([`get_env`]). A name in the snapshot that no
+/// consumer recognizes ([`EnvReader`]) is reported and its value is never
+/// read.
 pub(super) type EnvMap = HashMap<String, OsString>;
 
 /// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the one
@@ -57,7 +59,7 @@ pub(super) fn otel_env_from_process() -> EnvMap {
 /// namespace: Kubernetes injects service-link variables such as
 /// `NETDATA_OTEL_SERVICE_HOST` and `NETDATA_OTEL_PORT_4317_TCP` into every pod
 /// that can see a Service named `netdata-otel`, and those must never reach the
-/// strict unknown-name check below.
+/// unknown-name check below (they would be reported at every start).
 pub(super) fn otel_env_from_iter(vars: impl IntoIterator<Item = (OsString, OsString)>) -> EnvMap {
     let mut env = EnvMap::new();
     for (key, value) in vars {
@@ -71,7 +73,7 @@ pub(super) fn otel_env_from_iter(vars: impl IntoIterator<Item = (OsString, OsStr
 
 /// An [`EnvMap`] wrapper that records every name looked up, so that after
 /// resolution the leftovers — `NETDATA_OTEL_CFG_*` names no consumer
-/// recognizes, i.e. typos — can be rejected. Consumers query their full fixed
+/// recognizes, i.e. typos — can be reported. Consumers query their full fixed
 /// vocabulary unconditionally, so "read" equals "recognized" by construction:
 /// there is no second, hand-maintained list of accepted names to drift.
 struct EnvReader<'a> {
@@ -93,8 +95,9 @@ impl<'a> EnvReader<'a> {
         self.map.get(name)
     }
 
-    /// Error on any variable in the snapshot that no consumer looked up.
-    fn ensure_fully_consumed(&self) -> Result<()> {
+    /// The variables in the snapshot that no consumer looked up, sorted so
+    /// the report does not depend on the map's order.
+    fn unrecognized(&self) -> Vec<&'a str> {
         let read = self.read.borrow();
         let mut unknown: Vec<&str> = self
             .map
@@ -102,16 +105,8 @@ impl<'a> EnvReader<'a> {
             .filter(|name| !read.contains(*name))
             .map(String::as_str)
             .collect();
-        if unknown.is_empty() {
-            return Ok(());
-        }
         unknown.sort_unstable();
-        anyhow::bail!(
-            "unrecognized environment variable{}: {} — NETDATA_OTEL_CFG_* names are \
-             checked strictly so a typo cannot be silently ignored",
-            if unknown.len() == 1 { "" } else { "s" },
-            unknown.join(", ")
-        );
+        unknown
     }
 }
 
@@ -198,9 +193,10 @@ fn get_receiver_env<'a>(env: &EnvReader<'a>, key: &str) -> Result<Option<String>
 impl ConfigOverride {
     /// Build the config overrides from an [`EnvMap`] snapshot of the
     /// `NETDATA_OTEL_CFG_*` variables. Pure: reads only the provided map,
-    /// never the process env (tests build maps directly). Strictness — a name
-    /// no consumer recognizes is fatal — is [`EnvReader`]'s job, described
-    /// there. The `has_any` guards before returning collapse a section no
+    /// never the process env (tests build maps directly). A name no consumer
+    /// recognizes is ignored with a warning ([`EnvReader`] finds them); the
+    /// wording matches the user file's unknown keys. The `has_any` guards
+    /// before returning collapse a section no
     /// variable touched back to `None`, so the env layer counts as present
     /// only where at least one variable was set.
     pub(super) fn from_map(env: &EnvMap) -> Result<Self> {
@@ -212,7 +208,9 @@ impl ConfigOverride {
         let auth = AuthOverride::from_map(env)?;
         let logs = SignalOverride::from_map(env, "LOGS")?;
         let traces = SignalOverride::from_map(env, "TRACES")?;
-        env.ensure_fully_consumed()?;
+        for name in env.unrecognized() {
+            tracing::warn!("configuration: environment: {name} is not a known option, ignoring it");
+        }
 
         Ok(Self {
             receivers,

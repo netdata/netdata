@@ -145,6 +145,7 @@ roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocativ
 rustc-hash = "2.1"
 schemars = "1.0"
 serde = { version = "1.0" }
+serde_ignored = "0.1"
 serde_json = "1.0"
 serde_yaml = "0.9.34"
 tempfile = { version = "3" }

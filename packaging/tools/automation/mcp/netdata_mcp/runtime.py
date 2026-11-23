@@ -179,8 +179,8 @@ class OtelConfig:
 
     ``settings`` holds the caller's keys (see ``otel_settings``); unset keys keep
     the stock values. ``extra_yaml`` is a raw YAML mapping deep-merged on top, for
-    configs the typed model refuses on purpose (unknown keys for strict-config
-    refusal tests). After both, the harness pins what per-agent isolation needs:
+    configs the typed model refuses on purpose (unknown keys, which the plugin
+    ignores with a warning, and malformed values, which stop it). After both, the harness pins what per-agent isolation needs:
     ``base_dir`` under the run dir and each listener's ``enabled`` and endpoint. An
     unset endpoint auto-assigns a free loopback port so parallel agents never
     collide on 4317/4318; both listeners are on (HTTP too, unlike stock) unless
@@ -246,7 +246,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str | None, otlp_http_en
 
     # The pins below must survive the passthrough: they are harness invariants
     # (isolation, the reported OTLP endpoints, no undeclared 4318 bind), not
-    # plugin knobs. Everything else in extra_yaml, keys the plugin will refuse
+    # plugin knobs. Everything else in extra_yaml, keys the plugin does not know
     # included, passes through untouched. A disabled listener's section keeps
     # only its enabled pin, so it never shows an address that is not bound.
     if cfg.extra_yaml:

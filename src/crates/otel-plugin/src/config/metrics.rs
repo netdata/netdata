@@ -18,10 +18,8 @@ use serde::Deserialize;
 
 /// The user-layer `metrics:` section: every field optional, with `None`
 /// meaning "keep the value from the previous layer". Field names and units
-/// mirror `otel_bridge::config::MetricsConfig`; unknown keys are rejected, not
-/// ignored.
+/// mirror `otel_bridge::config::MetricsConfig`.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct MetricsOverride {
     /// Directory of per-metric chart config files the ingestor loads; a load
     /// failure is logged and the stock configs are kept (non-fatal).

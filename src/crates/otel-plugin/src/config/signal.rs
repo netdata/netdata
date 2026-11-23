@@ -9,8 +9,8 @@
 //! [`SignalOverride`] shape applies to every signal; [`apply_signal`] merges it
 //! onto a [`SignalConfig`]. Storage and auth are global, merged by
 //! [`apply_remote_storage`] / [`apply_auth`]. Every field is an `Option`, so a
-//! layer tunes only what it names, and `deny_unknown_fields` makes an
-//! unrecognized key a parse error rather than a silent default.
+//! layer tunes only what it names. A key these types do not know is reported
+//! by the parse call, not refused here (`parse_yaml` in `mod.rs`).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -27,7 +27,6 @@ use serde::Deserialize;
 /// `apply_overrides`: only `Some` fields replace, so the policy's `default`
 /// stays complete.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct SignalOverride {
     #[serde(default)]
     pub(super) crc_enabled: Option<bool>,
@@ -42,18 +41,18 @@ pub(super) struct SignalOverride {
     #[serde(default)]
     pub(super) ingest: Option<IngestOverride>,
     /// Where the former plugin's journal files live, for the read-only
-    /// legacy-logs viewer. Declared so strict parsing accepts it; valid under
-    /// `logs:` only — `traces.journal_dir` is rejected at resolve by
-    /// `ConfigOverride::validate` (mod.rs). Never merged: the value is consumed
-    /// by `resolve_legacy_journal_dir` re-reading the raw file, and no env var
-    /// exists for it (`env.rs` leaves it `None`).
+    /// legacy-logs viewer. Declared so the parse call does not report it as
+    /// an unknown key; valid under `logs:` only — `traces.journal_dir` is
+    /// rejected at resolve by `ConfigOverride::validate` (mod.rs). Never
+    /// merged: the value is consumed by `resolve_legacy_journal_dir`
+    /// re-reading the raw file, and no env var exists for it (`env.rs`
+    /// leaves it `None`).
     #[serde(default)]
     pub(super) journal_dir: Option<PathBuf>,
 }
 
 /// Partial [`otel_bridge::config::CatalogTuning`] (its dir is derived, not configured).
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct CatalogOverride {
     #[serde(default)]
     pub(super) rotation_count: Option<usize>,
@@ -64,7 +63,6 @@ pub(super) struct CatalogOverride {
 /// Partial [`otel_bridge::config::IngestConfig`]: per-record ingestion time-bounds,
 /// global for the signal (not per-tenant).
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct IngestOverride {
     #[serde(default, deserialize_with = "opt_humantime")]
     pub(super) max_age: Option<Duration>,
@@ -89,7 +87,6 @@ fn opt_humantime<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Durati
 /// one download cache for the whole process. `mod.rs` validation requires a
 /// non-empty `uri` when `enabled` is true.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct RemoteStorageOverride {
     #[serde(default)]
     pub(super) enabled: Option<bool>,
@@ -103,7 +100,6 @@ pub(super) struct RemoteStorageOverride {
 
 /// Partial form of the process-global [`AuthConfig`] (tenant authentication).
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct AuthOverride {
     #[serde(default)]
     pub(super) enabled: Option<bool>,
