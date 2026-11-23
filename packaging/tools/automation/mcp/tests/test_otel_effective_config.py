@@ -56,7 +56,7 @@ def test_scope_to_run_keeps_only_the_agents_supervisor():
         _env(7, "/r/a"),
         _env(8, "/r/b"),
         'T host otel-plugin[8]: effective config: {"base_dir": "/r/b/lib/otel"}',
-        "T host otel-plugin[7]: failed to load configuration: parsing /r/a/etc/otel.yaml: unknown field `tracez`",
+        "T host otel-plugin[7]: failed to load configuration: parsing /r/a/etc/otel.yaml: logs.crc_enabled: invalid type: string \"x\", expected a boolean",
         "garbage without a pid",
     ]
     assert scope_to_run(lines, "/r/a/etc") == [lines[0], lines[3]]
@@ -67,7 +67,7 @@ async def test_journal_ignores_other_agents_and_keeps_the_refusal(monkeypatch):
     # Another agent logs its effective config after this run started; this
     # run's supervisor refused its config and exited.
     seen = {}
-    refusal = "T host otel-plugin[7]: failed to load configuration: parsing /r/a/etc/otel.yaml: unknown field `tracez`"
+    refusal = "T host otel-plugin[7]: failed to load configuration: parsing /r/a/etc/otel.yaml: logs.crc_enabled: invalid type: string \"x\", expected a boolean"
 
     async def fake_read(**kw):
         seen.update(kw)

@@ -57,10 +57,10 @@ def usable() -> bool:
 READ_TIMEOUT = 30.0
 
 # Log sources, in process-tree order: the netdata daemon, the otel-plugin
-# supervisor, then its three workers. The worker name matches both the
+# supervisor, then its two workers. The worker name matches both the
 # SYSLOG_IDENTIFIER suffix and the `worker <name>` spawn arg (otel-plugin
 # supervisor.rs / main.rs).
-WORKER_COMPONENTS = ("ledger", "ingestor", "legacy-logs")
+WORKER_COMPONENTS = ("ledger", "ingestor")
 SOURCES = ("daemon", "supervisor", *WORKER_COMPONENTS)
 
 

@@ -49,7 +49,6 @@ def test_settings_refuse_unknown_and_misplaced_keys():
         {"some_future_option": True},
         {"base_dir": "/x"},
         {"endpoint": {"path": "127.0.0.1:4317"}},
-        {"traces": {"journal_dir": "/x"}},
         {"logs": {"rotation": {"default": {"max_file_szie": "1MB"}}}},
     ):
         with pytest.raises(ValidationError):
@@ -62,7 +61,6 @@ def test_settings_document_keeps_only_set_keys():
         "metrics": {"interval_secs": 5},
         "remote_storage": {"enabled": True, "read_cache_max_size": "64MB", "startup_op_timeout": "5s"},
         "logs": {
-            "journal_dir": "/j",
             "rotation": {"default": {"max_entries": 10}, "t1": {"max_file_size": 4096}},
             "retention": {"default": {"max_age": "1h", "horizon": "2 days"}},
             "catalog": {"rotation_count": 2, "rotation_period": "10m"},

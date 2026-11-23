@@ -21,9 +21,6 @@ bytes = { workspace = true }
 itoa = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true, features = ["io-std", "io-util"] }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tracing = { workspace = true }
 
 [build-dependencies]
 phf_codegen = { workspace = true }

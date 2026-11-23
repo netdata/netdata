@@ -1,25 +1,10 @@
-//! Host-identity lookups for the journal stack: machine ID, hostname, and
-//! boot ID. Each lookup is a set of `#[cfg]`-selected per-platform variants —
-//! Linux, macOS, and a stub returning `ErrorKind::Unsupported` everywhere
-//! else — behind one `io::Result`-returning API, so the platform split stays
-//! inside this module. All lookups do blocking I/O, including subprocess
-//! spawns (`system_profiler`, `sysctl`), and nothing is cached: call once at
-//! startup and pass the value around rather than re-querying per entry.
-//!
-//! Consumers (grep-verified): ng-ingest calls
-//! `journal_common::load_machine_id`/`load_boot_id` directly for its
-//! file-registry identity (`ng-ingest/src/main.rs` `main` and
-//! `ng-ingest/src/bin/traces.rs` `main`). [`crate::load_hostname`] is
-//! re-exported at the root but no crate calls it.
-//!
-//! `src/crates/jf/journal_file/src/file.rs` (`read_host_file`,
-//! `load_machine_id`, `load_boot_id`) carries a near-identical copy of the
-//! same lookups (same `/host` fallback and macOS parsing, but `[u8; 16]` +
-//! `JournalError` instead of `Uuid` + `io::Error`, and the Linux parsers
-//! decode hex by hand instead of `Uuid::try_parse`: there the machine-ID
-//! parser accepts only the 32-hex undashed form (`hex::decode` rejects
-//! hyphens), while the boot-ID parser strips hyphens first); the two must
-//! be edited in step by hand.
+//! Host-identity lookups for the receivers' file-registry identity: the
+//! machine ID and the boot ID. Each lookup is a set of `#[cfg]`-selected
+//! per-platform variants — Linux, macOS, and a stub returning
+//! `ErrorKind::Unsupported` everywhere else — behind one
+//! `io::Result`-returning API. The lookups do blocking I/O, including
+//! subprocess spawns on macOS (`system_profiler`, `sysctl`), and nothing is
+//! cached: both binaries call them once at startup.
 
 use std::io;
 
@@ -103,33 +88,6 @@ pub fn load_machine_id() -> io::Result<uuid::Uuid> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
         "Machine ID loading not supported on this platform",
-    ))
-}
-
-/// The system hostname.
-///
-/// Linux and macOS: `nix::unistd::gethostname()`; a failed lookup wraps the
-/// `nix` errno as `ErrorKind::Other`, and a hostname that is not valid
-/// UTF-8 is rejected as `ErrorKind::InvalidData` (the raw bytes are dropped).
-/// This is the only user of the crate's `nix` `hostname` feature (enabled on
-/// the `nix` dependency in `Cargo.toml`); currently no crate outside this
-/// module calls it.
-///
-/// Other platforms: `ErrorKind::Unsupported`.
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-pub fn load_hostname() -> io::Result<String> {
-    let hostname =
-        nix::unistd::gethostname().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    hostname
-        .into_string()
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "hostname is not valid UTF-8"))
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-pub fn load_hostname() -> io::Result<String> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "Hostname loading not supported on this platform",
     ))
 }
 

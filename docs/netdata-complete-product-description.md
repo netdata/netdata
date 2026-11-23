@@ -573,7 +573,7 @@ Syslog ingestion, Kubernetes log collection, log-pattern alerting (via logs-to-m
 - **Retention and offload**
   - Retention by total size, age and file count; per-tenant overrides
   - Offload to S3-compatible object storage (AWS S3, MinIO and others) or a filesystem target; offloaded files are fetched back on demand when queried, through a local read cache
-- **Query** (Functions `otel-logs`, `legacy-otel-logs`)
+- **Query** (Function `otel-logs`)
   - Same logs explorer as Logs Monitoring: facets, histograms, filtering on any field, regex search, paging
   - Service selector based on OpenTelemetry service identity
   - Offline command-line query: `otel-plugin logs` (NDJSON output)
@@ -766,7 +766,7 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 - **Storage:** write-ahead log sealed into indexed files; field-level indexing of every field of every record; zstd compression; about 1/4 of raw log size; records queryable immediately, before files are sealed
 - **Streams and tenancy:** streams partitioned by `service.namespace` / `service.name`; tenant selection with the `X-Scope-OrgID` header; per-tenant retention
 - **Retention and offload:** by total size, age and file count; offload to S3-compatible object storage or a filesystem target, with on-demand read-back through a local cache
-- **Query:** logs explorer (Functions `otel-logs`, `legacy-otel-logs`) with facets and value counts, histograms, filtering on any field, regex search, service selector; offline command-line query (`otel-plugin logs`)
+- **Query:** logs explorer (Function `otel-logs`) with facets and value counts, histograms, filtering on any field, regex search, service selector; offline command-line query (`otel-plugin logs`)
 - **Log-derived metrics:** metrics produced by the collection stage (e.g., counts per service, severity or status) become Netdata charts with machine learning anomaly detection and alerting
 - **Correlation:** logs share the timeline with metrics and traces; log records carry `trace_id` / `span_id` from OpenTelemetry instrumentation
 
@@ -1104,7 +1104,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 - **Not billed:** metrics volume, System Logs Monitoring (querying logs in place), users, data retention, containers, and API, uptime and other checks run from your own nodes.
 - **Netdata AI:** Business includes AI conversations for every user, subject to fair use. AI Investigations are bought pay as you go or as an annual subscription bundle (see Business products).
 - **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
-- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow), Traces (the Traces explorer over OpenTelemetry traces), Logs Management logs (the `otel-logs` and `legacy-otel-logs` Functions), SNMP traps, topology maps (SNMP network, application dependencies, vSphere and Cato Networks), Real User Monitoring, synthetic browser tests (Playwright journeys and Lighthouse audits) and DEM history status requires a paid plan or an active trial; collection and storage on the Agent are not restricted by plan. SNMP trap local storage and viewing require journal output. SNMP device metrics, System Logs Monitoring (including BMC event logs), the streaming topology and API, uptime and other checks are available on every plan. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
+- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow), Traces (the Traces explorer over OpenTelemetry traces), Logs Management logs (the `otel-logs` Function), SNMP traps, topology maps (SNMP network, application dependencies, vSphere and Cato Networks), Real User Monitoring, synthetic browser tests (Playwright journeys and Lighthouse audits) and DEM history status requires a paid plan or an active trial; collection and storage on the Agent are not restricted by plan. SNMP trap local storage and viewing require journal output. SNMP device metrics, System Logs Monitoring (including BMC event logs), the streaming topology and API, uptime and other checks are available on every plan. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
 ### Support
 

@@ -34,9 +34,11 @@ _ExtraYaml = Annotated[
     str | None,
     Field(description=(
         "Raw YAML mapping deep-merged over the generated file (wins on conflicts). Only for "
-        "configs the typed 'config' refuses on purpose: unknown or misplaced keys for "
-        "strict-config refusal tests. A config the plugin refuses keeps it down; the refusal "
-        "shows in netdata_agent_otel_effective_config."
+        "configs the typed 'config' refuses on purpose: unknown or misplaced keys, which the "
+        "plugin ignores with a warning, and malformed values, which it refuses. A config the "
+        "plugin refuses keeps it down; the refusal shows in "
+        "netdata_agent_otel_effective_config. The warnings for ignored keys are in the "
+        "plugin's journal (netdata_agent_logs)."
     )),
 ]
 

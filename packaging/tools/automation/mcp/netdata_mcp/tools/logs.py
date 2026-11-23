@@ -14,12 +14,12 @@ from .models import AgentLogs, unknown_agent_logs
 
 _AgentId = Annotated[str, Field(description="Agent id from netdata_agent_declare.")]
 _Component = Annotated[
-    Literal["daemon", "supervisor", "ledger", "ingestor", "legacy-logs"],
+    Literal["daemon", "supervisor", "ledger", "ingestor"],
     Field(
         description=(
             "Which part of the agent: 'daemon' (netdata itself), 'supervisor' "
             "(the otel-plugin process), or a specific otel-plugin worker "
-            "('ledger', 'ingestor', 'legacy-logs')."
+            "('ledger', 'ingestor')."
         ),
     ),
 ]
@@ -73,7 +73,7 @@ def register(mcp: FastMCP) -> None:
         description=(
             "Fetch an agent's logs from the systemd journal: the netdata daemon "
             "('daemon', the default), the otel-plugin supervisor ('supervisor'), or an "
-            "otel-plugin worker ('ledger'/'ingestor'/'legacy-logs'). When the agent is "
+            "otel-plugin worker ('ledger'/'ingestor'). When the agent is "
             "running, the query is scoped to that process via _PID so it isn't mixed with "
             "other agents (the daemon identifier 'netdata' especially is shared host-wide). "
             "Read-only. Prefer this over netdata_run_logs when you want structured, "

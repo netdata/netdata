@@ -6,9 +6,9 @@
 //!
 //! - No subcommand (the agent also passes `<update_every>`): run the supervisor
 //!   (`supervisor::run`), which speaks the pluginsd protocol on stdin/stdout,
-//!   loads `config`, and drives the three worker subprocesses.
+//!   loads `config`, and drives the two worker subprocesses.
 //! - `worker <kind>`: the supervisor's internal re-exec of this binary as the
-//!   ingestor, ledger, or legacy-logs worker (see `supervisor::spawn_worker`).
+//!   ingestor or ledger worker (see `supervisor::spawn_worker`).
 //!   With `--lifeline` the worker exits when the supervisor is gone
 //!   (`lifeline`).
 //! - `logs`: the embedded `sfsq-cli` query over stored WAL/SFST files, for
@@ -20,8 +20,8 @@
 //! are synchronous and never build one.
 //!
 //! The worker implementations live in their own crates (`otel_ingestor`,
-//! `otel_ledger`, `otel_legacy_logs`); this crate owns only the entry point,
-//! the supervisor, and configuration loading.
+//! `otel_ledger`); this crate owns only the entry point, the supervisor, and
+//! configuration loading.
 mod config;
 mod lifeline;
 mod supervisor;
@@ -47,13 +47,6 @@ enum WorkerKind {
     /// Run the ledger worker: owner of the WAL/SFST log and trace storage
     /// pipeline and the `otel-logs` query handler.
     Ledger {
-        /// Ferryboat IPC socket the supervisor bound for this worker.
-        #[arg(long)]
-        socket: String,
-    },
-    /// Run the read-only legacy OTel logs viewer worker: serves the
-    /// `legacy-otel-logs` function over the former otel plugin's journal files.
-    LegacyLogs {
         /// Ferryboat IPC socket the supervisor bound for this worker.
         #[arg(long)]
         socket: String,
@@ -155,9 +148,6 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
         WorkerKind::Ledger { socket } => otel_ledger::run_worker(&socket)
             .await
             .context("ledger worker failed"),
-        WorkerKind::LegacyLogs { socket } => otel_legacy_logs::run_worker(&socket)
-            .await
-            .context("legacy-logs worker failed"),
     }
 }
 
@@ -237,7 +227,6 @@ fn main() {
             let syslog_id = match &kind {
                 WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
-                WorkerKind::LegacyLogs { .. } => "otel-plugin/legacy-logs",
             };
             netdata_plugin_rt::init_tracing_with_identifier(syslog_id);
             if has_lifeline && let Err(e) = lifeline::exit_when_stdin_closes() {

@@ -199,7 +199,7 @@
 //! Direct dependents (workspace `src/crates/Cargo.toml`): `otel-plugin` — the
 //! supervisor binds one socket per worker and spawns them
 //! (`src/crates/otel-plugin/src/supervisor.rs`); the worker crates
-//! `otel-ingestor`, `otel-ledger` and `otel-legacy-logs`, which connect back
+//! `otel-ingestor` and `otel-ledger`, which connect back
 //! to the supervisor and speak the `otel-bridge` enum pairs; and `file-lifecycle`
 //! (`ipc.rs`), whose ledger accepts the ingestor's WAL-event connection
 //! carrying `wal::Message` (`src/crates/otel-ingestor/src/ledger_sender.rs`

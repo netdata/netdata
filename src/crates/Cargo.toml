@@ -2,14 +2,13 @@
 resolver = "2"
 exclude = ["jf"]
 members = [
-    # Shared Rust plugin SDK: the pluginsd protocol, the plugin runtime, the
-    # config-form schema, derived-metrics charts and the value types any Netdata
-    # Rust plugin builds on.
+    # Shared Rust plugin SDK: the pluginsd protocol, the plugin runtime,
+    # derived-metrics charts and the value types any Netdata Rust plugin builds
+    # on.
     "netdata-plugin/error",
     "netdata-plugin/metrics",
     "netdata-plugin/protocol",
     "netdata-plugin/rt",
-    "netdata-plugin/schema",
     "netdata-plugin/types",
 
     # OTel plugin: the supervisor binary, its worker processes and their IPC.
@@ -20,7 +19,6 @@ members = [
     "otel-ingestor",
     "otel-job-scheduler",
     "otel-ledger",
-    "otel-legacy-logs",
     "otel-plugin",
     "otel-service-map",
 
@@ -42,15 +40,6 @@ members = [
     # OTel tools: OTLP load generators and a standalone OTLP-to-WAL receiver.
     "ng-ingest",
     "otel-streams",
-
-    # Legacy journal stack: reads the former OTel plugin's journal files for
-    # otel-legacy-logs. Unrelated to jf, the C systemd-journal plugin's reader.
-    "journal-common",
-    "journal-core",
-    "journal-engine",
-    "journal-function",
-    "journal-index",
-    "journal-registry",
 
     # NetFlow plugin.
     "netflow-plugin",
@@ -74,7 +63,6 @@ netdata-plugin-error = { path = "netdata-plugin/error" }
 netdata-plugin-metrics = { path = "netdata-plugin/metrics" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }
-netdata-plugin-schema = { path = "netdata-plugin/schema" }
 netdata-plugin-types = { path = "netdata-plugin/types" }
 
 # Internal crates: OTel plugin.
@@ -85,7 +73,6 @@ otel-derived-metrics = { path = "otel-derived-metrics" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-job-scheduler = { path = "otel-job-scheduler" }
 otel-ledger = { path = "otel-ledger" }
-otel-legacy-logs = { path = "otel-legacy-logs" }
 otel-service-map = { path = "otel-service-map" }
 
 # Internal crates: OTel storage, indexing and query.
@@ -103,16 +90,8 @@ sfst = { path = "sfst" }
 treight = { path = "treight" }
 wal = { path = "wal" }
 
-# Internal crates: legacy journal stack.
-journal-common = { path = "journal-common" }
-journal-core = { path = "journal-core" }
-journal-engine = { path = "journal-engine" }
-journal-function = { path = "journal-function" }
-journal-index = { path = "journal-index", default-features = false }
-journal-registry = { path = "journal-registry" }
-
-# External crates used by more than one group (plugin SDK, OTel, legacy
-# journal stack, NetFlow, netipc).
+# External crates used by more than one group (plugin SDK, OTel, NetFlow,
+# netipc).
 allocative = "0.3.4"
 anyhow = "1.0"
 async-trait = "0.1.89"
@@ -136,15 +115,14 @@ lz4_flex = { version = "0.12", default-features = false, features = ["std", "saf
 memmap2 = "0.9"
 nix = { version = "0.30" }
 notify = "8.2"
-parking_lot = "0.12"
 proptest = "1.9"
 prost = "0.14"
 regex = "1.10"
 reqwest = { version = "0.13.2", default-features = false }
 roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
 rustc-hash = "2.1"
-schemars = "1.0"
 serde = { version = "1.0" }
+serde_ignored = "0.1"
 serde_json = "1.0"
 serde_yaml = "0.9.34"
 tempfile = { version = "3" }
@@ -218,28 +196,12 @@ tower = "0.5"
 url = "2"
 zstd = "0.13"
 
-# External crates: legacy journal stack only.
-async-stream = "0.3"
-crossbeam-channel = "0.5"
-foyer = { version = "0.20.0", features = ["serde"] }
-hashers = "1.0"
-lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "xz"] }
-md5 = "0.7"
-rand = "0.9"
-rayon = "1.11.0"
-ruzstd = "0.9.1"
-siphasher = "1.0"
-static_assertions = "1.1"
-walkdir = "2.4"
-
 # External crates: NetFlow only.
 
-# Published systemd-journal-sdk crates. Keys use the journal-sdk-* prefix
-# because the plain journal-* names are taken by the internal path crates
-# elsewhere in this file; in-code idents are journal_sdk_*.
+# Published systemd-journal-sdk crates. Keys use the journal-sdk-* prefix;
+# in-code idents are journal_sdk_*.
 journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.8.1" }
 journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.8.1" }
-journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.8.1" }
 journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.8.1" }
 journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.8.1" }
 journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.8.1" }

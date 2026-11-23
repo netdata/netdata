@@ -53,7 +53,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
 ];
 
 /// Request payload. The field set follows the netdata function wire
-/// contract (mirrors the legacy `JournalRequest`), so the agent's
+/// contract (the systemd-journal request shape), so the agent's
 /// existing wiring works unchanged. [`Self::into_query`] (defined in
 /// `super::adapter`) maps it onto the engine's
 /// [`sfsq::logs::LogsQuery`].

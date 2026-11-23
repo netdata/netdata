@@ -16,7 +16,6 @@ The Logs tab shows entries from the sources available on the node:
 | `windows-events` | Windows | Windows event channels, auto-detected and aggregated, including forwarded-events channels on a Windows Event Collector | [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) |
 | `macos-logs` | macOS | The native unified log store, through Apple's OSLog framework | [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) |
 | `otel-logs` | Any, via OTLP | Logs received by the OpenTelemetry plugin and stored in Netdata's indexed log store | [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) |
-| `legacy-otel-logs` | Any | Read-only journals kept by the former experimental OpenTelemetry plugin; appears only on nodes that still have them | [Logs from the former experimental plugin](/src/crates/otel-plugin/README.md#logs-written-by-the-previous-opentelemetry-plugin-are-not-visible) |
 | `snmp:traps` | Any | Journal-compatible files Netdata writes for the traps received by its SNMP traps collector | [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) |
 
 Application text files appear under `systemd-journal` when converted with log2journal, or under `otel-logs` when
@@ -137,10 +136,9 @@ The OS-native sources and the OpenTelemetry log store use different query engine
 
 ## Prerequisites
 
-- Sign in with Netdata Cloud, which is free for community use. The `otel-logs`, `legacy-otel-logs` (logs retained by the
-  former OpenTelemetry plugin) and `snmp:traps` sources require a signed-in member of the node's Space with permission to
-  view sensitive data, on a paid plan or an active trial. Log content is transmitted encrypted to your browser
-  and is not stored in Netdata Cloud; for full data sovereignty, run
+- Sign in with Netdata Cloud, which is free for community use. The `otel-logs` and `snmp:traps` sources require a
+  signed-in member of the node's Space with permission to view sensitive data, on a paid plan or an active trial. Log
+  content is transmitted encrypted to your browser and is not stored in Netdata Cloud; for full data sovereignty, run
   [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md).
 - Platform requirements, packages, and container settings are documented in each plugin's reference:
   [systemd journal](/src/collectors/systemd-journal.plugin/README.md#prerequisites),

@@ -525,7 +525,7 @@ async fn info_request_returns_capability_descriptor() {
 
 #[tokio::test]
 async fn empty_payload_defaults_to_data_request() {
-    // Matches the legacy JournalRequest semantic: a POST body
+    // Matches the systemd-journal request semantic: a POST body
     // without an `info` field is a data request, not capability
     // discovery. The UI's data POSTs rely on this.
     let req: OtelLogsRequest = serde_json::from_slice(b"{}").unwrap();
