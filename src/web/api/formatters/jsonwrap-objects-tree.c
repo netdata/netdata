@@ -151,10 +151,8 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         buffer_json_member_add_time_t_formatted(wb, JSKEY(last_entry), last_entry_s ? last_entry_s : now_s, options & RRDR_OPTION_RFC3339);
 
                         if(qm) {
-                            if(qm->status & RRDR_DIMENSION_GROUPED) {
-                                // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
-                                buffer_json_member_add_string(wb, "as", string2str(qm->grouped_as.name));
-                            }
+                            if((qm->status & RRDR_DIMENSION_GROUPED) && qm->grouped_as.slot < r->d && r->dn[qm->grouped_as.slot])
+                                buffer_json_member_add_string(wb, "as", string2str(r->dn[qm->grouped_as.slot]));
 
                             query_target_points_statistics(wb, qt, &qm->query_points);
 

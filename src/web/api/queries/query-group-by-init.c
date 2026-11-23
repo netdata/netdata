@@ -472,9 +472,6 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 qm->grouped_as.first_slot = pos;
 
             qm->grouped_as.slot = pos;
-            qm->grouped_as.id = entries[pos].id;
-            qm->grouped_as.name = entries[pos].name;
-            qm->grouped_as.units = entries[pos].units;
 
             // copy the dimension flags decided by the query target
             // we need this, because if a dimension is explicitly selected
