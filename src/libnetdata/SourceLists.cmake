@@ -133,8 +133,6 @@ set(LIBNETDATA_FILES
         json/json.h
         json/json-keys.c
         json/json-keys.h
-        json/vendored/jsmn.c
-        json/vendored/jsmn.h
         yaml/yaml.c
         yaml/yaml.h
         yaml/yaml-unittest.c
