@@ -1023,18 +1023,27 @@ int web_client_static_redirect_unittest(void)
     // URL component with a slash, relative to the request. A %3F ends the decoded
     // path that selects the directory, but not the URL as received, so the
     // component after it can look like a URL scheme. The redirect must stay a
-    // relative path either way.
+    // relative path either way. When the URL as received already ends in a
+    // slash, another slash cannot help, so the request is refused instead of
+    // being redirected to itself forever.
     static const struct {
         const char *target;
+        int status;
         const char *location;
     } cases[] = {
-        { "/v3", "./v3/" },
-        { "/v3?a=1", "./v3/?a=1" },
-        { "/docs", "./docs/" },
-        { "/docs?a=1&b=2", "./docs/?a=1&b=2" },
-        { "/v3%3F/https:evil.example", "./https:evil.example/" },
-        { "/v3%3F/https:evil.example?a=1", "./https:evil.example/?a=1" },
-        { "/docs%3F/http:evil.example", "./http:evil.example/" },
+        { "/v3", 301, "./v3/" },
+        { "/v3?a=1", 301, "./v3/?a=1" },
+        { "/docs", 301, "./docs/" },
+        { "/docs?a=1&b=2", 301, "./docs/?a=1&b=2" },
+        { "/v3%3F/https:evil.example", 301, "./https:evil.example/" },
+        { "/v3%3F/https:evil.example?a=1", 301, "./https:evil.example/?a=1" },
+        { "/docs%3F/http:evil.example", 301, "./http:evil.example/" },
+        { "/v3%3F", 301, "./v3%3F/" },
+        { "/v3%3F/", 400, NULL },
+        { "/v3%3F/?a=1", 400, NULL },
+        { "/docs%3F/", 400, NULL },
+        { "/v3%3F/https:evil.example/", 400, NULL },
+        { "/docs/", 200, NULL },
     };
 
     size_t memory_accounting = 0;
@@ -1053,20 +1062,37 @@ int web_client_static_redirect_unittest(void)
         ssize_t received = recv(sv[1], headers, sizeof(headers) - 1, MSG_DONTWAIT);
         headers[received > 0 ? received : 0] = '\0';
 
+        char status[32];
+        snprintfz(status, sizeof(status), "HTTP/1.1 %d ", cases[i].status);
         WEB_CLIENT_TEST(
-            strncmp(headers, "HTTP/1.1 301 ", 13) == 0,
-            "'%s' was answered with '%.*s', expected a 301",
+            strncmp(headers, status, strlen(status)) == 0,
+            "'%s' was answered with '%.*s', expected '%s'",
             cases[i].target,
             (int)strcspn(headers, "\r\n"),
-            headers);
-        char location[256];
-        snprintfz(location, sizeof(location), "\r\nLocation: %s\r\n", cases[i].location);
-        WEB_CLIENT_TEST(
-            strstr(headers, location) != NULL,
-            "'%s' was not redirected to '%s', the response headers are:\n%s",
-            cases[i].target,
-            cases[i].location,
-            headers);
+            headers,
+            status);
+        if (cases[i].location) {
+            char location[256];
+            snprintfz(location, sizeof(location), "\r\nLocation: %s\r\n", cases[i].location);
+            WEB_CLIENT_TEST(
+                strstr(headers, location) != NULL,
+                "'%s' was not redirected to '%s', the response headers are:\n%s",
+                cases[i].target,
+                cases[i].location,
+                headers);
+        }
+        else
+            WEB_CLIENT_TEST(
+                strstr(headers, "\r\nLocation:") == NULL,
+                "'%s' was redirected, the response headers are:\n%s",
+                cases[i].target,
+                headers);
+        if (cases[i].status == 400)
+            WEB_CLIENT_TEST(
+                strstr(headers, "\r\nContent-Type: text/plain") != NULL,
+                "'%s' was not answered with text/plain, the response headers are:\n%s",
+                cases[i].target,
+                headers);
 
         web_client_request_done(w);
     }
