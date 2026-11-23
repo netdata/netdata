@@ -7,4 +7,6 @@ ignore = [
     { id = "RUSTSEC-2025-0057", reason = "fxhash (via hashers) is unmaintained; vetted and accepted" },
     { id = "RUSTSEC-2024-0436", reason = "paste (via foyer-memory) is unmaintained; vetted and accepted" },
     { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml (via serde_yaml) is unmaintained; vetted and accepted" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained; also reached via netgauze-bmp-pkt and systemd-journal-sdk-engine; vetted and accepted" },
+    { id = "RUSTSEC-2026-0542", reason = "humantime (via console-subscriber, humantime-serde) is unmaintained because it wraps chrono; vetted and accepted" },
 ]
