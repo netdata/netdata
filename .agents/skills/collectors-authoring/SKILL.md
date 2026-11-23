@@ -45,6 +45,7 @@ prerequisites. In Go work, read `src/go/AGENTS.md` and the relevant subtree inst
 | Rust plugin | `src/crates/netdata-plugin/` SDK and `src/crates/netflow-plugin/` reference; platform/build context in `./landscape-and-domains.md#ibmd-rust-sdk-internal-c-pluginsd` |
 | Internal C plugin | `src/collectors/README.md`, adjacent collector and `./landscape-and-domains.md#ibmd-rust-sdk-internal-c-pluginsd` |
 | External plugin in another language | `src/plugins.d/README.md` for PLUGINSD |
+| Add or rename an external plugin executable shipped in Linux static packages | `.agents/skills/packaging-static-installer/SKILL.md#artifact-validation-ownership` for installed ownership, mode and service-account access |
 | SNMP profile or trap profile | `.agents/skills/collectors-snmp-profiles/SKILL.md` or `.agents/skills/collectors-snmp-trap-profiles/SKILL.md`; metric profiles use `src/go/plugin/go.d/collector/snmp/profile-format.md` |
 | Prometheus chart profile | `.agents/skills/collectors-prometheus-profiles/SKILL.md`; source and real-pipeline validation for the affected profile, with review action boundaries retained |
 | Interactive Function | `src/go/plugin/framework/functions/README.md`, `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` |

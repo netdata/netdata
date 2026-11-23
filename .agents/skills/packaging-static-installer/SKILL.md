@@ -100,9 +100,15 @@ Source files: `packaging/makeself/build-static.sh`, `packaging/makeself/build.sh
   selected privilege checks. `packaging/makeself/jobs/81-netdata-runtime-check.sh` supplies the install prefix and
   architecture-specific `NETDATA_SKIP_LIBEXEC_PARTS`. New required plugins MUST be checked against these owners;
   presence checks MUST NOT be duplicated in job80.
-- `artifact-verification-static` in `.github/workflows/build.yml` checks **installed plugin access** as the
-  local `netdata` user. Builder-side checks can pass when the archive still carries the
-  builder's group ID. See `packaging/makeself/README.md#state-permissions-during-updates`.
+- When adding or renaming a plugin executable shipped in a static archive, check its intended owner, group and mode.
+  For `root:netdata`, the installed filename MUST appear in the plugin ownership list in
+  `packaging/makeself/install-or-update.sh`. That loop assigns the target's local group after account creation.
+  Apply any required setuid mode or file capabilities after the ownership change.
+- `artifact-verification-static` in `.github/workflows/build.yml` checks execute access as the installed `netdata` user.
+  For a `root:netdata` plugin with a fixed mode, add a `check_plugin_permissions` call with that mode. The helper checks
+  optional plugins when present. Validate ownership on a fresh install whose local group ID differs from the archive's.
+  A world-executable plugin can pass the access check with the wrong group.
+  See `packaging/makeself/README.md#state-permissions-during-updates`.
 - **Feature opt-outs:** a source installer flag does not prove the official static pipeline permits that binary to
   be absent. Trace the actual build flags and runtime skip policy before changing validation. A linkage scan can
   pass with a missing plugin while the following runtime job correctly fails.
