@@ -2565,22 +2565,27 @@ int sql_health_text_unittest(void)
         failed++;
     }
 
-    size_t index_probes = 0;
+    // one equality search per index, and nothing else touching health_log_detail
+    size_t info_probes = 0, summary_probes = 0, other = 0;
     if (PREPARE_STATEMENT(db_meta, "EXPLAIN QUERY PLAN " SQL_DELETE_ORPHAN_HEALTH_LOG_TEXT, &res)) {
         while (sqlite3_step_monitored(res) == SQLITE_ROW) {
             const char *detail = (const char *)sqlite3_column_text(res, 3);
-            if (detail && strstr(detail, "health_log_detail") &&
-                (strstr(detail, "INDEX health_log_d_info_id") || strstr(detail, "INDEX health_log_d_summary_id")))
-                index_probes++;
-            else if (detail && strstr(detail, "SCAN health_log_detail")) {
-                fprintf(stderr, "FAILED [the sweep does not scan health_log_detail]: %s\n", detail);
-                failed++;
+            if (!detail || !strstr(detail, "health_log_detail"))
+                continue;
+            if (strstr(detail, "SEARCH health_log_detail") && strstr(detail, "INDEX health_log_d_info_id (info_id=?)"))
+                info_probes++;
+            else if (strstr(detail, "SEARCH health_log_detail") &&
+                     strstr(detail, "INDEX health_log_d_summary_id (summary_id=?)"))
+                summary_probes++;
+            else {
+                fprintf(stderr, "FAILED [the sweep reaches health_log_detail only through its indexes]: %s\n", detail);
+                other++;
             }
         }
     }
     SQLITE_FINALIZE(res);
-    if (index_probes != 2) {
-        fprintf(stderr, "FAILED [the sweep probes both partial indexes]: %zu\n", index_probes);
+    if (info_probes != 1 || summary_probes != 1 || other) {
+        fprintf(stderr, "FAILED [the sweep probes both partial indexes]: info %zu, summary %zu\n", info_probes, summary_probes);
         failed++;
     }
 
