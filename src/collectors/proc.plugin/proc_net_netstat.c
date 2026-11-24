@@ -91,20 +91,138 @@ static struct proc_net_snmp {
     kernel_uint_t udplite_IgnoredMulti;
 } snmp_root = { 0 };
 
-static void parse_line_pair(procfile *ff_netstat, ARL_BASE *base, size_t header_line, size_t values_line) {
-    size_t hwords = procfile_linewords(ff_netstat, header_line);
-    size_t vwords = procfile_linewords(ff_netstat, values_line);
+// /proc/net/netstat and /proc/net/snmp come in pairs of lines per section:
+// a header line with the field names and a values line, both starting with the section key
+struct proc_net_section {
+    const char *key;
+    uint32_t hash;
+    ARL_BASE **arl;
+    size_t min_words;
+};
+
+static void proc_net_sections_init(struct proc_net_section *sections, size_t count) {
+    for(size_t i = 0; i < count; i++)
+        sections[i].hash = simple_hash(sections[i].key);
+}
+
+static struct proc_net_section *proc_net_section_find(struct proc_net_section *sections, size_t count, const char *key) {
+    uint32_t hash = simple_hash(key);
+
+    for(size_t i = 0; i < count; i++) {
+        if(unlikely(sections[i].hash == hash && strcmp(sections[i].key, key) == 0))
+            return &sections[i];
+    }
+
+    return NULL;
+}
+
+static void parse_line_pair(procfile *ff, ARL_BASE *base, size_t header_line, size_t values_line) {
+    size_t hwords = procfile_linewords(ff, header_line);
+    size_t vwords = procfile_linewords(ff, values_line);
     size_t w;
 
     if(unlikely(vwords > hwords)) {
-        collector_error("File /proc/net/netstat on header line %zu has %zu words, but on value line %zu has %zu words.", header_line, hwords, values_line, vwords);
+        collector_error("File %s on header line %zu has %zu words, but on value line %zu has %zu words.", procfile_filename(ff), header_line, hwords, values_line, vwords);
         vwords = hwords;
     }
 
     for(w = 1; w < vwords ;w++) {
-        if(unlikely(arl_check(base, procfile_lineword(ff_netstat, header_line, w), procfile_lineword(ff_netstat, values_line, w))))
+        if(unlikely(arl_check(base, procfile_lineword(ff, header_line, w), procfile_lineword(ff, values_line, w))))
             break;
     }
+}
+
+struct netstat_chart {
+    const char *type;
+    const char *id;
+    const char *family;
+    const char *title;
+    const char *units;
+    long priority;
+    RRDSET_TYPE chart_type;
+};
+
+static RRDSET *netstat_chart_create(const struct netstat_chart *c, int update_every) {
+    return rrdset_create_localhost(
+        c->type, c->id, NULL, c->family, NULL, c->title, c->units,
+        PLUGIN_PROC_NAME, PLUGIN_PROC_MODULE_NETSTAT_NAME, c->priority, update_every, c->chart_type);
+}
+
+// a chart with a "received" and a negated "sent" incremental dimension
+struct rx_tx_chart {
+    struct netstat_chart chart;
+    collected_number multiplier;
+    collected_number divisor;
+
+    RRDSET *st;
+    RRDDIM *rd_received;
+    RRDDIM *rd_sent;
+};
+
+#define RX_TX_COUNTER(type, id, family, title, units, priority) \
+    { .chart = { type, id, family, title, units, priority, RRDSET_TYPE_LINE }, .multiplier = 1, .divisor = 1 }
+
+#define RX_TX_BANDWIDTH(type, id, family, title, priority) \
+    { .chart = { type, id, family, title, "kilobits/s", priority, RRDSET_TYPE_AREA }, .multiplier = 8, .divisor = BITS_IN_A_KILOBIT }
+
+static void rx_tx_chart_update(struct rx_tx_chart *c, int update_every, collected_number received, collected_number sent) {
+    if(unlikely(!c->st)) {
+        c->st = netstat_chart_create(&c->chart, update_every);
+        c->rd_received = rrddim_add(c->st, "received", NULL,  c->multiplier, c->divisor, RRD_ALGORITHM_INCREMENTAL);
+        c->rd_sent     = rrddim_add(c->st, "sent",     NULL, -c->multiplier, c->divisor, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(c->st, c->rd_received, received);
+    rrddim_set_by_pointer(c->st, c->rd_sent,     sent);
+    rrdset_done(c->st);
+}
+
+// UDP and UDPLite errors, IPv4 and IPv6
+struct udp_errors {
+    collected_number RcvbufErrors;
+    collected_number SndbufErrors;
+    collected_number InErrors;
+    collected_number NoPorts;
+    collected_number InCsumErrors;
+    collected_number IgnoredMulti;
+};
+
+struct udp_errors_chart {
+    struct netstat_chart chart;
+    bool has_ignored_multi; // the kernel does not report IgnoredMulti for UDPLite over IPv6
+
+    RRDSET *st;
+    RRDDIM *rd_RcvbufErrors;
+    RRDDIM *rd_SndbufErrors;
+    RRDDIM *rd_InErrors;
+    RRDDIM *rd_NoPorts;
+    RRDDIM *rd_InCsumErrors;
+    RRDDIM *rd_IgnoredMulti;
+};
+
+#define UDP_ERRORS(type, id, family, title, priority, ignored_multi) \
+    { .chart = { type, id, family, title, "events/s", priority, RRDSET_TYPE_LINE }, .has_ignored_multi = ignored_multi }
+
+static void udp_errors_chart_update(struct udp_errors_chart *c, int update_every, const struct udp_errors *v) {
+    if(unlikely(!c->st)) {
+        c->st = netstat_chart_create(&c->chart, update_every);
+        c->rd_RcvbufErrors = rrddim_add(c->st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        c->rd_SndbufErrors = rrddim_add(c->st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        c->rd_InErrors     = rrddim_add(c->st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        c->rd_NoPorts      = rrddim_add(c->st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        c->rd_InCsumErrors = rrddim_add(c->st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(c->has_ignored_multi)
+            c->rd_IgnoredMulti = rrddim_add(c->st, "IgnoredMulti", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(c->st, c->rd_RcvbufErrors, v->RcvbufErrors);
+    rrddim_set_by_pointer(c->st, c->rd_SndbufErrors, v->SndbufErrors);
+    rrddim_set_by_pointer(c->st, c->rd_InErrors,     v->InErrors);
+    rrddim_set_by_pointer(c->st, c->rd_NoPorts,      v->NoPorts);
+    rrddim_set_by_pointer(c->st, c->rd_InCsumErrors, v->InCsumErrors);
+    if(c->has_ignored_multi)
+        rrddim_set_by_pointer(c->st, c->rd_IgnoredMulti, v->IgnoredMulti);
+    rrdset_done(c->st);
 }
 
 static void do_proc_net_snmp6(int update_every) {
@@ -377,33 +495,8 @@ static void do_proc_net_snmp6(int update_every) {
 
     if (do_ip6_bandwidth == CONFIG_BOOLEAN_YES || do_ip6_bandwidth == CONFIG_BOOLEAN_AUTO) {
         do_ip6_bandwidth = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_received = NULL,
-                      *rd_sent = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    "system"
-                    , "ipv6"
-                    , NULL
-                    , "network"
-                    , NULL
-                    , "IPv6 Bandwidth"
-                    , "kilobits/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_IPV6
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_received = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_received, Ip6InOctets);
-        rrddim_set_by_pointer(st, rd_sent,     Ip6OutOctets);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_BANDWIDTH("system", "ipv6", "network", "IPv6 Bandwidth", NETDATA_CHART_PRIO_SYSTEM_IPV6);
+        rx_tx_chart_update(&chart, update_every, Ip6InOctets, Ip6OutOctets);
     }
 
     if (do_ip6_packets == CONFIG_BOOLEAN_YES || do_ip6_packets == CONFIG_BOOLEAN_AUTO) {
@@ -567,301 +660,72 @@ static void do_proc_net_snmp6(int update_every) {
     }
 
     if (do_ip6_udp_packets == CONFIG_BOOLEAN_YES || do_ip6_udp_packets == CONFIG_BOOLEAN_AUTO) {
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_received = NULL,
-                      *rd_sent     = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "udppackets"
-                    , NULL
-                    , "udp6"
-                    , NULL
-                    , "IPv6 UDP Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_UDP_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_received = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_received, Udp6InDatagrams);
-        rrddim_set_by_pointer(st, rd_sent,     Udp6OutDatagrams);
-        rrdset_done(st);
+        do_ip6_udp_packets = CONFIG_BOOLEAN_YES;
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP6, "udppackets", "udp6", "IPv6 UDP Packets", "packets/s", NETDATA_CHART_PRIO_IPV6_UDP_PACKETS);
+        rx_tx_chart_update(&chart, update_every, Udp6InDatagrams, Udp6OutDatagrams);
     }
 
     if (do_ip6_udp_errors == CONFIG_BOOLEAN_YES || do_ip6_udp_errors == CONFIG_BOOLEAN_AUTO) {
         do_ip6_udp_errors = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_RcvbufErrors = NULL,
-                      *rd_SndbufErrors = NULL,
-                      *rd_InErrors     = NULL,
-                      *rd_NoPorts      = NULL,
-                      *rd_InCsumErrors = NULL,
-                      *rd_IgnoredMulti = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "udperrors"
-                    , NULL
-                    , "udp6"
-                    , NULL
-                    , "IPv6 UDP Errors"
-                    , "events/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_UDP_ERRORS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_IgnoredMulti = rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_RcvbufErrors, Udp6RcvbufErrors);
-        rrddim_set_by_pointer(st, rd_SndbufErrors, Udp6SndbufErrors);
-        rrddim_set_by_pointer(st, rd_InErrors,     Udp6InErrors);
-        rrddim_set_by_pointer(st, rd_NoPorts,      Udp6NoPorts);
-        rrddim_set_by_pointer(st, rd_InCsumErrors, Udp6InCsumErrors);
-        rrddim_set_by_pointer(st, rd_IgnoredMulti, Udp6IgnoredMulti);
-        rrdset_done(st);
+        static struct udp_errors_chart chart = UDP_ERRORS(RRD_TYPE_NET_IP6, "udperrors", "udp6", "IPv6 UDP Errors", NETDATA_CHART_PRIO_IPV6_UDP_ERRORS, true);
+        struct udp_errors values = {
+            .RcvbufErrors = Udp6RcvbufErrors,
+            .SndbufErrors = Udp6SndbufErrors,
+            .InErrors = Udp6InErrors,
+            .NoPorts = Udp6NoPorts,
+            .InCsumErrors = Udp6InCsumErrors,
+            .IgnoredMulti = Udp6IgnoredMulti,
+        };
+        udp_errors_chart_update(&chart, update_every, &values);
     }
 
     if (do_ip6_udplite_packets == CONFIG_BOOLEAN_YES || do_ip6_udplite_packets == CONFIG_BOOLEAN_AUTO) {
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_received = NULL,
-                      *rd_sent     = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "udplitepackets"
-                    , NULL
-                    , "udplite6"
-                    , NULL
-                    , "IPv6 UDPlite Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_UDPLITE_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_received = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_received, UdpLite6InDatagrams);
-        rrddim_set_by_pointer(st, rd_sent,     UdpLite6OutDatagrams);
-        rrdset_done(st);
+        do_ip6_udplite_packets = CONFIG_BOOLEAN_YES;
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP6, "udplitepackets", "udplite6", "IPv6 UDPlite Packets", "packets/s", NETDATA_CHART_PRIO_IPV6_UDPLITE_PACKETS);
+        rx_tx_chart_update(&chart, update_every, UdpLite6InDatagrams, UdpLite6OutDatagrams);
     }
 
     if (do_ip6_udplite_errors == CONFIG_BOOLEAN_YES || do_ip6_udplite_errors == CONFIG_BOOLEAN_AUTO) {
         do_ip6_udplite_errors = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_RcvbufErrors = NULL,
-                      *rd_SndbufErrors = NULL,
-                      *rd_InErrors     = NULL,
-                      *rd_NoPorts      = NULL,
-                      *rd_InCsumErrors = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "udpliteerrors"
-                    , NULL
-                    , "udplite6"
-                    , NULL
-                    , "IPv6 UDP Lite Errors"
-                    , "events/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_UDPLITE_ERRORS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_InErrors,     UdpLite6InErrors);
-        rrddim_set_by_pointer(st, rd_NoPorts,      UdpLite6NoPorts);
-        rrddim_set_by_pointer(st, rd_RcvbufErrors, UdpLite6RcvbufErrors);
-        rrddim_set_by_pointer(st, rd_SndbufErrors, UdpLite6SndbufErrors);
-        rrddim_set_by_pointer(st, rd_InCsumErrors, UdpLite6InCsumErrors);
-        rrdset_done(st);
+        static struct udp_errors_chart chart = UDP_ERRORS(RRD_TYPE_NET_IP6, "udpliteerrors", "udplite6", "IPv6 UDP Lite Errors", NETDATA_CHART_PRIO_IPV6_UDPLITE_ERRORS, false);
+        struct udp_errors values = {
+            .RcvbufErrors = UdpLite6RcvbufErrors,
+            .SndbufErrors = UdpLite6SndbufErrors,
+            .InErrors = UdpLite6InErrors,
+            .NoPorts = UdpLite6NoPorts,
+            .InCsumErrors = UdpLite6InCsumErrors,
+        };
+        udp_errors_chart_update(&chart, update_every, &values);
     }
 
     if (do_ip6_mcast == CONFIG_BOOLEAN_YES || do_ip6_mcast == CONFIG_BOOLEAN_AUTO) {
         do_ip6_mcast = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_Ip6InMcastOctets  = NULL,
-                      *rd_Ip6OutMcastOctets = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "mcast"
-                    , NULL
-                    , "multicast6"
-                    , NULL
-                    , "IPv6 Multicast Bandwidth"
-                    , "kilobits/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_MCAST
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_Ip6InMcastOctets  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_Ip6OutMcastOctets = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_Ip6InMcastOctets,  Ip6InMcastOctets);
-        rrddim_set_by_pointer(st, rd_Ip6OutMcastOctets, Ip6OutMcastOctets);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_BANDWIDTH(RRD_TYPE_NET_IP6, "mcast", "multicast6", "IPv6 Multicast Bandwidth", NETDATA_CHART_PRIO_IPV6_MCAST);
+        rx_tx_chart_update(&chart, update_every, Ip6InMcastOctets, Ip6OutMcastOctets);
     }
 
     if (do_ip6_bcast == CONFIG_BOOLEAN_YES || do_ip6_bcast == CONFIG_BOOLEAN_AUTO) {
         do_ip6_bcast = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_Ip6InBcastOctets  = NULL,
-                      *rd_Ip6OutBcastOctets = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "bcast"
-                    , NULL
-                    , "broadcast6"
-                    , NULL
-                    , "IPv6 Broadcast Bandwidth"
-                    , "kilobits/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_BCAST
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_Ip6InBcastOctets  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_Ip6OutBcastOctets = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_Ip6InBcastOctets,  Ip6InBcastOctets);
-        rrddim_set_by_pointer(st, rd_Ip6OutBcastOctets, Ip6OutBcastOctets);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_BANDWIDTH(RRD_TYPE_NET_IP6, "bcast", "broadcast6", "IPv6 Broadcast Bandwidth", NETDATA_CHART_PRIO_IPV6_BCAST);
+        rx_tx_chart_update(&chart, update_every, Ip6InBcastOctets, Ip6OutBcastOctets);
     }
 
     if (do_ip6_mcast_p == CONFIG_BOOLEAN_YES || do_ip6_mcast_p == CONFIG_BOOLEAN_AUTO) {
         do_ip6_mcast_p = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_Ip6InMcastPkts  = NULL,
-                      *rd_Ip6OutMcastPkts = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "mcastpkts"
-                    , NULL
-                    , "multicast6"
-                    , NULL
-                    , "IPv6 Multicast Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_MCAST_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_Ip6InMcastPkts  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_Ip6OutMcastPkts = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_Ip6InMcastPkts,  Ip6InMcastPkts);
-        rrddim_set_by_pointer(st, rd_Ip6OutMcastPkts, Ip6OutMcastPkts);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP6, "mcastpkts", "multicast6", "IPv6 Multicast Packets", "packets/s", NETDATA_CHART_PRIO_IPV6_MCAST_PACKETS);
+        rx_tx_chart_update(&chart, update_every, Ip6InMcastPkts, Ip6OutMcastPkts);
     }
 
     if (do_ip6_icmp == CONFIG_BOOLEAN_YES || do_ip6_icmp == CONFIG_BOOLEAN_AUTO) {
         do_ip6_icmp = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_Icmp6InMsgs  = NULL,
-                      *rd_Icmp6OutMsgs = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "icmp"
-                    , NULL
-                    , "icmp6"
-                    , NULL
-                    , "IPv6 ICMP Messages"
-                    , "messages/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_ICMP
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_Icmp6InMsgs  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_Icmp6OutMsgs = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_Icmp6InMsgs,  Icmp6InMsgs);
-        rrddim_set_by_pointer(st, rd_Icmp6OutMsgs, Icmp6OutMsgs);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP6, "icmp", "icmp6", "IPv6 ICMP Messages", "messages/s", NETDATA_CHART_PRIO_IPV6_ICMP);
+        rx_tx_chart_update(&chart, update_every, Icmp6InMsgs, Icmp6OutMsgs);
     }
 
     if (do_ip6_icmp_redir == CONFIG_BOOLEAN_YES || do_ip6_icmp_redir == CONFIG_BOOLEAN_AUTO) {
         do_ip6_icmp_redir = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_Icmp6InRedirects  = NULL,
-                      *rd_Icmp6OutRedirects = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "icmpredir"
-                    , NULL
-                    , "icmp6"
-                    , NULL
-                    , "IPv6 ICMP Redirects"
-                    , "redirects/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_ICMP_REDIR
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_Icmp6InRedirects  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_Icmp6OutRedirects = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_Icmp6InRedirects,  Icmp6InRedirects);
-        rrddim_set_by_pointer(st, rd_Icmp6OutRedirects, Icmp6OutRedirects);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP6, "icmpredir", "icmp6", "IPv6 ICMP Redirects", "redirects/s", NETDATA_CHART_PRIO_IPV6_ICMP_REDIR);
+        rx_tx_chart_update(&chart, update_every, Icmp6InRedirects, Icmp6OutRedirects);
     }
 
     if (do_ip6_icmp_errors == CONFIG_BOOLEAN_YES || do_ip6_icmp_errors == CONFIG_BOOLEAN_AUTO) {
@@ -1077,33 +941,8 @@ static void do_proc_net_snmp6(int update_every) {
 
     if (do_ip6_icmp_mldv2 == CONFIG_BOOLEAN_YES || do_ip6_icmp_mldv2 == CONFIG_BOOLEAN_AUTO) {
         do_ip6_icmp_mldv2 = CONFIG_BOOLEAN_YES;
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_InMLDv2Reports  = NULL,
-                      *rd_OutMLDv2Reports = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP6
-                    , "icmpmldv2"
-                    , NULL
-                    , "icmp6"
-                    , NULL
-                    , "IPv6 ICMP MLDv2 Reports"
-                    , "reports/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV6_ICMP_LDV2
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_InMLDv2Reports  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutMLDv2Reports = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_InMLDv2Reports,  Icmp6InMLDv2Reports);
-        rrddim_set_by_pointer(st, rd_OutMLDv2Reports, Icmp6OutMLDv2Reports);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP6, "icmpmldv2", "icmp6", "IPv6 ICMP MLDv2 Reports", "reports/s", NETDATA_CHART_PRIO_IPV6_ICMP_LDV2);
+        rx_tx_chart_update(&chart, update_every, Icmp6InMLDv2Reports, Icmp6OutMLDv2Reports);
     }
 
     if (do_ip6_icmp_types == CONFIG_BOOLEAN_YES || do_ip6_icmp_types == CONFIG_BOOLEAN_AUTO) {
@@ -1213,8 +1052,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcp_opens = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1, do_udplite_packets = -1;
 
-    static uint32_t hash_ipext = 0, hash_tcpext = 0;
-    static uint32_t hash_ip = 0, hash_icmp = 0, hash_tcp = 0, hash_udp = 0, hash_icmpmsg = 0, hash_udplite = 0;
 
     static procfile *ff_netstat = NULL;
     static procfile *ff_snmp = NULL;
@@ -1228,6 +1065,20 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static ARL_BASE *arl_tcp = NULL;
     static ARL_BASE *arl_udp = NULL;
     static ARL_BASE *arl_udplite = NULL;
+
+    static struct proc_net_section netstat_sections[] = {
+        { .key = "IpExt",  .arl = &arl_ipext,  .min_words = 2 },
+        { .key = "TcpExt", .arl = &arl_tcpext, .min_words = 2 },
+    };
+
+    static struct proc_net_section snmp_sections[] = {
+        { .key = "Ip",      .arl = &arl_ip,      .min_words = 3 },
+        { .key = "Icmp",    .arl = &arl_icmp,    .min_words = 3 },
+        { .key = "IcmpMsg", .arl = &arl_icmpmsg, .min_words = 2 },
+        { .key = "Tcp",     .arl = &arl_tcp,     .min_words = 3 },
+        { .key = "Udp",     .arl = &arl_udp,     .min_words = 3 },
+        { .key = "UdpLite", .arl = &arl_udplite, .min_words = 3 },
+    };
 
     // --------------------------------------------------------------------
     // IP
@@ -1308,8 +1159,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     // prepare for /proc/net/netstat parsing
 
     if(unlikely(!arl_ipext)) {
-        hash_ipext = simple_hash("IpExt");
-        hash_tcpext = simple_hash("TcpExt");
+        proc_net_sections_init(netstat_sections, _countof(netstat_sections));
 
         do_bandwidth = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "bandwidth", CONFIG_BOOLEAN_AUTO);
         do_inerrors  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "input errors", CONFIG_BOOLEAN_AUTO);
@@ -1439,12 +1289,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_icmpmsg          = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 ICMP messages", CONFIG_BOOLEAN_AUTO);
         do_udplite_packets  = inicfg_get_boolean_ondemand(&netdata_config, "plugin:proc:/proc/net/snmp", "ipv4 UDPLite packets", CONFIG_BOOLEAN_AUTO);
 
-        hash_ip = simple_hash("Ip");
-        hash_tcp = simple_hash("Tcp");
-        hash_udp = simple_hash("Udp");
-        hash_icmp = simple_hash("Icmp");
-        hash_icmpmsg = simple_hash("IcmpMsg");
-        hash_udplite = simple_hash("UdpLite");
+        proc_net_sections_init(snmp_sections, _countof(snmp_sections));
 
         arl_ip = arl_create("snmp/Ip", arl_callback_str2kernel_uint_t, 60);
         // arl_expect(arl_ip, "Forwarding", &snmp_root.ip_Forwarding);
@@ -1556,32 +1401,19 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     arl_begin(arl_tcpext);
 
     for(l = 0; l < lines ;l++) {
-        char *key = procfile_lineword(ff_netstat, l, 0);
-        uint32_t hash = simple_hash(key);
+        struct proc_net_section *section = proc_net_section_find(netstat_sections, _countof(netstat_sections), procfile_lineword(ff_netstat, l, 0));
+        if(likely(!section))
+            continue;
 
-        if(unlikely(hash == hash_ipext && strcmp(key, "IpExt") == 0)) {
-            size_t h = l++;
+        size_t h = l++;
 
-            words = procfile_linewords(ff_netstat, l);
-            if(unlikely(words < 2)) {
-                collector_error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %zu.", words);
-                continue;
-            }
-
-            parse_line_pair(ff_netstat, arl_ipext, h, l);
-
+        words = procfile_linewords(ff_netstat, l);
+        if(unlikely(words < section->min_words)) {
+            collector_error("Cannot read %s %s line. Expected %zu+ params, read %zu.", procfile_filename(ff_netstat), section->key, section->min_words, words);
+            continue;
         }
-        else if(unlikely(hash == hash_tcpext && strcmp(key, "TcpExt") == 0)) {
-            size_t h = l++;
 
-            words = procfile_linewords(ff_netstat, l);
-            if(unlikely(words < 2)) {
-                collector_error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %zu.", words);
-                continue;
-            }
-
-            parse_line_pair(ff_netstat, arl_tcpext, h, l);
-        }
+        parse_line_pair(ff_netstat, *section->arl, h, l);
     }
 
     // parse /proc/net/snmp
@@ -1597,195 +1429,41 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if(unlikely(!ff_snmp)) return 0; // we return 0, so that we will retry to open it next time
 
     lines = procfile_lines(ff_snmp);
-    size_t w;
 
     for(l = 0; l < lines ;l++) {
-        char *key = procfile_lineword(ff_snmp, l, 0);
-        uint32_t hash = simple_hash(key);
+        struct proc_net_section *section = proc_net_section_find(snmp_sections, _countof(snmp_sections), procfile_lineword(ff_snmp, l, 0));
+        if(likely(!section))
+            continue;
 
-        if(unlikely(hash == hash_ip && strcmp(key, "Ip") == 0)) {
-            size_t h = l++;
+        size_t h = l++;
 
-            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Ip") != 0) {
-                collector_error("Cannot read Ip line from /proc/net/snmp.");
-                break;
-            }
-
-            words = procfile_linewords(ff_snmp, l);
-            if(words < 3) {
-                collector_error("Cannot read /proc/net/snmp Ip line. Expected 3+ params, read %zu.", words);
-                continue;
-            }
-
-            arl_begin(arl_ip);
-            for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_ip, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
-                    break;
-            }
+        if(strcmp(procfile_lineword(ff_snmp, l, 0), section->key) != 0) {
+            collector_error("Cannot read %s line from %s.", section->key, procfile_filename(ff_snmp));
+            break;
         }
-        else if(unlikely(hash == hash_icmp && strcmp(key, "Icmp") == 0)) {
-            size_t h = l++;
 
-            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Icmp") != 0) {
-                collector_error("Cannot read Icmp line from /proc/net/snmp.");
-                break;
-            }
-
-            words = procfile_linewords(ff_snmp, l);
-            if(words < 3) {
-                collector_error("Cannot read /proc/net/snmp Icmp line. Expected 3+ params, read %zu.", words);
-                continue;
-            }
-
-            arl_begin(arl_icmp);
-            for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_icmp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
-                    break;
-            }
+        words = procfile_linewords(ff_snmp, l);
+        if(words < section->min_words) {
+            collector_error("Cannot read %s %s line. Expected %zu+ params, read %zu.", procfile_filename(ff_snmp), section->key, section->min_words, words);
+            continue;
         }
-        else if(unlikely(hash == hash_icmpmsg && strcmp(key, "IcmpMsg") == 0)) {
-            size_t h = l++;
 
-            if(strcmp(procfile_lineword(ff_snmp, l, 0), "IcmpMsg") != 0) {
-                collector_error("Cannot read IcmpMsg line from /proc/net/snmp.");
-                break;
-            }
-
-            words = procfile_linewords(ff_snmp, l);
-            if(words < 2) {
-                collector_error("Cannot read /proc/net/snmp IcmpMsg line. Expected 2+ params, read %zu.", words);
-                continue;
-            }
-
-            arl_begin(arl_icmpmsg);
-            for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_icmpmsg, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
-                    break;
-            }
-        }
-        else if(unlikely(hash == hash_tcp && strcmp(key, "Tcp") == 0)) {
-            size_t h = l++;
-
-            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Tcp") != 0) {
-                collector_error("Cannot read Tcp line from /proc/net/snmp.");
-                break;
-            }
-
-            words = procfile_linewords(ff_snmp, l);
-            if(words < 3) {
-                collector_error("Cannot read /proc/net/snmp Tcp line. Expected 3+ params, read %zu.", words);
-                continue;
-            }
-
-            arl_begin(arl_tcp);
-            for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_tcp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
-                    break;
-            }
-        }
-        else if(unlikely(hash == hash_udp && strcmp(key, "Udp") == 0)) {
-            size_t h = l++;
-
-            if(strcmp(procfile_lineword(ff_snmp, l, 0), "Udp") != 0) {
-                collector_error("Cannot read Udp line from /proc/net/snmp.");
-                break;
-            }
-
-            words = procfile_linewords(ff_snmp, l);
-            if(words < 3) {
-                collector_error("Cannot read /proc/net/snmp Udp line. Expected 3+ params, read %zu.", words);
-                continue;
-            }
-
-            arl_begin(arl_udp);
-            for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_udp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
-                    break;
-            }
-        }
-        else if(unlikely(hash == hash_udplite && strcmp(key, "UdpLite") == 0)) {
-            size_t h = l++;
-
-            if(strcmp(procfile_lineword(ff_snmp, l, 0), "UdpLite") != 0) {
-                collector_error("Cannot read UdpLite line from /proc/net/snmp.");
-                break;
-            }
-
-            words = procfile_linewords(ff_snmp, l);
-            if(words < 3) {
-                collector_error("Cannot read /proc/net/snmp UdpLite line. Expected 3+ params, read %zu.", words);
-                continue;
-            }
-
-            arl_begin(arl_udplite);
-            for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_udplite, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
-                    break;
-            }
-        }
+        arl_begin(*section->arl);
+        parse_line_pair(ff_snmp, *section->arl, h, l);
     }
 
     // netstat IpExt charts
 
     if (do_bandwidth == CONFIG_BOOLEAN_YES || do_bandwidth == CONFIG_BOOLEAN_AUTO) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
-        static RRDSET *st_system_ip = NULL;
-        static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-        if(unlikely(!st_system_ip)) {
-            st_system_ip = rrdset_create_localhost(
-                    "system"
-                    , "ip" // FIXME: this is ipv4. Not changing it because it will require to do changes in cloud-frontend too
-                    , NULL
-                    , "network"
-                    , NULL
-                    , "IPv4 Bandwidth"
-                    , "kilobits/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_IP
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_in  = rrddim_add(st_system_ip, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_system_ip, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_system_ip, rd_in,  ipext_InOctets);
-        rrddim_set_by_pointer(st_system_ip, rd_out, ipext_OutOctets);
-        rrdset_done(st_system_ip);
+        static struct rx_tx_chart chart = RX_TX_BANDWIDTH("system", "ip", "network", "IPv4 Bandwidth", NETDATA_CHART_PRIO_SYSTEM_IP);
+        rx_tx_chart_update(&chart, update_every, ipext_InOctets, ipext_OutOctets);
     }
 
     if (do_mcast == CONFIG_BOOLEAN_YES || do_mcast == CONFIG_BOOLEAN_AUTO) {
         do_mcast = CONFIG_BOOLEAN_YES;
-        static RRDSET *st_ip_mcast = NULL;
-        static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-        if(unlikely(!st_ip_mcast)) {
-            st_ip_mcast = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP4
-                    , "mcast"
-                    , NULL
-                    , "multicast"
-                    , NULL
-                    , "IP Multicast Bandwidth"
-                    , "kilobits/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_MCAST
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_in  = rrddim_add(st_ip_mcast, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_mcast, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_ip_mcast, rd_in,  ipext_InMcastOctets);
-        rrddim_set_by_pointer(st_ip_mcast, rd_out, ipext_OutMcastOctets);
-
-        rrdset_done(st_ip_mcast);
+        static struct rx_tx_chart chart = RX_TX_BANDWIDTH(RRD_TYPE_NET_IP4, "mcast", "multicast", "IP Multicast Bandwidth", NETDATA_CHART_PRIO_IPV4_MCAST);
+        rx_tx_chart_update(&chart, update_every, ipext_InMcastOctets, ipext_OutMcastOctets);
     }
 
     // --------------------------------------------------------------------
@@ -1793,33 +1471,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_bcast == CONFIG_BOOLEAN_YES || do_bcast == CONFIG_BOOLEAN_AUTO) {
         do_bcast = CONFIG_BOOLEAN_YES;
 
-        static RRDSET *st_ip_bcast = NULL;
-        static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-        if(unlikely(!st_ip_bcast)) {
-            st_ip_bcast = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP4
-                    , "bcast"
-                    , NULL
-                    , "broadcast"
-                    , NULL
-                    , "IPv4 Broadcast Bandwidth"
-                    , "kilobits/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_BCAST
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_in  = rrddim_add(st_ip_bcast, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_bcast, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_ip_bcast, rd_in,  ipext_InBcastOctets);
-        rrddim_set_by_pointer(st_ip_bcast, rd_out, ipext_OutBcastOctets);
-
-        rrdset_done(st_ip_bcast);
+        static struct rx_tx_chart chart = RX_TX_BANDWIDTH(RRD_TYPE_NET_IP4, "bcast", "broadcast", "IPv4 Broadcast Bandwidth", NETDATA_CHART_PRIO_IPV4_BCAST);
+        rx_tx_chart_update(&chart, update_every, ipext_InBcastOctets, ipext_OutBcastOctets);
     }
 
     // --------------------------------------------------------------------
@@ -1827,63 +1480,15 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_mcast_p == CONFIG_BOOLEAN_YES || do_mcast_p == CONFIG_BOOLEAN_AUTO) {
         do_mcast_p = CONFIG_BOOLEAN_YES;
 
-        static RRDSET *st_ip_mcastpkts = NULL;
-        static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-        if(unlikely(!st_ip_mcastpkts)) {
-            st_ip_mcastpkts = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP4
-                    , "mcastpkts"
-                    , NULL
-                    , "multicast"
-                    , NULL
-                    , "IPv4 Multicast Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_MCAST_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_in  = rrddim_add(st_ip_mcastpkts, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_mcastpkts, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_ip_mcastpkts, rd_in,  ipext_InMcastPkts);
-        rrddim_set_by_pointer(st_ip_mcastpkts, rd_out, ipext_OutMcastPkts);
-        rrdset_done(st_ip_mcastpkts);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP4, "mcastpkts", "multicast", "IPv4 Multicast Packets", "packets/s", NETDATA_CHART_PRIO_IPV4_MCAST_PACKETS);
+        rx_tx_chart_update(&chart, update_every, ipext_InMcastPkts, ipext_OutMcastPkts);
     }
 
     if (do_bcast_p == CONFIG_BOOLEAN_YES || do_bcast_p == CONFIG_BOOLEAN_AUTO) {
         do_bcast_p = CONFIG_BOOLEAN_YES;
 
-        static RRDSET *st_ip_bcastpkts = NULL;
-        static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-        if(unlikely(!st_ip_bcastpkts)) {
-            st_ip_bcastpkts = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP4
-                    , "bcastpkts"
-                    , NULL
-                    , "broadcast"
-                    , NULL
-                    , "IPv4 Broadcast Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_BCAST_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_in  = rrddim_add(st_ip_bcastpkts, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_bcastpkts, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_ip_bcastpkts, rd_in,  ipext_InBcastPkts);
-        rrddim_set_by_pointer(st_ip_bcastpkts, rd_out, ipext_OutBcastPkts);
-        rrdset_done(st_ip_bcastpkts);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP4, "bcastpkts", "broadcast", "IPv4 Broadcast Packets", "packets/s", NETDATA_CHART_PRIO_IPV4_BCAST_PACKETS);
+        rx_tx_chart_update(&chart, update_every, ipext_InBcastPkts, ipext_OutBcastPkts);
     }
 
     if (do_ecn == CONFIG_BOOLEAN_YES || do_ecn == CONFIG_BOOLEAN_AUTO) {
@@ -2335,35 +1940,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_icmp_packets == CONFIG_BOOLEAN_YES || do_icmp_packets == CONFIG_BOOLEAN_AUTO) {
         do_icmp_packets = CONFIG_BOOLEAN_YES;
 
-        {
-            static RRDSET *st_packets = NULL;
-            static RRDDIM *rd_InMsgs = NULL,
-                            *rd_OutMsgs = NULL;
-
-            if(unlikely(!st_packets)) {
-                st_packets = rrdset_create_localhost(
-                        RRD_TYPE_NET_IP4
-                        , "icmp"
-                        , NULL
-                        , "icmp"
-                        , NULL
-                        , "IPv4 ICMP Packets"
-                        , "packets/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_ICMP_PACKETS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rd_InMsgs  = rrddim_add(st_packets, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_OutMsgs = rrddim_add(st_packets, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st_packets, rd_InMsgs,  (collected_number)snmp_root.icmp_InMsgs);
-            rrddim_set_by_pointer(st_packets, rd_OutMsgs, (collected_number)snmp_root.icmp_OutMsgs);
-            rrdset_done(st_packets);
-        }
+        static struct rx_tx_chart packets = RX_TX_COUNTER(RRD_TYPE_NET_IP4, "icmp", "icmp", "IPv4 ICMP Packets", "packets/s", NETDATA_CHART_PRIO_IPV4_ICMP_PACKETS);
+        rx_tx_chart_update(&packets, update_every, snmp_root.icmp_InMsgs, snmp_root.icmp_OutMsgs);
 
         {
             static RRDSET *st_errors = NULL;
@@ -2526,33 +2104,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_tcp_packets == CONFIG_BOOLEAN_YES || do_tcp_packets == CONFIG_BOOLEAN_AUTO) {
         do_tcp_packets = CONFIG_BOOLEAN_YES;
 
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_InSegs = NULL,
-                        *rd_OutSegs = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP
-                    , "tcppackets"
-                    , NULL
-                    , "tcp"
-                    , NULL
-                    , "IPv4 TCP Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_TCP_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_InSegs  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutSegs = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_InSegs,  (collected_number)snmp_root.tcp_InSegs);
-        rrddim_set_by_pointer(st, rd_OutSegs, (collected_number)snmp_root.tcp_OutSegs);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP, "tcppackets", "tcp", "IPv4 TCP Packets", "packets/s", NETDATA_CHART_PRIO_IP_TCP_PACKETS);
+        rx_tx_chart_update(&chart, update_every, snmp_root.tcp_InSegs, snmp_root.tcp_OutSegs);
     }
 
     // --------------------------------------------------------------------
@@ -2668,33 +2221,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_udp_packets == CONFIG_BOOLEAN_YES || do_udp_packets == CONFIG_BOOLEAN_AUTO) {
         do_udp_packets = CONFIG_BOOLEAN_YES;
 
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_InDatagrams = NULL,
-                        *rd_OutDatagrams = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP4
-                    , "udppackets"
-                    , NULL
-                    , "udp"
-                    , NULL
-                    , "IPv4 UDP Packets"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDP_PACKETS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_InDatagrams  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutDatagrams = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_InDatagrams,  (collected_number)snmp_root.udp_InDatagrams);
-        rrddim_set_by_pointer(st, rd_OutDatagrams, (collected_number)snmp_root.udp_OutDatagrams);
-        rrdset_done(st);
+        static struct rx_tx_chart chart = RX_TX_COUNTER(RRD_TYPE_NET_IP4, "udppackets", "udp", "IPv4 UDP Packets", "packets/s", NETDATA_CHART_PRIO_IPV4_UDP_PACKETS);
+        rx_tx_chart_update(&chart, update_every, snmp_root.udp_InDatagrams, snmp_root.udp_OutDatagrams);
     }
 
     // --------------------------------------------------------------------
@@ -2702,45 +2230,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_udp_errors == CONFIG_BOOLEAN_YES || do_udp_errors == CONFIG_BOOLEAN_AUTO) {
         do_udp_errors = CONFIG_BOOLEAN_YES;
 
-        static RRDSET *st = NULL;
-        static RRDDIM *rd_RcvbufErrors = NULL,
-                        *rd_SndbufErrors = NULL,
-                        *rd_InErrors = NULL,
-                        *rd_NoPorts = NULL,
-                        *rd_InCsumErrors = NULL,
-                        *rd_IgnoredMulti = NULL;
-
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(
-                    RRD_TYPE_NET_IP4
-                    , "udperrors"
-                    , NULL
-                    , "udp"
-                    , NULL
-                    , "IPv4 UDP Errors"
-                    , "events/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDP_ERRORS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_IgnoredMulti = rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st, rd_InErrors,     (collected_number)snmp_root.udp_InErrors);
-        rrddim_set_by_pointer(st, rd_NoPorts,      (collected_number)snmp_root.udp_NoPorts);
-        rrddim_set_by_pointer(st, rd_RcvbufErrors, (collected_number)snmp_root.udp_RcvbufErrors);
-        rrddim_set_by_pointer(st, rd_SndbufErrors, (collected_number)snmp_root.udp_SndbufErrors);
-        rrddim_set_by_pointer(st, rd_InCsumErrors, (collected_number)snmp_root.udp_InCsumErrors);
-        rrddim_set_by_pointer(st, rd_IgnoredMulti, (collected_number)snmp_root.udp_IgnoredMulti);
-        rrdset_done(st);
+        static struct udp_errors_chart chart = UDP_ERRORS(RRD_TYPE_NET_IP4, "udperrors", "udp", "IPv4 UDP Errors", NETDATA_CHART_PRIO_IPV4_UDP_ERRORS, true);
+        struct udp_errors values = {
+            .RcvbufErrors = snmp_root.udp_RcvbufErrors,
+            .SndbufErrors = snmp_root.udp_SndbufErrors,
+            .InErrors = snmp_root.udp_InErrors,
+            .NoPorts = snmp_root.udp_NoPorts,
+            .InCsumErrors = snmp_root.udp_InCsumErrors,
+            .IgnoredMulti = snmp_root.udp_IgnoredMulti,
+        };
+        udp_errors_chart_update(&chart, update_every, &values);
     }
 
     // snmp UdpLite charts
@@ -2748,76 +2247,19 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if (do_udplite_packets == CONFIG_BOOLEAN_YES || do_udplite_packets == CONFIG_BOOLEAN_AUTO) {
         do_udplite_packets = CONFIG_BOOLEAN_YES;
 
-        {
-            static RRDSET *st = NULL;
-            static RRDDIM *rd_InDatagrams = NULL,
-                            *rd_OutDatagrams = NULL;
+        static struct rx_tx_chart packets = RX_TX_COUNTER(RRD_TYPE_NET_IP4, "udplite", "udplite", "IPv4 UDPLite Packets", "packets/s", NETDATA_CHART_PRIO_IPV4_UDPLITE_PACKETS);
+        rx_tx_chart_update(&packets, update_every, snmp_root.udplite_InDatagrams, snmp_root.udplite_OutDatagrams);
 
-            if(unlikely(!st)) {
-                st = rrdset_create_localhost(
-                        RRD_TYPE_NET_IP4
-                        , "udplite"
-                        , NULL
-                        , "udplite"
-                        , NULL
-                        , "IPv4 UDPLite Packets"
-                        , "packets/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_UDPLITE_PACKETS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rd_InDatagrams  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_OutDatagrams = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st, rd_InDatagrams,  (collected_number)snmp_root.udplite_InDatagrams);
-            rrddim_set_by_pointer(st, rd_OutDatagrams, (collected_number)snmp_root.udplite_OutDatagrams);
-            rrdset_done(st);
-        }
-
-        {
-            static RRDSET *st = NULL;
-            static RRDDIM *rd_RcvbufErrors = NULL,
-                            *rd_SndbufErrors = NULL,
-                            *rd_InErrors = NULL,
-                            *rd_NoPorts = NULL,
-                            *rd_InCsumErrors = NULL,
-                            *rd_IgnoredMulti = NULL;
-
-            if(unlikely(!st)) {
-                st = rrdset_create_localhost(
-                        RRD_TYPE_NET_IP4
-                        , "udplite_errors"
-                        , NULL
-                        , "udplite"
-                        , NULL
-                        , "IPv4 UDPLite Errors"
-                        , "packets/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_UDPLITE_ERRORS
-                        , update_every
-                        , RRDSET_TYPE_LINE);
-
-                rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_IgnoredMulti = rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st, rd_NoPorts,      (collected_number)snmp_root.udplite_NoPorts);
-            rrddim_set_by_pointer(st, rd_InErrors,     (collected_number)snmp_root.udplite_InErrors);
-            rrddim_set_by_pointer(st, rd_InCsumErrors, (collected_number)snmp_root.udplite_InCsumErrors);
-            rrddim_set_by_pointer(st, rd_RcvbufErrors, (collected_number)snmp_root.udplite_RcvbufErrors);
-            rrddim_set_by_pointer(st, rd_SndbufErrors, (collected_number)snmp_root.udplite_SndbufErrors);
-            rrddim_set_by_pointer(st, rd_IgnoredMulti, (collected_number)snmp_root.udplite_IgnoredMulti);
-            rrdset_done(st);
-        }
+        static struct udp_errors_chart errors = UDP_ERRORS(RRD_TYPE_NET_IP4, "udplite_errors", "udplite", "IPv4 UDPLite Errors", NETDATA_CHART_PRIO_IPV4_UDPLITE_ERRORS, true);
+        struct udp_errors values = {
+            .RcvbufErrors = snmp_root.udplite_RcvbufErrors,
+            .SndbufErrors = snmp_root.udplite_SndbufErrors,
+            .InErrors = snmp_root.udplite_InErrors,
+            .NoPorts = snmp_root.udplite_NoPorts,
+            .InCsumErrors = snmp_root.udplite_InCsumErrors,
+            .IgnoredMulti = snmp_root.udplite_IgnoredMulti,
+        };
+        udp_errors_chart_update(&errors, update_every, &values);
     }
 
     do_proc_net_snmp6(update_every);
