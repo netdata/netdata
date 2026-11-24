@@ -9,7 +9,7 @@ void mallocz_register_out_of_memory_cb(out_of_memory_cb cb) {
 
 static __thread bool out_of_memory_running = false;
 
-ALWAYS_INLINE NORETURN
+NEVER_INLINE_COLD NORETURN
 void out_of_memory(const char *call, size_t size, const char *details) {
     int errno_saved = errno;
 
@@ -38,6 +38,9 @@ void out_of_memory(const char *call, size_t size, const char *details) {
     size_snprintf(mem_available, sizeof(mem_available), sm.ram_available_bytes, "B", false);
     size_snprintf(rss_used, sizeof(rss_used), max_rss, "B", false);
 
+    // may read /proc and change errno, so call it before restoring errno
+    unsigned long long mmap_limit = os_mmap_limit();
+
     errno = errno_saved;
     fatal("Out of memory on %s(%zu bytes)!\n"
           "System memory available: %s, while our max RSS usage is: %s\n"
@@ -45,7 +48,7 @@ void out_of_memory(const char *call, size_t size, const char *details) {
           "Additional details: %s",
           call, size,
           mem_available, rss_used,
-          os_mmap_limit(), __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED),
+          mmap_limit, __atomic_load_n(&nd_mmap_count, __ATOMIC_RELAXED),
           details ? details : "none");
 }
 
