@@ -9,7 +9,6 @@ struct nfsd_procs {
     unsigned long long value;
     int present;
     RRDDIM *rd;
-    const char *dim_name;   // dimension name when it differs from the id (name)
 };
 
 struct nfsd_procs nfsd_proc2_values[] = {
@@ -64,18 +63,6 @@ struct nfsd_procs nfsd_proc3_values[] = {
 
         /* termination */
         {  ""           , 0ULL, 0, NULL}
-};
-
-// The server registers only two NFSv4 procedures, NULL and COMPOUND (the
-// individual operations are in proc4ops). The COMPOUND dimension keeps the
-// id "read" it was published with, for continuity of existing data.
-struct nfsd_procs nfsd_proc4_values[] = {
-        {  "null"            , 0ULL, 0, NULL, NULL}
-        , {"read"            , 0ULL, 0, NULL, "compound"}
-        ,
-
-        /* termination */
-        {  ""                , 0ULL, 0, NULL, NULL}
 };
 
 struct nfsd_procs nfsd4_ops_values[] = {
@@ -214,6 +201,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     unsigned long long th_threads = 0;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
+    unsigned long long proc4_null = 0, proc4_compound = 0;
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
@@ -347,18 +335,17 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_proc3 = 2;
         }
         else if(do_proc4 == 1 && strcmp(type, "proc4") == 0) {
-            // the first number is the count of numbers present
-            // so we start for word 2
-
-            unsigned long long sum = 0;
-            unsigned int i, j;
-            for(i = 0, j = 2; j < words && nfsd_proc4_values[i].name[0] ; i++, j++) {
-                nfsd_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
-                nfsd_proc4_values[i].present = 1;
-                sum += nfsd_proc4_values[i].value;
+            // the server registers only two NFSv4 procedures, NULL and COMPOUND
+            // (the individual operations are in proc4ops); word 1 is their count
+            if(unlikely(words < 4)) {
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
+                continue;
             }
 
-            if(sum == 0ULL) {
+            proc4_null = str2ull(procfile_lineword(ff, l, 2), NULL);
+            proc4_compound = str2ull(procfile_lineword(ff, l, 3), NULL);
+
+            if(proc4_null + proc4_compound == 0ULL) {
                 if(!proc4_warning) {
                     collector_info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
@@ -639,6 +626,8 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
+        static RRDDIM *rd_null = NULL, *rd_compound = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     "nfsd"
@@ -654,16 +643,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
+
+            rd_null     = rrddim_add(st, "null", NULL,       1, 1, RRD_ALGORITHM_INCREMENTAL);
+            // COMPOUND keeps the id "read" it was published with, for continuity of existing data
+            rd_compound = rrddim_add(st, "read", "compound", 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        size_t i;
-        for(i = 0; nfsd_proc4_values[i].present ; i++) {
-            if(unlikely(!nfsd_proc4_values[i].rd))
-                nfsd_proc4_values[i].rd = rrddim_add(st, nfsd_proc4_values[i].name, nfsd_proc4_values[i].dim_name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_set_by_pointer(st, nfsd_proc4_values[i].rd, nfsd_proc4_values[i].value);
-        }
-
+        rrddim_set_by_pointer(st, rd_null, proc4_null);
+        rrddim_set_by_pointer(st, rd_compound, proc4_compound);
         rrdset_done(st);
     }
 
