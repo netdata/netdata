@@ -269,8 +269,6 @@ You can find the StatsD configuration in `/etc/netdata/netdata.conf`:
 	# create private charts for metrics matching = *
 	# max private charts hard limit = 1000
 	# set charts as obsolete after = 0
-	# private charts memory mode = save
-	# private charts history = 3996
 	# histograms and timers percentile (percentThreshold) = 95.00000
 	# add dimension for number of events received = no
 	# gaps on gauges (deleteGauges) = no
@@ -424,10 +422,7 @@ Example: To create charts for all `myapp.*` metrics except `myapp.*.badmetric`:
 create private charts for metrics matching = !myapp.*.badmetric myapp.*
 ```
 
-You can configure a different memory mode specifically for StatsD charts:
-
-- `private charts memory mode`
-- `private charts history`
+Private charts use the host's memory mode and retention.
 
 <details>
 <summary><strong>Private Chart Examples</strong></summary>
