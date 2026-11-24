@@ -20,7 +20,75 @@ void rrd_slot_memory_removed(size_t added) {
 
 struct netdata_buffers_statistics netdata_buffers_statistics = { 0 };
 
+// The buffers netdata.memory "buffers" sums and netdata.memory_buffers breaks down,
+// in the order of the netdata.memory_buffers dimensions.
+enum pulse_buffers {
+    PULSE_BUFFERS_QUERIES = 0,
+    PULSE_BUFFERS_COLLECTION,
+    PULSE_BUFFERS_ACLK,
+    PULSE_BUFFERS_API,
+    PULSE_BUFFERS_FUNCTIONS,
+    PULSE_BUFFERS_SQLITE,
+    PULSE_BUFFERS_EXPORTERS,
+    PULSE_BUFFERS_HEALTH,
+    PULSE_BUFFERS_STREAMING,
+    PULSE_BUFFERS_STREAMING_CBUF,
+    PULSE_BUFFERS_REPLICATION,
+    PULSE_BUFFERS_WEB,
+    PULSE_BUFFERS_ARAL_BY_SIZE_FREE,
+    PULSE_BUFFERS_ARAL_JUDY_FREE,
+    PULSE_BUFFERS_UUID,
+
+    // terminator
+    PULSE_BUFFERS_MAX,
+};
+
+static const char *pulse_buffers_dimension[PULSE_BUFFERS_MAX] = {
+    [PULSE_BUFFERS_QUERIES] = "queries",
+    [PULSE_BUFFERS_COLLECTION] = "collection",
+    [PULSE_BUFFERS_ACLK] = "aclk",
+    [PULSE_BUFFERS_API] = "api",
+    [PULSE_BUFFERS_FUNCTIONS] = "functions",
+    [PULSE_BUFFERS_SQLITE] = "sqlite",
+    [PULSE_BUFFERS_EXPORTERS] = "exporters",
+    [PULSE_BUFFERS_HEALTH] = "health",
+    [PULSE_BUFFERS_STREAMING] = "streaming",
+    [PULSE_BUFFERS_STREAMING_CBUF] = "streaming cbuf",
+    [PULSE_BUFFERS_REPLICATION] = "replication",
+    [PULSE_BUFFERS_WEB] = "web",
+    [PULSE_BUFFERS_ARAL_BY_SIZE_FREE] = "aral-by-size free",
+    [PULSE_BUFFERS_ARAL_JUDY_FREE] = "aral-judy free",
+    [PULSE_BUFFERS_UUID] = "uuid",
+};
+
+// read every buffer once and return their total
+static size_t pulse_buffers_get(size_t buffers[PULSE_BUFFERS_MAX]) {
+    buffers[PULSE_BUFFERS_QUERIES] = netdata_buffers_statistics.query_targets_size + onewayalloc_allocated_memory();
+    buffers[PULSE_BUFFERS_COLLECTION] = netdata_buffers_statistics.rrdset_done_rda_size;
+    buffers[PULSE_BUFFERS_ACLK] = netdata_buffers_statistics.buffers_aclk;
+    buffers[PULSE_BUFFERS_API] = netdata_buffers_statistics.buffers_api;
+    buffers[PULSE_BUFFERS_FUNCTIONS] = nrpc_buffers_functions;
+    buffers[PULSE_BUFFERS_SQLITE] = netdata_buffers_statistics.buffers_sqlite;
+    buffers[PULSE_BUFFERS_EXPORTERS] = netdata_buffers_statistics.buffers_exporters;
+    buffers[PULSE_BUFFERS_HEALTH] = netdata_buffers_statistics.buffers_health;
+    buffers[PULSE_BUFFERS_STREAMING] = netdata_buffers_statistics.buffers_streaming;
+    buffers[PULSE_BUFFERS_STREAMING_CBUF] = netdata_buffers_statistics.cbuffers_streaming;
+    buffers[PULSE_BUFFERS_REPLICATION] = replication_sender_allocated_buffers();
+    buffers[PULSE_BUFFERS_WEB] = netdata_buffers_statistics.buffers_web;
+    buffers[PULSE_BUFFERS_ARAL_BY_SIZE_FREE] = aral_by_size_free_bytes();
+    buffers[PULSE_BUFFERS_ARAL_JUDY_FREE] = judy_aral_free_bytes();
+    buffers[PULSE_BUFFERS_UUID] = uuidmap_free_bytes();
+
+    size_t total = 0;
+    for(size_t i = 0; i < PULSE_BUFFERS_MAX; i++)
+        total += buffers[i];
+
+    return total;
+}
+
 void pulse_daemon_memory_do(bool extended __maybe_unused) {
+    size_t buffers[PULSE_BUFFERS_MAX];
+    size_t buffers_total = pulse_buffers_get(buffers);
 
     {
         static RRDSET *st_memory = NULL;
@@ -98,24 +166,6 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
             rd_health_log = rrddim_add(st_memory, "health log", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        // each of these should also be analyzed below at the buffers chart
-        size_t buffers =
-            netdata_buffers_statistics.query_targets_size + onewayalloc_allocated_memory() +
-            netdata_buffers_statistics.rrdset_done_rda_size +
-            netdata_buffers_statistics.buffers_aclk +
-            netdata_buffers_statistics.buffers_api +
-            nrpc_buffers_functions +
-            netdata_buffers_statistics.buffers_sqlite +
-            netdata_buffers_statistics.buffers_exporters +
-            netdata_buffers_statistics.buffers_health +
-            netdata_buffers_statistics.buffers_streaming +
-            netdata_buffers_statistics.cbuffers_streaming +
-            netdata_buffers_statistics.buffers_web +
-            replication_sender_allocated_buffers() +
-            aral_by_size_free_bytes() +
-            judy_aral_free_bytes() +
-            uuidmap_free_bytes();
-
         sqlite3_int64 sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
         sqlite3_status64(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
 
@@ -189,7 +239,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                               (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
 
         rrddim_set_by_pointer(st_memory, rd_buffers,
-                              (collected_number)buffers);
+                              (collected_number)buffers_total);
 
         rrddim_set_by_pointer(st_memory, rd_workers,
                               (collected_number) workers_allocated_memory());
@@ -217,21 +267,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
 
     {
         static RRDSET *st_memory_buffers = NULL;
-        static RRDDIM *rd_queries = NULL;
-        static RRDDIM *rd_collectors = NULL;
-        static RRDDIM *rd_buffers_aclk = NULL;
-        static RRDDIM *rd_buffers_api = NULL;
-        static RRDDIM *rd_buffers_functions = NULL;
-        static RRDDIM *rd_buffers_sqlite = NULL;
-        static RRDDIM *rd_buffers_exporters = NULL;
-        static RRDDIM *rd_buffers_health = NULL;
-        static RRDDIM *rd_buffers_streaming = NULL;
-        static RRDDIM *rd_cbuffers_streaming = NULL;
-        static RRDDIM *rd_buffers_replication = NULL;
-        static RRDDIM *rd_buffers_web = NULL;
-        static RRDDIM *rd_buffers_aral = NULL;
-        static RRDDIM *rd_buffers_judy = NULL;
-        static RRDDIM *rd_buffers_uuid = NULL;
+        static RRDDIM *rd_buffer_dims[PULSE_BUFFERS_MAX] = { 0 };
 
         if (unlikely(!st_memory_buffers)) {
             st_memory_buffers = rrdset_create_localhost(
@@ -248,39 +284,12 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_queries = rrddim_add(st_memory_buffers, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_collectors = rrddim_add(st_memory_buffers, "collection", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_aclk = rrddim_add(st_memory_buffers, "aclk", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_api = rrddim_add(st_memory_buffers, "api", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_functions = rrddim_add(st_memory_buffers, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_sqlite = rrddim_add(st_memory_buffers, "sqlite", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_exporters = rrddim_add(st_memory_buffers, "exporters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_health = rrddim_add(st_memory_buffers, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_streaming = rrddim_add(st_memory_buffers, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_aral = rrddim_add(st_memory_buffers, "aral-by-size free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_judy = rrddim_add(st_memory_buffers, "aral-judy free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_uuid = rrddim_add(st_memory_buffers, "uuid", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            for(size_t i = 0; i < PULSE_BUFFERS_MAX; i++)
+                rd_buffer_dims[i] = rrddim_add(st_memory_buffers, pulse_buffers_dimension[i], NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        // the sum of all these needs to be above at the total buffers calculation
-        rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
-        rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)nrpc_buffers_functions);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_sqlite, (collected_number)netdata_buffers_statistics.buffers_sqlite);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
-        rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_sender_allocated_buffers());
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_free_bytes());
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_free_bytes());
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_uuid, (collected_number)uuidmap_free_bytes());
+        for(size_t i = 0; i < PULSE_BUFFERS_MAX; i++)
+            rrddim_set_by_pointer(st_memory_buffers, rd_buffer_dims[i], (collected_number)buffers[i]);
 
         rrdset_done(st_memory_buffers);
     }
@@ -311,7 +320,6 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
             rd_available = rrddim_add(st_memory_available, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        // the sum of all these needs to be above at the total buffers calculation
         rrddim_set_by_pointer(
             st_memory_available, rd_available,
             (collected_number)sm.ram_available_bytes);

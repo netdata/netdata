@@ -140,12 +140,7 @@ void pulse_daemon_memory_system_do(bool extended) {
         // cadence we can achieve, and our own interval has to be a multiple of it -
         // otherwise the chart would declare one update_every and be fed at another,
         // which shows up as gaps.
-        int pulse_every = (int)inicfg_get_duration_seconds(
-            &netdata_config, CONFIG_SECTION_PULSE,
-            "update every", localhost->rrd_update_every);
-
-        if(pulse_every < localhost->rrd_update_every)
-            pulse_every = localhost->rrd_update_every;
+        int pulse_every = pulse_update_every();
 
         mallinfo_every = (int)inicfg_get_duration_seconds(
             &netdata_config, CONFIG_SECTION_PULSE,
