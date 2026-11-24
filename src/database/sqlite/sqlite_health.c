@@ -543,6 +543,26 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
     netdata_mutex_unlock(&health_log_save_mutex);
 }
 
+// Interned texts no transition refers to any more: their rows aged out of retention, or their chart labels changed.
+// Each text costs two probes of the partial info_id / summary_id indexes, so the sweep never scans
+// health_log_detail. A deleted id may be handed out again, which is safe only because nothing refers to it.
+#define SQL_DELETE_ORPHAN_HEALTH_LOG_TEXT                                                                              \
+    "DELETE FROM health_log_text WHERE"                                                                                \
+    " NOT EXISTS (SELECT 1 FROM health_log_detail WHERE info_id = health_log_text.id)"                                 \
+    " AND NOT EXISTS (SELECT 1 FROM health_log_detail WHERE summary_id = health_log_text.id)"
+
+// Under health_log_save_mutex, like every transition insert: a text looked up for a row that is about to be written
+// is not referenced yet, and must not be swept before the row exists.
+void sql_health_text_cleanup(void)
+{
+    if (!REQUIRE_HEALTH_DB_OPEN())
+        return;
+
+    netdata_mutex_lock(&health_log_save_mutex);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_TEXT, NULL);
+    netdata_mutex_unlock(&health_log_save_mutex);
+}
+
 /*
  *
  * Health related SQL queries
@@ -2382,7 +2402,9 @@ int sql_health_text_unittest(void)
     }
 
     // created by database_config[], which runs after the migrations
-    if (db_execute(db_meta, SQL_CREATE_HEALTH_LOG_TEXT, NULL)) {
+    if (db_execute(db_meta, SQL_CREATE_HEALTH_LOG_TEXT, NULL) ||
+        db_execute(db_meta, SQL_CREATE_HEALTH_LOG_D_INFO_ID_INDEX, NULL) ||
+        db_execute(db_meta, SQL_CREATE_HEALTH_LOG_D_SUMMARY_ID_INDEX, NULL)) {
         fprintf(stderr, "FAILED [health log text interning]: cannot create health_log_text\n");
         failed++;
         goto cleanup;
@@ -2527,6 +2549,39 @@ int sql_health_text_unittest(void)
             fprintf(stderr, "FAILED [alert transition renders the text]: transition 0x%02x\n", direct[i].transition);
             failed++;
         }
+    }
+
+    // the sweep removes only texts no row refers to, and finds them through the partial indexes
+    STRING *text_orphan = string_strdupz("orphaned text");
+    int64_t id_orphan = sql_health_text_id(text_orphan);
+    string_freez(text_orphan);
+    sql_health_text_cleanup();
+    snprintfz(check, sizeof(check) - 1,
+              "SELECT COUNT(*) FROM health_log_text WHERE id IN (%"PRId64", %"PRId64") AND id <> %"PRId64,
+              id_a, id_b, id_orphan);
+    if (id_orphan <= 0 || health_text_unittest_count(check) != 2 ||
+        health_text_unittest_count("SELECT COUNT(*) FROM health_log_text") != 2) {
+        fprintf(stderr, "FAILED [the sweep removes only unreferenced texts]\n");
+        failed++;
+    }
+
+    size_t index_probes = 0;
+    if (PREPARE_STATEMENT(db_meta, "EXPLAIN QUERY PLAN " SQL_DELETE_ORPHAN_HEALTH_LOG_TEXT, &res)) {
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+            const char *detail = (const char *)sqlite3_column_text(res, 3);
+            if (detail && strstr(detail, "health_log_detail") &&
+                (strstr(detail, "INDEX health_log_d_info_id") || strstr(detail, "INDEX health_log_d_summary_id")))
+                index_probes++;
+            else if (detail && strstr(detail, "SCAN health_log_detail")) {
+                fprintf(stderr, "FAILED [the sweep does not scan health_log_detail]: %s\n", detail);
+                failed++;
+            }
+        }
+    }
+    SQLITE_FINALIZE(res);
+    if (index_probes != 2) {
+        fprintf(stderr, "FAILED [the sweep probes both partial indexes]: %zu\n", index_probes);
+        failed++;
     }
 
     failed += health_text_unittest_partial_migration();
