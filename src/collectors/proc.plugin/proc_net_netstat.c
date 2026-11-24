@@ -1206,13 +1206,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         }
 
         if(do_bcast != CONFIG_BOOLEAN_NO) {
-            arl_expect(arl_ipext, "InBcastPkts",  &ipext_InBcastPkts);
-            arl_expect(arl_ipext, "OutBcastPkts", &ipext_OutBcastPkts);
+            arl_expect(arl_ipext, "InBcastOctets",  &ipext_InBcastOctets);
+            arl_expect(arl_ipext, "OutBcastOctets", &ipext_OutBcastOctets);
         }
 
         if(do_bcast_p != CONFIG_BOOLEAN_NO) {
-            arl_expect(arl_ipext, "InBcastOctets",  &ipext_InBcastOctets);
-            arl_expect(arl_ipext, "OutBcastOctets", &ipext_OutBcastOctets);
+            arl_expect(arl_ipext, "InBcastPkts",  &ipext_InBcastPkts);
+            arl_expect(arl_ipext, "OutBcastPkts", &ipext_OutBcastPkts);
         }
 
         if(do_ecn != CONFIG_BOOLEAN_NO) {
