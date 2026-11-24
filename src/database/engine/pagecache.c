@@ -1250,8 +1250,12 @@ bool rrdeng_in_memory_take_lost_retention(void) {
 // metric has no retention, whatever order its pages were freed in: its release deletes it when nothing collects it.
 // When the newest page is lost, the latest time moves back to the newest page that remains.
 
-// the start of the metric's oldest page that holds data, or 0; with newest_end_s, the end of its newest one too
-static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_t metric_id, time_t *newest_end_s) {
+// the start of the metric's oldest page that holds data, or 0. With newest_end_s, the end of its newest page that holds
+// data too (0 when there is none). With newest_hot_end_s as well, the two are kept apart: newest_end_s gets the closed
+// pages only, and newest_hot_end_s the hot ones. A hot page's end is the collector's hot time, which follows it as the
+// collector appends, while the clean latest time comes from closed pages: a hot page that holds only gaps is discarded
+// when it is closed, and had its end been copied to the clean time, that time would stay past the data.
+static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_t metric_id, time_t *newest_end_s, time_t *newest_hot_end_s) {
     time_t start_s = 0, oldest_s = 0;
     PGC_SEARCH method = PGC_SEARCH_FIRST;
     PGC_PAGE *page;
@@ -1265,7 +1269,8 @@ static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_
         // a gap marker (pgc_inject_gap()) holds no data. A hot page counts as data without being read, because its
         // collector appends to it meanwhile: if it holds only gaps, the collector discards it when it closes it, and
         // the free callback of that discard decides again from the pages that remain
-        bool has_data = pgc_is_page_hot(page) || !pgd_is_empty(pgc_page_data(page));
+        bool is_hot = pgc_is_page_hot(page);
+        bool has_data = is_hot || !pgd_is_empty(pgc_page_data(page));
         // no inline eviction on release in this cache (PGC_OPTIONS_EVICT_PAGES_NO_INLINE)
         pgc_page_release(cache, page);
 
@@ -1278,8 +1283,9 @@ static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_
         if (!newest_end_s)
             break;
 
-        if (end_s > *newest_end_s)
-            *newest_end_s = end_s;
+        time_t *newest = (is_hot && newest_hot_end_s) ? newest_hot_end_s : newest_end_s;
+        if (end_s > *newest)
+            *newest = end_s;
     }
 
     return oldest_s;
@@ -1318,28 +1324,31 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
         // this page may have been the newest only while the metric's latest time is its end: then all the pages that
         // remain are scanned for the newest one
         bool was_latest = mrg_metric_latest_time_is(main_mrg, metric, entry.end_time_s);
-        time_t newest_end_s = 0;
-        time_t oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, was_latest ? &newest_end_s : NULL);
+        time_t newest_end_s = 0, newest_hot_end_s = 0;
+        time_t oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id,
+                                                           was_latest ? &newest_end_s : NULL, &newest_hot_end_s);
         ram_cache_retention_test_point(&entry, RAM_CACHE_RETENTION_HOOK_SCANNED);
         if (oldest_s) {
             mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s);
 
             if (was_latest && newest_end_s < entry.end_time_s) {
-                // the newest data is gone: the latest time moves back to the newest page that remains, so a new
-                // collector and a refill by replication start after the data that is kept, not after the data lost
+                // the newest data is gone: the clean latest time moves back to the newest closed page that remains, so
+                // a new collector and a refill by replication start after the data that is kept, not after the data
+                // lost. A hot page that remains is reported by the hot time: it is cleared only when it is this page's
+                // end and no hot page ends there
                 mrg_metric_replace_clean_latest_time_s(main_mrg, metric, entry.end_time_s, newest_end_s);
-                mrg_metric_clear_hot_latest_time_s(main_mrg, metric, entry.end_time_s);
+                if (newest_hot_end_s != entry.end_time_s)
+                    mrg_metric_clear_hot_latest_time_s(main_mrg, metric, entry.end_time_s);
 
-                // a collector may have stored this time again for a page of its own meanwhile: its page is in the
-                // index before it stores any time, so it is found here
-                time_t newest_end_now_s = 0;
-                ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &newest_end_now_s);
+                // a collector may have closed a page meanwhile: its page is in the index before it stores any time,
+                // so it is found here
+                time_t newest_end_now_s = 0, newest_hot_end_now_s = 0;
+                ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &newest_end_now_s, &newest_hot_end_now_s);
                 if (newest_end_now_s > newest_end_s)
                     mrg_metric_expand_retention(main_mrg, metric, 0, newest_end_now_s, 0);
             }
             else if (was_latest && newest_end_s > entry.end_time_s)
-                // a newer page remains: usually the collector's hot page, whose time is reported already; or another
-                // writer of the metric left the latest time at this page
+                // a newer closed page remains: another writer of the metric left the latest time at this page
                 mrg_metric_expand_retention(main_mrg, metric, 0, newest_end_s, 0);
         }
         else {
@@ -1348,9 +1357,11 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
             mrg_metric_clear_retention(main_mrg, metric);
 
             // a collector may have added pages after the scan, and the clear above may have erased the retention
-            // they recorded: restore it from them (the metric keeps its update every: the clear does not touch it)
+            // they recorded: restore it from them, hot pages included (a collector closing its page publishes the
+            // clean time before the page leaves the hot queue; a gap page found here is normally the only page left,
+            // so its discard clears this again). The metric keeps its update every: the clear does not touch it
             time_t restored_end_s = 0;
-            oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &restored_end_s);
+            oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &restored_end_s, NULL);
             if (oldest_s)
                 mrg_metric_expand_retention(main_mrg, metric, oldest_s, restored_end_s, 0);
             else

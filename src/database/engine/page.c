@@ -1100,6 +1100,11 @@ size_t pgd_compact(PGD *pg) {
     return before - size;
 }
 
+// was the page packed by pgd_compact()?
+bool pgd_is_compacted(PGD *pg) {
+    return pg && pg != PGD_EMPTY && (pg->states & PGD_STATE_COMPACTED);
+}
+
 // ----------------------------------------------------------------------------
 // querying with cursor
 

@@ -1135,6 +1135,39 @@ static size_t test_dbengine_in_memory(void) {
     unittest_storage_engine_store_flush(rd7->tiers[0].sch);
     errors += in_memory_test_retention(ctx, rd7, 0, 0, "after the last data page was evicted under a page of gaps,");
 
+    // 6c. as 6, but the collector appends another gap after the eviction and before it closes its page: the eviction
+    //     must leave the clean latest time at the data page that remains, not at the end the gap page had then, which
+    //     the discard of the gap page could no longer replace
+    RRDDIM *rd8 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-gaps-grow", 1);
+    if(!rd8)
+        return errors + 1;
+
+    in_memory_test_store_pages(rd8, base_s, 2);
+    const time_t gaps8_s = base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS;
+    for(time_t t = gaps8_s; t < gaps8_s + 5; t++)
+        unittest_storage_engine_store_metric(rd8->tiers[0].sch, (usec_t)t * USEC_PER_SEC, NAN, NAN, NAN, 1, 0, SN_EMPTY_SLOT);
+
+    f.metric_id = (Word_t)rd8->uuid;
+    f.start_time_s = base_s + IN_MEMORY_TEST_PAGE_POINTS;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+
+    METRIC *metric8 = mrg_metric_get_and_acquire_by_id(main_mrg, rd8->uuid, (Word_t)ctx);
+    if(!metric8)
+        return errors + 1;
+    time_t clean8_s = mrg_metric_get_latest_clean_time_s(main_mrg, metric8);
+    mrg_metric_release(main_mrg, metric8);
+    if(clean8_s != base_s + IN_MEMORY_TEST_PAGE_POINTS - 1) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the clean latest time is %jd after the newest data page was evicted "
+                        "under a page of gaps (expected %jd)\n",
+                (intmax_t)clean8_s, (intmax_t)(base_s + IN_MEMORY_TEST_PAGE_POINTS - 1));
+        errors++;
+    }
+
+    unittest_storage_engine_store_metric(rd8->tiers[0].sch, (usec_t)(gaps8_s + 5) * USEC_PER_SEC, NAN, NAN, NAN, 1, 0, SN_EMPTY_SLOT);
+    unittest_storage_engine_store_flush(rd8->tiers[0].sch);
+    errors += in_memory_test_retention(ctx, rd8, base_s, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1,
+                                       "after the newest data page was evicted under a page of gaps that grew,");
+
     // 7. a page closed because it is full: no hot time is left at its end (it would outlive the page), and evicting it
     //    moves the latest time back to the older page (a host with a longer retention, so the retention pass does not
     //    touch these pages, older than the main test host's window)
@@ -1152,7 +1185,8 @@ static size_t test_dbengine_in_memory(void) {
 
     time_t full_end_s = 0;
     for(time_t t = base3_s + 10; t < base3_s + 4 * IN_MEMORY_TEST_POINTS; t++) {
-        dbengine_cadence_test_store_point(rd3, t, 2);
+        // varying values: the page needs several gorilla buffers before it is full
+        dbengine_cadence_test_store_point(rd3, t, (NETDATA_DOUBLE)(t - base3_s + 1));
         if(!handle3->pgc_page) {
             full_end_s = t;
             break;
@@ -1169,6 +1203,27 @@ static size_t test_dbengine_in_memory(void) {
                     (intmax_t)handle3->hot_time_s);
             errors++;
         }
+
+        // the page grew to several gorilla buffers while hot, then was packed into one allocation that reads back
+        // what was stored, and the size histograms count it once
+        PGC_PAGE *full3 = pgc_page_get_and_acquire(ram_cache, (Word_t)ctx_long, (Word_t)rd3->uuid, base3_s + 10, PGC_SEARCH_EXACT);
+        if(!full3) {
+            fprintf(stderr, " >>> DBENGINE: in memory: the page that closed full is not in the cache\n");
+            errors++;
+        }
+        else {
+            PGD *pgd3 = pgc_page_data(full3);
+            uint32_t packed3 = pgd3 == PGD_EMPTY ? 0 : pgd_buffer_memory_footprint(pgd3);
+            if(!pgd_is_compacted(pgd3) || packed3 <= RRDENG_GORILLA_32BIT_BUFFER_SIZE) {
+                fprintf(stderr, " >>> DBENGINE: in memory: the page that closed full is %s, %u bytes "
+                                "(expected packed, more than one gorilla buffer)\n",
+                        pgd_is_compacted(pgd3) ? "packed" : "not packed", packed3);
+                errors++;
+            }
+            pgc_page_release(ram_cache, full3);
+        }
+        errors += in_memory_test_query(rd3, base3_s + 10, full_end_s, base3_s, "the page that closed full");
+        errors += in_memory_test_histograms("after a page of several gorilla buffers was packed");
 
         struct in_memory_test_page_filter f3 = {
             .section = (Word_t)ctx_long,
@@ -1217,6 +1272,7 @@ static size_t test_dbengine_in_memory(void) {
     rrdset_free(rd6->rrdset);
     rrdset_free(rd5->rrdset);
     rrdset_free(rd3->rrdset);
+    rrdset_free(rd8->rrdset);
     rrdset_free(rd7->rrdset);
     rrdset_free(rd4->rrdset);
     rrdset_free(rd2->rrdset);
@@ -1773,6 +1829,87 @@ static size_t test_dbengine_datafile_names(void) {
     return errors;
 }
 
+// db = none (src/database/storage-none.c): points are collected but none is kept. The retention of a metric is the
+// instant of its last point, queries return nothing, the metric cannot be found by id or uuid, and a handle a query
+// keeps stays valid after its dimension is freed.
+static size_t test_storage_none(void) {
+    fprintf(stderr, "\nDBENGINE: testing db = none...\n");
+    size_t errors = 0;
+
+    RRDHOST *host = dbengine_rrdhost_find_or_create_mode("unittest-storage-none", RRD_DB_MODE_NONE, 5);
+    if(!host || host->db[0].mode != RRD_DB_MODE_NONE) {
+        fprintf(stderr, " >>> STORAGE NONE: the host did not get db = none\n");
+        return 1;
+    }
+
+    char id[128];
+    snprintfz(id, sizeof(id) - 1, "unittest-none-%d", getpid());
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = st ? rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE) : NULL;
+    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_NONE || !rd->tiers[0].smh || !rd->tiers[0].sch) {
+        fprintf(stderr, " >>> STORAGE NONE: the dimension did not get a db = none handle\n");
+        return errors + 1;
+    }
+
+    STORAGE_METRIC_HANDLE *smh = rd->tiers[0].smh;
+    if(storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND_NONE, smh) != 0) {
+        fprintf(stderr, " >>> STORAGE NONE: a retention before the first point\n");
+        errors++;
+    }
+
+    const time_t base_s = now_realtime_sec() - 100;
+    for(time_t t = base_s; t < base_s + 5; t++)
+        unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+
+    time_t oldest_s = storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND_NONE, smh);
+    time_t latest_s = storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND_NONE, smh);
+    if(oldest_s != base_s + 4 || latest_s != base_s + 4) {
+        fprintf(stderr, " >>> STORAGE NONE: the retention is %jd - %jd, expected the last point %jd\n",
+                (intmax_t)oldest_s, (intmax_t)latest_s, (intmax_t)(base_s + 4));
+        errors++;
+    }
+
+    // nothing finds the metric again: it has no other copy
+    STORAGE_ENGINE *eng = host->db[0].eng;
+    time_t first_s = 1, last_s = 1;
+    nd_uuid_t metric_uuid;
+    if(!uuidmap_uuid(rd->uuid, metric_uuid) ||
+       eng->api.metric_get_by_uuid(host->db[0].si, &metric_uuid) ||
+       eng->api.metric_get_by_id(host->db[0].si, rd->uuid) ||
+       eng->api.metric_retention_by_uuid(host->db[0].si, &metric_uuid, &first_s, &last_s) || first_s || last_s) {
+        fprintf(stderr, " >>> STORAGE NONE: the metric was found by id or uuid, or has a retention there\n");
+        errors++;
+    }
+
+    // a query keeps its own copy of the handle (query_metric_add()): it returns no point
+    STORAGE_METRIC_HANDLE *query_smh = eng->api.metric_dup(smh);
+    struct storage_engine_query_handle seqh = { 0 };
+    unittest_storage_engine_query_init(STORAGE_ENGINE_BACKEND_NONE, query_smh, &seqh, base_s, base_s + 4, STORAGE_PRIORITY_SYNCHRONOUS);
+    size_t points = 0;
+    for(size_t safety = 0; safety < 10 && !unittest_storage_engine_query_is_finished(&seqh); safety++) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        if(!storage_point_is_gap(sp))
+            points++;
+    }
+    if(!unittest_storage_engine_query_is_finished(&seqh) || points) {
+        fprintf(stderr, " >>> STORAGE NONE: the query returned %zu points or did not finish\n", points);
+        errors++;
+    }
+    unittest_storage_engine_query_finalize(&seqh);
+
+    // the dimension goes, the query's copy stays valid until it is released (ASAN checks the use after free)
+    rrdset_free(st);
+    if(storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND_NONE, query_smh) != base_s + 4) {
+        fprintf(stderr, " >>> STORAGE NONE: the query's handle lost the retention when the dimension was freed\n");
+        errors++;
+    }
+    eng->api.metric_release(query_smh);
+
+    fprintf(stderr, "DBENGINE: db = none: %s\n", errors ? "FAILED" : "OK");
+    return errors;
+}
+
 int test_dbengine(void) {
     // the libuv pool is sized at the start of -W unittest (main.c): localhost (db = ram) starts dbengine before this
 
@@ -1790,6 +1927,7 @@ int test_dbengine(void) {
 
     errors += test_dbengine_datafile_names();
     errors += test_dbengine_in_memory();
+    errors += test_storage_none();
     errors += test_dbengine_burst_retention(host);
     errors += test_dbengine_page_close_time(host);
     errors += test_dbengine_page_phase_seed(host);
