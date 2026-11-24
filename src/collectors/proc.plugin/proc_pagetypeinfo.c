@@ -152,7 +152,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     static int do_global, do_detail;
     static SIMPLE_PATTERN *filter_types = NULL;
 
-    // Counters from parsing the file, that doesn't change after boot
+    // Parsed once at startup (the rows themselves live in pagelines, which can change at runtime)
     static struct systemorder systemorders[MAX_PAGETYPE_ORDER] = {};
     static long pagesize = 0;
     static size_t pageorders_cnt = 0;
