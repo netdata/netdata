@@ -227,7 +227,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     collector_error("Disabling /proc/net/rpc/nfs v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc2_warning = 1;
                 }
-                do_proc2 = 0;
+                do_proc2 = -1;
             }
             else do_proc2 = 2;
         }
@@ -248,7 +248,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     collector_info("Disabling /proc/net/rpc/nfs v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc3_warning = 1;
                 }
-                do_proc3 = 0;
+                do_proc3 = -1;
             }
             else do_proc3 = 2;
         }
@@ -269,7 +269,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     collector_info("Disabling /proc/net/rpc/nfs v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
                 }
-                do_proc4 = 0;
+                do_proc4 = -1;
             }
             else do_proc4 = 2;
         }
