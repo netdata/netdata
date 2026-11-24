@@ -1,0 +1,4 @@
+# The Agent owns the listener process; restart only after final erasure, not upgrade.
+if [ "$1" -eq 0 ] && [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    systemctl try-restart netdata.service || :
+fi
