@@ -315,46 +315,49 @@ int do_proc_ipc(int update_every, usec_t dt) {
 
         dimensions_limit = inicfg_get_number(&netdata_config, "plugin:proc:ipc", "max dimensions in memory allowed", 50);
 
-        // make sure it works
-        if(ipc_sem_get_limits(&limits) == -1) {
-            collector_error("unable to fetch semaphore limits");
-            do_sem = CONFIG_BOOLEAN_NO;
-        }
-        else if(ipc_sem_get_status(&status) == -1) {
-            collector_error("unable to fetch semaphore statistics");
-            do_sem = CONFIG_BOOLEAN_NO;
-        }
-        else {
-            // create the chart
-            if(unlikely(!st_arrays)) {
-                st_arrays = rrdset_create_localhost(
-                        "system"
-                        , "ipc_semaphore_arrays"
-                        , NULL
-                        , "ipc semaphores"
-                        , NULL
-                        , "IPC Semaphore Arrays"
-                        , "arrays"
-                        , PLUGIN_PROC_NAME
-                        , "ipc"
-                        , NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS
-                        , localhost->rrd_update_every
-                        , RRDSET_TYPE_AREA
-                );
-                rd_arrays = rrddim_add(st_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        if(do_sem != CONFIG_BOOLEAN_NO) {
+            if(ipc_sem_get_limits(&limits) == -1) {
+                collector_error("unable to fetch semaphore limits");
+                do_sem = CONFIG_BOOLEAN_NO;
             }
+            else if(ipc_sem_get_status(&status) == -1) {
+                collector_error("unable to fetch semaphore statistics");
+                do_sem = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                // create the chart
+                if(unlikely(!st_arrays)) {
+                    st_arrays = rrdset_create_localhost(
+                            "system"
+                            , "ipc_semaphore_arrays"
+                            , NULL
+                            , "ipc semaphores"
+                            , NULL
+                            , "IPC Semaphore Arrays"
+                            , "arrays"
+                            , PLUGIN_PROC_NAME
+                            , "ipc"
+                            , NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS
+                            , localhost->rrd_update_every
+                            , RRDSET_TYPE_AREA
+                    );
+                    rd_arrays = rrddim_add(st_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                }
 
-            // variables
-            semaphores_max = rrdvar_host_variable_add_and_acquire(localhost, "ipc_semaphores_max");
-            arrays_max     = rrdvar_host_variable_add_and_acquire(localhost, "ipc_semaphores_arrays_max");
+                // variables
+                semaphores_max = rrdvar_host_variable_add_and_acquire(localhost, "ipc_semaphores_max");
+                arrays_max     = rrdvar_host_variable_add_and_acquire(localhost, "ipc_semaphores_arrays_max");
+            }
         }
 
         struct stat stbuf;
-        if (stat(msg_filename, &stbuf)) {
+        if(do_msg != CONFIG_BOOLEAN_NO && stat(msg_filename, &stbuf))
             do_msg = CONFIG_BOOLEAN_NO;
-        }
 
-        if(unlikely(do_sem == CONFIG_BOOLEAN_NO && do_msg == CONFIG_BOOLEAN_NO)) {
+        if(do_shm != CONFIG_BOOLEAN_NO && stat(shm_filename, &stbuf))
+            do_shm = CONFIG_BOOLEAN_NO;
+
+        if(unlikely(do_sem == CONFIG_BOOLEAN_NO && do_msg == CONFIG_BOOLEAN_NO && do_shm == CONFIG_BOOLEAN_NO)) {
             collector_error("ipc module disabled");
             return 1;
         }
