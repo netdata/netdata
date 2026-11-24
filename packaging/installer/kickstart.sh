@@ -918,6 +918,10 @@ download() {
 #
 # Per-major version files are only published for non-nightly channels, so fall
 # back to the channel-wide latest version and accept it only if it matches.
+# The per-major file is treated as missing when the check reports it absent,
+# or its download returns not found after the check was skipped with
+# NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT non-empty. All other download
+# failures are lookup failures.
 get_actual_version() {
   major="${1}"
   channel="${2}"
@@ -925,9 +929,10 @@ get_actual_version() {
   set_tmpdir
   cd "${old_pwd}" || true
   tmp_file="${tmpdir}/version-info"
+  major_url="${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/${major}/Version"
+  latest_url="${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/latest/Version"
 
-  for version_url in "${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/${major}/Version" \
-                     "${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/latest/Version"; do
+  for version_url in "${major_url}" "${latest_url}"; do
     check_for_remote_file "${version_url}"
     check_ret="${?}"
 
@@ -939,7 +944,15 @@ get_actual_version() {
     fi
 
     # Reading the version file is read-only, so it is also done for dry runs.
-    if ! download "${version_url}" "${tmp_file}" force; then
+    download "${version_url}" "${tmp_file}" force
+    download_ret="${?}"
+    if [ "${download_ret}" -ne 0 ]; then
+      if [ "${download_ret}" -eq 1 ] &&
+        [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ] &&
+        [ "${version_url}" = "${major_url}" ]; then
+        continue
+      fi
+
       echo ""
       return
     fi

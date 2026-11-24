@@ -32,11 +32,12 @@ class KickstartMajorVersion(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.runs = 0
 
-    def run_major(self, table, major, selected='stable', release_channel='default', version='', success=True):
+    def run_major(self, table, major, selected='stable', release_channel='default', version='', success=True,
+                  assume_present=None, download_status=1):
         """Run handle_major_version with a {url: (check_status, content)} table.
 
         check_status is the return code of the stubbed check_for_remote_file; content None means that
-        downloading the URL fails. Returns the process result and the list of requested URLs.
+        downloading the URL fails with download_status. Returns the process result and the list of requested URLs.
         """
         self.runs += 1
         work = self.root / f'run{self.runs}'
@@ -64,7 +65,7 @@ check_for_remote_file() {{
 download() {{
   echo "download $1 $3" >> urls
   key="$(url_key "$1")"
-  [ -f "table/$key.content" ] || return 1
+  [ -f "table/$key.content" ] || return {download_status}
   cp "table/$key.content" "$2"
 }}
 INTERACTIVE=0
@@ -78,6 +79,8 @@ handle_major_version
 printf 'INSTALL_VERSION=%s\\n' "$INSTALL_VERSION"
 '''
         env = {k: v for k, v in os.environ.items() if not k.startswith('NETDATA_')}
+        if assume_present is not None:
+            env['NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT'] = assume_present
         result = subprocess.run(['/bin/sh', '-c', setup], cwd=work, env=env, text=True, capture_output=True)
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -124,7 +127,9 @@ printf 'INSTALL_VERSION=%s\\n' "$INSTALL_VERSION"
         cases = {
             'major file check fails': ({major: (2, None)}, [f'check {major}']),
             'latest check fails': ({major: (1, None), latest: (2, None)}, [f'check {major}', f'check {latest}']),
-            'download fails': ({major: (0, None)}, [f'check {major}', f'download {major} force']),
+            'major download fails': ({major: (0, None)}, [f'check {major}', f'download {major} force']),
+            'latest download fails': (
+                {major: (1, None), latest: (0, None)}, [f'check {major}', f'check {latest}', f'download {latest} force']),
         }
         for name, (table, expected_urls) in cases.items():
             with self.subTest(name):
@@ -132,6 +137,59 @@ printf 'INSTALL_VERSION=%s\\n' "$INSTALL_VERSION"
                 self.assertIn('F0517', result.stderr)
                 self.assertIn("channel 'stable'", result.stderr)
                 self.assertEqual(urls, expected_urls)
+
+    # With NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT, check_for_remote_file returns 0 without probing, so a
+    # missing per-major file only shows up as a failed download (status 0, no content in the stub table).
+    def test_assumed_present_major_download_failure_falls_back_to_latest(self):
+        major, latest = version_url('nightly', '2'), version_url('nightly', 'latest')
+        result, urls = self.run_major({major: (0, None), latest: (0, 'v2.12.0-653-nightly\n')}, '2',
+                                      selected='nightly', assume_present='1')
+        self.assertEqual(result.stdout, 'INSTALL_VERSION=2.12.0-653-nightly\n')
+        self.assertEqual(urls, [f'check {major}', f'download {major} force',
+                                f'check {latest}', f'download {latest} force'])
+
+    def test_assumed_present_major_and_latest_download_failures_are_fatal(self):
+        major, latest = version_url('nightly', '2'), version_url('nightly', 'latest')
+        result, urls = self.run_major({major: (0, None), latest: (0, None)}, '2', selected='nightly',
+                                      success=False, assume_present='1')
+        self.assertIn('F0517', result.stderr)
+        self.assertIn("channel 'nightly'", result.stderr)
+        self.assertEqual(urls, [f'check {major}', f'download {major} force',
+                                f'check {latest}', f'download {latest} force'])
+
+    def test_assumed_present_major_download_failure_with_latest_of_another_major(self):
+        major, latest = version_url('nightly', '2'), version_url('nightly', 'latest')
+        result, urls = self.run_major({major: (0, None), latest: (0, 'v3.0.0-1-nightly\n')}, '2',
+                                      selected='nightly', assume_present='1')
+        self.assertEqual(result.stdout, 'INSTALL_VERSION=\n')
+        self.assertIn("WARNING No releases with major version '2' have been published", result.stderr)
+        self.assertEqual(urls, [f'check {major}', f'download {major} force',
+                                f'check {latest}', f'download {latest} force'])
+
+    def test_assumed_present_major_download_errors_are_fatal(self):
+        major, latest = version_url('nightly', '2'), version_url('nightly', 'latest')
+        cases = {
+            'connection error': 2,
+            'TLS error': 3,
+            'HTTP client error': 5,
+            'HTTP server error': 6,
+        }
+        for name, status in cases.items():
+            with self.subTest(name):
+                result, urls = self.run_major({major: (0, None), latest: (0, 'v3.0.0-1-nightly\n')}, '2',
+                                              selected='nightly', success=False, assume_present='1',
+                                              download_status=status)
+                self.assertIn('F0517', result.stderr)
+                self.assertIn("channel 'nightly'", result.stderr)
+                self.assertEqual(urls, [f'check {major}', f'download {major} force'])
+
+    def test_empty_assume_present_major_download_not_found_is_fatal(self):
+        major, latest = version_url('nightly', '2'), version_url('nightly', 'latest')
+        result, urls = self.run_major({major: (0, None), latest: (0, 'v3.0.0-1-nightly\n')}, '2',
+                                      selected='nightly', success=False, assume_present='', download_status=1)
+        self.assertIn('F0517', result.stderr)
+        self.assertIn("channel 'nightly'", result.stderr)
+        self.assertEqual(urls, [f'check {major}', f'download {major} force'])
 
     def test_resolved_channel_is_used(self):
         major, latest = version_url('nightly', '2'), version_url('nightly', 'latest')
