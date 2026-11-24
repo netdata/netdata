@@ -351,11 +351,15 @@ int do_proc_ipc(int update_every, usec_t dt) {
         }
 
         struct stat stbuf;
-        if(do_msg != CONFIG_BOOLEAN_NO && stat(msg_filename, &stbuf))
+        if(do_msg != CONFIG_BOOLEAN_NO && stat(msg_filename, &stbuf)) {
+            collector_error("cannot stat '%s', ipc message queues disabled", msg_filename);
             do_msg = CONFIG_BOOLEAN_NO;
+        }
 
-        if(do_shm != CONFIG_BOOLEAN_NO && stat(shm_filename, &stbuf))
+        if(do_shm != CONFIG_BOOLEAN_NO && stat(shm_filename, &stbuf)) {
+            collector_error("cannot stat '%s', ipc shared memory disabled", shm_filename);
             do_shm = CONFIG_BOOLEAN_NO;
+        }
 
         if(unlikely(do_sem == CONFIG_BOOLEAN_NO && do_msg == CONFIG_BOOLEAN_NO && do_shm == CONFIG_BOOLEAN_NO)) {
             collector_error("ipc module disabled");
