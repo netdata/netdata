@@ -5,11 +5,11 @@ package ddsnmpcollector
 import (
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
-func snmprecPDUsWithPrefix(pdus []gosnmp.SnmpPDU, prefix string) []gosnmp.SnmpPDU {
-	out := make([]gosnmp.SnmpPDU, 0, len(pdus))
+func snmprecPDUsWithPrefix(pdus []gosnmp.VarBind, prefix string) []gosnmp.VarBind {
+	out := make([]gosnmp.VarBind, 0, len(pdus))
 	for _, pdu := range pdus {
 		if strings.HasPrefix(strings.Trim(pdu.Name, "."), strings.Trim(prefix, ".")) {
 			out = append(out, pdu)

@@ -208,7 +208,6 @@ static void test_features_zero_smooth_matches_one()
     memcpy(dst1, input, n * sizeof(calculated_number_t));
     ml_features_preprocess_predict(&features1, sample1);
 
-    ML_TEST_ASSERT(sample0.size() == sample1.size(), "prediction sample size should match for smooth_n=0 and smooth_n=1");
     for (size_t i = 0; i < features0.lag_n + 1; i++) {
         char msg[128];
         snprintf(msg, sizeof(msg), "prediction smooth_n=0 should match smooth_n=1 at sample(%zu)", i);
@@ -216,10 +215,9 @@ static void test_features_zero_smooth_matches_one()
     }
 }
 
-// Regression: DSample is a fixed 6-row matrix whose constructor leaves the rows
-// uninitialized, and set_size() does not resize it. With lag_n < 5 feature
-// extraction writes only lag_n + 1 rows, but training and scoring use all 6,
-// so the unused rows must be zero in both the training and prediction samples.
+// DSample always has 6 rows. With lag_n < 5 feature extraction writes only
+// lag_n + 1 rows, but training and scoring use all 6, so the unused rows must
+// be zero in both the training and prediction samples.
 //
 // The sample is poisoned with NaN first, so a row that is not explicitly zeroed
 // fails here instead of passing by luck of a zeroed stack.
@@ -240,10 +238,10 @@ static void test_features_unused_rows_are_zero()
         };
 
         DSample sample;
-        sample = NAN;
+        sample.fill(NAN);
         ml_features_preprocess_predict(&features, sample);
 
-        for (long row = (long)lag_n + 1; row < sample.nr(); row++) {
+        for (long row = (long)lag_n + 1; row < (long)sample.size(); row++) {
             char msg[128];
             snprintf(msg, sizeof(msg), "prediction sample row %ld must be zero with lag_n=%zu", row, lag_n);
             ML_TEST_ASSERT(sample(row) == 0.0, msg);
@@ -256,13 +254,13 @@ static void test_features_unused_rows_are_zero()
         memcpy(dst, input, sizeof(dst));
         std::vector<DSample> pf(n);
         for (auto &ds : pf)
-            ds = NAN;
+            ds.fill(NAN);
         pf.clear();
         ml_features_preprocess(&features, pf, 1.0);
 
         ML_TEST_ASSERT(!pf.empty(), "training must produce at least one sample");
         for (size_t i = 0; i < pf.size(); i++) {
-            for (long row = (long)lag_n + 1; row < pf[i].nr(); row++) {
+            for (long row = (long)lag_n + 1; row < (long)pf[i].size(); row++) {
                 char msg[128];
                 snprintf(msg, sizeof(msg), "training sample %zu row %ld must be zero with lag_n=%zu", i, row, lag_n);
                 ML_TEST_ASSERT(pf[i](row) == 0.0, msg);
@@ -319,12 +317,6 @@ static void test_full_pipeline()
 
     ML_TEST_ASSERT(all_features.size() > 2, "should have enough features for kmeans");
 
-    // Each feature vector should have lag_n + 1 = 6 elements
-    if (all_features.size() > 0) {
-        ML_TEST_ASSERT(all_features[0].size() == (long)(lag_n + 1),
-                       "feature vector should have lag_n+1 elements");
-    }
-
     // Train a kmeans model on the normal data
     std::vector<DSample> training_features = std::move(all_features);
 
@@ -379,8 +371,6 @@ static void test_kmeans_scoring()
 
     // Build a simple model with known cluster centers
     ml_kmeans_inlined_t km;
-    km.cluster_centers[0].set_size(6);
-    km.cluster_centers[1].set_size(6);
     for (int i = 0; i < 6; i++) {
         km.cluster_centers[0](i) = 0.0;
         km.cluster_centers[1](i) = 10.0;
@@ -392,7 +382,6 @@ static void test_kmeans_scoring()
 
     // Sample at cluster center 0 — should score low
     DSample at_center0;
-    at_center0.set_size(6);
     for (int i = 0; i < 6; i++)
         at_center0(i) = 0.0;
 
@@ -401,7 +390,6 @@ static void test_kmeans_scoring()
 
     // Sample at midpoint — should score moderate
     DSample at_mid;
-    at_mid.set_size(6);
     for (int i = 0; i < 6; i++)
         at_mid(i) = 5.0;
 
@@ -410,7 +398,6 @@ static void test_kmeans_scoring()
 
     // Sample far away — should score high (capped at 100)
     DSample far_away;
-    far_away.set_size(6);
     for (int i = 0; i < 6; i++)
         far_away(i) = 100.0;
 
@@ -419,8 +406,6 @@ static void test_kmeans_scoring()
 
     // When min_dist == max_dist, the model is flat and abstains (NaN)
     ml_kmeans_inlined_t km_equal;
-    km_equal.cluster_centers[0].set_size(6);
-    km_equal.cluster_centers[1].set_size(6);
     for (int i = 0; i < 6; i++) {
         km_equal.cluster_centers[0](i) = 5.0;
         km_equal.cluster_centers[1](i) = 5.0;
@@ -446,15 +431,12 @@ static void test_kmeans_flat_spread_abstains()
 
     // A tiny blip in a coordinate the spike does not use: off the C0-C1 segment.
     DSample blip;
-    blip.set_size(6);
     for (int i = 0; i < 6; i++)
         blip(i) = 0.0;
     blip(5) = 0.001;
 
     // Model as stored: zero centre, spike centre, spread of one ULP.
     ml_kmeans_inlined_t km;
-    km.cluster_centers[0].set_size(6);
-    km.cluster_centers[1].set_size(6);
     for (int i = 0; i < 6; i++) {
         km.cluster_centers[0](i) = 0.0;
         km.cluster_centers[1](i) = spike[i];
@@ -469,7 +451,6 @@ static void test_kmeans_flat_spread_abstains()
     std::vector<DSample> training;
     for (int n = 0; n < 200; n++) {
         DSample s;
-        s.set_size(6);
         for (int i = 0; i < 6; i++)
             s(i) = (n % 67 == 0) ? spike[i] : 0.0;  // 3 spikes: their mean is not exact
         training.push_back(s);
@@ -492,8 +473,6 @@ static void test_kmeans_flat_spread_abstains()
 
     // A small but real spread is still scored, not treated as flat.
     ml_kmeans_inlined_t narrow;
-    narrow.cluster_centers[0].set_size(6);
-    narrow.cluster_centers[1].set_size(6);
     for (int i = 0; i < 6; i++) {
         narrow.cluster_centers[0](i) = 0.0;
         narrow.cluster_centers[1](i) = 0.0;
@@ -502,7 +481,6 @@ static void test_kmeans_flat_spread_abstains()
     narrow.max_dist = 1.0 + 1e-6;
 
     DSample half;
-    half.set_size(6);
     for (int i = 0; i < 6; i++)
         half(i) = 0.0;
     half(0) = 1.0 + 0.5e-6;
@@ -559,7 +537,7 @@ static void test_kmeans_zero_distance_model_abstains()
 
     bool all_zero = true;
     for (const auto &s : training)
-        for (long i = 0; i < s.size(); i++)
+        for (size_t i = 0; i < s.size(); i++)
             all_zero = all_zero && s(i) == 0.0;
     ML_TEST_ASSERT(all_zero, "period-3 series should produce all-zero features");
 
@@ -571,7 +549,6 @@ static void test_kmeans_zero_distance_model_abstains()
 
     // A later change in the series.
     DSample change;
-    change.set_size(lag_n + 1);
     for (size_t i = 0; i < lag_n + 1; i++)
         change(i) = 0.0;
     change(0) = 1.0;
@@ -604,10 +581,9 @@ static void test_kmeans_inlined_empty_source_is_zero_initialized()
     ML_TEST_ASSERT_DOUBLE_EQ(constructed.min_dist, empty_km.min_dist, 0.0, "constructed empty model should preserve min_dist");
     ML_TEST_ASSERT_DOUBLE_EQ(constructed.max_dist, empty_km.max_dist, 0.0, "constructed empty model should preserve max_dist");
     for (size_t center = 0; center < constructed.cluster_centers.size(); center++) {
-        ML_TEST_ASSERT(constructed.cluster_centers[center].size() == 6, "constructed empty-source centers must keep fixed-size geometry");
-        for (long i = 0; i < constructed.cluster_centers[center].size(); i++) {
+        for (size_t i = 0; i < constructed.cluster_centers[center].size(); i++) {
             char msg[160];
-            snprintf(msg, sizeof(msg), "constructed empty-source center[%zu](%ld) should be zero", center, i);
+            snprintf(msg, sizeof(msg), "constructed empty-source center[%zu](%zu) should be zero", center, i);
             ML_TEST_ASSERT_DOUBLE_EQ(constructed.cluster_centers[center](i), 0.0, 0.0, msg);
         }
     }
@@ -624,10 +600,9 @@ static void test_kmeans_inlined_empty_source_is_zero_initialized()
     ML_TEST_ASSERT_DOUBLE_EQ(assigned.min_dist, empty_km.min_dist, 0.0, "assigned empty model should preserve min_dist");
     ML_TEST_ASSERT_DOUBLE_EQ(assigned.max_dist, empty_km.max_dist, 0.0, "assigned empty model should preserve max_dist");
     for (size_t center = 0; center < assigned.cluster_centers.size(); center++) {
-        ML_TEST_ASSERT(assigned.cluster_centers[center].size() == 6, "empty-source centers must keep fixed-size geometry");
-        for (long i = 0; i < assigned.cluster_centers[center].size(); i++) {
+        for (size_t i = 0; i < assigned.cluster_centers[center].size(); i++) {
             char msg[160];
-            snprintf(msg, sizeof(msg), "empty-source center[%zu](%ld) should be zero", center, i);
+            snprintf(msg, sizeof(msg), "empty-source center[%zu](%zu) should be zero", center, i);
             ML_TEST_ASSERT_DOUBLE_EQ(assigned.cluster_centers[center](i), 0.0, 0.0, msg);
         }
     }
@@ -842,9 +817,9 @@ static void test_circular_buffer_equivalence()
                    "both methods should produce same number of results");
 
     for (size_t i = 0; i < rotate_results.size() && i < circ_results.size(); i++) {
-        for (long j = 0; j < rotate_results[i].size(); j++) {
+        for (size_t j = 0; j < rotate_results[i].size(); j++) {
             char msg[128];
-            snprintf(msg, sizeof(msg), "result[%zu](%ld) should match between rotate and circular", i, j);
+            snprintf(msg, sizeof(msg), "result[%zu](%zu) should match between rotate and circular", i, j);
             ML_TEST_ASSERT_DOUBLE_EQ(rotate_results[i](j), circ_results[i](j), 1e-12, msg);
         }
     }
@@ -1113,12 +1088,7 @@ static void test_parameter_combinations()
                  diff_n, smooth_n, lag_n, cases[c].expected_vectors, pf.size());
         ML_TEST_ASSERT(pf.size() == cases[c].expected_vectors, msg);
 
-        // Verify feature vector is a 6x1 matrix (DSample is fixed-size)
         if (pf.size() >= 1) {
-            snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu): DSample should be 6 elements",
-                     diff_n, smooth_n, lag_n);
-            ML_TEST_ASSERT(pf[0].size() == 6, msg);
-
             // Verify no NaN/Inf in the lag_n+1 active feature elements
             bool has_nan_inf = false;
             for (size_t fi = 0; fi < lag_n + 1; fi++) {
@@ -1170,8 +1140,6 @@ static void test_kmeans_timestamp_roundtrip()
     const time_t large_before = (time_t) 3000003600LL;
 
     ml_kmeans_inlined_t original;
-    original.cluster_centers[0].set_size(6);
-    original.cluster_centers[1].set_size(6);
     for (int i = 0; i < 6; i++) {
         original.cluster_centers[0](i) = (double)(i + 1);
         original.cluster_centers[1](i) = (double)(i + 7);
@@ -1191,8 +1159,6 @@ static void test_kmeans_timestamp_roundtrip()
 
     if (root) {
         ml_kmeans_inlined_t result;
-        result.cluster_centers[0].set_size(6);
-        result.cluster_centers[1].set_size(6);
 
         bool ok = ml_kmeans_deserialize(&result, root);
         ML_TEST_ASSERT(ok, "round-trip: deserialize must succeed for large timestamp");
@@ -1239,8 +1205,6 @@ static void test_kmeans_timestamp_rejection()
     {
         struct json_object *r = make_full_root(-1LL, 100LL);
         ml_kmeans_inlined_t km;
-        km.cluster_centers[0].set_size(6);
-        km.cluster_centers[1].set_size(6);
         bool ok = ml_kmeans_deserialize(&km, r);
         ML_TEST_ASSERT(!ok, "negative 'after' must be rejected");
         json_object_put(r);
@@ -1249,8 +1213,6 @@ static void test_kmeans_timestamp_rejection()
     {
         struct json_object *r = make_full_root(100LL, -1LL);
         ml_kmeans_inlined_t km;
-        km.cluster_centers[0].set_size(6);
-        km.cluster_centers[1].set_size(6);
         bool ok = ml_kmeans_deserialize(&km, r);
         ML_TEST_ASSERT(!ok, "negative 'before' must be rejected");
         json_object_put(r);
@@ -1527,7 +1489,6 @@ static void test_predict_flat_model_abstains()
     ml_kmeans_inlined_t real;
     for (auto *km : { &flat, &real }) {
         for (auto &cc : km->cluster_centers) {
-            cc.set_size(6);
             for (int i = 0; i < 6; i++)
                 cc(i) = 0.0;
         }
@@ -1645,7 +1606,6 @@ static void test_predict_max_threshold_flags_anomaly()
 
     ml_kmeans_inlined_t real;
     for (auto &cc : real.cluster_centers) {
-        cc.set_size(6);
         for (int i = 0; i < 6; i++)
             cc(i) = 0.0;
     }

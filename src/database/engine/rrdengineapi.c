@@ -242,7 +242,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     if (unlikely(!handle->pgc_page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
 
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
@@ -314,6 +314,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->common.seb = STORAGE_ENGINE_BACKEND_DBENGINE;
+    handle->ctx = ctx;
     handle->metric = metric;
     
     handle->pgc_page = NULL;
@@ -393,14 +394,13 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
 }
 
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
-                                                struct rrdengine_instance *ctx,
                                                 usec_t point_in_time_ut,
                                                 PGD *data) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     const uint32_t update_every_s = (uint32_t)(handle->update_every_ut / USEC_PER_SEC);
 
     PGC_ENTRY page_entry = {
-            .section = (Word_t) ctx,
+            .section = (Word_t) handle->ctx,
             .metric_id = mrg_metric_id(main_mrg, handle->metric),
             .start_time_s = point_in_time_s,
             .end_time_s = point_in_time_s,
@@ -481,7 +481,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
 }
 
 static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut) {
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     PGD *d = NULL;
     
@@ -552,7 +552,6 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
                                              const SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if(unlikely(!handle->page_data))
         handle->page_data = rrdeng_alloc_new_page_data(handle, point_in_time_ut);
@@ -567,7 +566,7 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
     if(unlikely(!handle->pgc_page)) {
-        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->page_data);
+        rrdeng_store_metric_create_new_page(handle, point_in_time_ut, handle->page_data);
         // handle->position is set to 1 already
 
         rrdeng_store_metric_first_retention(handle);
@@ -719,7 +718,7 @@ ALWAYS_INLINE_HOT void rrdeng_store_metric_next(
  */
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
     rrdeng_store_metric_flush_current_page(sch);

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -119,12 +119,11 @@ func TestCollectorRuntimeSystemChangeNativeOutputRetries(t *testing.T) {
 
 	client, _ := newReplacementTestClient(t, device, nil)
 	t.Cleanup(cleanup) // Close the installed client before its mock controller settles.
-	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return client, nil }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector { return newReplacementTestDD(t, cfg) }
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: replacementTestObjectID,
+		Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 	}
 	device.setText(snmputils.OidSysName, "replacement")
 	*now = now.Add(time.Minute)
@@ -202,16 +201,15 @@ func TestCollectorRuntimeReplacementDimensionsOutputRetries(t *testing.T) {
 	require.True(t, collect(1).committed)
 	client, _ := newReplacementTestClient(t, device, nil)
 	t.Cleanup(cleanup)
-	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return client, nil }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 		cfg.Profiles = []*ddsnmp.Profile{profile}
 		return ddsnmpcollector.New(cfg)
 	}
 	device.omittedOID = outOID
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: replacementTestObjectID,
+		Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 	}
 	*now = now.Add(time.Minute)
 	sink.reject.Store(true)

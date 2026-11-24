@@ -227,10 +227,10 @@ if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
   run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
 fi
 
-# The otel-signal-viewer plugin was removed in favour of otel-plugin plus the
-# read-only legacy-otel-logs function. Native packages drop its files via
-# Obsoletes/Replaces, but an overlay upgrade only stops shipping them, so both
-# artifacts linger here. Only stock paths are touched, never user config.
+# The otel-signal-viewer plugin was removed in favour of otel-plugin. Native
+# packages drop its files via Obsoletes/Replaces, but an overlay upgrade only
+# stops shipping them, so both artifacts linger here. Only stock paths are
+# touched, never user config.
 for x in usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin \
   usr/lib/netdata/conf.d/otel-signal-viewer.yaml; do
   if [ -e "${NETDATA_PREFIX}/${x}" ] || [ -L "${NETDATA_PREFIX}/${x}" ]; then
@@ -242,7 +242,7 @@ done
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh cgroup-name otel-plugin systemd-journal.plugin macos-logs.plugin netflow-plugin; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin scripts.d.plugin dem.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh cgroup-name otel-plugin systemd-journal.plugin macos-logs.plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"

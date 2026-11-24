@@ -9,9 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -19,7 +17,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
@@ -57,34 +57,31 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 				Metric:   "jnxFWCounterPacketCount",
 			}
 			profile = stockIdentitySelectRow(t, profile, tc)
-			var pdus []gosnmp.SnmpPDU
+			var pdus []gosnmp.VarBind
 			for i, row := range rows {
 				pdus = append(
 					pdus,
-					gosnmp.SnmpPDU{
+					gosnmp.VarBind{
 						Name:  "1.3.6.1.4.1.2636.3.5.2.1.4." + suffix(row[0], row[1]),
-						Type:  gosnmp.Counter64,
-						Value: uint64(100 + i),
+						Value: gosnmp.Counter64Value(uint64(100 + i)),
 					},
 				)
 			}
 
-			handler := snmpmock.NewMockHandler(gomock.NewController(t))
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().MaxOids().Return(60).AnyTimes()
+			handler := snmpmock.NewMockSession(gomock.NewController(t))
 			walks, gets := 0, 0
-			handler.EXPECT().BulkWalkAll(tc.TableOID).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+			handler.EXPECT().BulkWalkAll(gomock.Any(), tc.TableOID, gomock.Any()).DoAndReturn(func(_ context.Context, _ string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 				walks++
-				return pdus, nil
+				return pdus, gosnmp.WalkEnd{}, nil
 			}).AnyTimes()
-			handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
+			handler.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oids []string) (*gosnmp.Message, error) {
 				gets++
-				packet := &gosnmp.SnmpPacket{}
+				packet := &gosnmp.Message{}
 				for _, oid := range oids {
 					found := false
 					for _, pdu := range pdus {
 						if strings.Trim(oid, ".") == pdu.Name {
-							packet.Variables = append(packet.Variables, pdu)
+							packet.VarBinds = append(packet.VarBinds, pdu)
 							found = true
 						}
 					}
@@ -95,6 +92,8 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 			acquire := func(p *ddsnmp.Profile) *ddsnmpcollector.Collector {
 				return ddsnmpcollector.New(
 					ddsnmpcollector.Config{
+						Version:    gosnmp.Version2c,
+						MaxOIDs:    60,
 						SnmpClient: handler,
 						Profiles:   []*ddsnmp.Profile{p},
 						Log:        logger.New(),
@@ -118,7 +117,7 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 						acquisition = acquire(stockIdentitySelectRow(t, reloaded, tc))
 					}
 					beforeWalk, beforeGet := walks, gets
-					results, err := acquisition.Collect()
+					results, err := acquisition.Collect(context.Background())
 					require.NoError(t, err)
 					require.Len(t, results, 1)
 					metrics := results[0].Metrics

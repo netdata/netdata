@@ -10,7 +10,7 @@ endmeta-->
 
 # Network Topologies
 
-Netdata shows you how your infrastructure is connected — which device links to which, which service depends on which,
+Netdata shows you how your network, systems and services are connected — which device links to which, which service depends on which,
 and where each part sits — built automatically from what you already monitor.
 
 Two maps, in the same view:
@@ -66,7 +66,7 @@ See [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md) f
 
 ## Other sources in the same view
 
-The topology view brings in the rest of your infrastructure in the same form, so it all sits together:
+The topology view brings in the rest of your environment in the same form, so it all sits together:
 
 - **Netdata streaming** — how your Agents connect to each other (`topology:streaming`).
 - **VMware vSphere** — datacenters, clusters, resource pools, hosts, VMs, datastores, and networks (`topology:vsphere`).

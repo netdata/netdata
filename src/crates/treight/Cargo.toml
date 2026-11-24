@@ -5,12 +5,10 @@ edition.workspace = true
 description = "Compressed bitmap using an 8-way bit-tree (as used by GNU idutils)"
 
 [features]
-allocative = ["dep:allocative"]
 roaring = ["dep:roaring"]
 serde = ["dep:serde"]
 
 [dependencies]
-allocative = { workspace = true, optional = true }
 roaring = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 

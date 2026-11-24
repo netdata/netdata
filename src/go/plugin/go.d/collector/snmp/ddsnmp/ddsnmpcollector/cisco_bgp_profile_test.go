@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,10 +16,10 @@ import (
 )
 
 func TestCollector_Collect_CiscoBgpPeer3Profile(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.9", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.9", []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.9.9.187.1.2.9.1.6.7.1.4.192.0.2.1", 2),
 		createIntegerPDU("1.3.6.1.4.1.9.9.187.1.2.9.1.5.7.1.4.192.0.2.1", 6),
 		createCounter32PDU("1.3.6.1.4.1.9.9.187.1.2.9.1.15.7.1.4.192.0.2.1", 42),
@@ -235,13 +236,15 @@ func TestCollector_Collect_CiscoBgpPeer3Profile(t *testing.T) {
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: "",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 

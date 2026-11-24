@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 #[test]
 fn a_worker_exits_when_its_lifeline_closes() {
     let tmp = tempfile::tempdir().unwrap();
-    let socket = tmp.path().join("legacy-logs.sock");
+    let socket = tmp.path().join("ingestor.sock");
     // The supervisor's side of the worker's connection. It is accepted and
     // kept open and silent: the worker waits for its configuration, as a
     // ledger that is still starting does not read its connection.
@@ -16,7 +16,7 @@ fn a_worker_exits_when_its_lifeline_closes() {
     listener.set_nonblocking(true).unwrap();
 
     let mut worker = Command::new(env!("CARGO_BIN_EXE_otel-plugin"))
-        .args(["worker", "legacy-logs", "--socket"])
+        .args(["worker", "ingestor", "--socket"])
         .arg(&socket)
         .arg("--lifeline")
         .stdin(Stdio::piped())

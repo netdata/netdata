@@ -1,6 +1,6 @@
 # Custom Investigations
 
-Create deeply researched, context‑aware analyses by asking Netdata open‑ended questions about your infrastructure. Custom Investigations correlate metrics, anomalies, and events to answer the questions dashboards can’t—typically in about two minutes.
+Create deeply researched, context‑aware analyses by asking Netdata open‑ended questions about your systems and applications. Custom Investigations correlate metrics, anomalies, and events to answer the questions dashboards can’t—typically in about two minutes.
 
 ![Custom Investigation creation](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/custom-investigation.png)
 

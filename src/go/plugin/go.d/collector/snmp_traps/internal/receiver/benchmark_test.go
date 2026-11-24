@@ -7,16 +7,15 @@ import (
 	"net"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
-func benchmarkPDUs(count int) []gosnmp.SnmpPDU {
-	out := make([]gosnmp.SnmpPDU, count)
+func benchmarkPDUs(count int) []gosnmp.VarBind {
+	out := make([]gosnmp.VarBind, count)
 	for i := range out {
-		out[i] = gosnmp.SnmpPDU{
+		out[i] = gosnmp.VarBind{
 			Name:  fmt.Sprintf("1.3.6.1.2.1.2.2.1.%d", i+1),
-			Type:  gosnmp.Integer,
-			Value: int(i),
+			Value: gosnmp.IntegerValue(int32(i)),
 		}
 	}
 	return out
@@ -35,10 +34,11 @@ func BenchmarkDecodeTrap(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			data := buildV2cTrap(b, "public", "1.3.6.1.6.3.1.1.5.1", benchmarkPDUs(count)...)
 			peer := net.ParseIP("10.1.2.3")
+			receiver := newPlainReceiver(b)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _ = decodeTrap(data, peer, nil)
+				_, _, _ = decodeTrap(data, peer, receiver)
 			}
 			b.StopTimer()
 			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "traps/s")
@@ -59,10 +59,11 @@ func BenchmarkBERRejection(b *testing.B) {
 
 	for name, data := range cases {
 		b.Run(name, func(b *testing.B) {
+			receiver := newPlainReceiver(b)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _ = decodePacket(data, nil)
+				_, _, _ = decodePacket(data, false, receiver)
 			}
 			b.StopTimer()
 			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "rejected/s")

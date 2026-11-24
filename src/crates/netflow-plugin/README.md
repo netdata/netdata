@@ -126,10 +126,16 @@ packaged databases in this order:
 - `${NETDATA_CACHE_DIR}/topology-ip-intel`
 - `${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`
 
-`netdata-plugin-netflow` now ships a stock MMDB seed set under
-`${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`. Freshly downloaded data written by
-`topology-ip-intel-downloader` stays in `${NETDATA_CACHE_DIR}/topology-ip-intel` and
-overrides the stock copy automatically.
+On native installs, `netdata-ip-intel-data` owns the stock MMDBs under
+`${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`. Both `netdata-plugin-netflow` and
+`netdata-plugin-dem` require that package.
+
+Removing `netdata-plugin-netflow` on a systemd host briefly restarts an already-running Agent to stop the
+NetFlow listeners. A stopped Agent stays stopped. Debian service policy is respected; if it denies the restart,
+the listeners remain until the next allowed Agent restart. Shared data required by DEM remains installed.
+
+Freshly downloaded data written by `topology-ip-intel-downloader` stays in
+`${NETDATA_CACHE_DIR}/topology-ip-intel` and overrides the stock copy automatically.
 
 Important:
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/require"
@@ -134,9 +134,8 @@ func TestBuildTableMetric_LegacyMetricType(t *testing.T) {
 			cfg := def.Metrics[0]
 			metric, err := buildTableMetric(
 				cfg.Symbols[0],
-				gosnmp.SnmpPDU{
-					Type:  gosnmp.Counter32,
-					Value: uint32(100),
+				gosnmp.VarBind{
+					Value: gosnmp.Counter32Value(100),
 				},
 				100,
 				map[string]string{"interface": "1"},

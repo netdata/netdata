@@ -99,6 +99,21 @@ class PrepareFleetTests(unittest.TestCase):
         result = self.run_script(*args, success=options.get('success', True))
         return target, result
 
+    def test_removing_netflow_preserves_shared_rum_geoip_data(self):
+        netflow = 'usr/libexec/netdata/plugins.d/netflow-plugin'
+        dem = 'usr/libexec/netdata/plugins.d/dem.plugin'
+        self.put(netflow, 'NetFlow executable')
+        self.put(dem, 'DEM executable')
+        stock_files = ('README.md', 'topology-ip-asn.mmdb', 'topology-ip-geo.mmdb', 'topology-ip-intel.json')
+        for name in stock_files:
+            self.put('usr/share/netdata/topology-ip-intel/' + name, 'shared stock ' + name)
+        target, _ = self.prepare('none')
+        self.assertFalse((target / netflow).exists())
+        self.assertEqual((target / dem).read_text(), 'DEM executable')
+        for name in stock_files:
+            self.assertEqual((target / 'usr/share/netdata/topology-ip-intel' / name).read_text(),
+                             'shared stock ' + name)
+
     def test_ipmi_capability_keeps_both_implementations_and_go_config(self):
         paths = ('usr/libexec/netdata/plugins.d/ipmi.plugin',
                  'usr/libexec/netdata/plugins.d/freeipmi.plugin',

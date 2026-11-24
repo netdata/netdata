@@ -159,7 +159,7 @@ static const char *buffer_tostring(BUFFER *wb)
     return(wb->buffer);
 }
 
-ALWAYS_INLINE
+inline
 static void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
     int next_depth = wb->json.depth + 1;
 
@@ -177,7 +177,7 @@ static void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
     wb->json.stack[wb->json.depth].type = type;
 }
 
-ALWAYS_INLINE
+inline
 static void _buffer_json_depth_pop(BUFFER *wb) {
     wb->json.depth--;
 }
@@ -301,7 +301,7 @@ static void buffer_memcat(BUFFER *wb, const void *mem, size_t bytes) {
     buffer_overflow_check(wb);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_strcat(BUFFER *wb, const char *txt)
 {
     if(unlikely(!txt || !*txt)) return;
@@ -376,7 +376,7 @@ static void buffer_json_strcat(BUFFER *wb, const char *txt)
     buffer_overflow_check(wb);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_quoted_strcat(BUFFER *wb, const char *txt) {
     if(unlikely(!txt || !*txt)) return;
 
@@ -800,13 +800,13 @@ static void buffer_print_spaces(BUFFER *wb, size_t spaces) {
     buffer_overflow_check(wb);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_print_json_comma(BUFFER *wb) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_putc(wb, ',');
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     buffer_print_json_comma(wb);
 
@@ -818,14 +818,14 @@ static void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     buffer_print_spaces(wb, wb->json.depth + 1);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_print_json_key(BUFFER *wb, const char *key) {
     buffer_strcat(wb, wb->json.key_quote);
     buffer_json_strcat(wb, key);
     buffer_strcat(wb, wb->json.key_quote);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_string_value(BUFFER *wb, const char *value) {
     if(value) {
         buffer_strcat(wb, wb->json.value_quote);
@@ -836,7 +836,7 @@ static void buffer_json_add_string_value(BUFFER *wb, const char *value) {
         buffer_fast_strcat(wb, "null", 4);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_quoted_string_value(BUFFER *wb, const char *value) {
     if(value) {
         buffer_strcat(wb, wb->json.value_quote);
@@ -847,7 +847,7 @@ static void buffer_json_add_quoted_string_value(BUFFER *wb, const char *value) {
         buffer_fast_strcat(wb, "null", 4);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_object(BUFFER *wb, const char *key) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -857,7 +857,7 @@ static void buffer_json_member_add_object(BUFFER *wb, const char *key) {
     _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_object_close(BUFFER *wb) {
 #ifdef NETDATA_INTERNAL_CHECKS
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
@@ -871,7 +871,7 @@ static void buffer_json_object_close(BUFFER *wb) {
     _buffer_json_depth_pop(wb);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_string(BUFFER *wb, const char *key, const char *value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -881,13 +881,13 @@ static void buffer_json_member_add_string(BUFFER *wb, const char *key, const cha
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_string_or_omit(BUFFER *wb, const char *key, const char *value) {
     if(value && *value)
         buffer_json_member_add_string(wb, key, value);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_string_or_empty(BUFFER *wb, const char *key, const char *value) {
     if(!value)
         value = "";
@@ -898,7 +898,7 @@ static void buffer_json_member_add_string_or_empty(BUFFER *wb, const char *key, 
 void buffer_json_member_add_datetime_rfc3339(BUFFER *wb, const char *key, uint64_t datetime_ut, bool utc);
 void buffer_json_member_add_duration_ut(BUFFER *wb, const char *key, int64_t duration_ut);
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_quoted_string(BUFFER *wb, const char *key, const char *value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -912,7 +912,7 @@ static void buffer_json_member_add_quoted_string(BUFFER *wb, const char *key, co
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_uuid_ptr(BUFFER *wb, const char *key, nd_uuid_t *value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -929,7 +929,7 @@ static void buffer_json_member_add_uuid_ptr(BUFFER *wb, const char *key, nd_uuid
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_uuid(BUFFER *wb, const char *key, nd_uuid_t value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -946,7 +946,7 @@ static void buffer_json_member_add_uuid(BUFFER *wb, const char *key, nd_uuid_t v
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_uuid_compact(BUFFER *wb, const char *key, nd_uuid_t value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -963,7 +963,7 @@ static void buffer_json_member_add_uuid_compact(BUFFER *wb, const char *key, nd_
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_boolean(BUFFER *wb, const char *key, bool value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -973,7 +973,7 @@ static void buffer_json_member_add_boolean(BUFFER *wb, const char *key, bool val
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_array(BUFFER *wb, const char *key) {
     buffer_print_json_comma_newline_spacing(wb);
     if (key) {
@@ -988,7 +988,7 @@ static void buffer_json_member_add_array(BUFFER *wb, const char *key) {
     _buffer_json_depth_push(wb, BUFFER_JSON_ARRAY);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_array(BUFFER *wb) {
     if(!(wb->json.options & BUFFER_JSON_OPTIONS_MINIFY) && wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY) {
         // an array inside another array
@@ -1005,7 +1005,7 @@ static void buffer_json_add_array_item_array(BUFFER *wb) {
     _buffer_json_depth_push(wb, BUFFER_JSON_ARRAY);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_string(BUFFER *wb, const char *value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1013,7 +1013,7 @@ static void buffer_json_add_array_item_string(BUFFER *wb, const char *value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_uuid(BUFFER *wb, nd_uuid_t *value) {
     if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
@@ -1024,7 +1024,7 @@ static void buffer_json_add_array_item_uuid(BUFFER *wb, nd_uuid_t *value) {
         buffer_json_add_array_item_string(wb, NULL);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_uuid_compact(BUFFER *wb, nd_uuid_t *value) {
     if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
@@ -1035,7 +1035,7 @@ static void buffer_json_add_array_item_uuid_compact(BUFFER *wb, nd_uuid_t *value
         buffer_json_add_array_item_string(wb, NULL);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1043,7 +1043,7 @@ static void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) 
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_int64(BUFFER *wb, int64_t value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1051,7 +1051,7 @@ static void buffer_json_add_array_item_int64(BUFFER *wb, int64_t value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1059,7 +1059,7 @@ static void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_boolean(BUFFER *wb, bool value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1067,7 +1067,7 @@ static void buffer_json_add_array_item_boolean(BUFFER *wb, bool value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1075,7 +1075,7 @@ static void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1086,7 +1086,7 @@ static void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
 
 void buffer_json_add_array_item_datetime_rfc3339(BUFFER *wb, uint64_t datetime_ut, bool utc);
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_time_t_formatted(BUFFER *wb, time_t value, bool rfc3339) {
     if(unlikely(rfc3339 && (!value || value > API_RELATIVE_TIME_MAX))) {
         if (!value)
@@ -1098,7 +1098,7 @@ static void buffer_json_add_array_item_time_t_formatted(BUFFER *wb, time_t value
         buffer_json_add_array_item_time_t(wb, value);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_add_array_item_object(BUFFER *wb) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -1108,7 +1108,7 @@ static void buffer_json_add_array_item_object(BUFFER *wb) {
     _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_time_t(BUFFER *wb, const char *key, time_t value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -1118,7 +1118,7 @@ static void buffer_json_member_add_time_t(BUFFER *wb, const char *key, time_t va
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_time_t_formatted(BUFFER *wb, const char *key, time_t value, bool rfc3339) {
     if(unlikely(rfc3339 && (!value || value > API_RELATIVE_TIME_MAX))) {
         if(!value)
@@ -1130,7 +1130,7 @@ static void buffer_json_member_add_time_t_formatted(BUFFER *wb, const char *key,
         buffer_json_member_add_time_t(wb, key, value);
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_uint64(BUFFER *wb, const char *key, uint64_t value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -1140,7 +1140,7 @@ static void buffer_json_member_add_uint64(BUFFER *wb, const char *key, uint64_t 
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_int64(BUFFER *wb, const char *key, int64_t value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -1151,7 +1151,7 @@ static void buffer_json_member_add_int64(BUFFER *wb, const char *key, int64_t va
 }
 
 // writes the key and the colon; the caller appends a raw JSON value
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -1159,7 +1159,7 @@ static void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -1169,7 +1169,7 @@ static void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_D
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
+inline
 static void buffer_json_array_close(BUFFER *wb) {
 #ifdef NETDATA_INTERNAL_CHECKS
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");

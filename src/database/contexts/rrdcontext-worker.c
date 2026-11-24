@@ -290,10 +290,8 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     if (rc->rrdhost->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
         return;
 
-    // delete it from SQL
-    if(ctx_delete_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
-        netdata_log_error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.",
-                          rc->hub.id, rc->hub.version);
+    // delete it from SQL (queued: the caller holds the context lock)
+    ctx_sql_queue_delete(&rc->rrdhost->host_id.uuid, &rc->hub);
 }
 
 void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
@@ -911,9 +909,8 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
     else {
         if (rc->rrdhost->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
             return;
-        if (ctx_store_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
-            netdata_log_error(
-                "RRDCONTEXT: failed to save context '%s' version %" PRIu64 " to SQL.", rc->hub.id, rc->hub.version);
+        // queued: the caller holds the context lock
+        ctx_sql_queue_store(&rc->rrdhost->host_id.uuid, &rc->hub);
     }
 }
 

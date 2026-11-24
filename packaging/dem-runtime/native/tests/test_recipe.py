@@ -22,6 +22,10 @@ def configure_agent(root, fmt='DEB', native_version='2.12.0', with_payload=True,
     (payload / 'release-info').write_text(RELEASE_INFO if paired else RELEASE_INFO.replace('stable', 'nightly'))
     (payload / 'native.json').write_text('{}\n')
     (source / 'fixture').write_text('Agent package fixture\n')
+    stock = root / 'stock'
+    stock.mkdir()
+    for name in ('README.md', 'topology-ip-asn.mmdb', 'topology-ip-geo.mmdb', 'topology-ip-intel.json'):
+        (stock / name).write_text('Stock package fixture: ' + name + '\n')
     release = root / 'os-release'
     release.write_text('ID=' + ('debian\nVERSION_ID=11\n' if fmt == 'DEB' else 'rocky\nVERSION_ID=9\n'))
     (source / 'CMakeLists.txt').write_text('''
@@ -31,15 +35,19 @@ list(APPEND CMAKE_MODULE_PATH "${REPO}/packaging/cmake/Modules")
 set(OS_LINUX TRUE)
 set(PKG_FILES_PATH "${REPO}/packaging/cmake/pkg-files")
 set(PLUGINS_DIR /usr/libexec/netdata/plugins.d)
+set(STOCK_DATA_DEST usr/share/netdata)
+set(PKG_DOC_DEST usr/share/doc)
 set(netdata_group_POST netdata)
 include(NetdataUtil)
 install(FILES fixture DESTINATION usr/sbin COMPONENT netdata)
 install(FILES fixture DESTINATION usr/libexec/netdata/plugins.d COMPONENT plugin-dem)
+include(NetdataTopologyIPIntel)
 include(Packaging)
 ''')
     command = ['cmake', '-S', str(source), '-B', str(build), '-DREPO=' + str(REPO),
                '-DOS_RELEASE_PATH=' + str(release), '-DNETDATA_PACKAGE_VERSION=' + native_version,
                '-DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=' + architecture,
+               '-DNETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=' + str(stock),
                '-DNETDATA_PACKAGE_KIND=' + (kind or fmt.lower()),
                '-DENABLE_PLUGIN_DEM=' + ('ON' if plugin else 'OFF')]
     if with_payload:

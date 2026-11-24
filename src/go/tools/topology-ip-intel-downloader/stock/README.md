@@ -2,8 +2,10 @@
 
 # Stock IP Intelligence Payload
 
-This directory documents the stock MMDB payload shipped by
-`netdata-plugin-netflow`.
+This directory documents the stock MMDB payload shipped by native
+`netdata-ip-intel-data` packages, official static installers and DEM Docker images.
+The native NetFlow and DEM plugins both depend on the data package. DEM/RUM uses
+the GEO database without requiring the NetFlow listener.
 
 The generated stock databases are not stored in Git. Package/release builds
 stage them into the build workspace from CI/release tooling.

@@ -108,15 +108,7 @@ Add `--install-dem-runtime` to an ordinary kickstart install or update to prepar
 sudo sh ./kickstart.sh --install-dem-runtime
 ```
 
-For local, rootful Docker on Linux, start Netdata with the [documented container configuration](/packaging/docker/README.md#recommended-way),
-including a persistent `/var/lib/netdata` and the documented AppArmor setting where applicable. Currently you must
-set `runtime.release_url` in the container's `dem.conf` to the signed metadata URL for its architecture.
-Run `sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata` on the daemon host, using the
-container's exact name. Kickstart prepares any required host policy and installs the runtime as the container's
-service account. After the first installation succeeds, run `docker restart netdata` to activate it.
-The host does not need an Agent installation. Rootless, nested and remote Docker need separate administrator
-setup. For those configurations and retirement, see
-[Docker browser runtime setup](/packaging/installer/DEM-RUNTIME.md#docker-host-preparation).
+For Docker, choose a [DEM image](/packaging/docker/README.md#enable-dem-in-docker) with the runtime included.
 
 For native package installations, kickstart installs the optional `netdata-dem-runtime` package using the same package manager and interaction policy as the Agent. Native runtime packages require the named `netdata` service account. Package hooks qualify the runtime and may restart a previously running Agent. If package installation or runtime readiness fails, kickstart reports failure; it does not switch to managed delivery.
 

@@ -1,6 +1,6 @@
 # OpenAI Codex CLI
 
-Configure OpenAI's Codex CLI to access your Netdata infrastructure through MCP for AI-powered DevOps operations.
+Configure OpenAI's Codex CLI to access your Netdata observability data through MCP for AI-powered DevOps operations.
 
 ## Transport Support
 
@@ -17,7 +17,7 @@ Codex CLI supports both stdio launchers and direct Streamable HTTP when the RMCP
 ## Prerequisites
 
 1. **OpenAI Codex CLI installed** - Available via npm, Homebrew, or direct download from [GitHub](https://github.com/openai/codex)
-2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 3. **Launcher** – Run Netdata through `nd-mcp` (always) or `npx mcp-remote` (useful when you want a single stdio launcher for multiple MCP clients). Direct HTTP is also available for v2.7.2+ when you enable the RMCP client.
@@ -44,7 +44,7 @@ Codex CLI uses a TOML configuration file at `~/.codex/config.toml` for MCP serve
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local setup, bridges,
 or firewall changes needed.
 
@@ -190,13 +190,13 @@ Replace in all examples:
 
 ## How to Use
 
-Once configured, Codex CLI can leverage Netdata's observability data for infrastructure analysis:
+Once configured, Codex CLI can leverage Netdata's observability data for analysis:
 
 ```
 # Start Codex CLI
 codex
 
-# Ask infrastructure questions
+# Ask questions about your systems
 What's the current CPU usage across all servers?
 Show me any performance anomalies in the last hour
 Which services are consuming the most resources?

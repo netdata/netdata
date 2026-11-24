@@ -14,7 +14,7 @@ Generate a report that assesses alert validity, uncovers correlated signals, and
 
 ## Anomaly Advisor
 
-Explore incident timelines visually and see how anomalies cascade across your infrastructure. Start from the Anomalies tab in Netdata Cloud.
+Explore incident timelines visually and see how anomalies cascade across systems, networks and applications. Start from the Anomalies tab in Netdata Cloud.
 
 ## Metric Correlations
 

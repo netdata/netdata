@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +23,7 @@ func TestCollector_Collect_AlcatelBGP_TypedRows(t *testing.T) {
 	ipv6Idx := "32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.1"
 	ipv6Neighbor := []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 	ipv6Local := []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
-	pdus := []gosnmp.SnmpPDU{
+	pdus := []gosnmp.VarBind{
 		createPDU(oidWithIndex("1.3.6.1.2.1.15.3.1.1", ipv4Idx), gosnmp.IPAddress, "198.51.100.1"),
 		createIntegerPDU(oidWithIndex("1.3.6.1.2.1.15.3.1.2", ipv4Idx), 6),
 		createIntegerPDU(oidWithIndex("1.3.6.1.2.1.15.3.1.3", ipv4Idx), 2),
@@ -91,20 +92,22 @@ func TestCollector_Collect_AlcatelBGP_TypedRows(t *testing.T) {
 		createIntegerPDU(oidWithIndex("1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.73", ipv6Idx), 30),
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSystemMetadataGets(mockHandler, sysObjectID, "alcatel")
 	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: sysObjectID,
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].Metrics)

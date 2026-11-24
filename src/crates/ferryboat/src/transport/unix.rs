@@ -32,8 +32,8 @@
 //!
 //! Consumers reach this only through ferryboat's typed public API (the
 //! `transport` module is private): the otel-plugin supervisor binds one
-//! socket per worker and accepts, the workers (otel-ingestor, otel-ledger,
-//! otel-legacy-logs) connect; the writer→ledger WAL-event link is bound by
+//! socket per worker and accepts, the workers (otel-ingestor, otel-ledger)
+//! connect; the writer→ledger WAL-event link is bound by
 //! `file_lifecycle::ipc::accept_writer` (called by otel-ledger) and connected
 //! by the ingestor's `LedgerSender`, which retries forever. Message contracts
 //! live in the `otel-bridge` crate and `file_lifecycle::ipc`; socket naming and

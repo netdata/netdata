@@ -4,7 +4,7 @@
 
 **Executive Summary**
 
-- Netdata Cloud offers secure real-time monitoring without storing raw metrics.
+- Netdata Cloud offers secure real-time observability without storing raw metrics.
 - Only minimal metadata passes securely through Netdata Cloud.  
   Users retain full control of their data.
 - Infrastructure is protected with strong encryption, access control, and compliance with GDPR, CCPA, PCI DSS, SOC 2, and HIPAA standards.

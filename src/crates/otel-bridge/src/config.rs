@@ -1,6 +1,5 @@
 //! The plugin configuration model, shared between the supervisor and its
-//! workers: [`PluginConfig`] for the ingestor and ledger workers,
-//! [`LegacyLogsConfig`] for the legacy-logs viewer.
+//! workers: [`PluginConfig`] for the ingestor and ledger workers.
 //!
 //! The supervisor resolves the config (otel-plugin's `config` module layers
 //! the stock, user, then env YAML sources, then validates) and sends the
@@ -16,8 +15,11 @@
 //! tuning; positions are derived — [`PluginConfig::lifecycle_for`] yields each
 //! signal's `{base_dir}/{signal}/...` subtree as the [`LifecycleConfig`] the
 //! file-lifecycle substrate consumes, while remote storage and auth are
-//! process-global. Every YAML section rejects unknown keys, so a typo in a
-//! config file refuses startup instead of silently keeping defaults. A
+//! process-global. A key these types do not know is refused in the stock
+//! file and reported, then ignored, in the user file: the rule belongs to the
+//! parse call (`parse_yaml`, otel-plugin's config module), which is why the
+//! two entry types the user file shares ([`RotationEntry`],
+//! [`RetentionEntry`]) carry no `deny_unknown_fields`. A
 //! malformed rotation/retention policy is rejected at deserialize, so a
 //! resolved value is always complete and [`RotationPolicy::resolve`] /
 //! [`RetentionPolicy::resolve`] cannot fail.
@@ -183,46 +185,6 @@ impl PluginConfig {
     /// signal's directory.
     pub fn seq_highwater_path(&self) -> PathBuf {
         self.base_dir.join("shared").join("seq_highwater")
-    }
-}
-
-/// Configuration for the read-only legacy OTel logs viewer worker.
-///
-/// The former otel plugin stored logs as systemd journal files; this worker
-/// serves a read-only `legacy-otel-logs` function over those files. The new
-/// [`PluginConfig`] schema does not carry the former `logs.journal_dir`, so the
-/// supervisor resolves the directory (and the viewer's cache location)
-/// separately and sends them here. The viewer never writes to `journal_dir`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LegacyLogsConfig {
-    /// Directory holding the former otel-plugin journal files. Read-only.
-    pub journal_dir: PathBuf,
-    /// Disk-backed index cache directory for the viewer.
-    pub cache_dir: PathBuf,
-    /// Number of file indexes to keep in memory.
-    pub memory_capacity: usize,
-    /// Disk cache capacity for file indexes.
-    pub disk_capacity: ByteSize,
-    /// Max distinct values indexed per field; fields exceeding the cap have
-    /// their value indexing truncated (cardinality cap).
-    pub max_unique_values_per_field: usize,
-    /// Max field-value payload size (bytes) that gets indexed; values at or
-    /// above the cap (and compressed ones) are skipped.
-    pub max_field_payload_size: usize,
-}
-
-impl LegacyLogsConfig {
-    /// Build with the viewer's stock indexing defaults; the supervisor
-    /// supplies the resolved directories.
-    pub fn new(journal_dir: PathBuf, cache_dir: PathBuf) -> Self {
-        Self {
-            journal_dir,
-            cache_dir,
-            memory_capacity: 1000,
-            disk_capacity: ByteSize::mb(32),
-            max_unique_values_per_field: 500,
-            max_field_payload_size: 100,
-        }
     }
 }
 
@@ -614,9 +576,9 @@ pub struct WalConfig {
 
 /// A rotation policy entry. All fields are optional so that per-tenant
 /// entries can override only specific values from the `"default"` entry.
-/// Tenant names are open map keys; the fields inside an entry are strict.
+/// Tenant names are open map keys; an unknown field inside an entry is
+/// reported by the parse call (see the module docs).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct RotationEntry {
     /// Max bytes per data file before it rotates.
     #[serde(default, with = "opt_bytesize")]
@@ -877,9 +839,9 @@ impl From<RotationPolicy> for HashMap<String, RotationEntry> {
 
 /// A retention policy entry. All fields are optional so that per-tenant
 /// entries can override only specific values from the `"default"` entry.
-/// Tenant names are open map keys; the fields inside an entry are strict.
+/// Tenant names are open map keys; an unknown field inside an entry is
+/// reported by the parse call (see the module docs).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
 pub struct RetentionEntry {
     /// Max SFST files kept per tenant.
     #[serde(default)]

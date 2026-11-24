@@ -4,6 +4,8 @@
 
 You can leverage machine learning to detect patterns and anomalies in your large datasets, enabling you to identify issues early before they escalate.
 
+Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
+
 Netdata offers **Anomaly Advisor**, a tool designed to improve your troubleshooting experience, reduce mean time to resolution, and prevent issues from escalating. You can access it through the [Netdata dashboard](/docs/dashboards-and-charts/README.md).
 
 :::tip
@@ -20,14 +22,14 @@ When you use Netdata's machine learning models, you benefit from these key princ
 |----------------------------|----------------------------------------------------------------------------------------------------------------------------|
 | **Unsupervised Learning**  | Models operate independently without requiring your input                                                                  |
 | **Real-time Performance**  | While ML impacts CPU usage, you won't experience any compromise to Netdata's high-fidelity, real-time monitoring           |
-| **Seamless Integration**   | ML-based insights are fully embedded into your existing Netdata infrastructure monitoring and troubleshooting workflow     |
+| **Seamless Integration**   | ML-based insights are fully embedded into your existing Netdata observability and troubleshooting workflow                    |
 | **Assistance Over Alerts** | ML helps you investigate potential issues rather than triggering unnecessary alerts - no 3 AM wake-ups for minor anomalies |
 | **Many Light Models**      | Netdata uses many lightweight models instead of a few heavy ones, optimizing for resource usage while maintaining accuracy |
 | **Scalable Architecture**  | The system is designed to handle thousands of metrics simultaneously, scoring each one every second with minimal latency   |
 
 :::note
 
-Netdata deliberately avoids using deep learning models, as they would introduce heavy dependencies and resource requirements that wouldn't align with Netdata's goal of running efficiently on any Linux system. Instead, the implementation uses the lightweight [dlib](https://github.com/davisking/dlib) library and spreads training costs over a wide window to minimize performance impact.
+Netdata deliberately avoids using deep learning models, as they would introduce heavy dependencies and resource requirements that wouldn't align with Netdata's goal of running efficiently on any Linux system. Instead, the implementation uses a small built-in k-means and spreads training costs over a wide window to minimize performance impact.
 
 :::
 

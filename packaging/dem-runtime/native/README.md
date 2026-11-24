@@ -14,10 +14,19 @@ and the complete release identity before the distro builder runs. CMake consumes
 the explicit staging directory without downloading components or executing a
 browser, and requires no additional Python dependency in the Agent build.
 
-From the Agent checkout inside a native package builder:
+Native builds with DEM or NetFlow also require a staged stock IP intelligence
+payload. Prepare it from the Agent checkout with Go and network access, or make
+an existing staged directory available inside the builder.
+
+```sh
+./src/go/tools/topology-ip-intel-downloader/refresh-stock.sh /build/topology-ip-intel-stock
+```
+
+Pass the stock directory when running the native build.
 
 ```sh
 DEM_RUNTIME_PAYLOAD_DIR=/build/paired-runtime \
+  NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/build/topology-ip-intel-stock \
   packaging/build-package.sh DEB /build/native-package
 ```
 

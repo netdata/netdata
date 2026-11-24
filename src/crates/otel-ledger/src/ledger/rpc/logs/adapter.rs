@@ -363,10 +363,8 @@ fn facet_from_sfst(order: usize, sfst_facet: &sfst::FacetResult) -> Facet {
 /// triples on each [`DataPoint`].
 ///
 /// Appends an `"(unset)"` trailer dimension counting per-bucket logs that
-/// match the filter but don't carry `field`. Matches the legacy
-/// systemd-journal wire shape (journal-function/src/netdata/histogram.rs):
-/// `result.labels` ends with `"(unset)"`, each `DataPoint.items` carries
-/// an extra trailing triple.
+/// match the filter but don't carry `field`: `result.labels` ends with
+/// `"(unset)"`, each `DataPoint.items` carries an extra trailing triple.
 fn histogram_from_sfst(field: &str, timeline: &sfst::Timeline) -> Histogram {
     const UNSET_LABEL: &str = "(unset)";
 
@@ -468,9 +466,8 @@ fn build_columns(fields: &[String], facetable: &BTreeSet<&str>) -> serde_json::V
 
     let mut columns = serde_json::Map::new();
     // The UI formats the cell from `valueOptions.transform`, not from
-    // `type` (which only selects the cell component). Match the legacy
-    // journal column (journal-function/src/netdata/columns.rs): a
-    // `timestamp` cell carrying a µs value rendered via the
+    // `type` (which only selects the cell component). Match the
+    // systemd-journal column: a `timestamp` cell carrying a µs value rendered via the
     // `datetime_usec` transform.
     columns.insert(
         "timestamp".into(),

@@ -89,6 +89,12 @@ lower `measure_sample_rate` in the RUM site jobs to receive fewer reports.
 
 ### Prerequisites
 
+#### Select the DEM image on Docker
+
+If your Netdata Agent runs in Docker, use a `-dem` image such as `netdata/netdata:stable-dem`.
+See [Enable DEM in Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md#enable-dem-in-docker).
+
+
 #### Make the receiver reachable over HTTPS
 
 Visitors' browsers must reach the receiver at a public HTTPS address; browsers do not let HTTPS pages send

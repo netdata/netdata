@@ -484,7 +484,7 @@ func TestContainedAvailabilityPollFinisherDoesNotWaitForPhysicalRelease(t *testi
 	waitBundleContainmentTestValue(t, entered, "availability callback entry")
 	finished := make(chan struct{})
 	go func() {
-		(&Controller{}).finishAvailabilityPoll(functionOwner{name: "module"}, poll)
+		poll.await()
 		close(finished)
 	}()
 
@@ -555,7 +555,7 @@ func TestContainedAvailabilityPollFencesInvocationBeforeAwaitReturns(t *testing.
 	waitBundleContainmentTestValue(t, entered, "availability callback entry")
 	finished := make(chan struct{})
 	go func() {
-		(&Controller{}).finishAvailabilityPoll(functionOwner{name: "module"}, poll)
+		poll.await()
 		close(finished)
 	}()
 	require.True(t, poll.attempt.Cut(jobmgr.ErrProcessAttemptSuperseded))

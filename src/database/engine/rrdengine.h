@@ -231,7 +231,6 @@ struct rrdeng_collect_handle {
 
     RRDENG_COLLECT_PAGE_FLAGS page_flags;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
-    uint8_t type;
 
     struct rrdengine_instance *ctx;
     struct metric *metric;

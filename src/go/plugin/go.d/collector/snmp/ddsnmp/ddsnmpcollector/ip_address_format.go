@@ -9,26 +9,25 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
-func convPduToIPAddress(pdu gosnmp.SnmpPDU) (string, error) {
-	if pdu.Type == gosnmp.IPAddress {
+func convPduToIPAddress(pdu gosnmp.VarBind) (string, error) {
+	if pdu.Value.Type() == gosnmp.IPAddress {
 		return convPduToString(pdu)
 	}
 
-	switch v := pdu.Value.(type) {
-	case []byte:
-		if s, ok := ipAddressFromOctetBytes(v); ok {
+	if bs, ok := pdu.Value.Bytes(); ok {
+		if s, ok := ipAddressFromOctetBytes(bs); ok {
 			return s, nil
 		}
-	case string:
-		if s, ok := ipAddressFromText(v); ok {
+	} else if oid, ok := pdu.Value.OID(); ok {
+		if s, ok := ipAddressFromText(oid); ok {
 			return s, nil
 		}
 	}
 
-	return "", fmt.Errorf("cannot convert %T to IP address", pdu.Value)
+	return "", fmt.Errorf("cannot convert %v to IP address", pdu.Value.Type())
 }
 
 func ipAddressFromOctetBytes(bs []byte) (string, bool) {

@@ -3,16 +3,17 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -22,7 +23,8 @@ import (
 func TestTableCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		profile        *ddsnmp.Profile
-		setupMock      func(m *snmpmock.MockHandler)
+		setupMock      func(m *snmpmock.MockSession)
+		requests       requestConfig // zero: testRequests
 		expectedResult []ddsnmp.Metric
 		expectedError  bool
 		errorContains  string
@@ -57,8 +59,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
@@ -122,8 +124,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					// Row 1
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.16.1", 500),
@@ -219,8 +221,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{})
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{})
 			},
 			expectedResult: []ddsnmp.Metric{},
 			expectedError:  false,
@@ -246,7 +248,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				expectSNMPWalkError(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", errors.New("timeout walking table"))
 			},
 			expectedResult: nil,
@@ -254,6 +256,7 @@ func TestTableCollector_Collect(t *testing.T) {
 			errorContains:  "timeout walking table",
 		},
 		"table with snmpv1": {
+			requests: requestConfig{version: gosnmp.Version1, maxOIDs: 10},
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
 				Definition: &ddprofiledefinition.ProfileDefinition{
@@ -282,8 +285,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version1, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version1, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 				})
@@ -342,14 +345,14 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// First table walk
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 				})
 				// Second table walk
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.31.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.31.1", []gosnmp.VarBind{
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.1", 5000),
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.2", 6000),
 				})
@@ -415,9 +418,9 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk returns partial data - some metrics missing for some rows
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					// Row 1 - complete
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.16.1", 500),
@@ -506,9 +509,9 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Table walk happens even without symbols (for tags)
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.2", "eth1"),
 				})
@@ -540,8 +543,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 				})
@@ -601,8 +604,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "lo0"),
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.1", 24), // softwareLoopback
@@ -661,8 +664,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0 - Primary Network Interface"),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.2", 5),
@@ -739,8 +742,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.1", 6),
@@ -797,8 +800,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 				})
@@ -857,8 +860,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "GigabitEthernet1/0"),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
@@ -925,8 +928,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.29671.1.1.4", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.29671.1.1.4", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.4.1.29671.1.1.4.1.5.1", 10),
 					createPDU("1.3.6.1.4.1.29671.1.1.4.1.1.1", gosnmp.OctetString, []byte{0x00, 0x50, 0x56, 0xAB, 0xCD, 0xEF}),
 				})
@@ -973,8 +976,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.20", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.20", []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.4.20.1.3.1", 1),
 					createPDU("1.3.6.1.2.1.4.20.1.1.1", gosnmp.IPAddress, "192.168.1.1"),
 				})
@@ -1035,8 +1038,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0 - Primary Interface"),
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.1", 6),
@@ -1096,8 +1099,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "tunnel0"),
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.1", 131), // No mapping for this value
@@ -1145,8 +1148,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", ""), // Empty string
 				})
@@ -1198,8 +1201,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					// Row 1 - complete
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.16.1", 500),
@@ -1294,8 +1297,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.109.1.1.1", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.109.1.1.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.9.9.109.1.1.1.1.12.1", 2048), // 2048 KB
 					createIntegerPDU("1.3.6.1.4.1.9.9.109.1.1.1.1.2.1", 1),
 				})
@@ -1348,8 +1351,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.8.1", 1), // up
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.8.2", 2), // down
@@ -1428,8 +1431,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.674.10892.1.1100.32", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.674.10892.1.1100.32", []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.6.1", 129), // internalError + processorPresent
 					createStringPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.7.1", "CPU 1"),
 				})
@@ -1487,8 +1490,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12124.1.13", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12124.1.13", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.13.1.3.1", "Status1"), // normal
 					createStringPDU("1.3.6.1.4.1.12124.1.13.1.2.1", "Fan1"),
 					createStringPDU("1.3.6.1.4.1.12124.1.13.1.3.2", "Status3"), // critical
@@ -1560,8 +1563,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.305.1.1.1", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.305.1.1.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.9.9.305.1.1.1.1.5.1", 1024),
 					createGauge32PDU("1.3.6.1.4.1.9.9.305.1.1.1.1.6.1", 2048000),
 					createStringPDU("1.3.6.1.4.1.9.9.305.1.1.1.1.2.1", "Processor"),
@@ -1622,8 +1625,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.318.1.1.10.4.3.3", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.318.1.1.10.4.3.3", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.318.1.1.10.4.3.3.1.4.1", 150),
 					createIntegerPDU("1.3.6.1.4.1.318.1.1.10.4.3.3.1.1.1", 1), // L1
 					createGauge32PDU("1.3.6.1.4.1.318.1.1.10.4.3.3.1.4.2", 160),
@@ -1685,8 +1688,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12124.1.1", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12124.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.1.1.5.1", "OK"),
 					createStringPDU("1.3.6.1.4.1.12124.1.1.1.2.1", "node1"),
 					createStringPDU("1.3.6.1.4.1.12124.1.1.1.5.2", "DOWN"),
@@ -1759,8 +1762,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.305.1.1.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.305.1.1.2", []gosnmp.VarBind{
 					createPDU("1.3.6.1.4.1.9.9.305.1.1.2.1.1.1", gosnmp.OpaqueFloat, float32(0.75)),
 					createPDU("1.3.6.1.4.1.9.9.305.1.1.2.1.2.1", gosnmp.OpaqueFloat, float32(0.82)),
 					createIntegerPDU("1.3.6.1.4.1.9.9.305.1.1.2.1.0.1", 1),
@@ -1810,8 +1813,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"), // Can't convert to int64
 				})
@@ -1873,14 +1876,14 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.2", 20),
 				})
 				// Walk ifXTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0"),
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "GigabitEthernet0/1"),
 				})
@@ -1949,15 +1952,15 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable - has 3 interfaces
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.2", 20),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.3", 30),
 				})
 				// Walk ifXTable - only has 2 interfaces (missing index 3)
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0"),
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "GigabitEthernet0/1"),
 				})
@@ -2055,14 +2058,14 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 				})
 				// Walk ifXTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0"),
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.18.1", "Uplink to Core"),
 				})
@@ -2199,14 +2202,14 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.3", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.3", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.3.1.1.100.1.1.1.192.0.2.1", 123),
 				})
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6.100.1.1.1.192.0.2.1", "blue"),
 				})
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.2.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.2.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2.100.1.1.1.192.0.2.1", 65001),
 					createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.100.1.1.1.192.0.2.1", gosnmp.OctetString, []byte{192, 0, 2, 1}),
 					createStringPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12.100.1.1.1.192.0.2.1", "Transit-1"),
@@ -2280,13 +2283,13 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 				})
 				// Walk ifXTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0.100"),
 				})
 			},
@@ -2368,17 +2371,17 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk cieIfInterfaceTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.276.1.1.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.276.1.1.2", []gosnmp.VarBind{
 					createCounter64PDU("1.3.6.1.4.1.9.9.276.1.1.2.1.1.1", 5),
 				})
 				// Walk ifXTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0"),
 				})
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.1", 6),
 				})
 			},
@@ -2453,13 +2456,13 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk cpiPduBranchTable with complex index: 1.6.0.36.155.53.3.246
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.30932.1.10.1.3.110", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.30932.1.10.1.3.110", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.30932.1.10.1.3.110.1.3.1.6.0.36.155.53.3.246", 15),
 				})
 				// Walk cpiPduTable with simpler index: 6.0.36.155.53.3.246
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.30932.1.10.1.2.10", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.30932.1.10.1.2.10", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.30932.1.10.1.2.10.1.3.6.0.36.155.53.3.246", "PDU-A1"),
 				})
 			},
@@ -2528,13 +2531,13 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk customTable with index: 1.2.3.4.5.6.7
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.1.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.12345.1.1.1.1.1.2.3.4.5.6.7", 100),
 				})
 				// Walk deviceTable with transformed index: 2.3.5.6.7
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.2.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.2.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12345.2.1.1.1.2.3.5.6.7", "Device-123"),
 				})
 			},
@@ -2622,11 +2625,11 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2636.5.1.1.2.6.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2636.5.1.1.2.6.2", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.2636.5.1.1.2.6.2.1.8.100.1.1", 42),
 				})
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", []gosnmp.VarBind{
 					createPDU("1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11.7.1.4.10.0.0.1.1.4.192.0.2.1", gosnmp.OctetString, []byte{192, 0, 2, 1}),
 					createGauge32PDU("1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13.7.1.4.10.0.0.1.1.4.192.0.2.1", 65001),
 					createGauge32PDU("1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14.7.1.4.10.0.0.1.1.4.192.0.2.1", 100),
@@ -2697,13 +2700,13 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk customTable with short index: 1.2.3
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.1.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.12345.1.1.1.1.1.2.3", 100),
 				})
 				// Walk deviceTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.2.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.2.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12345.2.1.1.1.1", "Device-1"),
 				})
 			},
@@ -2750,14 +2753,14 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk panEntityFRUModuleTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
 					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
 				})
 				// Walk entPhysicalDescr column only (not the whole entPhysicalTable)
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1.2", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
 					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
 				})
@@ -2822,9 +2825,9 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk panEntityFRUModuleTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
 					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
 				})
@@ -2832,7 +2835,7 @@ func TestTableCollector_Collect(t *testing.T) {
 				// With preprocessing, should walk the common prefix for entPhysicalTable
 				// Common prefix of 1.3.6.1.2.1.47.1.1.1.1.2 and 1.3.6.1.2.1.47.1.1.1.1.3
 				// is 1.3.6.1.2.1.47.1.1.1.1
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1", []gosnmp.VarBind{
 					// entPhysicalDescr column
 					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
 					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
@@ -2907,9 +2910,9 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0-description"),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.2", 20),
@@ -2918,7 +2921,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.3", "eth2-description"),
 				})
 				// Walk ifName column from ifXTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigabitEthernet0/0"),
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "GigabitEthernet0/1"),
 					// No entry for index 3 - missing cross-table data
@@ -2999,9 +3002,9 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					// Interface 1 - has both ifName and ifDescr
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0-description"),
@@ -3012,7 +3015,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.3.2", 6),
 				})
 				// Walk ifName column
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigE0/0"),
 					// No entry for index 2 - simulating missing ifName
 				})
@@ -3084,16 +3087,16 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0-description"),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.2", ""), // Empty ifDescr
 				})
 				// Walk ifName column
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigE0/0"),
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "GigE0/1"),
 				})
@@ -3161,9 +3164,9 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					// Interface 1 - has both ifName and ifDescr
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
@@ -3175,7 +3178,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.3", ""),
 				})
 				// Walk ifName column
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.SnmpPDU{
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "GigE0/0"),
 					// No entry for index 2
 					// No entry for index 3
@@ -3239,8 +3242,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.31.1", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.31.1", []gosnmp.VarBind{
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.1", 1000), // IPv4
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.2", 2000), // IPv6
 				})
@@ -3297,8 +3300,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.147.1.2.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.9.9.147.1.2.2.2", []gosnmp.VarBind{
 					createCounter64PDU("1.3.6.1.4.1.9.9.147.1.2.2.2.1.5.20.2", 4087850099),
 					createCounter64PDU("1.3.6.1.4.1.9.9.147.1.2.2.2.1.5.21.3", 1234567890),
 				})
@@ -3353,8 +3356,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.31.1", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.31.1", []gosnmp.VarBind{
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.1", 1000),
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.2", 2000),
 					createCounter64PDU("1.3.6.1.2.1.4.31.1.1.4.0", 10), // Unknown
@@ -3421,8 +3424,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),   // Single index
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2.3", 2000), // Multi-part index
 				})
@@ -3477,8 +3480,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.24.4", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.4.24.4", []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.4.24.4.1.3.192.168.1.0.255.255.255.0", 1),
 				})
 			},
@@ -3532,8 +3535,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.1.1", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.12345.1.1", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.12345.1.1.1.1.10.20.30.40.50", 100),
 				})
 			},
@@ -3585,8 +3588,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 				})
 			},
@@ -3633,8 +3636,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.5", 5000),
 				})
 			},
@@ -3701,8 +3704,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.14988.1.1.3.100", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.14988.1.1.3.100", []gosnmp.VarBind{
 					// Temperature sensor (type 1)
 					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.3.1", 25),
 					createStringPDU("1.3.6.1.4.1.14988.1.1.3.100.1.2.1", "cpu-temperature"),
@@ -3780,8 +3783,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000),
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 					createCounter32PDU("1.3.6.1.2.1.2.2.1.10.2", 2000),
@@ -3865,8 +3868,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.8.1", 1), // up
 					createStringPDU("1.3.6.1.2.1.2.2.1.2.1", "eth0"),
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.8.2", 2), // down
@@ -3956,8 +3959,8 @@ func TestTableCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.25.2.3", []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.25.2.3", []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.2.1.25.2.3.1.5.1", 1000000),
 					createStringPDU("1.3.6.1.2.1.25.2.3.1.3.1", "/"),
 					createGauge32PDU("1.3.6.1.2.1.25.2.3.1.5.2", 500000),
@@ -4016,7 +4019,7 @@ func TestTableCollector_Collect(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setupMock(mockHandler)
@@ -4031,10 +4034,14 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			missingOIDs := make(map[string]bool)
 			tcache := newTableCache(0, 0) // Cache disabled
-			collector := newTableCollector(mockHandler, missingOIDs, tcache, logger.New(), false)
+			requests := tc.requests
+			if requests == (requestConfig{}) {
+				requests = testRequests
+			}
+			collector := newTableCollector(mockHandler, requests, 0, missingOIDs, tcache, logger.New(), false)
 
 			var stats ddsnmp.CollectionStats
-			result, err := collector.collect(tc.profile, &stats)
+			result, err := collector.collect(context.Background(), tc.profile, &stats)
 
 			if tc.expectedError {
 				assert.Error(t, err)
@@ -4060,7 +4067,7 @@ func TestTableCollector_Collect(t *testing.T) {
 func TestCollector_Collect_TableCaching(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
-		setupMock      func(m *snmpmock.MockHandler)
+		setupMock      func(m *snmpmock.MockSession)
 		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
@@ -4104,107 +4111,91 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 
 				// First collection: Full walk
-				m.EXPECT().Version().Return(gosnmp.Version2c).Times(1)
-				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
-					[]gosnmp.SnmpPDU{
+				m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.2.1.2.2", gomock.Any()).Return(
+					[]gosnmp.VarBind{
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.10.1",
-							Type:  gosnmp.Counter32,
-							Value: uint(1000),
+							Value: gosnmp.Counter32Value(1000),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.16.1",
-							Type:  gosnmp.Counter32,
-							Value: uint(500),
+							Value: gosnmp.Counter32Value(500),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.2.1",
-							Type:  gosnmp.OctetString,
-							Value: []byte("eth0"),
+							Value: gosnmp.OctetStringValue([]byte("eth0")),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.10.2",
-							Type:  gosnmp.Counter32,
-							Value: uint(2000),
+							Value: gosnmp.Counter32Value(2000),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.16.2",
-							Type:  gosnmp.Counter32,
-							Value: uint(1500),
+							Value: gosnmp.Counter32Value(1500),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.2.2",
-							Type:  gosnmp.OctetString,
-							Value: []byte("eth1"),
+							Value: gosnmp.OctetStringValue([]byte("eth1")),
 						},
-					}, nil,
+					}, gosnmp.WalkEnd{}, nil,
 				).Times(1)
 
 				// Second collection: Only GET metrics (not tags)
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.2.2.1.10.1",
 					"1.3.6.1.2.1.2.2.1.16.1",
 					"1.3.6.1.2.1.2.2.1.10.2",
 					"1.3.6.1.2.1.2.2.1.16.2",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(1100), // Values changed
+								Value: gosnmp.Counter32Value(1100), // Values changed
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.16.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(600),
+								Value: gosnmp.Counter32Value(600),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.2",
-								Type:  gosnmp.Counter32,
-								Value: uint(2200),
+								Value: gosnmp.Counter32Value(2200),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.16.2",
-								Type:  gosnmp.Counter32,
-								Value: uint(1700),
+								Value: gosnmp.Counter32Value(1700),
 							},
 						},
 					}, nil,
 				).Times(1)
 
 				// Third collection: Still using cache
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.2.2.1.10.1",
 					"1.3.6.1.2.1.2.2.1.16.1",
 					"1.3.6.1.2.1.2.2.1.10.2",
 					"1.3.6.1.2.1.2.2.1.16.2",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(1200),
+								Value: gosnmp.Counter32Value(1200),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.16.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(700),
+								Value: gosnmp.Counter32Value(700),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.2",
-								Type:  gosnmp.Counter32,
-								Value: uint(2400),
+								Value: gosnmp.Counter32Value(2400),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.16.2",
-								Type:  gosnmp.Counter32,
-								Value: uint(1900),
+								Value: gosnmp.Counter32Value(1900),
 							},
 						},
 					}, nil,
@@ -4291,64 +4282,55 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
-				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 
 				// First collection: Full walk
 				gomock.InOrder(
-					m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
-						[]gosnmp.SnmpPDU{
+					m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.2.1.2.2", gomock.Any()).Return(
+						[]gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(1000),
+								Value: gosnmp.Counter32Value(1000),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.2.1",
-								Type:  gosnmp.OctetString,
-								Value: []byte("eth0"),
+								Value: gosnmp.OctetStringValue([]byte("eth0")),
 							},
-						}, nil,
+						}, gosnmp.WalkEnd{}, nil,
 					),
 
 					// Second collection: Using cache
-					m.EXPECT().Get([]string{"1.3.6.1.2.1.2.2.1.10.1"}).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
+					m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.2.2.1.10.1"}).Return(
+						&gosnmp.Message{
+							VarBinds: []gosnmp.VarBind{
 								{
 									Name:  "1.3.6.1.2.1.2.2.1.10.1",
-									Type:  gosnmp.Counter32,
-									Value: uint(1100),
+									Value: gosnmp.Counter32Value(1100),
 								},
 							},
 						}, nil,
 					),
 
 					// Third collection: After expiration, full walk again
-					m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
-						[]gosnmp.SnmpPDU{
+					m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.2.1.2.2", gomock.Any()).Return(
+						[]gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(1200),
+								Value: gosnmp.Counter32Value(1200),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.2.1",
-								Type:  gosnmp.OctetString,
-								Value: []byte("eth0"),
+								Value: gosnmp.OctetStringValue([]byte("eth0")),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.2",
-								Type:  gosnmp.Counter32,
-								Value: uint(2000),
+								Value: gosnmp.Counter32Value(2000),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.2.2",
-								Type:  gosnmp.OctetString,
-								Value: []byte("eth1"),
+								Value: gosnmp.OctetStringValue([]byte("eth1")),
 							},
-						}, nil,
+						}, gosnmp.WalkEnd{}, nil,
 					),
 				)
 			},
@@ -4444,80 +4426,69 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
-				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 
 				// First collection: Walk table once
-				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
-					[]gosnmp.SnmpPDU{
+				m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.2.1.2.2", gomock.Any()).Return(
+					[]gosnmp.VarBind{
 						// Interface 1
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.2.1",
-							Type:  gosnmp.OctetString,
-							Value: []byte("eth0"),
+							Value: gosnmp.OctetStringValue([]byte("eth0")),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.10.1",
-							Type:  gosnmp.Counter32,
-							Value: uint(1000),
+							Value: gosnmp.Counter32Value(1000),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.16.1",
-							Type:  gosnmp.Counter32,
-							Value: uint(500),
+							Value: gosnmp.Counter32Value(500),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.14.1",
-							Type:  gosnmp.Counter32,
-							Value: uint(10),
+							Value: gosnmp.Counter32Value(10),
 						},
 						{
 							Name:  "1.3.6.1.2.1.2.2.1.20.1",
-							Type:  gosnmp.Counter32,
-							Value: uint(5),
+							Value: gosnmp.Counter32Value(5),
 						},
-					}, nil,
+					}, gosnmp.WalkEnd{}, nil,
 				).Times(1)
 
 				// Second collection: Each config uses cache separately
 				// First config GET
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.2.2.1.10.1",
 					"1.3.6.1.2.1.2.2.1.16.1",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.10.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(1100),
+								Value: gosnmp.Counter32Value(1100),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.16.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(600),
+								Value: gosnmp.Counter32Value(600),
 							},
 						},
 					}, nil,
 				).Times(1)
 
 				// Second config GET
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.2.2.1.14.1",
 					"1.3.6.1.2.1.2.2.1.20.1",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.14.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(12),
+								Value: gosnmp.Counter32Value(12),
 							},
 							{
 								Name:  "1.3.6.1.2.1.2.2.1.20.1",
-								Type:  gosnmp.Counter32,
-								Value: uint(6),
+								Value: gosnmp.Counter32Value(6),
 							},
 						},
 					}, nil,
@@ -4607,35 +4578,33 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
-				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 
 				// First collection: Walk both table and cross-table column
 
 				// Walk main table
-				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
-					[]gosnmp.SnmpPDU{
+				m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.4.1.25461.1.1.7.1.2.1", gomock.Any()).Return(
+					[]gosnmp.VarBind{
 						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
 						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
-					}, nil,
+					}, gosnmp.WalkEnd{}, nil,
 				).Times(1)
 
 				// Walk cross-table column
-				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1.2").Return(
-					[]gosnmp.SnmpPDU{
+				m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.2.1.47.1.1.1.1.2", gomock.Any()).Return(
+					[]gosnmp.VarBind{
 						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
 						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
-					}, nil,
+					}, gosnmp.WalkEnd{}, nil,
 				).Times(1)
 
 				// Second collection: GET metrics only, cross-table column should be cached
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
 						},
@@ -4643,12 +4612,12 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 				).Times(1)
 
 				// Third collection: Still using cache
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
 						},
@@ -4728,34 +4697,32 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
-				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 
 				// First collection: Walk both tables (order doesn't matter)
-				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
-					[]gosnmp.SnmpPDU{
+				m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.4.1.25461.1.1.7.1.2.1", gomock.Any()).Return(
+					[]gosnmp.VarBind{
 						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
 						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
-					}, nil,
+					}, gosnmp.WalkEnd{}, nil,
 				).Times(1)
 
-				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1").Return(
-					[]gosnmp.SnmpPDU{
+				m.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6.1.2.1.47.1.1.1.1", gomock.Any()).Return(
+					[]gosnmp.VarBind{
 						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
 						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
 						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.1", "Type A"),
 						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.2", "Type B"),
-					}, nil,
+					}, gosnmp.WalkEnd{}, nil,
 				).Times(1)
 
 				// Second collection: GET metrics only
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
 						},
@@ -4763,12 +4730,12 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 				).Times(1)
 
 				// Third collection: Still using cache
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
 					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
 							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
 						},
@@ -4820,11 +4787,13 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHandler := snmpmock.NewMockHandler(ctrl)
+			mockHandler := snmpmock.NewMockSession(ctrl)
 			tc.setupMock(mockHandler)
 
 			ddsnmp.FinalizeProfiles(tc.profiles)
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    tc.profiles,
 				Log:         logger.New(),
@@ -4847,7 +4816,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					time.Sleep(tc.sleepBetween)
 				}
 
-				result, err = collector.Collect()
+				result, err = collector.Collect(context.Background())
 
 				// For intermediate collections, just verify no error
 				if i < tc.collectCount-1 {

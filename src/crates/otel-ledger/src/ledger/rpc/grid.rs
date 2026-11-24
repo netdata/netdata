@@ -16,13 +16,10 @@
 /// lands on 15s buckets (60 of them).
 const TARGET_BUCKETS: u32 = 60;
 
-/// "Nice" bucket widths in seconds, mirroring journal-engine's
-/// `calculate_bucket_duration` (`journal-engine/src/histogram.rs`) so
-/// otel charts land on the same wall-clock-friendly intervals
-/// (1s, 2s, 5s, 10s, 15s, 30s,
-/// 1m, 5m, …) as the journal histograms. Only the density target
-/// differs: journal-engine settles for ≥ 50 buckets, this picks the
-/// largest entry that still meets [`TARGET_BUCKETS`] (see
+/// "Nice" bucket widths in seconds, so otel charts land on
+/// wall-clock-friendly intervals (1s, 2s, 5s, 10s, 15s, 30s, 1m, 5m, …),
+/// the same ones the systemd-journal histograms use. The width chosen is
+/// the largest entry that still meets [`TARGET_BUCKETS`] (see
 /// [`bucket_width_for_span_s`]), so chart density is stable as the
 /// window scales.
 const VALID_BUCKET_WIDTHS_S: &[u32] = &[

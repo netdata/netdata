@@ -6,16 +6,18 @@ package snmptopology
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -205,15 +207,14 @@ func TestTopologyProductionPath_CatalogFixtureRejectsMalformedModernIPv4Indexes(
 func addMalformedModernIPv4FixtureRow(fixture *topologySNMPRecHandler, index string, ifIndex int) {
 	const entryOID = "1.3.6.1.2.1.4.34.1"
 	fixture.addEntries(
-		gosnmp.SnmpPDU{Name: entryOID + ".3." + index, Type: gosnmp.Integer, Value: ifIndex},
-		gosnmp.SnmpPDU{Name: entryOID + ".4." + index, Type: gosnmp.Integer, Value: 1},
-		gosnmp.SnmpPDU{
+		gosnmp.VarBind{Name: entryOID + ".3." + index, Value: gosnmp.IntegerValue(int32(ifIndex))},
+		gosnmp.VarBind{Name: entryOID + ".4." + index, Value: gosnmp.IntegerValue(1)},
+		gosnmp.VarBind{
 			Name:  entryOID + ".5." + index,
-			Type:  gosnmp.ObjectIdentifier,
-			Value: fmt.Sprintf("1.3.6.1.2.1.4.32.1.5.%d.1.4.203.0.113.0.24", ifIndex),
+			Value: gosnmp.ObjectIdentifierValue(fmt.Sprintf("1.3.6.1.2.1.4.32.1.5.%d.1.4.203.0.113.0.24", ifIndex)),
 		},
-		gosnmp.SnmpPDU{Name: entryOID + ".7." + index, Type: gosnmp.Integer, Value: 1},
-		gosnmp.SnmpPDU{Name: entryOID + ".10." + index, Type: gosnmp.Integer, Value: 1},
+		gosnmp.VarBind{Name: entryOID + ".7." + index, Value: gosnmp.IntegerValue(1)},
+		gosnmp.VarBind{Name: entryOID + ".10." + index, Value: gosnmp.IntegerValue(1)},
 	)
 }
 
@@ -224,7 +225,7 @@ func collectCatalogFixtureTopology(
 	t.Helper()
 	sysObjectPDU, ok := fixture.byOID["1.3.6.1.2.1.1.2.0"]
 	require.True(t, ok, "fixture should contain sysObjectID")
-	sysObjectID, ok := sysObjectPDU.Value.(string)
+	sysObjectID, ok := sysObjectPDU.Value.OID()
 	require.True(t, ok)
 
 	dev := ddsnmp.DeviceConnectionInfo{
@@ -240,11 +241,13 @@ func collectCatalogFixtureTopology(
 	require.NotEmpty(t, profiles, "stock catalog should resolve topology profiles")
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  fixture,
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
 		SysObjectID: dev.SysObjectID,
-	}).Collect()
+	}).Collect(context.Background())
 	require.NoError(t, err)
 	require.NotEmpty(t, profileMetrics)
 	return dev, profileMetrics
@@ -269,11 +272,13 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 	require.NotEmpty(t, profiles, "stock catalog should resolve Cisco topology profiles")
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  fixture,
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
 		SysObjectID: dev.SysObjectID,
-	}).Collect()
+	}).Collect(context.Background())
 	require.NoError(t, err)
 	require.NotEmpty(t, profileMetrics)
 
@@ -335,22 +340,19 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 }
 
 func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
-	pdus := []gosnmp.SnmpPDU{
+	pdus := []gosnmp.VarBind{
 		{
 			Name:  "1.3.6.1.2.1.4.22.1.2.17.192.0.2.18",
-			Type:  gosnmp.OctetString,
-			Value: []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef},
+			Value: gosnmp.OctetStringValue([]byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef}),
 		},
 		{
 			Name:  "1.3.6.1.2.1.4.22.1.4.17.192.0.2.18",
-			Type:  gosnmp.Integer,
-			Value: 3,
+			Value: gosnmp.IntegerValue(3),
 		},
 	}
 	handler := &topologySNMPRecHandler{
-		Handler: gosnmp.NewHandler(),
 		entries: pdus,
-		byOID:   make(map[string]gosnmp.SnmpPDU, len(pdus)),
+		byOID:   make(map[string]gosnmp.VarBind, len(pdus)),
 	}
 	for _, pdu := range pdus {
 		handler.byOID[pdu.Name] = pdu
@@ -369,11 +371,13 @@ func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
 	require.NotEmpty(t, profiles)
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  handler,
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
 		SysObjectID: dev.SysObjectID,
-	}).Collect()
+	}).Collect(context.Background())
 	require.NoError(t, err)
 
 	cache := newTestTopologyCache(dev)
@@ -395,7 +399,7 @@ func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandl
 	require.NoError(t, err)
 	defer file.Close()
 
-	var entries []gosnmp.SnmpPDU
+	var entries []gosnmp.VarBind
 	scanner := bufio.NewScanner(file)
 	for lineNumber := 1; scanner.Scan(); lineNumber++ {
 		line := strings.TrimSpace(scanner.Text())
@@ -429,106 +433,101 @@ func TestTopologySNMPRecPDURejectsMalformedValues(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pdu, err := topologySNMPRecPDU("1.2.3", tc.typeCode, tc.raw)
 			require.Error(t, err)
-			require.Equal(t, gosnmp.SnmpPDU{}, pdu)
+			require.Equal(t, gosnmp.VarBind{}, pdu)
 		})
 	}
 }
 
-func topologySNMPRecPDU(name, typeCode, raw string) (gosnmp.SnmpPDU, error) {
+func topologySNMPRecPDU(name, typeCode, raw string) (gosnmp.VarBind, error) {
 	name = strings.TrimPrefix(name, ".")
 	switch typeCode {
 	case "2":
-		value, err := strconv.Atoi(raw)
+		value, err := strconv.ParseInt(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.Integer,
-			Value: value,
+			Value: gosnmp.IntegerValue(int32(value)),
 		}, nil
 	case "4":
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.OctetString,
-			Value: []byte(raw),
+			Value: gosnmp.OctetStringValue([]byte(raw)),
 		}, nil
 	case "4x":
 		value, err := hex.DecodeString(raw)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.OctetString,
-			Value: value,
+			Value: gosnmp.OctetStringValue(value),
 		}, nil
 	case "6":
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.ObjectIdentifier,
-			Value: strings.TrimPrefix(raw, "."),
+			Value: gosnmp.ObjectIdentifierValue(strings.TrimPrefix(raw, ".")),
 		}, nil
 	case "64":
-		return gosnmp.SnmpPDU{
+		addr, err := netip.ParseAddr(raw)
+		if err != nil {
+			return gosnmp.VarBind{}, err
+		}
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.IPAddress,
-			Value: raw,
+			Value: gosnmp.IPAddressValue(addr),
 		}, nil
 	case "64x":
 		value, err := hex.DecodeString(raw)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		if len(value) != 4 && len(value) != 16 {
-			return gosnmp.SnmpPDU{}, fmt.Errorf("unsupported 64x length %d", len(value))
+		addr, ok := netip.AddrFromSlice(value)
+		if !ok {
+			return gosnmp.VarBind{}, fmt.Errorf("unsupported 64x length %d", len(value))
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.IPAddress,
-			Value: value,
+			Value: gosnmp.IPAddressValue(addr),
 		}, nil
 	case "65":
 		value, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.Counter32,
-			Value: uint(value),
+			Value: gosnmp.Counter32Value(uint32(value)),
 		}, nil
 	case "66":
 		value, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.Gauge32,
-			Value: uint(value),
+			Value: gosnmp.Gauge32Value(uint32(value)),
 		}, nil
 	case "67":
 		value, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.TimeTicks,
-			Value: uint32(value),
+			Value: gosnmp.TimeTicksValue(uint32(value)),
 		}, nil
 	case "70":
 		value, err := strconv.ParseUint(raw, 10, 64)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, err
+			return gosnmp.VarBind{}, err
 		}
-		return gosnmp.SnmpPDU{
+		return gosnmp.VarBind{
 			Name:  name,
-			Type:  gosnmp.Counter64,
-			Value: value,
+			Value: gosnmp.Counter64Value(uint64(value)),
 		}, nil
 	default:
-		return gosnmp.SnmpPDU{}, fmt.Errorf("unsupported snmprec type %q", typeCode)
+		return gosnmp.VarBind{}, fmt.Errorf("unsupported snmprec type %q", typeCode)
 	}
 }

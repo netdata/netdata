@@ -35,7 +35,7 @@ run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
   --help-header "${NETDATA_MAKESELF_PATH}/makeself-help-header.txt" \
   "${NETDATA_INSTALL_PATH}" \
   "${NETDATA_INSTALL_PATH}.gz.run" \
-  "Netdata, X-Ray Vision for your infrastructure" \
+  "Netdata, full-stack observability: the AI SRE that learns your stack" \
   ./system/post-installer.sh
 
 run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"

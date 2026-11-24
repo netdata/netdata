@@ -7,13 +7,13 @@ meta:
   categories:
     - export
   icon_filename: 'json.svg'
-  description: 'Export Netdata Agent metrics as JSON documents for long-term storage, further analysis, and correlation with other data sources.'
+  description: 'Export Netdata Agent metrics as JSON documents to feed existing pipelines, further analysis, and correlation with other data sources.'
 keywords:
   - exporter
   - json
 overview:
   exporter_description: |
-    Use the JSON connector for the exporting engine to archive your Agent's metrics to JSON document databases for long-term storage,
+    Use the JSON connector for the exporting engine to send your Agent's metrics to JSON document databases to feed existing pipelines,
     further analysis, or correlation with data from other sources
   exporter_limitations: ''
 setup:

@@ -10,21 +10,12 @@
 //!   <cmds> <view_access> <edit_access>`, printed lowercase via `Display` by
 //!   the netdata-plugin-protocol encoder and parsed by pluginsd_config
 //!   (src/plugins.d/pluginsd_dyncfg.c) through `dyncfg_source_type2id`.
-//! - `configDeclaration` JSON: the `sourceType` string, read by
-//!   types::config and emitted by netdata-plugin-schema, which also accepts
-//!   it as the `x-config-source-type` schema attribute.
 //!
-//! Parsing is strict here (`from_name` rejects unknown words), while the
-//! agent's C parser defaults unknown or empty words to `internal` — a
-//! misspelled word passes the agent but fails schema/JSON parsing.
-//!
-//! `from_slice`, `Default` and `FromStr` have no callers outside this
-//! file's tests; the file-level allow(dead_code) keeps them, as in the
-//! sibling dyncfg_* vocabulary modules.
+//! `Default` has no callers outside this file's tests; the file-level
+//! allow(dead_code) keeps it, as in the sibling dyncfg_* vocabulary modules.
 #![allow(dead_code)]
 
 use std::fmt;
-use std::str::FromStr;
 
 /// Where a dyncfg entry's current value came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -48,9 +39,7 @@ pub enum DynCfgSourceType {
 
 impl DynCfgSourceType {
     /// The canonical lowercase vocabulary word for this value: what
-    /// `Display` prints into the `CONFIG` line and what
-    /// netdata-plugin-schema writes into the `sourceType` field of a
-    /// `configDeclaration`.
+    /// `Display` prints into the `CONFIG` line.
     pub fn name(&self) -> &'static str {
         match self {
             Self::Internal => "internal",
@@ -59,28 +48,6 @@ impl DynCfgSourceType {
             Self::Dyncfg => "dyncfg",
             Self::Discovered => "discovered",
         }
-    }
-
-    /// Strict inverse of `name()`: exact lowercase match, no trimming, None
-    /// for unknown words. Used by the `configDeclaration` parser in
-    /// types::config and by netdata-plugin-schema's `x-config-*` attribute
-    /// reader.
-    pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "internal" => Some(Self::Internal),
-            "stock" => Some(Self::Stock),
-            "user" => Some(Self::User),
-            "dyncfg" => Some(Self::Dyncfg),
-            "discovered" => Some(Self::Discovered),
-            _ => None,
-        }
-    }
-
-    /// `from_name` over UTF-8 bytes, trimming surrounding whitespace first;
-    /// None for invalid UTF-8 or unknown words.
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        let s = std::str::from_utf8(bytes).ok()?.trim();
-        Self::from_name(s)
     }
 }
 
@@ -100,16 +67,6 @@ impl fmt::Display for DynCfgSourceType {
     }
 }
 
-impl FromStr for DynCfgSourceType {
-    type Err = ();
-
-    /// `str::parse` support, delegating to `from_name`; failures carry no
-    /// detail (`Err(())`).
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_name(s).ok_or(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,88 +81,12 @@ mod tests {
     }
 
     #[test]
-    fn test_from_name() {
-        assert_eq!(
-            DynCfgSourceType::from_name("internal"),
-            Some(DynCfgSourceType::Internal)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_name("stock"),
-            Some(DynCfgSourceType::Stock)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_name("user"),
-            Some(DynCfgSourceType::User)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_name("dyncfg"),
-            Some(DynCfgSourceType::Dyncfg)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_name("discovered"),
-            Some(DynCfgSourceType::Discovered)
-        );
-        assert_eq!(DynCfgSourceType::from_name("invalid"), None);
-    }
-
-    #[test]
-    fn test_from_slice() {
-        assert_eq!(
-            DynCfgSourceType::from_slice(b"internal"),
-            Some(DynCfgSourceType::Internal)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_slice(b"  stock  "),
-            Some(DynCfgSourceType::Stock)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_slice(b"user"),
-            Some(DynCfgSourceType::User)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_slice(b"dyncfg"),
-            Some(DynCfgSourceType::Dyncfg)
-        );
-        assert_eq!(
-            DynCfgSourceType::from_slice(b"discovered"),
-            Some(DynCfgSourceType::Discovered)
-        );
-        assert_eq!(DynCfgSourceType::from_slice(b"invalid"), None);
-        assert_eq!(DynCfgSourceType::from_slice(&[0xFF, 0xFE]), None); // Invalid UTF-8
-    }
-
-    #[test]
     fn test_display() {
         assert_eq!(format!("{}", DynCfgSourceType::Internal), "internal");
         assert_eq!(format!("{}", DynCfgSourceType::Stock), "stock");
         assert_eq!(format!("{}", DynCfgSourceType::User), "user");
         assert_eq!(format!("{}", DynCfgSourceType::Dyncfg), "dyncfg");
         assert_eq!(format!("{}", DynCfgSourceType::Discovered), "discovered");
-    }
-
-    #[test]
-    fn test_from_str() {
-        assert_eq!(
-            "internal".parse::<DynCfgSourceType>(),
-            Ok(DynCfgSourceType::Internal)
-        );
-        assert_eq!(
-            "stock".parse::<DynCfgSourceType>(),
-            Ok(DynCfgSourceType::Stock)
-        );
-        assert_eq!(
-            "user".parse::<DynCfgSourceType>(),
-            Ok(DynCfgSourceType::User)
-        );
-        assert_eq!(
-            "dyncfg".parse::<DynCfgSourceType>(),
-            Ok(DynCfgSourceType::Dyncfg)
-        );
-        assert_eq!(
-            "discovered".parse::<DynCfgSourceType>(),
-            Ok(DynCfgSourceType::Discovered)
-        );
-        assert_eq!("invalid".parse::<DynCfgSourceType>(), Err(()));
     }
 
     #[test]

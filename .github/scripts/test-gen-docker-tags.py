@@ -111,6 +111,20 @@ class DockerTagsTest(unittest.TestCase):
         with self.assertRaises(URLError):
             self.generate('2.12.2', error=URLError('unavailable'))
 
+    def test_dem_matches_current_aliases_and_has_its_own_rotation_namespace(self):
+        for version, tags in (
+            ('', ('test',)),
+            ('nightly', ('edge', 'latest')),
+            ('2.12.2-rc.1', ('v2.12.2-rc.1',)),
+            ('2.12.2', ('v2', 'v2.12', 'v2.12.2', 'stable', 'preview')),
+            ('2.12.1', ('v2', 'v2.12', 'v2.12.1', 'stable')),
+        ):
+            with self.subTest(version=version):
+                result, _ = self.generate(version)
+                self.assertEqual(result['dem_tags'].split(','), [f'{repo}:{tag}-dem' for repo in REPOS for tag in tags])
+                self.assertEqual(result['dem_nightly_tag'], 'edge-dem')
+                self.assertEqual(result['nightly_tag'], 'edge')
+
 
 if __name__ == '__main__':
     unittest.main()

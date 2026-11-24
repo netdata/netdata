@@ -1284,11 +1284,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
     build_info_set_status(BIB_LIB_ZLIB, true);
 
-#ifdef HAVE_DLIB
-    build_info_set_status(BIB_LIB_DLIB, true);
-    build_info_set_value(BIB_LIB_DLIB, "bundled");
-#endif
-
 #ifdef HAVE_PROTOBUF
     build_info_set_status(BIB_LIB_PROTOBUF, true);
 #ifdef ENABLE_BUNDLED_PROTOBUF
@@ -1302,9 +1297,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
     build_info_set_status(BIB_LIB_OPENSSL, true);
-#ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
-#endif
 #ifdef HAVE_CAPABILITY
     build_info_set_status(BIB_LIB_LIBCAP, true);
 #endif
@@ -1554,7 +1547,7 @@ static void populate_packaging_info() {
     build_info_set_status(BIB_RUNTIME_PARENT, stream_conf_is_parent(false));
     build_info_set_status(BIB_RUNTIME_CHILD, stream_conf_is_child());
 
-    OS_SYSTEM_MEMORY sm = os_system_memory(true);
+    OS_SYSTEM_MEMORY sm = os_system_memory();
     if(OS_SYSTEM_MEMORY_OK(sm)) {
         char buf[1024];
         snprintfz(buf, sizeof(buf), "%" PRIu64, sm.ram_total_bytes);

@@ -40,11 +40,11 @@ sudo netdatacli reload-health
 
 **Key Concept**
 
-You can highly configure Netdata's health watchdog with support for dynamic thresholds, hysteresis, alert templates, and more. You can customize any existing alerts based on your infrastructure's topology or specific monitoring needs or create entirely new entities.
+You can highly configure Netdata's health watchdog with support for dynamic thresholds, hysteresis, alert templates, and more. You can customize any existing alerts based on your environment's topology or specific needs or create entirely new entities.
 
 You can use health alerts with any of Netdata's [collectors](/src/collectors/README.md) (see the [supported collector list](/src/collectors/COLLECTORS.md)) to monitor your systems, containers, and applications in real time.
 
-While you can view active alerts on both the local dashboard and Netdata Cloud, you configure all health alerts _per node_ via individual Netdata Agents. If you want to deploy a new alert across your [infrastructure](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md), you must configure each node with the same health configuration files.
+While you can view active alerts on both the local dashboard and Netdata Cloud, you configure all health alerts _per node_ via individual Netdata Agents. If you want to deploy a new alert across your [nodes](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md), you must configure each node with the same health configuration files.
 
 :::
 

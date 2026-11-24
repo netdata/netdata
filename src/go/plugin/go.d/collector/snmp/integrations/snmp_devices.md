@@ -28,7 +28,7 @@ This collector discovers and monitors any SNMP-enabled network device.
 - **Custom profiles supported**: Users can extend or override stock profiles to add new devices, modify charts, or collect additional OIDs.
 - **Automatic vendor/model detection**: Devices are matched to the right profile using selectors such as `sysObjectID` and `sysDescr`.
 - **ICMP ping**: Optional round-trip latency monitoring alongside SNMP, with a `ping_only` mode available.
-- **SNMP v1, v2c, and v3 support**: Fully implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
+- **SNMP v1, v2c, and v3 support**: Fully implemented via the [gosnmp](https://github.com/netdata/gosnmp) library.
 - **Shared device-level licensing metrics for supported profiles**: When a profile exposes license telemetry, Netdata emits compact per-device licensing charts for earliest expiry, license-state counts (`healthy`, `informational`, `degraded`, `broken`, `ignored`), and highest usage pressure. Supported profile coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. For MikroTik, epoch-like placeholder `mtxrLicUpgrUntil` values are ignored instead of treated as real expired licenses.
 - **Interactive licensing drill-down**: The `snmp:licenses` function follows the existing SNMP function pattern and shows normalized licensing rows for the selected SNMP job/device using cached collector data.
 
@@ -200,7 +200,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.port | Target port. | 161 | no |
 |  | options.retries | Retries to attempt. | 1 | no |
 |  | options.timeout | SNMP request/response timeout. | 5 | no |
-|  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
+|  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request (at most 2147483647, the SNMP limit). | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
 | **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
 |  | ping.enabled | Enable ICMP round-trip measurements alongside SNMP profile metrics. This option does not enable profile-less operation; use `ping_only` for that. When disabled, no ping metrics are collected. | yes | no |

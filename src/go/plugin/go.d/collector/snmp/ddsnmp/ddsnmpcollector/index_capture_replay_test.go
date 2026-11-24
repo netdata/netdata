@@ -3,13 +3,14 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -125,16 +126,16 @@ func TestStockIndexCaptureReplay(t *testing.T) {
 					if !oldColumnPresent {
 						fixture.entries = slices.DeleteFunc(
 							fixture.entries,
-							func(pdu gosnmp.SnmpPDU) bool { return strings.HasPrefix(pdu.Name, tc.oldColumn+".") },
+							func(pdu gosnmp.VarBind) bool { return strings.HasPrefix(pdu.Name, tc.oldColumn+".") },
 						)
 					}
-					ctrl, handler := setupMockHandler(t)
+					ctrl, handler := setupMockSession(t)
 					defer ctrl.Finish()
 					expectSNMPWalkFromFixture(handler, gosnmp.Version2c, fixture, tc.root)
 					getCalls := 0
-					handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
+					handler.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oids []string) (*gosnmp.Message, error) {
 						getCalls++
-						pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
+						pdus := make([]gosnmp.VarBind, 0, len(oids))
 						for _, oid := range oids {
 							require.False(
 								t,
@@ -145,19 +146,21 @@ func TestStockIndexCaptureReplay(t *testing.T) {
 							require.True(t, ok, "unexpected cached acquisition %s", oid)
 							pdus = append(pdus, pdu)
 						}
-						return &gosnmp.SnmpPacket{
-							Variables: pdus,
+						return &gosnmp.Message{
+							VarBinds: pdus,
 						}, nil
 					}).AnyTimes()
 					profile := mustLoadIndexCaptureRow(t, tc.profile, tc.table)
 					collector := New(Config{
+						Version:    gosnmp.Version2c,
+						MaxOIDs:    10,
 						SnmpClient: handler,
 						Profiles:   []*ddsnmp.Profile{profile},
 						Log:        logger.New(),
 					})
 					for _, phase := range []string{"initial WALK", "cached GET"} {
 						t.Run(phase, func(t *testing.T) {
-							result, err := collector.Collect()
+							result, err := collector.Collect(context.Background())
 							require.NoError(t, err)
 							require.Len(t, result, 1)
 							require.Zero(t, result[0].Stats.Errors.Processing.Table)
@@ -224,15 +227,17 @@ func TestStockIndexCaptureReplay_RB750ScopedAcquisition(t *testing.T) {
 				Topology: profile.Definition.Topology,
 			}
 			fixture := mustLoadSNMPFixture(t, "../testdata/profile-mib-access-rb750gr3.snmprec")
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			expectSNMPWalkFromFixture(handler, gosnmp.Version2c, fixture, "1.0.8802.1.1.2.1.4.2")
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
 			})
-			result, err := collector.Collect()
+			result, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, result, 1)
 			require.Zero(t, result[0].Stats.Errors.Processing.Table)

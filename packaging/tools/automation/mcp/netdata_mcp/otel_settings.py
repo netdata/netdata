@@ -169,12 +169,6 @@ class Signal(_Strict):
     ingest: Ingest | None = None
 
 
-class LogsSignal(Signal):
-    journal_dir: str | None = Field(default=None, description=(
-        "Read-only journal files of the former plugin, for the legacy-otel-logs viewer."
-    ))
-
-
 class OtelSettings(_Strict):
     """The user ``otel.yaml``, minus ``base_dir`` and the deprecated ``endpoint``."""
 
@@ -182,7 +176,7 @@ class OtelSettings(_Strict):
     auth: Auth | None = None
     metrics: Metrics | None = None
     remote_storage: RemoteStorage | None = None
-    logs: LogsSignal | None = None
+    logs: Signal | None = None
     traces: Signal | None = None
 
     def protocol(self, name: str) -> Protocol | None:

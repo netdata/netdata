@@ -1,6 +1,6 @@
 # Update and Troubleshoot Reduced Fleet Images
 
-Keep monitoring lightweight through every device release. Prepare a reduced Netdata package with the same capability policy, deliver it through your image pipeline, and preserve each device's identity so its history stays with the same node.
+Keep the Netdata footprint small through every device release. Prepare a reduced Netdata package with the same capability policy, deliver it through your image pipeline, and preserve each device's identity so its history stays with the same node.
 
 ## Build and deliver each release
 

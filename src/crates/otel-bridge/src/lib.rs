@@ -1,7 +1,7 @@
 //! Message types exchanged over ferryboat IPC between the otel-plugin
-//! supervisor and its worker subprocesses (`otel-ingestor`, `otel-ledger`,
-//! `otel-legacy-logs`): one request/response enum pair per worker link, over a
-//! supervisor-owned IPC socket.
+//! supervisor and its worker subprocesses (`otel-ingestor`, `otel-ledger`):
+//! one request/response enum pair per worker link, over a supervisor-owned
+//! IPC socket.
 //!
 //! Function traffic is typed: the supervisor translates between the agent's
 //! pluginsd protocol (`netdata_plugin_protocol::Message` on stdin/stdout) and
@@ -12,8 +12,8 @@
 //! verbatim.
 //!
 //! The submodules carry the crate's other shared contracts: `config` (the
-//! types sent in `Configure`), `function` (the handler engine the ledger and
-//! legacy-logs workers run), and `signals` (the OTel signal axis).
+//! types sent in `Configure`), `function` (the handler engine the workers
+//! run), and `signals` (the OTel signal axis).
 //!
 //! This module covers only the supervisor↔worker links. The ingestor's direct
 //! WAL-event socket to the ledger (`writer_socket_path`) is a separate
@@ -35,8 +35,8 @@
 //!    the worker connects and waits. The order of the spawns means nothing.
 //! 2. The supervisor sends `Configure` with the worker's resolved config,
 //!    to one worker at a time, and waits for that worker's answer: the
-//!    ledger first, then the ingestor, then legacy-logs. The ingestor must
-//!    not write before the ledger's `Ready`, for two reasons:
+//!    ledger first, then the ingestor. The ingestor must not write before
+//!    the ledger's `Ready`, for two reasons:
 //!    - The ledger's start-up recovery takes every WAL file on the disk as
 //!      a closed file of the last run (`wal::Registry::recover`): it indexes
 //!      the file and deletes it. A file that a live ingestor still writes
@@ -56,8 +56,6 @@
 //!    supervisor holds every worker's declarations until the last handshake
 //!    is over: the agent calls only what was declared, so until then the
 //!    one message it can send is `QUIT`.
-//!    The legacy-logs worker may instead send `Disabled` — nothing to serve
-//!    or init failed — and exits immediately after.
 //!    Before its `Ready` a worker sends nothing else: the supervisor takes
 //!    any other first message as a failed start.
 //! 4. The supervisor enters its main loop, routing function calls, results,
@@ -81,7 +79,7 @@ pub mod signals;
 use netdata_plugin_types::{FunctionDeclaration, FunctionResult};
 use serde::{Deserialize, Serialize};
 
-use config::{LegacyLogsConfig, PluginConfig};
+use config::PluginConfig;
 
 /// Max ferryboat message size for the supervisor ↔ worker IPC links.
 ///
@@ -90,8 +88,8 @@ use config::{LegacyLogsConfig, PluginConfig};
 /// refuses, killing the connection. Doubles ferryboat's 8 MiB default.
 /// Function results (rows + facets + histogram) are the largest messages on
 /// these links; an oversized one is degraded to a small error result by the
-/// sending worker instead of failing the link (the ledger and legacy-logs
-/// workers do this), so the ceiling is headroom, not a correctness bound.
+/// sending worker instead of failing the link (both workers do this), so the
+/// ceiling is headroom, not a correctness bound.
 pub const IPC_MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 
 // --- Ingestor subprocess ---
@@ -218,62 +216,4 @@ pub enum LedgerResponse {
     /// as [`IngestorResponse::ChartData`]: the supervisor writes the bytes to
     /// the agent's stdout verbatim.
     ChartData { payload: Vec<u8> },
-}
-
-// --- Legacy OTel logs viewer subprocess ---
-
-/// Messages sent from the supervisor to the legacy-logs worker.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LegacyLogsRequest {
-    /// Same contract as the ingestor's `Configure`: the worker's resolved
-    /// config, sent exactly once as the first message on the link; later
-    /// `Configure`s are logged and ignored.
-    Configure(LegacyLogsConfig),
-    /// Execute a function — same fields and semantics as
-    /// [`IngestorRequest::Call`]. The worker runs its declared function
-    /// through the `otel_bridge::function` engine; an undeclared `name` is
-    /// answered with a 404 `Result`.
-    Call {
-        transaction: String,
-        timeout: u32,
-        name: String,
-        args: Vec<String>,
-        payload: Option<Vec<u8>>,
-    },
-    /// Cancel the running function identified by `transaction`; silently
-    /// ignored if the worker is not tracking it.
-    Cancel { transaction: String },
-    /// Shut down gracefully: the worker exits its run loop and drops the
-    /// connection. Sent once at plugin shutdown.
-    Shutdown,
-}
-
-/// Messages sent from the legacy-logs worker back to the supervisor.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LegacyLogsResponse {
-    /// Startup fully succeeded; the declarations are what the supervisor may
-    /// advertise to the agent. Sent once, as the reply to `Configure` — the
-    /// supervisor accepts no other message in between. The supervisor
-    /// advertises them only once every handshake is over (see the module
-    /// docs).
-    Ready {
-        declarations: Vec<FunctionDeclaration>,
-    },
-    /// Worker will not serve — the legacy journal directory is absent or the
-    /// handler failed to initialize (details in the worker's own logs) — and
-    /// exits immediately after sending this. Terminal: no further messages
-    /// follow, and the supervisor is expected to reap the child.
-    Disabled,
-    /// Function completed; terminal for the transaction — a result for an id
-    /// the supervisor no longer tracks (e.g. raced in after a cancel) is
-    /// dropped.
-    Result(FunctionResult),
-    /// Progress update for a running function; `done`/`total` are forwarded
-    /// to the agent verbatim and carry percent and a fixed denominator of
-    /// 100 (the `otel_bridge::function` percent model), not raw work units.
-    Progress {
-        transaction: String,
-        done: usize,
-        total: usize,
-    },
 }

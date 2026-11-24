@@ -10,6 +10,9 @@ import unittest
 
 HELPER = Path(__file__).resolve().parents[1] / "netdata-dem-pair.sh"
 GNU_LINUX = os.uname().sysname == "Linux" and all(shutil.which(x) for x in ("tar", "flock", "sync"))
+# BusyBox hosts such as Alpine have su but no runuser. BSD su has other -s/-c
+# semantics, so the su fallback is exercised on Linux only.
+SWITCH_USER = bool(shutil.which('runuser') or (os.uname().sysname == 'Linux' and shutil.which('su')))
 
 
 class CommandTests(unittest.TestCase):
@@ -203,7 +206,7 @@ class CommandTests(unittest.TestCase):
             self.assertFalse(stage.exists(), result.stderr)
             self.assertEqual(list(parent.iterdir()), [])
 
-    @unittest.skipUnless(os.geteuid() == 0 and shutil.which('runuser'), 'service boundary requires private root scope')
+    @unittest.skipUnless(os.geteuid() == 0 and SWITCH_USER, 'service boundary requires private root scope')
     def test_source_stage_private_tmpdir_preserves_service_access_and_parent_permissions(self):
         import pwd
         try:
@@ -239,7 +242,7 @@ class CommandTests(unittest.TestCase):
                                 plan + '; [ "$DP_ENABLED" = 1 ]')
             self.assertEqual(result.returncode, 0, result.stderr)
 
-    @unittest.skipUnless(os.geteuid() == 0 and shutil.which('runuser'), 'service boundary requires root')
+    @unittest.skipUnless(os.geteuid() == 0 and SWITCH_USER, 'service boundary requires root')
     def test_plan_stages_target_as_resolved_service_user_on_both_install_routes(self):
         import pwd
         try:
@@ -323,6 +326,65 @@ class CommandTests(unittest.TestCase):
                     else:
                         self.assertNotEqual(result.returncode, 0, result.stderr)
                     self.assertFalse(cache.exists())
+
+
+def path_without(directory, hidden):
+    """A PATH directory linking every command on PATH except the hidden ones."""
+    for entry in os.environ.get('PATH', '').split(os.pathsep):
+        if not os.path.isabs(entry) or not os.path.isdir(entry):
+            continue
+        for name in os.listdir(entry):
+            link = Path(directory) / name
+            source = Path(entry) / name
+            if name in hidden or link.exists() or link.is_symlink():
+                continue
+            if source.is_file() and os.access(source, os.X_OK):
+                link.symlink_to(source)
+    return str(directory)
+
+
+@unittest.skipUnless(GNU_LINUX and os.geteuid() == 0, 'switching to the service account requires Linux root')
+class SwitchUserTests(unittest.TestCase):
+    """dem_pair_as_user with runuser hidden, as on BusyBox hosts."""
+
+    def setUp(self):
+        import pwd
+        try:
+            pwd.getpwnam('nobody')
+        except KeyError:
+            self.skipTest('requires an unprivileged nobody account')
+        self.temp = tempfile.TemporaryDirectory(prefix='netdata-dem-switch-')
+        self.addCleanup(self.temp.cleanup)
+        # The service account resolves commands through the PATH directory below.
+        Path(self.temp.name).chmod(0o755)
+
+    def run_as_user(self, hidden, arguments, stdin=''):
+        bin_dir = Path(self.temp.name) / ('bin-' + '-'.join(sorted(hidden)))
+        bin_dir.mkdir()
+        body = ('PATH=' + shlex.quote(path_without(bin_dir, hidden)) + '\n. ' + shlex.quote(str(HELPER)) + '\n'
+                'NETDATA_RUN_DIR=/run-dir; export NETDATA_RUN_DIR\n'
+                'DP_USER=nobody DP_LIB=/lib-dir DP_CONFIG=/config-dir DP_STOCK=/stock-dir DP_PREFIX=\n'
+                'dem_pair_as_user ' + shlex.join(arguments))
+        return subprocess.run(['sh', '-c', body], text=True, capture_output=True, input=stdin)
+
+    @unittest.skipUnless(shutil.which('su'), 'su unavailable')
+    def test_su_fallback_preserves_identity_arguments_environment_stdin_and_status(self):
+        script = ('id -un; printf "%s\\n" "$PATH" "$NETDATA_RUN_DIR"; '
+                  'printf "%s|%s|%s\\n" "$NETDATA_LIB_DIR" "$NETDATA_USER_CONFIG_DIR" '
+                  '"$NETDATA_STOCK_CONFIG_DIR"; for a do printf "<%s>\\n" "$a"; done; cat; exit 37')
+        arguments = ['', '-', '--config-dir', '-c', 'a b', "it's", '$(false)']
+        result = self.run_as_user({'runuser'}, ['sh', '-c', script, 'sh'] + arguments, stdin='from-stdin\n')
+        self.assertEqual(result.returncode, 37, result.stderr)
+        self.assertIn("'su' '-s' '/bin/sh'", result.stderr)
+        self.assertEqual(result.stdout.splitlines(),
+                         ['nobody', str(Path(self.temp.name) / 'bin-runuser'), '/run-dir',
+                          '/lib-dir|/config-dir|/stock-dir'] +
+                         ['<' + a + '>' for a in arguments] + ['from-stdin'])
+
+    def test_missing_switch_tools_report_the_requirement(self):
+        result = self.run_as_user({'runuser', 'su'}, ['true'])
+        self.assertEqual(result.returncode, 127, result.stderr)
+        self.assertIn('runuser or su is required', result.stderr)
 
 
 class ServiceBoundaryTests(unittest.TestCase):
@@ -700,7 +762,7 @@ class ArchiveEntryTests(unittest.TestCase):
         self.temp.cleanup()
 
     def build(self, netdata=True):
-        label = 'Netdata, X-Ray Vision for your infrastructure' if netdata else 'Generic fixture'
+        label = 'Netdata, full-stack observability: the AI SRE that learns your stack' if netdata else 'Generic fixture'
         result = subprocess.run(['sh', str(self.makeself), '--gzip', '--header', str(self.header),
                                  str(self.tree), str(self.archive), label, './system/post-installer.sh'],
                                 text=True, capture_output=True)

@@ -1,6 +1,6 @@
 # ML Configuration
 
-You can use Netdata's [Machine Learning](/src/ml/README.md) capabilities to detect anomalies in your infrastructure metrics. This feature is enabled by default if your [Database mode](/src/database/README.md) is set to `db = dbengine`.
+You can use Netdata's [Machine Learning](/src/ml/README.md) capabilities to detect anomalies in every metric. This feature is enabled by default if your [Database mode](/src/database/README.md) is set to `db = dbengine`.
 
 ## Enabling or Disabling Machine Learning
 
@@ -15,19 +15,19 @@ To enable or disable Machine Learning capabilities on your node:
 
 ## Technical Implementation
 
-Netdata implements machine learning using the lightweight [dlib](https://github.com/davisking/dlib) C++ library. This implementation choice allows Netdata to:
+Netdata implements machine learning with a small k-means implementation built into the Agent, with no external ML library. This implementation choice allows Netdata to:
 
 ```mermaid
 flowchart TD
-    Dlib("dlib C++ Library<br/>Implementation")
+    KMeans("Built-in k-means<br/>Implementation")
     
     Efficiency("Run efficiently on<br/>any system without<br/>heavy dependencies")
     Resources("Minimize resource usage<br/>while maintaining<br/>high accuracy")
     Codebase("Operate within the<br/>constraints of agent's<br/>C/C++ codebase")
     
-    Dlib --> Efficiency
-    Dlib --> Resources
-    Dlib --> Codebase
+    KMeans --> Efficiency
+    KMeans --> Resources
+    KMeans --> Codebase
     
     %% Style definitions
     classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
@@ -36,7 +36,7 @@ flowchart TD
     classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
 
     %% Apply styles
-    class Dlib alert
+    class KMeans alert
     class Efficiency,Resources,Codebase complete
 ```
 

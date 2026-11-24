@@ -16,7 +16,7 @@ run the installation procedures in linked operator docs. Action boundaries remai
 | Source installation or kickstart fallback | `netdata-installer.sh`, `packaging/installer/kickstart.sh`, `packaging/installer/functions.sh` |
 | Scheduled/manual Agent updates | `packaging/installer/netdata-updater.sh` and the installer or package manager it invokes |
 | Optional DEM pairing, offline inputs or repair | `packaging/installer/netdata-dem-pair.sh`, `packaging/installer/DEM-RUNTIME.md#paired-agent-updates` |
-| Docker entrypoint, host setup or image replacement | `packaging/docker/run.sh`, `packaging/docker/README.md#update-your-netdata-docker-container`, `packaging/installer/DEM-RUNTIME.md#docker-pair-switching` |
+| Docker entrypoint, host setup or image replacement | `packaging/docker/run.sh`, `packaging/docker/README.md#update-your-netdata-docker-container`, `packaging/installer/DEM-RUNTIME.md#docker-host-preparation` |
 | Shared service, IPC or log rotation | `system/systemd/`, `system/logrotate/`, `system/install-service.sh.in`, `docs/netdata-agent/start-stop-restart.md#unix` |
 | DEB/RPM dependencies or package hooks | `.agents/skills/packaging-native-packages/SKILL.md`; this skill covers their shared installer/service callers |
 | Static build, ELF checks or makeself artifact production | `.agents/skills/packaging-static-installer/SKILL.md`; this skill covers installation/update callers |
@@ -27,7 +27,9 @@ run the installation procedures in linked operator docs. Action boundaries remai
 1. Map the complete path from entrypoint to installed helper and service. Record which account runs each step,
    which paths it can traverse/execute, how arguments/environment survive privilege elevation, and how callers
    interpret exit statuses. A root-only helper test does not prove access by the service account; a correct child
-   failure can still trigger the wrong caller cleanup or fallback.
+   failure can still trigger the wrong caller cleanup or fallback. BusyBox hosts (Alpine static) have `su` but no
+   `runuser`; DEM pairing's root-to-service-account switch MUST fall back to
+   `su -s /bin/sh -c 'exec "$0" "$@"' -- <user> env PATH="$PATH" ...` (`dem_pair_as_user`) and be exercised on Alpine.
 2. Separate shipped content from retained configuration, data and runtime ownership records. Inspect the existing
    cleanup and permission owners before changing them. Preserve preexisting prefixes on failed updates, including
    symlinked prefixes; distinguish them from newly created partial installations. For static/source state boundaries,
@@ -40,17 +42,18 @@ run the installation procedures in linked operator docs. Action boundaries remai
    Directory ownership checks: `.agents/skills/packaging-native-packages/SKILL.md#validate-at-the-relevant-layer`.
    For logrotate, verify a fresh record reaches the new inode without restarting the Agent or signalling
    unrelated child processes.
-5. Treat Docker image, persistent volume and host-policy lifetimes separately. Inspect the target image's helper,
-   entrypoint and mounts before inferring update behavior from image replacement. Use
-   `packaging/installer/DEM-RUNTIME.md#docker-host-preparation` for supported enrollment/host setup and its paired
-   switching section for updates. Preserve the service identity and machine-ID mapping used by stored history.
+5. Treat the Docker image, persistent volumes and host policy as separate lifetimes. The DEM image supplies the
+   runtime as a preload. Inspect the image, service identity and mounts before evaluating an image replacement.
+   `packaging/docker/README.md#enable-dem-in-docker` owns deployment and updates.
+   `packaging/installer/DEM-RUNTIME.md#docker-host-preparation` owns policy setup. Preserve the service identity and
+   machine-ID mapping used by stored history.
 
 ## Validate the affected path
 
 - Start with focused fixtures that execute shipped helpers and callers. Select by the behavior changed:
   `packaging/installer/tests/test_static_install_callers.py`, `packaging/installer/tests/test_dem_pair.py`,
   `packaging/installer/tests/test_updater_dem.py`, `packaging/installer/tests/test_updater_artifacts.py`, or
-  `packaging/installer/tests/test_dem_docker_pair.py`. Do not recreate the installer in a test or claim a fixture
+  `packaging/installer/tests/test_dem_runtime_host.py`. Do not recreate the installer in a test or claim a fixture
   establishes a full package transaction or real service restart.
 - For an authorized lifecycle test, use a disposable target with the relevant kernel/service policy. Record exact
   artifact identities and distinguish public artifacts from locally modified candidates. Pin Docker image digests

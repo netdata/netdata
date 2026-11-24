@@ -65,8 +65,8 @@
 //!
 //! Consumers: the `netdata-plugin-rt` plugin runtime (netflow-plugin) runs
 //! its event loop on these types; the otel-plugin supervisor drives the
-//! agent's stdin/stdout directly and relays over IPC to its `otel-ingestor`,
-//! `otel-ledger` and `otel-legacy-logs` workers, which build the same payload
+//! agent's stdin/stdout directly and relays over IPC to its `otel-ingestor`
+//! and `otel-ledger` workers, which build the same payload
 //! and message types but never touch the agent's stream.
 
 mod chart;

@@ -1,8 +1,8 @@
 # Browser runtime host setup
 
-DEM journeys and Lighthouse audits need an explicitly installed browser runtime. RUM does not. The runtime is one
-signed, portable bundle for Linux amd64 or arm64 that contains its own Node, Chromium, Playwright, Lighthouse and their
-JavaScript adapters. Installing it does not require, use or discover a system browser, Node or npm.
+DEM journeys and Lighthouse audits use a browser runtime for Linux amd64 or arm64. The DEM Docker image bundles
+it. For other deployments, install the signed portable bundle or the optional native package. The runtime includes
+Node, Chromium, Playwright, Lighthouse and their JavaScript adapters. RUM works without a browser runtime.
 
 :::info
 
@@ -21,28 +21,32 @@ descriptor, its archive and an administrator-provisioned public keyring.
 :::
 
 Enabling a browser monitor never downloads or installs the runtime. Without one, browser jobs wait for it and report
-no website failures. **Activation requires restarting the Agent, including after first setup.** A running plugin keeps
-the release it acquired at startup. Native hooks and paired source/static installers restart a previously running
-Agent under their service policy. Explicit CLI setup/repair and Docker/preload deployments leave restart to their owner.
+no website failures. The plugin acquires its runtime at startup. **Restart the Agent after manual setup or repair.**
+Native hooks and paired source/static installers restart a previously running Agent under their service policy.
+Starting a DEM Docker container activates the runtime bundled with its image.
 
 On Ubuntu 24.04, default AppArmor restrictions prevent an ordinary unconfined process from creating Chromium's
-sandbox. `netdata-dem-runtime.sh` prepares the host allowance and then runs the existing runtime CLI as Netdata's
-nonroot service account. DEM receives no host-policy privileges.
+sandbox. `netdata-dem-runtime.sh` prepares the host allowance. For source/static setup, it also runs the runtime CLI
+as Netdata's nonroot service account. DEM receives no host-policy privileges.
 
 | Installation | Explicit setup | Policy owner |
 |---|---|---|
 | Native DEB/RPM | Install the optional `netdata-dem-runtime` package | Package manager and package hooks |
 | Static or source | Installed `netdata-dem-runtime.sh`, or kickstart with `--install-dem-runtime` | Administrator-run helper |
-| Local rootful Docker | Run kickstart on the daemon host for the named running container, then restart it after successful setup. | Host deployment administrator |
+| Local rootful Docker | Start a DEM image. Prepare host policy where required for browser jobs. | Host deployment administrator |
 | Protected preload | Prepare the policy before validation/sealing at the preload's final path | Preload/deployment administrator |
 
-Ordinary Agent installation and enabling a monitor do not download a browser or install an unused namespace allowance.
+Selecting a DEM Docker image includes its browser runtime. Other ordinary Agent installations and enabling a monitor
+do not acquire a browser. Host namespace allowances remain explicit.
 Agent-linked `install`, `repair` and `preload` through this helper are for static/source installations. Native-packaged
 Agent builds use the optional runtime package; changing `runtime.mode` does not enable mixed-mode automatic host setup.
 AppArmor being absent or disabled does not cause the helper to install it. On an enabled host, missing parser tools or
 unreadable policy state are reported as prerequisites; the helper does not download host packages.
 
 ## Native DEB/RPM packages
+
+`netdata-plugin-dem` automatically installs the shared `netdata-ip-intel-data` package for RUM geographic
+enrichment. It uses the stock database without a `geoip_db` override or the NetFlow listener.
 
 Install the optional `netdata-dem-runtime` package with the system package manager. DEM never invokes the package
 manager itself, and the package owns its installation lifecycle: the low-level CLI refuses to install, update, repair
@@ -128,43 +132,41 @@ user-owned Agent code as root.
 
 ## Docker host preparation
 
-This command targets a local, rootful Linux Docker daemon and the [documented Netdata container configuration](/packaging/docker/README.md#recommended-way).
-On AppArmor hosts use the documented `apparmor=unconfined` container setting. Chromium's sandbox and the
-host's namespace restrictions stay enabled. Persist `/var/lib/netdata` on local storage, so the installation survives
-container replacement. No Agent is needed on the host. For the first install, the container needs access to a
-published signed release matching its image. On the daemon host, replace `netdata` with the running container's name:
+Use a [DEM image](/packaging/docker/README.md#enable-dem-in-docker) on Linux amd64 or arm64.
+The image provides the Agent, DEM plugin, matching browser runtime at `/opt/netdata-dem-runtime` and stock GeoIP
+data. The preloaded bundle is private to the image's Netdata service account. Keep the runtime path outside
+your volume mounts. The image can start with its bundled runtime offline.
+
+Chromium's sandbox needs unprivileged user namespaces. On a local rootful Linux Docker daemon, use the recommended
+container settings, including `apparmor=unconfined` on AppArmor hosts and Docker's default seccomp profile.
+On hosts that restrict unprivileged user namespaces, such as Ubuntu 24.04 with its default policy, prepare a
+host AppArmor allowance for the image's launcher path. Keep host namespace restrictions and Chromium’s sandbox
+enabled. Rootless, nested and remote Docker or custom confinement require deployment-specific host policy.
+
+On the daemon host, choose a trusted DEM image pinned by digest and a token unique to this deployment. You will
+extract a helper from the image and run it as root on the host. Keep the copy for status and removal. Docker
+creates a temporary container for the copy and leaves it stopped. Use the digest of the DEM image you intend to deploy.
 
 ```sh
-sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata
+(
+  set -eu
+  image='netdata/netdata@sha256:REPLACE_WITH_TRUSTED_DEM_IMAGE_DIGEST'
+  deployment='netdata-monitoring'
+  policy_dir=$(mktemp -d)
+  sudo docker pull "$image"
+  container=$(sudo docker create --pull=never --network=none "$image")
+  trap 'sudo docker rm -v "$container" >/dev/null' EXIT
+  sudo docker cp "$container:/usr/libexec/netdata/netdata-dem-runtime.sh" "$policy_dir/netdata-dem-runtime.sh"
+  sudo sh "$policy_dir/netdata-dem-runtime.sh" policy-prepare \
+    --deployment "$deployment" --runtime-root /opt/netdata-dem-runtime
+  printf 'Policy helper: %s/netdata-dem-runtime.sh\n' "$policy_dir"
+)
 ```
 
-Use this command with a Netdata image you trust to supply code that runs as root on the host. Kickstart
-reads the running deployment’s exact local image ID and creates a temporary container from that image.
-It copies the host setup scripts out and removes the temporary container and its anonymous volumes.
-The temporary container never starts. Changes inside the running deployment cannot replace these scripts.
-
-The host helper prepares AppArmor on hosts that need it. The running deployment downloads, verifies and unpacks the
-signed runtime as the container’s nonroot service user. Preparation verifies artifact integrity and bound paths without
-executing a browser while the Agent continues monitoring. Preparation has no overall time limit. An error or administrator
-cancellation returns a failure. After a successful first installation, activate the runtime when ready:
-
-```sh
-docker restart netdata
-```
-
-Keep the printed registration token for retirement. On restricted hosts, run kickstart once per deployment,
-even if another container already registered the same launcher path. Each registration protects the shared policy.
-Image updates require the paired deployment procedure below; the plugin does not download a new runtime in the
-background. Running kickstart again reuses a valid selection offline and preserves its update policy. An
-already-selected result by itself requires no additional restart.
-
-The host command and sandboxed browser jobs were tested on Ubuntu 24.04 amd64 and Debian 13 amd64. Automatic
-AppArmor setup on hosts that restrict unprivileged user namespaces is qualified for Ubuntu 24.04. On hosts
-without that restriction, the command skips the policy installation. The standard runtime root inside the
-container is `/var/lib/netdata/dem/runtime`. Rootless, nested and remote Docker, custom confinement and custom
-runtime roots need separate administrator setup. For offline inputs or custom roots, use a trusted copy
-of the supplied host helper with `policy-prepare --deployment TOKEN --runtime-root /execution/visible/root`,
-then use the [runtime CLI](#runtime-cli-reference) as the service user.
+Retain the token and helper in an administrator-controlled directory. Use the same
+registration when replacing the image at the same runtime path. Prepare a separate registration for each
+deployment that shares the policy. The helper's status and removal commands work on the host independently of
+the container. See [Status, retry and removal](#status-retry-and-removal).
 
 ## Protected preload updates
 
@@ -212,13 +214,13 @@ updates retain the installed runtime after checking its contract, platform, boun
 | Native DEB/RPM | Package manager; the Netdata updater requests the Agent, DEM plugin and runtime together when the runtime is installed | Hooks drain, validate the exact pair and restore prior service intent. Retry or downgrade the matching packages together. |
 | Released source/static | Agent installer/updater, only for an enrolled runtime | Verify target inputs, stop/drain, install Agent files normally, activate and restore prior service intent. Repair/retry a failed Agent installation; runtime selection and ownership records remain protected. |
 | Unstamped source | Source installer | Validate and retain the existing runtime, stop/drain, install Agent files and recheck before restoring service intent. No runtime download or selection change. |
-| Docker | Deployment administrator using the pinned target image | Fetch before stopping; prepare and activate against the persistent volume after drainage. Roll back selection and image together. |
+| Docker | Deployment administrator | Pull and recreate with a matching `-dem` image. Recreate with the previous pinned image to restore that Agent and runtime pair. |
 | Protected preload | Deployment administrator | For released builds, select the matching sealed root and Agent together and retain both for rollback. Unstamped source builds validate and retain the existing compatible root. |
 
-No runtime is acquired by an ordinary Agent update unless it was already installed. DEM has no independent download
-timer. Initial `install` or `repair` permits companion acquisition during Agent updates unless `--manual-updates` is
-given. `runtime update` directs operators to this installation owner. Integrity and version checks are mandatory. Browser smoke tests run in
-release CI, and `runtime qualify` remains an optional local diagnostic.
+Source, static and native updates acquire the optional runtime only if it was already installed. DEM has no
+independent download timer. Initial `install` or `repair` permits companion acquisition during Agent updates unless
+`--manual-updates` is given. `runtime update` directs operators to the installation owner. Integrity and version
+checks are mandatory. Browser smoke tests run in release CI, and `runtime qualify` remains an optional local diagnostic.
 
 ### Source/static controls and repair
 
@@ -275,29 +277,11 @@ and leaves the service stopped. The deployment owner retains previous Agent arti
 if rollback is needed, and must stop every consumer before replacing or removing a preload. The installer does not
 copy, restore or remove either preload root.
 
-### Docker pair switching
-
-Use `/usr/libexec/netdata/netdata-dem-docker` from the exact pinned target image, with the same service account,
-configuration, `/var/lib/netdata` volume and host-policy mapping as the deployment. The wrapper runs as the service
-account and supports these operations:
-
-| Order | Target-image operation | Deployment owner action |
-|---|---|---|
-| 1 | `fetch --allow-download --output /var/lib/netdata/dem-pair-inputs/target` | Create an accessible input parent outside `dem/runtime`; keep the old image running during fetch. Offline `--release`/`--archive` inputs are also supported. |
-| 2 | — | Stop every old consumer, including other containers sharing this store. |
-| 3 | `prepare --release .../release.json --archive .../runtime.tar.zst --keyring .../release-public.gpg` | Use the retained inputs. Preparation does not activate the target. |
-| 4 | `activate`, then `status` | Start the pinned matching target image only after success. |
-| Recovery | `rollback`, then `status` with the previous image | Keep consumers stopped, restore the previous image and its configuration, then start it. `rollback --prepared-only` cancels an unactivated preparation. |
-
-Keep the authenticated inputs for retry after an older image has run: its garbage collector may not recognize new
-pending-state protection. Re-running `prepare` reimports from those inputs. The wrapper does not create/replace
-containers, change image tags, migrate volumes or manage host policy. Preserve the existing machine-ID host mapping.
-
 ## Release trust and offline operation
 
-Explicit CLI installation, ensure, repair and preload verify signed release metadata, archive digest and
-bounds, architecture and final private paths. Integrity and execution compatibility checks remain mandatory. These
-commands select or seal the verified release without executing a browser.
+Explicit CLI installation, preparation, repair and preload verify signed release metadata, archive digest and bounds,
+architecture and final private paths without executing a browser. Integrity and execution compatibility checks remain
+mandatory.
 
 `dem.plugin runtime qualify` is an optional local diagnostic against the installed release. It runs the contract
 checks, a sandboxed journey and Lighthouse, and requires process drainage; it reports its actual result and the calling
@@ -315,9 +299,9 @@ account and environment. A skipped diagnostic is not a passing result. Failure d
 - **Self-trust.** The descriptor and archive cannot supply their own verification key.
 - **What signatures prove.** They authenticate the Agent identity and complete preparation instructions. They
   cannot detect withheld updates or guarantee freshness on a new installation.
-- **Pairing.** New descriptors bind the exact Agent version, channel and source commit. Changing that pair requires
-  the installation owner's `prepare`/`activate` transition, not a floating runtime update. Legacy sequence metadata
-  remains readable for migration and recovery. Downgrade restores a matching Agent/runtime pair explicitly.
+- **Pairing.** New descriptors bind the exact Agent version, channel and source commit. The installation owner changes
+  the pair. Managed deployments use `prepare` and `activate` and Docker deploys a single matching image.
+  Legacy sequence metadata remains readable for managed recovery.
 - **No network at run time.** Ordinary execution and `status` fetch no key, and an installed runtime keeps working
   offline.
 
@@ -343,17 +327,7 @@ Low-level nonroot `dem.plugin runtime uninstall` cannot remove administrator-own
 to complete host cleanup. Multiple registrations sharing an attachment share one policy; removing one registration
 preserves the others.
 
-For Docker, after stopping consumers and retiring the deployment, remove its kickstart-created host registration
-with the printed token. When creating a registration, the host retains a root-owned copy of its policy helper
-under `/var/lib/netdata-dem-runtime-host-policy/docker-helpers`. The commands below work even after the container
-and image have been deleted. Successful removal also retires that helper and leaves Docker volumes in place.
-
-```sh
-sudo sh ./kickstart.sh --dem-docker-policy-status TOKEN
-sudo sh ./kickstart.sh --dem-docker-policy-remove TOKEN --deployments-stopped
-```
-
-For a registration created explicitly with the low-level helper, first stop and retire every affected deployment.
+To retire a policy-only registration, including for Docker, first stop every deployment that uses it.
 Then unregister it:
 
 ```sh
@@ -424,13 +398,15 @@ runtime:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `mode` | `native` on DEB/RPM builds, `managed` elsewhere | `managed` (a store DEM maintains), `native` (the package-manager payload) or `preloaded` (a sealed preload). |
+| `mode` | `native` on DEB/RPM builds, `preloaded` in DEM Docker images, `managed` elsewhere | `managed` (a store DEM maintains), `native` (the package-manager payload) or `preloaded` (a sealed preload). |
 | `cache_path` | `NETDATA_LIB_DIR/dem/runtime` | Managed store directory, absolute. Managed mode only. |
 | `max_bytes` | `4294967296` (4 GiB) | Logical allowance of the managed store. |
 | `previous_retention_days` | `7` | Grace for the most recently used obsolete release (0-36500). |
 | `release_url` | Exact Agent companion URL on release builds; empty on unstamped builds | HTTPS signed descriptor URL. An override must still match the Agent identity and architecture; an explicit empty string disables online discovery. |
 | `offline_keyring` | empty | Absolute path to an administrator-provisioned OpenPGP public keyring for offline operations. |
-| `preload_path` | empty | Sealed preload root. Requires `mode: preloaded`. |
+| `preload_path` | `/opt/netdata-dem-runtime` in DEM Docker images, empty elsewhere | Sealed preload root. Requires `mode: preloaded`. |
+
+Explicit runtime configuration takes precedence over the build defaults.
 
 The managed budget also covers temporary overlap during preparation. After A→B, importing C can still protect A
 until C has been verified and prepared; allow room for A, B and incoming C. A budget that fits only B+C can therefore
@@ -446,8 +422,7 @@ refuse the attempt while preserving B. One recovery pair limits the rollback pro
   Preparing a different target replaces that rollback point with the currently selected pair.
 - **Cleanup.** Unprotected old releases are removed hourly, with the `previous_retention_days` grace for the most
   recently used obsolete release; storage pressure can shorten that grace.
-- **Location.** Use the same store and service account for the CLI and the running plugin. In Docker, persist the store
-  (under `/var/lib/netdata`) to keep the installation across container replacement.
+- **Location.** Use the same store and service account for the CLI and the running plugin.
 
 ## Runtime CLI reference
 
@@ -472,7 +447,6 @@ any required host policy is prepared, with the same installation directory and c
 | `preload-validate` | Installation-owner check: verifies the configured preload matches this helper's exact Agent identity, without executing a browser. | preloaded |
 | `status` | Reports the selected installation and storage inventory without launching a browser. | every |
 | `qualify` | Optional local diagnostic: checks the execution contract and runs a sandboxed journey and Lighthouse against the installed release, requiring process drainage. | every |
-| `ensure` | First enrollment for the Docker host command: reuses a usable selection or downloads and selects the matching release, allowing later paired acquisition. Refuses to run as root. | managed |
 
 In `native` mode, managed mutations refuse and point to the package manager; in
 `preloaded` mode they require `runtime.mode: managed`. `preload`, `status` and `qualify` work in every mode.
@@ -483,7 +457,7 @@ hooks; do not call them directly.
 
 | Flag | Commands | Meaning |
 |---|---|---|
-| `--allow-download` | `install`, `fetch`, `prepare`, `repair`, `preload`, `ensure` | Download the package keyring and the archive, and the signed release metadata from `runtime.release_url` unless `--release` names a local descriptor. |
+| `--allow-download` | `install`, `fetch`, `prepare`, `repair`, `preload` | Download the package keyring and the archive, and the signed release metadata from `runtime.release_url` unless `--release` names a local descriptor. |
 | `--release FILE` | same | Absolute path to a local signed release descriptor. |
 | `--archive FILE` | same | Absolute path to the matching archive for a fully offline operation. Requires `--release`. Give exactly one of `--archive` and `--allow-download`. |
 | `--manual-updates` | `install`, `repair` | Require explicit inputs or one-run download consent for later paired Agent updates. |
@@ -493,11 +467,10 @@ hooks; do not call them directly.
 | `--root DIR` | `preload` | Absolute final preload root, new or empty. |
 | `--cache DIR` | all but `preload` | Managed store directory; overrides `runtime.cache_path`. |
 | `--config-dir DIR` | all | Absolute directory that holds the administrator `dem.conf`. Terminal sessions ignore the Agent's configuration-root environment variables, so use it when the configuration is not in the default place. |
-| `--expected-root DIR`, `--cancel-on-stdin-close` | `ensure` | Used by the Docker host command. |
 
 Once its configuration loads, every command prints exactly one JSON report, failures included. Its `state` is
-`installed`, `inputs-verified`, `qualified`, `uninstalled`, `unavailable`, `incompatible`, `damaged` or `unknown`; `ensure` adds an `outcome` of
-`already-selected`, `newly-selected` or `failed`. A failure also sets `setup_error` and a nonzero exit status.
+`installed`, `inputs-verified`, `qualified`, `uninstalled`, `unavailable`, `incompatible`, `damaged` or `unknown`.
+A failure sets `setup_error` and returns a nonzero exit status.
 
 ### Install and qualify
 

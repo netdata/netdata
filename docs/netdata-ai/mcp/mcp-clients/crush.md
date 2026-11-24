@@ -1,6 +1,6 @@
 # Crush
 
-Configure Crush by Charmbracelet to access your Netdata infrastructure through MCP for glamorous terminal-based AI operations.
+Configure Crush by Charmbracelet to access your Netdata observability data through MCP for glamorous terminal-based AI operations.
 
 ## Transport Support
 
@@ -16,7 +16,7 @@ Crush has comprehensive MCP transport support, making it highly flexible for con
 ## Prerequisites
 
 1. **Crush installed** - Available via npm, Homebrew, or direct download from [GitHub](https://github.com/charmbracelet/crush)
-2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
 3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
@@ -61,7 +61,7 @@ Crush uses JSON configuration files with the following priority:
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local setup, bridges,
 or firewall changes needed.
 
@@ -263,7 +263,7 @@ Once configured, start Crush and it will automatically connect to your Netdata M
 # Start Crush
 crush
 
-# Ask infrastructure questions
+# Ask questions about your systems
 What's the current CPU usage across all servers?
 Show me any performance anomalies in the last hour
 Which services are consuming the most resources?

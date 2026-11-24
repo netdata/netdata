@@ -40,7 +40,7 @@ an OS log store, such as Kubernetes.
 | Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md). |
 | macOS | In place. macOS has no OS-native log forwarding; to centralize, use the [OpenTelemetry Collector's macOS receiver](/docs/opentelemetry/logs-collection.md#macos-unified-log). |
 
-Any mix works. Centralization points do not need to be infrastructure-wide: run one per team, environment, or
+Any mix works. Centralization points do not need to cover every node: run one per team, environment, or
 datacenter, sized for its own volume, and keep critical systems' logs local. Netdata Cloud presents every node and every
 centralization point in one dashboard with one role-based access model.
 
@@ -66,15 +66,12 @@ reading production logs does not require shell access to production systems. See
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md).
 
 Log content stays in your infrastructure. Viewing logs requires signing in with Netdata Cloud, which is free for
-community use. Viewing OpenTelemetry logs (`otel-logs`, and `legacy-otel-logs` for logs kept by the former experimental
-plugin) and SNMP trap logs (`snmp:traps`) requires a signed-in member of the node's Space with permission to view
-sensitive data, on a paid plan or an active trial.
+community use. Viewing OpenTelemetry logs (`otel-logs`) and SNMP trap logs (`snmp:traps`) requires a signed-in member of
+the node's Space with permission to view sensitive data, on a paid plan or an active trial.
 
 The Agent receives OpenTelemetry logs and SNMP traps on all plans. OpenTelemetry logs are stored on the Agent; SNMP
 traps are stored locally when journal output is enabled (the default). An OTLP-only trap job forwards events without
 local storage or a local `snmp:traps` source. See [SNMP Traps](/docs/npm/snmp-traps/README.md).
-The read-only `legacy-otel-logs` source is available only where journals from the former plugin remain; see the
-[legacy logs guidance](/src/crates/otel-plugin/README.md#logs-written-by-the-previous-opentelemetry-plugin-are-not-visible).
 
 The content is transmitted encrypted to your browser and is not stored in Netdata Cloud. For full data sovereignty,
 [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)

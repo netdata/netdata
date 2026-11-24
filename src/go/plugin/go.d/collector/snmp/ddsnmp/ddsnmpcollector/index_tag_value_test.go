@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -91,9 +91,8 @@ func TestTableRowProcessor_ProcessIndexTag_InvalidMACAddress(t *testing.T) {
 }
 
 func TestFormatMACAddress_ColumnAndIndexParity(t *testing.T) {
-	columnValue, err := convPhysAddressToString(gosnmp.SnmpPDU{
-		Type:  gosnmp.OctetString,
-		Value: []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef},
+	columnValue, err := convPhysAddressToString(gosnmp.VarBind{
+		Value: gosnmp.OctetStringValue([]byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef}),
 	})
 	require.NoError(t, err)
 

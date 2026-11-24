@@ -3,15 +3,16 @@
 package ddsnmp_test
 
 import (
+	"context"
 	"errors"
 	"maps"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -24,7 +25,7 @@ import (
 
 type metadataSourceFunc func() (map[string]ddsnmp.MetaTag, error)
 
-func (f metadataSourceFunc) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+func (f metadataSourceFunc) CollectDeviceMetadata(context.Context) (map[string]ddsnmp.MetaTag, error) {
 	return f()
 }
 
@@ -141,7 +142,7 @@ func TestAcquireDeviceIdentity(t *testing.T) {
 				})
 			}
 
-			identity, err := ddsnmp.AcquireDeviceIdentity(&tc.sysInfo, source, tc.opts)
+			identity, err := ddsnmp.AcquireDeviceIdentity(context.Background(), &tc.sysInfo, source, tc.opts)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, identity)
 			assert.Equal(t, wantCalls, calls)
@@ -175,7 +176,7 @@ func TestAcquireDeviceIdentityFailure(t *testing.T) {
 				calls++
 				return map[string]ddsnmp.MetaTag{"vendor": {Value: "partial"}}, metadataErr
 			})
-			identity, err := ddsnmp.AcquireDeviceIdentity(tc.sysInfo, source, ddsnmp.DeviceIdentityOptions{})
+			identity, err := ddsnmp.AcquireDeviceIdentity(context.Background(), tc.sysInfo, source, ddsnmp.DeviceIdentityOptions{})
 			require.Error(t, err)
 			if tc.wantErr != nil {
 				assert.Same(t, tc.wantErr, err)
@@ -188,26 +189,24 @@ func TestAcquireDeviceIdentityFailure(t *testing.T) {
 
 func TestAcquireDeviceIdentityWithoutMetricsJob(t *testing.T) {
 	const metadataOID = "1.3.6.1.4.1.9.999.0"
-	client := snmpmock.NewMockHandler(gomock.NewController(t))
-	client.EXPECT().MaxOids().Return(20).AnyTimes()
-	client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+	client := snmpmock.NewMockSession(gomock.NewController(t))
 	gomock.InOrder(
 		client.EXPECT().
-			Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
+			Get(gomock.Any(), []string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
 			Return(
-				&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9"},
-						{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
+				&gosnmp.Message{
+					VarBinds: []gosnmp.VarBind{
+						{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.9")},
+						{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("router"))},
 					},
 				}, nil),
-		client.EXPECT().Get([]string{metadataOID}).Return(&gosnmp.SnmpPacket{
-			Variables: []gosnmp.SnmpPDU{
-				{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("serial-123")},
+		client.EXPECT().Get(gomock.Any(), []string{metadataOID}).Return(&gosnmp.Message{
+			VarBinds: []gosnmp.VarBind{
+				{Name: metadataOID, Value: gosnmp.OctetStringValue([]byte("serial-123"))},
 			},
 		}, nil),
 	)
-	si, err := snmputils.GetSysInfo(client)
+	si, err := snmputils.GetSysInfo(context.Background(), client, gosnmp.Version2c, 20)
 	require.NoError(t, err)
 	source := ddsnmpcollector.New(ddsnmpcollector.Config{
 		SnmpClient:  client,
@@ -224,7 +223,7 @@ func TestAcquireDeviceIdentityWithoutMetricsJob(t *testing.T) {
 			},
 		}}},
 	})
-	identity, err := ddsnmp.AcquireDeviceIdentity(si, source, ddsnmp.DeviceIdentityOptions{
+	identity, err := ddsnmp.AcquireDeviceIdentity(context.Background(), si, source, ddsnmp.DeviceIdentityOptions{
 		Address: "192.0.2.1",
 	})
 	require.NoError(t, err)
@@ -247,17 +246,15 @@ func TestAcquiredDeviceNameUsesTrimmedFallback(t *testing.T) {
 		{"authored hostname", " ", " authored ", " authored "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := snmpmock.NewMockHandler(gomock.NewController(t))
-			client.EXPECT().MaxOids().Return(20).AnyTimes()
-			client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			client := snmpmock.NewMockSession(gomock.NewController(t))
 			client.EXPECT().
-				Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
-				Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte(tc.wireName)},
+				Get(gomock.Any(), []string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
+				Return(&gosnmp.Message{
+					VarBinds: []gosnmp.VarBind{
+						{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte(tc.wireName))},
 					},
 				}, nil)
-			si, err := snmputils.GetSysInfo(client)
+			si, err := snmputils.GetSysInfo(context.Background(), client, gosnmp.Version2c, 20)
 			require.NoError(t, err)
 			original := *si
 			identity, err := ddsnmp.ComposeDeviceIdentity(

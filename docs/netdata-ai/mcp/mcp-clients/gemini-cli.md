@@ -1,6 +1,6 @@
 # Gemini CLI
 
-Configure Google's Gemini CLI to access your Netdata infrastructure through MCP for powerful AI-driven operations.
+Configure Google's Gemini CLI to access your Netdata observability data through MCP for powerful AI-driven operations.
 
 ## Transport Support
 
@@ -16,7 +16,7 @@ Gemini CLI supports all major MCP transport types, giving you maximum flexibilit
 ## Prerequisites
 
 1. **Gemini CLI installed** - Available from [GitHub](https://github.com/google-gemini/gemini-cli)
-2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
 3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
@@ -41,7 +41,7 @@ Gemini CLI has built-in MCP server support. For detailed MCP configuration, see 
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local setup, bridges,
 or firewall changes needed.
 
@@ -250,7 +250,7 @@ Replace in all examples:
 
 ## How to Use
 
-Gemini CLI can leverage Netdata's observability data for infrastructure analysis and automation:
+Gemini CLI can leverage Netdata's observability data for analysis and automation:
 
 ```
 What's the current system performance across all monitored servers?

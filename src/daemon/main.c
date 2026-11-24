@@ -116,8 +116,8 @@ int help(int exitcode) {
 
     fprintf(stream, "%s", "\n"
             " ^\n"
-            " |.-.   .-.   .-.   .-.   .  Netdata                                         \n"
-            " |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!           \n"
+            " |.-.   .-.   .-.   .-.   .  Netdata, full-stack observability               \n"
+            " |   '-'   '-'   '-'   '-'   the AI SRE that learns your stack!              \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
             " Copyright 2018-2025 Netdata Inc.\n"
@@ -238,6 +238,7 @@ int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
 int aclk_backoff_unittest(void);
+int aclk_otp_unittest(void);
 int aclk_http_msg_unittest(void);
 int https_client_timeout_unittest(void);
 int https_client_chunked_unittest(void);
@@ -252,6 +253,7 @@ int web_client_registry_cookie_unittest(void);
 int web_client_header_parsing_unittest(void);
 int web_client_request_size_unittest(void);
 int web_client_forwarded_for_unittest(void);
+int web_client_static_redirect_unittest(void);
 int rrdhost_machine_guid_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
@@ -537,12 +539,14 @@ int netdata_main(int argc, char **argv) {
 
                             // first: its drain joins every exited thread, so run it before other tests start threads
                             if (threads_unittest()) return 1;
+                            if (os_system_memory_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_registry_cookie_unittest()) return 1;
                             if (web_client_header_parsing_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
                             if (web_client_forwarded_for_unittest()) return 1;
+                            if (web_client_static_redirect_unittest()) return 1;
                             if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
@@ -569,7 +573,7 @@ int netdata_main(int argc, char **argv) {
                             if (aclk_http_msg_unittest()) return 1;
                             // summed, not short-circuited: this is the path CI runs, so one
                             // failing suite must not hide the others
-                            if (aclk_timeout_unittest() + aclk_backoff_unittest() +
+                            if (aclk_timeout_unittest() + aclk_backoff_unittest() + aclk_otp_unittest() +
                                 https_client_timeout_unittest() + https_client_chunked_unittest() +
                                 mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
@@ -601,6 +605,7 @@ int netdata_main(int argc, char **argv) {
                             if (build_info_system_info_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (query_plan_unittest()) return 1;
+                            if (query_scope_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (os_socket_egress_interface_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
@@ -653,6 +658,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "alertqueuetest") == 0) {
                             unittest_running = true;
                             return alert_queue_unittest();
+                        }
+                        else if(strcmp(optarg, "queryscopetest") == 0) {
+                            unittest_running = true;
+                            return query_scope_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
@@ -781,6 +790,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "aclkbackofftest") == 0) {
                             unittest_running = true;
                             return aclk_backoff_unittest() ? 1 : 0;
+                        }
+                        else if(strcmp(optarg, "aclkotptest") == 0) {
+                            unittest_running = true;
+                            return aclk_otp_unittest() ? 1 : 0;
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
@@ -1444,6 +1457,12 @@ int netdata_main(int argc, char **argv) {
 
     netdata_main_spawn_server_init("plugins", argc, (const char **)argv);
 
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("system memory sampler");
+
+    // after the forks above: a thread started before them would not exist in this process
+    os_system_memory_sampler_start();
+
 #ifdef ENABLE_SENTRY
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sentry");
@@ -1561,7 +1580,7 @@ int netdata_main(int argc, char **argv) {
     usec_t median_start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME);
     netdata_log_info(
         "NETDATA STARTUP: version '%s', sqlite '%s', completed in %llu ms (median start up time is %llu ms). "
-        "Enjoy X-Ray Vision for your infrastructure!",
+        "Netdata, full-stack observability: the AI SRE that learns your stack!",
         NETDATA_VERSION, sqlite3_libversion(),
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 

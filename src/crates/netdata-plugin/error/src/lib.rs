@@ -12,18 +12,16 @@
 //!   stdout-write paths call through.
 //! - `Protocol` comes only from netdata-plugin-protocol's `MessageReader`
 //!   decode path.
-//! - `Schema` comes only from `ConfigDeclaration::try_from(&serde_json::Value)`
-//!   in netdata-plugin-types.
 //! - `BadRequest` is built by the otel-ledger otel-traces handler for the
 //!   requests it rejects; `FunctionHandler` by the otel-ledger otel-logs and
 //!   otel-traces handlers for everything else; `Other` by the function engines
-//!   in `netdata-plugin-rt`/`otel-bridge` (cancellation) and the otel-legacy-logs and
+//!   in `netdata-plugin-rt`/`otel-bridge` (cancellation) and the
 //!   netflow-plugin handlers. `Runtime`, `Config` and `Closed` have no
 //!   constructor in the tree.
 //!
 //! Consumers type function handlers with [`Result`]: the `FunctionHandler`
-//! traits in `netdata-plugin-rt` and `otel-bridge`, `PluginRuntime::run`, and the otel-ledger,
-//! otel-legacy-logs and netflow-plugin handlers. At the boundary, `otel-bridge`
+//! traits in `netdata-plugin-rt` and `otel-bridge`, `PluginRuntime::run`, and the otel-ledger
+//! and netflow-plugin handlers. At the boundary, `otel-bridge`
 //! renders `BadRequest` as an HTTP 400 result whose JSON body carries the
 //! bare message, and any other handler error as an HTTP 500 result whose JSON
 //! body carries the variant's Display text. `netdata-plugin-rt` renders every handler error,
@@ -45,7 +43,7 @@ pub type Result<T> = std::result::Result<T, NetdataPluginError>;
 ///
 /// Only `Transport` carries a `source()` — the wrapped `std::io::Error`;
 /// every other variant is message-only, so a cause dropped when the error
-/// was built cannot be recovered. Display conventions: the six categorized
+/// was built cannot be recovered. Display conventions: the five categorized
 /// variants prefix their message with a lowercase `<category>: ` label,
 /// `Other` prints the bare message, and `Transport` is transparent. Callers
 /// render with `Display` (`{}`) into agent-visible bodies and logs, and with
@@ -99,15 +97,6 @@ pub enum NetdataPluginError {
     #[error("function handler error: {message}")]
     FunctionHandler { message: String },
 
-    /// A generated schema could not be parsed into its dyncfg declaration.
-    /// Built only by `ConfigDeclaration::try_from(&serde_json::Value)` in
-    /// netdata-plugin-types, when the schema JSON lacks `configDeclaration`
-    /// or one of its required keys; the message names the key even when the
-    /// key exists with an unknown value or wrong type. Messages read
-    /// `Missing <key> ...`.
-    #[error("schema validation error: {message}")]
-    Schema { message: String },
-
     /// Terminal state of a shut-down transport. No constructor in the current
     /// tree.
     #[error("transport is closed")]
@@ -115,9 +104,8 @@ pub enum NetdataPluginError {
 
     /// Anything without a dedicated variant, displayed as the bare message.
     /// Built by the function engines in `netdata-plugin-rt` and `otel-bridge` when a handler is
-    /// cancelled (`"Function cancelled"`), and by the otel-legacy-logs and
-    /// netflow-plugin handlers for their stage failures; legacy-logs prefixes
-    /// each message with the transaction id.
+    /// cancelled (`"Function cancelled"`), and by the netflow-plugin
+    /// handlers for their stage failures.
     #[error("{message}")]
     Other { message: String },
 }

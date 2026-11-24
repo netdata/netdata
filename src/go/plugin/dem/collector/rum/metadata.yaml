@@ -105,6 +105,10 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: Select the DEM image on Docker
+            description: |
+              If your Netdata Agent runs in Docker, use a `-dem` image such as `netdata/netdata:stable-dem`.
+              See [Enable DEM in Docker](/packaging/docker/README.md#enable-dem-in-docker).
           - title: Expose the RUM receiver to your visitors
             description: |
               Browsers send reports to the [RUM Receiver](/src/go/plugin/dem/collector/receiver/integrations/rum_receiver.md), which

@@ -1,12 +1,12 @@
 # Netdata Model Context Protocol (MCP) Integration
 
-Netdata Agents (and soon Netdata Cloud) provide a Model Context Protocol (MCP) server that enables AI assistants like Claude or Cursos to interact with your infrastructure monitoring data. This integration allows AI assistants to access metrics, logs, alerts, and live system information (processes, services, containers, VMs, network connections, etc), acting as a capable DevOps/SRE/SysAdmin assistant.
+Netdata Agents (and soon Netdata Cloud) provide a Model Context Protocol (MCP) server that enables AI assistants like Claude or Cursor to interact with your observability data. This integration allows AI assistants to access metrics, logs, alerts, and live system information (processes, services, containers, VMs, network connections, etc), acting as a capable DevOps/SRE/SysAdmin assistant.
 
 ## Overview
 
-The AI assistants have different visibility on your infrastructure, depending on where in a Netdata hierarchy they are connected:
+The AI assistants have different visibility on your nodes, depending on where in a Netdata hierarchy they are connected:
 
- - **Netdata Cloud**: (not yet available) AI assistants connected to Netdata Cloud will have full visibility across all nodes in your infrastructure.
+ - **Netdata Cloud**: (not yet available) AI assistants connected to Netdata Cloud will have full visibility across all your nodes.
  - **Netdata Parent Node**: AI assistants connected to a Netdata parent node will have visibility across all child nodes connected to that parent.
  - **Netdata Child Node**: AI assistants connected to a Netdata child node will only have visibility into that specific node.
  - **Netdata Standalone Node**: AI assistants connected to a standalone Netdata node will only have visibility into that specific node.
@@ -15,9 +15,9 @@ The AI assistants have different visibility on your infrastructure, depending on
 
 You can use Netdata with the following AI assistants:
 
-- [Claude Desktop](https://claude.ai/download): supports flat-fee usage for unlimited access
-- [Claude Code](https://claude.ai/code): supports flat-fee usage for unlimited access
-- [Cursor](https://www.cursor.com/): supports flat-fee usage for unlimited access. Enables Netdata use with multiple AI assistants, including Claude, ChatGPT, and Gemini.
+- [Claude Desktop](https://claude.ai/download): supports flat-fee subscription plans
+- [Claude Code](https://claude.ai/code): supports flat-fee subscription plans
+- [Cursor](https://www.cursor.com/): supports flat-fee subscription plans. Enables Netdata use with multiple AI assistants, including Claude, ChatGPT, and Gemini.
 
 Probably more: Check the [MCP documentation](https://modelcontextprotocol.io/clients) for a full list of supported AI assistants.
 
@@ -25,7 +25,7 @@ All these AI assistants need local access to the MCP servers. When the client su
 
 Many desktop assistants, however, still talk to MCP servers over `stdio`. For them you still need a bridge that converts `stdio` to a network transport. Netdata keeps shipping the `nd-mcp` bridge (plus the polyglot bridges in `bridges/`) for this purpose.
 
-Once MCP is integrated into Netdata Cloud, Web-based AI assistants will also be supported. For Web-based AI assistants, the backend of the assistant connects to a publicly accessible MCP server (i.e. Netdata Cloud) to access infrastructure observability data, without needing a bridge.
+Once MCP is integrated into Netdata Cloud, Web-based AI assistants will also be supported. For Web-based AI assistants, the backend of the assistant connects to a publicly accessible MCP server (i.e. Netdata Cloud) to access observability data, without needing a bridge.
 
 ## Installation
 
@@ -170,8 +170,8 @@ The Go bridge provides also a `build.bat` script for Windows users.
 
 The MCP integration provides AI assistants with access to:
 
-### Infrastructure Discovery
-- **Nodes information**: Complete visibility across all connected nodes in your infrastructure
+### Node and Service Discovery
+- **Nodes information**: Complete visibility across all connected nodes
   - Hardware specifications, OS details, virtualization info
   - Streaming configuration and parent-child relationships
   - Connection status and data collection capabilities
@@ -248,10 +248,10 @@ The integration provides access to all metrics categories collected by Netdata i
 
 Once configured, you can ask questions like:
 
-### Infrastructure Overview
+### Environment Overview
 - "Show me all connected nodes and their status"
 - "What metrics are available for my database servers?"
-- "Provide an observability coverage report for my infrastructure"
+- "Provide an observability coverage report for my systems and applications"
 - "Which nodes are offline or having connection issues?"
 
 ### Performance Analysis
@@ -265,7 +265,7 @@ Once configured, you can ask questions like:
 ### Anomaly Detection and Troubleshooting
 - "Which metrics are showing anomalous behavior in the last hour?"
 - "Find metrics that changed significantly during the outage at 2 PM"
-- "What are the most unstable metrics in my infrastructure?"
+- "What are the most unstable metrics across all my nodes?"
 - "Analyze the correlation between disk I/O and application response time"
 
 ### Alerts and Monitoring
@@ -327,7 +327,7 @@ Once configured, you can ask questions like:
 
 ### AI Assistants sampling data
 
-Sometimes, when you ask generic questions about your infrastructure, AI assistants do a simple sampling on a few nodes of the infrastructure, instead of querying all nodes. In Netdata we have provided the tools to properly do that, but AI assistants may not use them.
+Sometimes, when you ask generic questions about your environment, AI assistants sample a few nodes, instead of querying all nodes. In Netdata we have provided the tools to properly do that, but AI assistants may not use them.
 
 Examples:
 

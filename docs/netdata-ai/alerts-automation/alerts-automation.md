@@ -15,7 +15,7 @@ Alerts Automation provides three AI-powered capabilities that work together as a
 
 ### Suggest
 
-Ask Netdata AI what alerts would be appropriate for your infrastructure, and it responds with suggestions described in plain English. Because suggestions are in natural language, anyone on the team can understand, discuss, and refine them before they become configurations.
+Ask Netdata AI what alerts would be appropriate for your systems and applications, and it responds with suggestions described in plain English. Because suggestions are in natural language, anyone on the team can understand, discuss, and refine them before they become configurations.
 
 ### Generate
 

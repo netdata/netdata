@@ -4,7 +4,7 @@
 
 Netdata provides a **distributed, real-time health monitoring framework** that evaluates conditions against your metrics and executes actions on state transitions. You can configure notifications as one of these actions.
 
-Unlike traditional monitoring systems, Netdata evaluates alerts simultaneously at multiple levels - on the edge (Agents), at aggregation points (Parents), and deduplicates them in Netdata Cloud. This allows your teams to implement different alerting strategies at different infrastructure levels.
+Unlike traditional monitoring systems, Netdata evaluates alerts simultaneously at multiple levels - on the edge (Agents), at aggregation points (Parents), and deduplicates them in Netdata Cloud. This allows your teams to implement different alerting strategies at different levels of your deployment.
 
 ### Understanding Alerts in Netdata
 
@@ -12,7 +12,7 @@ Netdata alerts function as **component-level watchdogs**. You attach them to spe
 
 To simplify your configuration, you can define alert templates once and apply them to all matching components. The system matches instances by host labels, instance labels, and names, allowing you to define the same alert multiple times with different matching criteria.
 
-Each alert provides a name, value, unit, and status - making them easy to display in dashboards and send as meaningful notifications regardless of your infrastructure's complexity.
+Each alert provides a name, value, unit, and status - making them easy to display in dashboards and send as meaningful notifications regardless of your environment's complexity.
 
 ### Where Your Alerts Run
 
@@ -49,7 +49,7 @@ This design enables you to:
 
 1. **Maintain team independence**: Different teams run their own Parents with custom alerts
 2. **Implement edge intelligence**: Critical alerts trigger automations directly on nodes
-3. **Scale naturally**: Alert evaluation distributes with your infrastructure
+3. **Scale naturally**: Alert evaluation distributes with your nodes
 4. **Mix strategies**: Combine edge, regional, and central alerting
 
 ### Quick Example
@@ -74,7 +74,7 @@ Netdata Cloud:
   - Provides unified view for incident response
 ```
 
-Each level operates independently while Netdata Cloud provides a coherent, deduplicated view of your entire infrastructure's health (when all agents connect directly to Cloud).
+Each level operates independently while Netdata Cloud provides a coherent, deduplicated view of the health of all your nodes (when all agents connect directly to Cloud).
 
 ## Managing Alert Configuration
 
@@ -90,7 +90,7 @@ Config paths vary by install prefix. Run `sudo ./edit-config health.d/<file>` fr
 
 ## Managing Notification Configuration
 
-You can configure notifications for any infrastructure node at 3 levels:
+You can configure notifications for any node at 3 levels:
 
 | Level              | What It Evaluates          | Where Notifications Come From | Use Case                   | Documentation                                                                                                               |
 |--------------------|----------------------------|-------------------------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|

@@ -177,6 +177,9 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     th_ignored_metrics = th_ignored_instances = th_zero_retention_metrics = 0;
 
+    // a host re-created for the same id must read the writes queued by its previous instance
+    ctx_sql_flush(false);
+
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
     if (unlikely(exit_initiated_get()))
         return;

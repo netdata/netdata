@@ -34,7 +34,7 @@ void out_of_memory(const char *call, size_t size, const char *details) {
     char mem_available[64];
     char rss_used[64];
 
-    OS_SYSTEM_MEMORY sm = os_last_reported_system_memory();
+    OS_SYSTEM_MEMORY sm = os_system_memory_cached(0);
     size_snprintf(mem_available, sizeof(mem_available), sm.ram_available_bytes, "B", false);
     size_snprintf(rss_used, sizeof(rss_used), max_rss, "B", false);
 

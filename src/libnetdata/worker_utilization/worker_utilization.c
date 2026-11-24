@@ -49,7 +49,6 @@ struct worker {
 
     struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
-    size_t spinlocks_used;
     struct worker_spinlock spinlocks[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
 
     uint64_t memory_calls[WORKERS_MEMORY_CALL_MAX];
@@ -552,15 +551,20 @@ ALWAYS_INLINE void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// Hash the pointer only: never dereference func (a cold .rodata string).
+// __FUNCTION__ strings sit close together, so take the top bits of a multiplicative (Fibonacci) hash.
 static ALWAYS_INLINE size_t pointer_hash_function(const char *func) {
     uintptr_t addr = (uintptr_t)func;
-    return (size_t)(((addr >> 4) | (addr >> 16)) + func[0]) % WORKER_SPINLOCK_CONTENTION_FUNCTIONS;
+
+    if(sizeof(uintptr_t) == sizeof(uint64_t))
+        return (size_t)(((uint64_t)addr * UINT64_C(0x9E3779B97F4A7C15)) >> (64 - WORKER_SPINLOCK_CONTENTION_FUNCTIONS_BITS));
+
+    return (size_t)(((uint32_t)addr * UINT32_C(0x9E3779B9)) >> (32 - WORKER_SPINLOCK_CONTENTION_FUNCTIONS_BITS));
 }
 
 static void worker_spinlock_contention_do(const char *func, size_t spins) {
-    size_t hash = pointer_hash_function(func);
+    size_t slot = pointer_hash_function(func);
     for (size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS; i++) {
-        size_t slot = (hash + i) % WORKER_SPINLOCK_CONTENTION_FUNCTIONS;
         if (worker->spinlocks[slot].function == func || worker->spinlocks[slot].function == NULL) {
             // Either an empty slot or a matching slot
 
@@ -570,6 +574,7 @@ static void worker_spinlock_contention_do(const char *func, size_t spins) {
 
             return;
         }
+        slot = (slot + 1) & (WORKER_SPINLOCK_CONTENTION_FUNCTIONS - 1);
     }
 
     // Array is full - do nothing

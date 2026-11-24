@@ -66,12 +66,11 @@ pub(super) fn resolve_deprecated<T>(
 }
 
 /// The user file's deprecated `endpoint:` section: exactly the four keys of
-/// the first release. Unknown keys are a parse error, so names that were never
-/// released (`grpc_path`, `http_path`, ...) are rejected too. A key set to
+/// the first release. Names that were never released (`grpc_path`,
+/// `http_path`, ...) are unknown keys: reported and ignored. A key set to
 /// `null` carries no value and is ignored, so a copy of the first release's
 /// stock file needs no edit.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct DeprecatedEndpointOverride {
     #[serde(default)]
     path: Option<String>,
@@ -86,23 +85,20 @@ pub(super) struct DeprecatedEndpointOverride {
 /// Partial form of [`ReceiversConfig`]: every level optional, so a config
 /// layer overrides only the fields it names. `null` at any level (and so a
 /// bare `http:` key, which YAML reads as `null`) means "no override", like an
-/// absent key. Unknown keys are a parse error (`deny_unknown_fields`).
+/// absent key.
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct ReceiversOverride {
     #[serde(default)]
     otlp: Option<OtlpOverride>,
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct OtlpOverride {
     #[serde(default)]
     protocols: Option<ProtocolsOverride>,
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct ProtocolsOverride {
     #[serde(default)]
     grpc: Option<ProtocolOverride>,
@@ -112,7 +108,6 @@ struct ProtocolsOverride {
 
 /// Partial form of one listener's [`ProtocolConfig`].
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct ProtocolOverride {
     #[serde(default)]
     pub(super) enabled: Option<bool>,
@@ -123,7 +118,6 @@ pub(super) struct ProtocolOverride {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct TlsOverride {
     #[serde(default)]
     pub(super) cert_file: Option<String>,

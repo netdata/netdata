@@ -141,6 +141,10 @@ typedef struct rrdresult {
     struct {
         size_t folded;              // dimensions folded into 'remaining'
         NETDATA_DOUBLE cut;         // the largest folded |sum| contribution
+
+        // v1 folds only: per result column, the query metric it came from
+        // (SIZE_MAX for 'remaining'); NULL means column c is query metric c
+        size_t *source_metric;
     } cardinality;
 
     struct {

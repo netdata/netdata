@@ -141,6 +141,11 @@ class DeliveryTests(unittest.TestCase):
         expected = {path.name for path in Path(__file__).parent.glob('test_*.py')}
         self.assertEqual({name for name in bundle.recipe_sources() if name.startswith('test_')}, expected)
 
+    def test_declared_recipe_sources_are_readable(self):
+        for name in bundle.recipe_sources():
+            with self.subTest(source=name):
+                bundle.sha256(Path(__file__).parent / name)
+
     def fixture(self, base):
         recipe = base / 'packaging/dem-runtime'
         recipe.mkdir(parents=True)

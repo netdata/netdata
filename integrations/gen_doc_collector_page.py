@@ -359,7 +359,7 @@ def render_header() -> str:
 
 # Monitor anything with Netdata
 
-**850+ integrations. Zero configuration. Deploy anywhere.**
+**2,000+ integrations. Zero configuration. Deploy anywhere.**
 
 {intro}
 
@@ -367,7 +367,7 @@ def render_header() -> str:
 
 ### Why Teams Choose Us
 
-- ✅ **850+ integrations** automatically discovered and configured
+- ✅ **2,000+ integrations** automatically discovered and configured
 - ✅ **Zero configuration** required - monitors start collecting data immediately
 - ✅ **No vendor lock-in** - Deploy anywhere, own your data
 - ✅ **1-second resolution** - Real-time visibility, not delayed averages
@@ -443,14 +443,14 @@ def _render_tech_navigation() -> str:
 
     tech_section = "\n".join(tech_lines)
     generic_link = (
-        "**Don't see what you need?** We support [Prometheus endpoints](#beyond-the-850-integrations), "
-        "[SNMP devices](#networking), [StatsD](#beyond-the-850-integrations), and "
-        "[custom data sources](#beyond-the-850-integrations)."
+        "**Don't see what you need?** We support [Prometheus endpoints](#beyond-the-2000-integrations), "
+        "[SNMP devices](#networking), [StatsD](#beyond-the-2000-integrations), and "
+        "[custom data sources](#beyond-the-2000-integrations)."
     )
 
     return f"""### Find Your Technology
 
-**Select your primary infrastructure to jump directly to relevant integrations:**
+**Select your technology to jump directly to relevant integrations:**
 
 {tech_section}
 {generic_link}
@@ -458,7 +458,7 @@ def _render_tech_navigation() -> str:
 
 
 def _render_generic_collectors() -> str:
-    """Render the 'Beyond the 850+ integrations' section."""
+    """Render the 'Beyond the 2,000+ integrations' section."""
     generic_collectors = [
         {
             "name": "Prometheus collector",
@@ -487,7 +487,7 @@ def _render_generic_collectors() -> str:
         "[Submit a feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub."
     )
 
-    return f"""## Beyond the 850+ integrations
+    return f"""## Beyond the 2,000+ integrations
 
 Netdata can monitor virtually any application through generic collectors:
 

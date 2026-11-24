@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Netdata -	X-Ray Vision for your infrastructure!
+# Netdata, full-stack observability: the AI SRE that learns your stack!
 # chkconfig: 345 99 01
 # description: netdata is a high-resolution, real-time, low-latency observability platform.
 #              Per-second data collection, high-performance long-term storage, low-latency

@@ -3,28 +3,32 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // globalTagsCollector handles collection of profile-wide tags
 type globalTagsCollector struct {
-	snmpClient  gosnmp.Handler
+	snmpClient  snmputils.Client
+	req         requestConfig
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	tagProc     *globalTagProcessor
 }
 
-func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *globalTagsCollector {
+func newGlobalTagsCollector(snmpClient snmputils.Client, req requestConfig, missingOIDs map[string]bool, log *logger.Logger) *globalTagsCollector {
 	return &globalTagsCollector{
 		snmpClient:  snmpClient,
+		req:         req,
 		missingOIDs: missingOIDs,
 		log:         log,
 		tagProc:     newGlobalTagProcessor(),
@@ -32,11 +36,12 @@ func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bo
 }
 
 // Collect gathers all global tags from the profile
-func (gc *globalTagsCollector) collect(prof *ddsnmp.Profile) (map[string]string, error) {
-	return gc.collectObserved(prof, &ddsnmp.CollectionStats{}, nil)
+func (gc *globalTagsCollector) collect(ctx context.Context, prof *ddsnmp.Profile) (map[string]string, error) {
+	return gc.collectObserved(ctx, prof, &ddsnmp.CollectionStats{}, nil)
 }
 
 func (gc *globalTagsCollector) collectObserved(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
 	acquisition *acquisitionProfileCollection,
@@ -50,7 +55,7 @@ func (gc *globalTagsCollector) collectObserved(
 	gc.processStaticTags(prof.Definition.StaticTags, tags)
 
 	observer := acquisition.globalTagObserver(prof.Definition.MetricTags)
-	if err := gc.processDynamicTagsObserved(prof.Definition.MetricTags, tags, stats, observer); err != nil {
+	if err := gc.processDynamicTagsObserved(ctx, prof.Definition.MetricTags, tags, stats, observer); err != nil {
 		return ternary(len(tags) > 0, tags, nil), err
 	}
 
@@ -62,12 +67,8 @@ func (gc *globalTagsCollector) processStaticTags(staticTags []ddprofiledefinitio
 	ta.addTags(parseStaticTags(staticTags))
 }
 
-// processDynamicTags processes tags that require SNMP fetching
-func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.GlobalMetricTagConfig, globalTags map[string]string) error {
-	return gc.processDynamicTagsObserved(metricTags, globalTags, &ddsnmp.CollectionStats{}, nil)
-}
-
 func (gc *globalTagsCollector) processDynamicTagsObserved(
+	ctx context.Context,
 	metricTags []ddprofiledefinition.GlobalMetricTagConfig,
 	globalTags map[string]string,
 	stats *ddsnmp.CollectionStats,
@@ -88,7 +89,7 @@ func (gc *globalTagsCollector) processDynamicTagsObserved(
 
 	source := sourceRecorder(gc.snmpClient)
 	cursor := source.Cursor()
-	pdus, err := gc.fetchTagValues(oids, stats)
+	pdus, err := gc.fetchTagValues(ctx, oids, stats)
 	if source != nil {
 		requests := source.requestsSince(cursor)
 		observer.bindSource(requests)
@@ -163,6 +164,6 @@ func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.
 	return oids, missingOIDs
 }
 
-func (gc *globalTagsCollector) fetchTagValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(gc.snmpClient, oids, gc.missingOIDs, stats)
+func (gc *globalTagsCollector) fetchTagValues(ctx context.Context, oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.VarBind, error) {
+	return getSNMPValues(ctx, gc.snmpClient, gc.req, oids, gc.missingOIDs, stats)
 }
