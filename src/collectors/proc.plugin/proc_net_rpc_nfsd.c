@@ -9,6 +9,7 @@ struct nfsd_procs {
     unsigned long long value;
     int present;
     RRDDIM *rd;
+    const char *dim_name;   // dimension name when it differs from the id (name)
 };
 
 struct nfsd_procs nfsd_proc2_values[] = {
@@ -65,76 +66,16 @@ struct nfsd_procs nfsd_proc3_values[] = {
         {  ""           , 0ULL, 0, NULL}
 };
 
+// The server registers only two NFSv4 procedures, NULL and COMPOUND (the
+// individual operations are in proc4ops). The COMPOUND dimension keeps the
+// id "read" it was published with, for continuity of existing data.
 struct nfsd_procs nfsd_proc4_values[] = {
-        {  "null"            , 0ULL, 0, NULL}
-        , {"read"            , 0ULL, 0, NULL}
-        , {"write"           , 0ULL, 0, NULL}
-        , {"commit"          , 0ULL, 0, NULL}
-        , {"open"            , 0ULL, 0, NULL}
-        , {"open_conf"       , 0ULL, 0, NULL}
-        , {"open_noat"       , 0ULL, 0, NULL}
-        , {"open_dgrd"       , 0ULL, 0, NULL}
-        , {"close"           , 0ULL, 0, NULL}
-        , {"setattr"         , 0ULL, 0, NULL}
-        , {"fsinfo"          , 0ULL, 0, NULL}
-        , {"renew"           , 0ULL, 0, NULL}
-        , {"setclntid"       , 0ULL, 0, NULL}
-        , {"confirm"         , 0ULL, 0, NULL}
-        , {"lock"            , 0ULL, 0, NULL}
-        , {"lockt"           , 0ULL, 0, NULL}
-        , {"locku"           , 0ULL, 0, NULL}
-        , {"access"          , 0ULL, 0, NULL}
-        , {"getattr"         , 0ULL, 0, NULL}
-        , {"lookup"          , 0ULL, 0, NULL}
-        , {"lookup_root"     , 0ULL, 0, NULL}
-        , {"remove"          , 0ULL, 0, NULL}
-        , {"rename"          , 0ULL, 0, NULL}
-        , {"link"            , 0ULL, 0, NULL}
-        , {"symlink"         , 0ULL, 0, NULL}
-        , {"create"          , 0ULL, 0, NULL}
-        , {"pathconf"        , 0ULL, 0, NULL}
-        , {"statfs"          , 0ULL, 0, NULL}
-        , {"readlink"        , 0ULL, 0, NULL}
-        , {"readdir"         , 0ULL, 0, NULL}
-        , {"server_caps"     , 0ULL, 0, NULL}
-        , {"delegreturn"     , 0ULL, 0, NULL}
-        , {"getacl"          , 0ULL, 0, NULL}
-        , {"setacl"          , 0ULL, 0, NULL}
-        , {"fs_locations"    , 0ULL, 0, NULL}
-        , {"rel_lkowner"     , 0ULL, 0, NULL}
-        , {"secinfo"         , 0ULL, 0, NULL}
-        , {"fsid_present"    , 0ULL, 0, NULL}
-        ,
-
-        /* nfsv4.1 client ops */
-        {  "exchange_id"     , 0ULL, 0, NULL}
-        , {"create_session"  , 0ULL, 0, NULL}
-        , {"destroy_session" , 0ULL, 0, NULL}
-        , {"sequence"        , 0ULL, 0, NULL}
-        , {"get_lease_time"  , 0ULL, 0, NULL}
-        , {"reclaim_comp"    , 0ULL, 0, NULL}
-        , {"layoutget"       , 0ULL, 0, NULL}
-        , {"getdevinfo"      , 0ULL, 0, NULL}
-        , {"layoutcommit"    , 0ULL, 0, NULL}
-        , {"layoutreturn"    , 0ULL, 0, NULL}
-        , {"secinfo_no"      , 0ULL, 0, NULL}
-        , {"test_stateid"    , 0ULL, 0, NULL}
-        , {"free_stateid"    , 0ULL, 0, NULL}
-        , {"getdevicelist"   , 0ULL, 0, NULL}
-        , {"bind_conn_to_ses", 0ULL, 0, NULL}
-        , {"destroy_clientid", 0ULL, 0, NULL}
-        ,
-
-        /* nfsv4.2 client ops */
-        {  "seek"            , 0ULL, 0, NULL}
-        , {"allocate"        , 0ULL, 0, NULL}
-        , {"deallocate"      , 0ULL, 0, NULL}
-        , {"layoutstats"     , 0ULL, 0, NULL}
-        , {"clone"           , 0ULL, 0, NULL}
+        {  "null"            , 0ULL, 0, NULL, NULL}
+        , {"read"            , 0ULL, 0, NULL, "compound"}
         ,
 
         /* termination */
-        {  ""                , 0ULL, 0, NULL}
+        {  ""                , 0ULL, 0, NULL, NULL}
 };
 
 struct nfsd_procs nfsd4_ops_values[] = {
@@ -718,7 +659,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         size_t i;
         for(i = 0; nfsd_proc4_values[i].present ; i++) {
             if(unlikely(!nfsd_proc4_values[i].rd))
-                nfsd_proc4_values[i].rd = rrddim_add(st, nfsd_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                nfsd_proc4_values[i].rd = rrddim_add(st, nfsd_proc4_values[i].name, nfsd_proc4_values[i].dim_name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfsd_proc4_values[i].rd, nfsd_proc4_values[i].value);
         }
