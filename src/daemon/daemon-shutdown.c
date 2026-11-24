@@ -363,6 +363,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             freez(th);
 
+            rrdeng_in_memory_quiesce_all();
             dbengine_drained = dbengine_shutdown();
             if(!dbengine_drained) {
                 __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
@@ -375,6 +376,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
             if(rrdeng_dbengine_spawned()) {
+                rrdeng_in_memory_quiesce_all();
                 dbengine_drained = dbengine_shutdown();
                 if(!dbengine_drained) {
                     __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);

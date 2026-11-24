@@ -1409,6 +1409,15 @@ struct rrdengine_instance *rrdeng_in_memory_instance(size_t points) {
     return ctx;
 }
 
+// at shutdown, before the event loop closes: new queries of in-memory instances get no data, instead of sending their
+// work to a loop that is gone (disk tiers are quiesced by rrdeng_quiesce(), through the loop, much earlier)
+void rrdeng_in_memory_quiesce_all(void) {
+    spinlock_lock(&in_memory_instances.spinlock);
+    for(size_t i = 0; i < in_memory_instances.used; i++)
+        __atomic_store_n(&in_memory_instances.array[i]->quiesce.enabled, true, __ATOMIC_RELEASE);
+    spinlock_unlock(&in_memory_instances.spinlock);
+}
+
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
