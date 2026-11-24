@@ -4,8 +4,8 @@
 
 #define STREAMING_FUNCTION_UPDATE_EVERY 10
 
-// Doubles the capacity of a growable array. Arguments must be plain lvalues:
-// each is evaluated more than once.
+// Doubles the capacity of a growable array. items and size are assigned and
+// evaluated more than once: pass side-effect-free lvalues.
 #define STREAMING_TOPOLOGY_RESERVE(items, used, size, initial) do {  \
     if((used) == (size)) {                                           \
         size_t new_size_ = (size) ? (size) * 2 : (initial);          \
@@ -497,6 +497,10 @@ static bool streaming_topology_v1_actor_index_for_uuid(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
     ND_UUID host_id,
     uint64_t *index) {
+    // a zero UUID has no actor
+    if(UUIDiszero(host_id))
+        return false;
+
     char actor_id[256];
     streaming_topology_actor_id_for_uuid(host_id, actor_id, sizeof(actor_id));
     return streaming_topology_v1_actor_index_get(payload, actor_id, index);
