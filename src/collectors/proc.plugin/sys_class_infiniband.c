@@ -312,13 +312,14 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
     (void)dt;
     static SIMPLE_PATTERN *disabled_list = NULL;
     static int initialized = 0;
-    static int enable_new_ports = -1, enable_only_active = CONFIG_BOOLEAN_YES;
+    static bool config_loaded = false;
+    static int enable_only_active = CONFIG_BOOLEAN_YES;
     static int do_bytes = -1, do_packets = -1, do_errors = -1, do_hwpackets = -1, do_hwerrors = -1;
     static const char *sys_class_infiniband_dirname = NULL;
 
     static long long int dt_to_refresh_ports = 0, last_refresh_ports_usec = 0;
 
-    if (unlikely(enable_new_ports == -1)) {
+    if (unlikely(!config_loaded)) {
         char dirname[FILENAME_MAX + 1];
 
         snprintfz(dirname, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/infiniband");
@@ -348,6 +349,8 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             USEC_PER_SEC;
         if (dt_to_refresh_ports < 0)
             dt_to_refresh_ports = 0;
+
+        config_loaded = true;
     }
 
     // init listing of /sys/class/infiniband/ (or rediscovery)
