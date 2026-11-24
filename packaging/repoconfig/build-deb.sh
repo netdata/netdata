@@ -4,8 +4,7 @@ set -e
 
 SRC_DIR="$(CDPATH='' cd -- "$(dirname -- "${0}")" && pwd -P)"
 BUILD_DIR=/build
-DISTRO="$(awk -F'=' '/^ID=/ {print $2}' /etc/os-release)"
-DISTRO_VERSION="$(awk -F'"' '/VERSION_ID=/ {print $2}' /etc/os-release)"
+. /etc/os-release
 
 # Needed because dpkg is stupid and tries to configure things interactively if it sees a terminal.
 export DEBIAN_FRONTEND=noninteractive
@@ -26,18 +25,16 @@ echo "::endgroup::"
 
 [ -d "${SRC_DIR}/artifacts" ] || mkdir -p "${SRC_DIR}/artifacts"
 
-# Embed distro info in package name.
-# This is required to make the repo actually standards compliant wthout packagecloud's hacks.
-distid="${DISTRO}${DISTRO_VERSION}"
+# Check the version APT will compare and the filename the installer will request.
 for pkg in "${BUILD_DIR}"/packages/*.deb; do
-  extension="${pkg##*.}"
-  pkgname="$(basename "${pkg}" "${extension}")"
-  name="$(echo "${pkgname}" | cut -f 1 -d '_')"
-  version="$(echo "${pkgname}" | cut -f 2 -d '_')"
-  arch="$(echo "${pkgname}" | cut -f 3 -d '_')"
-
-  newname="${SRC_DIR}/artifacts/${name}_${version}+${distid}_${arch}${extension}"
-  mv "${pkg}" "${newname}"
+  version="$(dpkg-deb -f "${pkg}" Version)"
+  case "${version}" in
+    *+"${ID}${VERSION_ID}") ;;
+    *) printf 'Unexpected package version %s in %s\n' "${version}" "${pkg}" >&2; exit 1 ;;
+  esac
+  name="$(dpkg-deb -f "${pkg}" Package)"
+  test "${pkg##*/}" = "${name}_${version}_all.deb"
+  mv "${pkg}" "${SRC_DIR}/artifacts/"
 done
 
 # Correct ownership of the artifacts.

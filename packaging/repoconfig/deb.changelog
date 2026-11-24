@@ -1,3 +1,9 @@
+@PKG_NAME@ (5-@DEB_PACKAGE_RELEASE@) unstable; urgency=medium
+
+  * Include the target distribution and release in the package version
+
+ -- Netdata Builder <bot@netdata.cloud>  Tue, 24 Nov 2026 12:00:00 +0000
+
 @PKG_NAME@ (5-6) unstable; urgency=medium
 
   * Add preview repository configuration packages
