@@ -186,8 +186,12 @@ const char *database_migrate_v18_v19[] = {
     NULL
 };
 
-const char *database_migrate_v19_v20[] = {
+const char *database_migrate_v19_v20_info[] = {
     "ALTER TABLE health_log_detail ADD info_id INT",
+    NULL
+};
+
+const char *database_migrate_v19_v20_summary[] = {
     "ALTER TABLE health_log_detail ADD summary_id INT",
     NULL
 };
@@ -472,11 +476,20 @@ static int do_migration_v18_v19(sqlite3 *database)
 // ALTER TABLE ADD COLUMN is metadata-only, so this stays O(1) even on the 25M-row tables
 // seen on large parents. Existing rows keep their inline text and are resolved by the
 // readers with COALESCE(t.text, hld.<col>) until retention removes them.
+// Each ALTER commits on its own, so each column is checked on its own: a run interrupted
+// between them adds the missing one on the next start.
 static int do_migration_v19_v20(sqlite3 *database)
 {
-    if (table_exists_in_database(database, "health_log_detail") &&
-        !column_exists_in_table(database, "health_log_detail", "info_id"))
-        return init_database_batch(database, &database_migrate_v19_v20[0], "meta_migrate");
+    if (!table_exists_in_database(database, "health_log_detail"))
+        return 0;
+
+    if (!column_exists_in_table(database, "health_log_detail", "info_id") &&
+        init_database_batch(database, &database_migrate_v19_v20_info[0], "meta_migrate"))
+        return 1;
+
+    if (!column_exists_in_table(database, "health_log_detail", "summary_id") &&
+        init_database_batch(database, &database_migrate_v19_v20_summary[0], "meta_migrate"))
+        return 1;
 
     return 0;
 }

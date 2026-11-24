@@ -2309,6 +2309,38 @@ static bool health_text_unittest_same(const char *expected, const unsigned char 
     return strcmp(expected, (const char *)actual) == 0;
 }
 
+// an upgrade interrupted after the first ALTER: the next start adds the other column
+static int health_text_unittest_partial_migration(void)
+{
+    sqlite3 *database = NULL;
+    int failed = 0;
+
+    if (sqlite3_open(":memory:", &database) != SQLITE_OK ||
+        db_execute(database, SQL_CREATE_HEALTH_LOG_DETAIL_V19, NULL) ||
+        db_execute(database, "ALTER TABLE health_log_detail ADD info_id INT", NULL) ||
+        db_execute(database, "PRAGMA user_version = 19", NULL) ||
+        perform_database_migration(database, DB_METADATA_VERSION) != DB_METADATA_VERSION) {
+        fprintf(stderr, "FAILED [an interrupted upgrade completes]: migration failed\n");
+        failed++;
+    } else {
+        sqlite3_stmt *res = NULL;
+        int64_t columns = -1;
+        if (sqlite3_prepare_v2(database, "SELECT COUNT(*) FROM pragma_table_info('health_log_detail')"
+                               " WHERE name IN ('info_id', 'summary_id')", -1, &res, NULL) == SQLITE_OK &&
+            sqlite3_step(res) == SQLITE_ROW)
+            columns = sqlite3_column_int64(res, 0);
+        sqlite3_finalize(res);
+        if (columns != 2) {
+            fprintf(stderr, "FAILED [an interrupted upgrade completes]: %"PRId64" of 2 columns\n", columns);
+            failed++;
+        }
+    }
+
+    if (database)
+        sqlite3_close(database);
+    return failed;
+}
+
 int sql_health_text_unittest(void)
 {
     sqlite3 *saved_db_meta = db_meta;
@@ -2392,10 +2424,42 @@ int sql_health_text_unittest(void)
         failed++;
     }
 
+    // a text that cannot be interned is stored inline; an already interned one still resolves to its id
+    STRING *text_c = string_strdupz("fallback info");
+    ae.unique_id = 103;
+    ae.alarm_event_id = 4;
+    ae.info = text_c;
+    ae.summary = text_b;
+    memset(ae.transition_id, 0x88, sizeof(ae.transition_id));
+    saved = !db_execute(db_meta, "CREATE TRIGGER ut_text_fail BEFORE INSERT ON health_log_text"
+                                 " BEGIN SELECT RAISE(ABORT, 'unittest'); END", NULL) &&
+            sql_health_alarm_log_insert_detail(host, 1, &ae) &&
+            !db_execute(db_meta, "DROP TRIGGER ut_text_fail", NULL);
+    string_freez(text_c);
+
+    char check[512];
+    snprintfz(check, sizeof(check) - 1,
+              "SELECT COUNT(*) FROM health_log_detail WHERE unique_id = 103 AND info = 'fallback info'"
+              " AND info_id IS NULL AND summary IS NULL AND summary_id = %"PRId64, id_b);
+    if (!saved || health_text_unittest_count(check) != 1) {
+        fprintf(stderr, "FAILED [a text that cannot be interned is stored inline]\n");
+        failed++;
+    }
+
     // removal events copy the text of the transition they close, in either representation
     if (!health_text_unittest_inject_removed(100, 200, 0x33, 0x66) ||
         !health_text_unittest_inject_removed(101, 201, 0x44, 0x77)) {
         fprintf(stderr, "FAILED [a removal event is injected for each transition]\n");
+        failed++;
+    }
+
+    snprintfz(check, sizeof(check) - 1,
+              "SELECT COUNT(*) FROM health_log_detail WHERE"
+              " (unique_id = 200 AND info = 'old info' AND summary = 'old summary' AND info_id IS NULL AND summary_id IS NULL)"
+              " OR (unique_id = 201 AND info IS NULL AND summary IS NULL AND info_id = %"PRId64" AND summary_id = %"PRId64")",
+              id_a, id_b);
+    if (health_text_unittest_count(check) != 2) {
+        fprintf(stderr, "FAILED [a removal event keeps the representation of the transition it closes]\n");
         failed++;
     }
 
@@ -2407,6 +2471,7 @@ int sql_health_text_unittest(void)
         { 100, "old info", "old summary" },
         { 101, "interned info", "interned summary" },
         { 102, "interned info", NULL },
+        { 103, "fallback info", "interned summary" },
         { 200, "old info", "old summary" },
         { 201, "interned info", "interned summary" },
     };
@@ -2463,6 +2528,8 @@ int sql_health_text_unittest(void)
             failed++;
         }
     }
+
+    failed += health_text_unittest_partial_migration();
 
 cleanup:
     fprintf(stderr, "\n===================================================\n");
