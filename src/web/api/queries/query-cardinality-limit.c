@@ -38,6 +38,59 @@ static void group_by_labels_merge(DICTIONARY *dst, DICTIONARY *src) {
     dfe_done(k);
 }
 
+// the fold creates new values (the row sums of the "remaining" column), so
+// the range copied from the original RRDR no longer covers the result:
+// recompute it over every value cell of the reduced RRDR
+static void rrdr_cardinality_update_view_min_max(RRDR *r) {
+    bool found = false;
+    NETDATA_DOUBLE min = NAN, max = NAN;
+
+    for(size_t row = 0; row < r->rows; row++) {
+        for(size_t d = 0; d < r->d; d++) {
+            size_t idx = row * r->d + d;
+
+            if(r->o[idx] & RRDR_VALUE_EMPTY)
+                continue;
+
+            NETDATA_DOUBLE n = r->v[idx];
+            if(!isfinite(n))
+                continue;
+
+            if(!found) {
+                min = max = n;
+                found = true;
+            }
+            else {
+                if(n < min) min = n;
+                if(n > max) max = n;
+            }
+        }
+    }
+
+    if(found) {
+        r->view.min = min;
+        r->view.max = max;
+    }
+}
+
+// the all-zero fallback of group-by finalization ran on the dimensions before
+// the fold; the reduced result can still be all zero (a folded tail that
+// cancels out), so check again: options=nonzero must never hide every
+// dimension of the result
+static void rrdr_cardinality_nonzero_fallback(RRDR *r) {
+    QUERY_TARGET *qt = r->internal.qt;
+
+    if(!(qt->window.options & RRDR_OPTION_NONZERO))
+        return;
+
+    for(size_t d = 0; d < r->d; d++) {
+        if(rrdr_dimension_should_be_exposed(r->od[d], qt->window.options))
+            return;
+    }
+
+    qt->window.options &= ~RRDR_OPTION_NONZERO;
+}
+
 RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -261,7 +314,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
 
         new_r->di[remaining_idx] = string_strdupz(remaining_name);
         new_r->dn[remaining_idx] = string_strdupz(remaining_name);
-        new_r->od[remaining_idx] = RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO;
+        new_r->od[remaining_idx] = RRDR_DIMENSION_QUERIED;
 
         if(new_r->cardinality.source_metric)
             new_r->cardinality.source_metric[remaining_idx] = SIZE_MAX;
@@ -310,6 +363,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         // Aggregate remaining dimensions
         NETDATA_DOUBLE sum = 0.0, min = NAN, max = NAN, ars = 0.0;
         size_t count = 0;
+        bool nonzero = false;
 
         for (size_t row = 0; row < r->rows; row++) {
             size_t dst_idx = row * new_r->d + remaining_idx;
@@ -372,6 +426,10 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
                 if(new_r->gbc)
                     new_r->gbc[dst_idx] = aggregated_gbc;
 
+                // the sum of non-zero values can be zero (e.g. +x and -x)
+                if(islessgreater(aggregated_value, 0.0))
+                    nonzero = true;
+
                 // Update statistics for dview
                 sum += aggregated_value;
                 ars += aggregated_ar;
@@ -388,6 +446,9 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
                 new_r->o[dst_idx] = RRDR_VALUE_EMPTY;
             }
         }
+
+        if(nonzero)
+            new_r->od[remaining_idx] |= RRDR_DIMENSION_NONZERO;
 
         // Set dview for remaining dimension
         if(new_r->dview) {
@@ -418,6 +479,9 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         if (qm->status & RRDR_DIMENSION_GROUPED)
             qm->grouped_as.slot = qm->grouped_as.slot < r->d ? new_slot[qm->grouped_as.slot] : QUERY_METRIC_NOT_GROUPED_SLOT;
     }
+
+    rrdr_cardinality_update_view_min_max(new_r);
+    rrdr_cardinality_nonzero_fallback(new_r);
 
     // Cleanup
     onewayalloc_freez(owa, new_slot);
