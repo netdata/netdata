@@ -424,8 +424,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
         rrdset_done(st_mdstat_health);
     } else if (unlikely(st_mdstat_health && make_charts_obsolete)) {
         // no redundant arrays left: retire the chart and drop the cached pointers,
-        // so that a returning array binds to the revived or re-created chart
-        rrdset_is_obsolete___safe_from_collector_thread(st_mdstat_health);
+        // so that a returning array binds to the revived or re-created chart.
+        // The lookup refreshes the chart's last-access time before it is flagged obsolete,
+        // like the per-array charts above.
+        make_chart_obsolete("mdstat", "health");
         st_mdstat_health = NULL;
 
         for (raid_idx = 0; raid_idx < raids_num; raid_idx++)
