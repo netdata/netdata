@@ -1115,6 +1115,7 @@ static size_t dbengine_crc_test_valid_points(RRDDIM *rd, time_t start_time_s, ti
     return points;
 }
 
+// a buffered write is visible to the engine's O_DIRECT reads (the kernel writes the range back first), so no fsync
 static bool dbengine_crc_test_flip_byte(const char *path, uint64_t offset) {
     int fd = open(path, O_RDWR | O_CLOEXEC);
     if(fd == -1)
@@ -1123,7 +1124,7 @@ static bool dbengine_crc_test_flip_byte(const char *path, uint64_t offset) {
     uint8_t byte;
     bool ok = pread(fd, &byte, 1, (off_t)offset) == 1;
     byte ^= 0xFF;
-    ok = ok && pwrite(fd, &byte, 1, (off_t)offset) == 1 && fsync(fd) == 0;
+    ok = ok && pwrite(fd, &byte, 1, (off_t)offset) == 1;
     close(fd);
     return ok;
 }
@@ -1150,11 +1151,17 @@ static size_t test_dbengine_corrupt_extent_is_not_cached(RRDHOST *host) {
         dbengine_cadence_test_store_point(rd, expected[i].end_time_s, expected[i].value);
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
 
-    // write the page to disk; this returns after its open cache entry is published
-    pgc_flush_dirty_pages(main_cache, (Word_t)ctx);
-
+    // write the page to disk; the extent is on disk once the page is in the open cache (the background flusher may
+    // have claimed the page first, so the flush below can return before that write completes)
     Word_t metric_id = mrg_metric_id(main_mrg, (METRIC *)rd->tiers[0].smh);
-    PGC_PAGE *open_page = pgc_page_get_and_acquire(open_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_CLOSEST);
+    PGC_PAGE *open_page = NULL;
+    for(size_t i = 0; i < 100 && !open_page; i++) {
+        if(i)
+            sleep_usec(100 * USEC_PER_MS);
+
+        pgc_flush_dirty_pages(main_cache, (Word_t)ctx);
+        open_page = pgc_page_get_and_acquire(open_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_CLOSEST);
+    }
     if(!open_page) {
         fprintf(stderr, " >>> DBENGINE: corrupt-extent page did not reach the open cache\n");
         return 1;
@@ -1169,9 +1176,9 @@ static size_t test_dbengine_corrupt_extent_is_not_cached(RRDHOST *host) {
     uint64_t offset = BLOCK_TO_OFFSET(block) + xio->bytes - sizeof(struct rrdeng_df_extent_trailer) - 1;
     pgc_page_release(open_cache, open_page);
 
-    // drop the clean page from the main cache, so that the query reads the extent
+    // drop the clean page from the main cache (unless already evicted), so that the query reads the extent
     PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_EXACT);
-    if(!page || !pgc_page_to_clean_evict_or_release(main_cache, page)) {
+    if(page && !pgc_page_to_clean_evict_or_release(main_cache, page)) {
         fprintf(stderr, " >>> DBENGINE: corrupt-extent page could not be evicted from the main cache\n");
         return 1;
     }
