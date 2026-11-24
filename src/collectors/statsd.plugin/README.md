@@ -568,7 +568,7 @@ Settings like `private charts`, `gaps when not collected`, and `history` configu
 - **private charts** - Enable/disable private charts for matched metrics (yes|no)
 - **gaps when not collected** - Show gaps when no metrics are collected (yes|no)
 - **memory mode** - Ignored in the `[app]` section; application charts use the host's default memory mode
-- **history** - Size of round-robin database for application charts (optional, minimum 5)
+- **history** - Requested number of points kept for the application charts by `ram` and `alloc` on agents built without the Database Engine (optional, minimum 5). On agents built with it (the default), the charts keep the host's retention, set in the `[db]` section; with `ram` and `alloc`, `history` then only sets how long a collection gap may be before the chart is reset
 
 :::
 
