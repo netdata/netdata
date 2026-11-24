@@ -30,6 +30,21 @@
 - Build: add -rdynamic only when a stack trace backend can use it ([#24823](https://github.com/netdata/netdata/issues/24823))
 - Build: run git describe only when the source directory is a checkout ([#24764](https://github.com/netdata/netdata/issues/24764))
 - Fix(web): reject a bare LF or CR in the HTTP request line ([#24783](https://github.com/netdata/netdata/issues/24783))
+- Keep the trailing-slash redirect on the agent's origin ([#24632](https://github.com/netdata/netdata/issues/24632))
+- Fix(dbengine): move page cache memory reads to a sampler thread ([#24853](https://github.com/netdata/netdata/issues/24853))
+- Query: align v1 jsonwrap arrays with folded result columns ([#24898](https://github.com/netdata/netdata/issues/24898))
+- Test(query): add cardinality fold cases for details "as" and v1 jsonwrap ([#24899](https://github.com/netdata/netdata/issues/24899))
+- Json: traverse nested arrays and skip scalars in json_parse() ([#24864](https://github.com/netdata/netdata/issues/24864))
+- Query: match long exact node lists through a hash ([#24826](https://github.com/netdata/netdata/issues/24826))
+- Query: resolve details "as" after the cardinality fold ([#24897](https://github.com/netdata/netdata/issues/24897))
+- Exporting: build the JSON chart prefix once per chart ([#24885](https://github.com/netdata/netdata/issues/24885))
+- Status: save shutdown progress to a separate unsynced file ([#24881](https://github.com/netdata/netdata/issues/24881))
+- Build(rust): bump url to 2.5.9 and accept unmaintained chrono advisories ([#24905](https://github.com/netdata/netdata/issues/24905))
+- Test(query): record the fixes for CASE-046 and CASE-047 ([#24906](https://github.com/netdata/netdata/issues/24906))
+- Network-viewer: simplify topology payload plumbing ([#24900](https://github.com/netdata/netdata/issues/24900))
+- Ml: replace dlib with an in-tree k-means ([#24767](https://github.com/netdata/netdata/issues/24767))
+- Rrdcontext: queue context SQL writes instead of running SQLite under the context lock ([#24824](https://github.com/netdata/netdata/issues/24824))
+- Otel-plugin: remove legacy OTel logs support; unknown config options are warnings ([#24907](https://github.com/netdata/netdata/issues/24907))
 
 ## [2.13.0] - 2026-11-19
 
