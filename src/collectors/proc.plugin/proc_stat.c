@@ -432,15 +432,22 @@ static int read_cpuidle_states(const char *cpuidle_name_filename, const char *cp
                 return 1;
             }
 
-            name_buf[r - 1] = '\0'; // erase extra character
-            cc->cpuidle_state[state].name = strdupz(trim(name_buf));
             close(fd);
+
+            name_buf[r - 1] = '\0'; // erase extra character
+            char *name = trim(name_buf);
+            if(unlikely(!name)) {
+                collector_error("Empty cpuidle state name in file '%s'", filename);
+                cc->rescan_cpu_states = 1;
+                return 1;
+            }
+            cc->cpuidle_state[state].name = strdupz(name);
 
             snprintfz(filename, FILENAME_MAX, cpuidle_time_filename, core, state);
             cc->cpuidle_state[state].time_filename = strdupz(filename);
         }
 
-        // the set of states changed: the caller adds the chart dimensions again
+        // rebind the chart and its dimensions on the next successful collection
         if(old_state_len || cc->cpuidle_state_len) {
             cc->active_time_rd = NULL;
             cc->st = NULL;
