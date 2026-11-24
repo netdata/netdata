@@ -1335,13 +1335,14 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
                 // the newest data is gone: the clean latest time moves back to the newest closed page that remains, so
                 // a new collector and a refill by replication start after the data that is kept, not after the data
                 // lost. A hot page that remains is reported by the hot time: it is cleared only when it is this page's
-                // end and no hot page ends there
-                mrg_metric_replace_clean_latest_time_s(main_mrg, metric, entry.end_time_s, newest_end_s);
+                // end and no hot page ends there. It is cleared before the clean time moves back: until then a new
+                // collector starts after this page's end, so it cannot have stored this time again (afterwards it can)
                 if (newest_hot_end_s != entry.end_time_s)
                     mrg_metric_clear_hot_latest_time_s(main_mrg, metric, entry.end_time_s);
+                mrg_metric_replace_clean_latest_time_s(main_mrg, metric, entry.end_time_s, newest_end_s);
 
                 // a collector may have closed a page meanwhile: its page is in the index before it stores any time,
-                // so it is found here
+                // so it is found here (the hot ends are kept apart, so that hot pages stay out of newest_end_now_s)
                 time_t newest_end_now_s = 0, newest_hot_end_now_s = 0;
                 ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &newest_end_now_s, &newest_hot_end_now_s);
                 if (newest_end_now_s > newest_end_s)
