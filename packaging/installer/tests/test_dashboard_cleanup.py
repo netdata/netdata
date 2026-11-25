@@ -260,6 +260,20 @@ netdata_banner() { :; }
         self.assertEqual((relocated / 'index.html').read_bytes(), b'dashboard')
         self.assertEqual((relocated / 'manifest.txt').read_text(), 'new/chunk.js')
         self.assertTrue((relocated / 'local.css').is_file())
+        if os.geteuid() != 0:
+            # A read-only directory must not turn a failed replacement into a
+            # write through the existing link.
+            index = relocated / 'index.html'
+            index.unlink()
+            index.symlink_to(outside)
+            relocated.chmod(0o550)
+            try:
+                result = subprocess.run(['sh', '-c', script], env=env, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(index.is_symlink())
+                self.assertEqual(outside.read_text(), 'untouched')
+            finally:
+                relocated.chmod(0o750)
         # A payload file cannot replace an existing directory or chmod its target.
         index = relocated / 'index.html'
         index.unlink()

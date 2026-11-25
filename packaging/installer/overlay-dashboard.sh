@@ -14,6 +14,15 @@ copy_files() {
     done
 }
 
+replace_linked_file() (
+    temporary=$(mktemp "$destination/.netdata-dashboard.XXXXXXXX")
+    trap 'rm -f "$temporary"' 0
+    "$cmake" -E copy "$1" "$temporary"
+    touch -r "$1" "$temporary"
+    mv -f "$temporary" "$2"
+    trap - 0
+)
+
 merge_directory() (
     staged=$1
     release=$2
@@ -65,6 +74,16 @@ merge_directory() (
                     ;;
                 *) exit 1 ;;
             esac
+        fi
+        installed="$destination/$name"
+        if [ -e "$installed" ] || [ -L "$installed" ]; then
+            # CMake may write in place when it cannot unlink the old entry. Only
+            # permit that for a regular file with no other hard links.
+            single_file=$(find "$installed" -prune -type f -links 1 -print)
+            if [ -z "$single_file" ]; then
+                replace_linked_file "$file" "$installed"
+                continue
+            fi
         fi
         set -- "$@" "$file"
         if [ "$#" -eq 128 ]; then
