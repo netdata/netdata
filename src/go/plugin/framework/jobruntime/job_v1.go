@@ -103,7 +103,7 @@ func NewJob(cfg JobConfig) *Job {
 	j.Logger = log
 	if j.module != nil {
 		moduleLog := log
-		if sanitize := lifecycleLogMessageSanitizer(cfg.LifecycleErrorSanitizer); sanitize != nil {
+		if sanitize := LifecycleLogMessageSanitizer(cfg.LifecycleErrorSanitizer); sanitize != nil {
 			moduleLog = moduleLog.WithMessageSanitizer(sanitize)
 		}
 		j.module.GetBase().Logger = moduleLog

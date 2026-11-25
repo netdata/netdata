@@ -10,8 +10,15 @@ import (
 const publicErrorFallback = "dynamic configuration operation failed"
 
 // PublicError separates a response-safe explanation from its private cause.
-// The public message MUST be static, code-authored text. It MUST NOT contain
-// submitted or resolved values, endpoints, credentials, backend errors, or
+// It is the one marker of text that stays visible when the framework redacts
+// a job whose configuration resolved secret references.
+//
+// The public message MUST be code-authored text. It MAY be formatted with
+// values from closed protocol domains: numeric status or error codes and the
+// code-defined names of those codes. It MUST NOT contain any configuration
+// value, because any option (host, URL, user name, path) may be a resolved
+// secret reference; nor submitted values, endpoints, credentials, principal or
+// account names, server-supplied or backend text, raw library errors, or
 // response bodies.
 type PublicError struct {
 	message string
@@ -45,7 +52,8 @@ func (err *PublicError) Unwrap() error {
 	return err.cause
 }
 
-// PublicMessage returns an explicitly response-safe explanation from err.
+// PublicMessage returns an explicitly response-safe explanation from err: the
+// message of the first PublicError in its chain.
 func PublicMessage(err error) (string, bool) {
 	var public *PublicError
 	if !errors.As(err, &public) || public == nil {

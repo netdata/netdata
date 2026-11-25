@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"gopkg.in/yaml.v2"
 )
 
@@ -294,9 +295,7 @@ func (cmf *ConfigModuleFactory) moduleLogger(config confgroup.Config, redact boo
 	if !redact {
 		return log
 	}
-	return log.WithMessageSanitizer(func(message string, _ []any) string {
-		return redactResolvedLifecycleError(errors.New(message)).Error()
-	})
+	return log.WithMessageSanitizer(jobruntime.LifecycleLogMessageSanitizer(redactResolvedLifecycleError))
 }
 
 type constructedConfigModule struct {

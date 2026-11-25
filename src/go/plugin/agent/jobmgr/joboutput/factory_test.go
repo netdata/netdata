@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,9 +20,11 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1447,6 +1450,71 @@ func TestFactoryProbeRedactsResolvedValuesFromCollectorFailure(t *testing.T) {
 				require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 			})
 		}
+	}
+}
+
+func TestFactoryProbeKeepsPublicCollectorDiagnostic(t *testing.T) {
+	const (
+		resolvedFixture = "resolved-sensitive-fixture"
+		publicText      = "transport returned HTTP 401"
+	)
+	publicFailure := func(resolved string) error {
+		return fmt.Errorf(
+			"check wrapper for %s: %w",
+			resolved,
+			dyncfg.NewPublicError(publicText, errors.New("private cause for "+resolved)),
+		)
+	}
+	for _, variant := range []string{"V1", "V2"} {
+		t.Run(variant, func(t *testing.T) {
+			creator := collectorapi.Creator{}
+			if variant == "V1" {
+				creator.Create = func() collectorapi.CollectorV1 {
+					module := &collectorapi.MockCollectorV1{}
+					module.CheckFunc = func(context.Context) error { return publicFailure(module.Config.OptionStr) }
+					return module
+				}
+			} else {
+				creator.CreateV2 = func() collectorapi.CollectorV2 {
+					module := &factoryTestV2{state: &factoryTestState{}}
+					module.check = func(context.Context) error { return publicFailure(module.OptionStr) }
+					return module
+				}
+			}
+			factory, _ := newFactoryTestHarness(t, creator, nil)
+			resolver, err := secretresolver.NewAtomicResolver(map[string]secretresolver.AtomicProvider{
+				"fixture": secretresolver.AtomicProviderFunc(func(context.Context, string) ([]byte, error) {
+					return []byte(resolvedFixture), nil
+				}),
+			})
+			require.NoError(t, err)
+			factory.config.ConfigModules.config.Configs = testConfigResolver(t, resolver, unavailableStoreScope)
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
+			config := factoryTestConfig(false)
+			config["option_str"] = "${fixture:value}"
+			config["option_int"] = 1
+
+			prepared, failure, err := prepareFactoryTestCandidate(
+				context.Background(),
+				factory,
+				config,
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
+				permit,
+			)
+
+			require.NoError(t, err)
+			require.False(t, prepared.Valid())
+			require.Error(t, failure)
+			assert.Contains(t, failure.Error(), publicText)
+			assert.NotContains(t, failure.Error(), resolvedFixture)
+			assert.NotContains(t, failure.Error(), "check wrapper")
+			assert.NotContains(t, failure.Error(), "private cause")
+			require.NoError(t, permit.AbortUnused())
+			require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+		})
 	}
 }
 

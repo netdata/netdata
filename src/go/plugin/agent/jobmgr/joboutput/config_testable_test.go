@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -124,6 +126,57 @@ func TestConfigModuleFactoryOptionalTestResolvedSecrets(t *testing.T) {
 	assert.Contains(t, err.Error(), "redacted")
 	assert.NotContains(t, logs.String(), fixture)
 	assert.Contains(t, logs.String(), "redacted")
+}
+
+func TestConfigModuleFactoryOptionalTestKeepsPublicDiagnostics(t *testing.T) {
+	const (
+		fixture    = "synthetic-test-secret"
+		publicText = "transport returned HTTP 401"
+		logText    = "inventory query failed: E_ACCESSDENIED (0x80070005)"
+	)
+	resolver, err := secretresolver.NewAtomicResolver(map[string]secretresolver.AtomicProvider{
+		"fixture": secretresolver.AtomicProviderFunc(func(context.Context, string) ([]byte, error) {
+			return []byte(fixture), nil
+		}),
+	})
+	require.NoError(t, err)
+	module := &configTestV1{}
+	module.test = func(context.Context) error {
+		secret := module.Config.OptionStr
+		queryFailure := dyncfg.NewPublicError(logText, errors.New("server text for "+secret))
+		module.Limit("query", 1, time.Minute).Warning(queryFailure)
+		module.Warningf("query against %s failed: %v", secret, queryFailure)
+		module.With("err", queryFailure).Info("attribute carries a public diagnostic")
+		module.Warningf("unmarked line contains %s", secret)
+		return fmt.Errorf(
+			"test wrapper for %s: %w",
+			secret,
+			dyncfg.NewPublicError(publicText, errors.New("private cause for "+secret)),
+		)
+	}
+	module.CleanupFunc = func(context.Context) {}
+	factory := newOperationalTestFactory(t, "v1", module, testConfigResolver(t, resolver, unavailableStoreScope))
+	var logs bytes.Buffer
+	factory.logger = logger.NewWithWriter(&logs)
+	config := factoryTestConfig(false)
+	config["option_str"] = "${fixture:value}"
+
+	err = factory.Test(t.Context(), config)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), publicText)
+	assert.NotContains(t, err.Error(), fixture)
+	assert.NotContains(t, err.Error(), "test wrapper")
+	assert.NotContains(t, err.Error(), "private cause")
+	output := logs.String()
+	assert.NotContains(t, output, fixture)
+	assert.NotContains(t, output, "server text")
+	assert.NotContains(t, output, "query against")
+	assert.NotContains(t, output, "unmarked line")
+	assert.NotContains(t, output, "attribute carries")
+	// Limit warning, formatted warning and attribute value each keep only the public message.
+	assert.Equal(t, 3, strings.Count(output, logText))
+	assert.Contains(t, output, errResolvedLifecycleRedacted.Error())
 }
 
 func TestConfigModuleFactoryOptionalTestNotUsedForConfigurationOrValidation(t *testing.T) {

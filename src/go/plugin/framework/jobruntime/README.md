@@ -69,8 +69,9 @@ write lease before revoking future admission.
 
 On requested stop, nil and cancellation-only returns are normal. Mixed or unrelated errors, recovered panics and
 already settled failures remain failures. Collector error text is sanitized separately from its phase, code and retry
-eligibility. Jobs with resolved secret references retain blanket lifecycle-error redaction, including endpoint
-details. A recovered collector `Run` panic permits explicit restart after successful cleanup; independent lifecycle,
+eligibility. Jobs with resolved secret references redact all other lifecycle-error text, including endpoint details,
+except a collector's `dyncfg.PublicError` message; their module logger applies the same rule to every line through
+`LifecycleLogMessageSanitizer`. A recovered collector `Run` panic permits explicit restart after successful cleanup; independent lifecycle,
 owner or cleanup failures retain the existing containment/quarantine behavior. V1 collectors and V2 collectors without
 `Run` keep their existing collection lifecycle.
 
