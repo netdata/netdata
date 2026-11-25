@@ -84,7 +84,7 @@ func TestCollector_GroupConfig(t *testing.T) {
 						require.NoError(t, c.Init(t.Context()))
 						_, err = collecttest.CollectScalarSeries(c)
 						require.NoError(t, err)
-						assert.Equal(t, tc.wantQueries, session.queries)
+						assert.Equal(t, tc.wantQueries, metricQueries(session.queries))
 						assert.Equal(t, 1, session.closed)
 					}
 				})
@@ -134,7 +134,7 @@ func TestCollector_GeneratedVnodeIdentity(t *testing.T) {
 		}
 		assert.Equal(t, expectedGUID, vnode.GUID)
 		assert.Equal(t, "windows.example.com", vnode.Hostname)
-		assert.Equal(t, map[string]string{"_vnode_type": "wmi"}, vnode.Labels)
+		assert.Equal(t, map[string]string{"_vnode_type": "wmi", "_os": "windows", "address": c.Host}, vnode.Labels)
 	}
 }
 

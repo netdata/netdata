@@ -30,7 +30,19 @@ jobs:
 
 Omit `collectors` to collect all four groups. Set any of `cpu`, `memory`, `network`, and `disk` to `false` to skip that query. Leave at least one group enabled. The example above collects CPU, memory, and network traffic. Add another job for each additional endpoint.
 
-The job creates a Netdata virtual node identified by the configured target. Use a consistent hostname across restarts. If the address may change, assign an existing named `vnode` before the first collection so its history follows that node.
+## Virtual node and system information
+
+Each job automatically creates a virtual node. It displays the Windows computer name reported by WMI and records the configured IP address or DNS name in the `address` host label. Until Windows supplies a usable name, the node displays the endpoint. Its GUID comes from the configured endpoint, so a Windows rename keeps the node’s metric history. Changing the endpoint can create a new node. To manage the identity and labels yourself, set `vnode` to an existing named virtual node.
+
+The collector reads inventory after a successful metric poll and refreshes it every five minutes in the same WMI session. A failed inventory query preserves the last values from that provider. When a successful query shows that a value is absent or ambiguous, the collector omits its label.
+
+| Host information | Source and coverage |
+| --- | --- |
+| Windows | OS family, Windows product caption, recognizable marketing version and edition, and kernel version with base build. The full patch revision and registry display release are unavailable in these queries. |
+| Processor and memory | Logical processor count, architecture, processor model and reported clock in Hz, and the sum of installed memory-module capacities in bytes. |
+| Hardware | Manufacturer and model. Recognized virtual platforms also supply virtualization labels. |
+| Disk capacity | With disk collection enabled, the collector sums the volume lengths when every fixed drive letter maps to a single partition extent. The per-drive usage charts use filesystem sizes. |
+| Default network | The IPv4 default interface name and address when routes resolve to one interface with one usable IPv4 address. |
 
 ## Target requirements
 

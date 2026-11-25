@@ -6,6 +6,7 @@ package windows
 import (
 	"context"
 	_ "embed"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -39,9 +40,10 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	store   metrix.CollectorStore
-	metrics collectorMetrics
-	vnode   *vnodes.VirtualNode
+	store         metrix.CollectorStore
+	metrics       collectorMetrics
+	vnode         *vnodes.VirtualNode
+	nextInventory time.Time
 
 	open func(ctx context.Context, host, username, password, auth string) (queryClient, error)
 }
@@ -65,6 +67,7 @@ func (c *Collector) Init(context.Context) error {
 		return err
 	}
 	c.vnode = newVirtualNode(c.Host)
+	c.nextInventory = time.Time{}
 	return nil
 }
 

@@ -105,6 +105,8 @@ func usedSpace(total, free sample) sample {
 
 func readUnsigned(value any) sample {
 	switch v := value.(type) {
+	case uint16:
+		return sample{value: uint64(v), valid: true}
 	case uint32:
 		return sample{
 			value: uint64(v),

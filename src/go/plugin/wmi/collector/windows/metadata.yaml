@@ -19,7 +19,7 @@ modules:
     overview:
       data_collection:
         metrics_description: Monitor CPU, physical memory, network interface traffic, and fixed-drive space on a remote Windows host.
-        method_description: One job connects to one configured host over DCOM and reads the enabled groups in the root/cimv2 WMI namespace. The monitored machine uses its built-in Windows providers.
+        method_description: One job connects to one configured host over DCOM and reads the enabled groups in the root/cimv2 WMI namespace. Built-in Windows providers also supply OS, hardware and default network labels for the generated virtual node.
       supported_platforms:
         include: [Linux, Windows]
         exclude: []
@@ -32,7 +32,7 @@ modules:
         limits:
           description: This experimental source-only plugin uses explicit NTLMv2. It collects total CPU utilization, visible physical memory, rates per Windows network interface performance instance, and fixed logical drives with drive letters.
         performance_impact:
-          description: Each cycle opens a WMI session and queries each enabled group once. Disabling a group skips its remote query.
+          description: Each cycle opens a WMI session and queries each enabled group once. Generated nodes use the same session to refresh host inventory every five minutes after a successful metric poll. Disabling a metric group skips its metric query.
     setup:
       prerequisites:
         list:
@@ -43,7 +43,7 @@ modules:
       configuration:
         file:
           name: wmi/windows.conf
-          description: Define one job per remote Windows endpoint. Each job creates a virtual node for its host unless an existing named vnode is specified.
+          description: Define one job per remote Windows endpoint. Each job automatically creates a virtual node displaying the Windows computer name, with the configured endpoint in the `address` host label. The endpoint identifies the node across Windows renames. An existing named vnode uses its configured identity and labels.
         options:
           description: All four metric groups are enabled by default. Set an individual group to false to skip its query.
           folding:

@@ -131,7 +131,7 @@ func decodeRow(pointer *dcom.InterfacePointer) (_ map[string]any, err error) {
 			continue
 		}
 		switch value := property.Value.Value.(type) {
-		case string, bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64:
+		case string, []string, bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64:
 			row[strings.ToLower(property.Name)] = value
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -36,68 +37,81 @@ func TestCollector_JobV2Publication(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := configuredCollector()
-			c.open = func(context.Context, string, string, string, string) (queryClient, error) {
-				return &fakeSession{
-					results: validQueryResults(),
-				}, nil
-			}
-			out := make(wireOutput, 16)
-			job := jobruntime.NewJobV2(jobruntime.JobV2Config{
-				PluginName:  "wmi",
-				Name:        "fixture",
-				ModuleName:  "windows",
-				FullName:    "windows_fixture",
-				Module:      c,
-				Out:         out,
-				UpdateEvery: c.UpdateEvery,
-				Vnode:       vnode,
-				VnodeName:   vnode.Name,
-			})
-			require.NoError(t, job.AutoDetectionManaged(t.Context()))
-			assert.Equal(t, 0, job.AutoDetectionEvery())
-
-			run := jobruntime.NewManagedRun(t.Context(), nil)
-			done := make(chan struct{})
-			go func() {
-				defer close(done)
-				job.StartManaged(run)
-			}()
-			t.Cleanup(func() {
-				run.Stop(nil)
-				<-done
-				job.Cleanup()
-			})
-			<-run.StartupDone()
-			require.NoError(t, run.StartupErr())
-
-			ticker := time.NewTicker(5 * time.Millisecond)
-			defer ticker.Stop()
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-			for {
-				select {
-				case <-ticker.C:
-					job.Tick(c.UpdateEvery)
-				case output := <-out:
-					if !strings.Contains(output, "SET 'received' = 190") {
-						continue
+			synctest.Test(t, func(t *testing.T) {
+				c := configuredCollector()
+				renameAt := time.Now().Add(inventoryInterval)
+				c.Vnode = vnode.Name
+				c.open = func(context.Context, string, string, string, string) (queryClient, error) {
+					results := validQueryResults()
+					hostname := "WIN-LAB"
+					if !time.Now().Before(renameAt) {
+						hostname = "WIN-RENAMED"
 					}
-					if vnode.Name == "" {
-						assert.Contains(t, output, "HOST_DEFINE '"+c.VirtualNode().GUID+"' 'windows.example.com'")
-						assert.Contains(t, output, "HOST_LABEL '_vnode_type' 'wmi'")
-					} else {
-						assert.Contains(t, output, "HOST_DEFINE '"+namedGUID+"' 'configured.example.com'")
-						assert.NotContains(t, output, c.VirtualNode().GUID)
-					}
-					assert.Contains(t, output, "CLABEL 'interface' 'Ethernet'")
-					assert.Contains(t, output, "SET 'busy' = 0")
-					assert.Contains(t, output, "SET 'used' = 6442450944")
-					return
-				case <-ctx.Done():
-					t.Fatal("the job did not emit Windows metric data")
+					results[queryOSInfo] = fixtureRows(map[string]any{"CSName": hostname, "Caption": "Microsoft Windows Server 2022 Standard", "ProductType": uint32(3)})
+					return &fakeSession{results: results}, nil
 				}
-			}
+				out := make(wireOutput, 16)
+				job := jobruntime.NewJobV2(jobruntime.JobV2Config{
+					PluginName:  "wmi",
+					Name:        "fixture",
+					ModuleName:  "windows",
+					FullName:    "windows_fixture",
+					Module:      c,
+					Out:         out,
+					UpdateEvery: c.UpdateEvery,
+					Vnode:       vnode,
+					VnodeName:   vnode.Name,
+				})
+				require.NoError(t, job.AutoDetectionManaged(t.Context()))
+				assert.Equal(t, 0, job.AutoDetectionEvery())
+
+				run := jobruntime.NewManagedRun(t.Context(), nil)
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					job.StartManaged(run)
+				}()
+				t.Cleanup(func() {
+					run.Stop(nil)
+					<-done
+					job.Cleanup()
+				})
+				<-run.StartupDone()
+				require.NoError(t, run.StartupErr())
+
+				collect := func(clock int) string {
+					t.Helper()
+					synctest.Wait()
+					job.Tick(clock)
+					synctest.Wait()
+					var output strings.Builder
+					for len(out) > 0 {
+						output.WriteString(<-out)
+					}
+					require.Contains(t, output.String(), "SET 'received' = 190")
+					return output.String()
+				}
+				output := collect(c.UpdateEvery)
+				assert.Contains(t, output, "CLABEL 'interface' 'Ethernet'")
+				assert.Contains(t, output, "SET 'busy' = 0")
+				assert.Contains(t, output, "SET 'used' = 6442450944")
+				if vnode.Name != "" {
+					assert.Contains(t, output, "HOST_DEFINE '"+namedGUID+"' 'configured.example.com'")
+					assert.NotContains(t, output, c.VirtualNode().GUID)
+					assert.NotContains(t, output, "HOST_LABEL '_os_edition'")
+					return
+				}
+				guid := c.VirtualNode().GUID
+				assert.Contains(t, output, "HOST_DEFINE '"+guid+"' 'WIN-LAB'")
+				assert.Contains(t, output, "HOST_LABEL '_vnode_type' 'wmi'")
+				assert.Contains(t, output, "HOST_LABEL 'address' 'windows.example.com'")
+				assert.Contains(t, output, "HOST_LABEL '_os_edition' 'Standard'")
+
+				time.Sleep(inventoryInterval)
+				renamed := collect(2 * c.UpdateEvery)
+				assert.Contains(t, renamed, "HOST_DEFINE '"+guid+"' 'WIN-RENAMED'")
+				assert.Contains(t, renamed, "HOST_LABEL 'address' 'windows.example.com'")
+			})
 		})
 	}
 }

@@ -157,7 +157,7 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Equal(t, first, recovered)
 
 	for _, session := range sessions {
-		assert.Equal(t, []string{cpuProjection, memoryProjection, networkProjection, diskProjection}, session.queries)
+		assert.Equal(t, []string{cpuProjection, memoryProjection, networkProjection, diskProjection}, metricQueries(session.queries))
 		assert.Equal(t, 1, session.closed)
 	}
 	c.Cleanup(t.Context())

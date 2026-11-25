@@ -18,8 +18,8 @@ const (
 	queryDisk = "SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType = 3"
 )
 
-func (c *Collector) poll(ctx context.Context) (observations, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+func (c *Collector) poll(parent context.Context) (observations, error) {
+	ctx, cancel := context.WithTimeout(parent, c.Timeout.Duration())
 	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return observations{}, err
@@ -35,6 +35,8 @@ func (c *Collector) poll(ctx context.Context) (observations, error) {
 	defer client.Close()
 
 	var snapshot observations
+	var fixedDrives []map[string]any
+	var diskQueryOK bool
 	groups := [...]struct {
 		name    string
 		enabled *bool
@@ -57,6 +59,9 @@ func (c *Collector) poll(ctx context.Context) (observations, error) {
 			return observations{}, err
 		}
 		rows, err := client.Query(ctx, group.query)
+		if group.query == queryDisk && err == nil {
+			fixedDrives, diskQueryOK = rows, true
+		}
 		switch {
 		case err != nil:
 			failures[i] = safeTransportError(group.name+" WMI query failed", err)
@@ -78,7 +83,11 @@ func (c *Collector) poll(ctx context.Context) (observations, error) {
 			c.Limit("wmi:"+groups[i].name, 1, time.Minute).Warning(err)
 		}
 	}
-	return snapshot, nil
+	if c.Vnode == "" && !time.Now().Before(c.nextInventory) {
+		c.refreshInventory(ctx, client, fixedDrives, diskQueryOK)
+	}
+	// Exhausting the optional inventory budget must not discard successful samples.
+	return snapshot, parent.Err()
 }
 
 func safeTransportError(operation string, err error) error {

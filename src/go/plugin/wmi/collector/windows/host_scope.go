@@ -11,15 +11,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-func newVirtualNode(host string) *vnodes.VirtualNode {
+func canonicalEndpoint(host string) string {
 	if addr, err := netip.ParseAddr(host); err == nil {
-		host = addr.Unmap().String()
-	} else {
-		host = strings.ToLower(strings.TrimSuffix(host, "."))
+		return addr.Unmap().String()
 	}
+	return strings.ToLower(strings.TrimSuffix(host, "."))
+}
+
+func newVirtualNode(endpoint string) *vnodes.VirtualNode {
+	host := canonicalEndpoint(endpoint)
 	return &vnodes.VirtualNode{
 		GUID:     uuid.NewSHA1(uuid.NameSpaceDNS, []byte("wmi:"+host)).String(),
 		Hostname: host,
-		Labels:   map[string]string{"_vnode_type": "wmi"},
+		Labels:   map[string]string{"_vnode_type": "wmi", "_os": "windows", "address": endpoint},
 	}
 }
