@@ -50,7 +50,7 @@ func Open(ctx context.Context, host, username, password, auth string) (*Client, 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if host == "" || (net.ParseIP(host) == nil && strings.ContainsAny(host, ":@/\\[]% \t\r\n")) {
+	if !ValidHost(host) {
 		return nil, diagnostic("WMI host must be a hostname or IP address")
 	}
 
@@ -73,6 +73,9 @@ func Open(ctx context.Context, host, username, password, auth string) (*Client, 
 
 func (c *Client) open(host, username, password, auth string) error {
 	ctx := c.ctx
+	// An IPv6 zone selects an interface on the poller. Only the socket dialer
+	// needs it; the DCOM address parser and NTLM target use the remote address.
+	host, _, _ = strings.Cut(host, "%")
 	security, err := securityOptions(host, username, password, auth)
 	if err != nil {
 		return err

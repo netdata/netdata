@@ -129,6 +129,32 @@ func TestOpenRejectsMissingSecurityOptions(t *testing.T) {
 	}
 }
 
+func TestScopedIPv6ReachesResolverOnTheSpecifiedInterface(t *testing.T) {
+	const host = "fe80::1%test0"
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	var addresses []string
+	client := &Client{
+		ctx:    ctx,
+		cancel: cancel,
+		dialer: rpcDialer{
+			host: host,
+			ctx:  ctx,
+			dial: func(_ context.Context, _, address string) (net.Conn, error) {
+				addresses = append(addresses, address)
+				return nil, syscall.ECONNREFUSED
+			},
+		},
+	}
+	defer client.Close()
+	err := client.open(host, "reader", "synthetic", "ntlm")
+	require.Error(t, err)
+	require.NotEmpty(t, addresses)
+	for _, address := range addresses {
+		assert.Equal(t, "[fe80::1%test0]:135", address)
+	}
+}
+
 func TestDialerPinsTheConfiguredHostAndClosesOnCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()

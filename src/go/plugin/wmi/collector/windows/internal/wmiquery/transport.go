@@ -5,13 +5,27 @@ package wmiquery
 import (
 	"context"
 	"net"
+	"net/netip"
 	"strings"
+	"unicode"
 
 	"github.com/oiweiwei/go-msrpc/dcerpc"
 	"github.com/oiweiwei/go-msrpc/ssp/credential"
 	"github.com/oiweiwei/go-msrpc/ssp/gssapi"
 	"github.com/oiweiwei/go-msrpc/ssp/ntlm"
 )
+
+// ValidHost accepts hostnames and IP literals, including scoped IPv6 addresses.
+func ValidHost(host string) bool {
+	if host == "" || host == "." || strings.ContainsAny(host, " /\\?#@[]") ||
+		strings.IndexFunc(host, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
+		return false
+	}
+	if _, err := netip.ParseAddr(host); err == nil {
+		return true
+	}
+	return !strings.ContainsAny(host, ":%")
+}
 
 func securityOptions(host, username, password, auth string) ([]dcerpc.Option, error) {
 	if auth != "ntlm" {

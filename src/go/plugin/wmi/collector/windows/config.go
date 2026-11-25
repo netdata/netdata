@@ -4,12 +4,11 @@ package windows
 
 import (
 	"errors"
-	"net/netip"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
 )
 
 const (
@@ -47,7 +46,7 @@ func defaultConfig() Config {
 
 func (c *Config) validate() error {
 	c.Host = strings.TrimSpace(c.Host)
-	if !validHost(c.Host) {
+	if !wmiquery.ValidHost(c.Host) {
 		return errors.New("host must be a Windows hostname or IP address without a URL or port")
 	}
 	if c.Auth != "ntlm" {
@@ -67,17 +66,6 @@ func (c *Config) validate() error {
 		return errors.New("at least one collector group must be enabled")
 	}
 	return nil
-}
-
-func validHost(host string) bool {
-	if host == "" || host == "." || strings.ContainsAny(host, " /\\?#@[]") ||
-		strings.IndexFunc(host, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
-		return false
-	}
-	if _, err := netip.ParseAddr(host); err == nil {
-		return true
-	}
-	return !strings.ContainsAny(host, ":%")
 }
 
 func enabled(option *bool) bool { return option == nil || *option }

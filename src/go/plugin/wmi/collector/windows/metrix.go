@@ -10,27 +10,27 @@ const (
 )
 
 type collectorMetrics struct {
+	meter           metrix.SnapshotMeter
 	cpuBusy         metrix.SnapshotGauge
 	memoryUsed      metrix.SnapshotGauge
 	memoryAvailable metrix.SnapshotGauge
-	networkReceived metrix.SnapshotGaugeVec
-	networkSent     metrix.SnapshotGaugeVec
-	diskUsed        metrix.SnapshotGaugeVec
-	diskFree        metrix.SnapshotGaugeVec
+	networkReceived metrix.SnapshotGauge
+	networkSent     metrix.SnapshotGauge
+	diskUsed        metrix.SnapshotGauge
+	diskFree        metrix.SnapshotGauge
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	m := store.Write().SnapshotMeter("")
-	network := m.Vec(interfaceLabel)
-	disk := m.Vec(driveLabel)
 	return collectorMetrics{
+		meter:           m,
 		cpuBusy:         m.Gauge("cpu_busy_percent"),
 		memoryUsed:      m.Gauge("memory_used_bytes"),
 		memoryAvailable: m.Gauge("memory_available_bytes"),
-		networkReceived: network.Gauge("network_received_bytes_per_second"),
-		networkSent:     network.Gauge("network_sent_bytes_per_second"),
-		diskUsed:        disk.Gauge("disk_used_bytes"),
-		diskFree:        disk.Gauge("disk_free_bytes"),
+		networkReceived: m.Gauge("network_received_bytes_per_second"),
+		networkSent:     m.Gauge("network_sent_bytes_per_second"),
+		diskUsed:        m.Gauge("disk_used_bytes"),
+		diskFree:        m.Gauge("disk_free_bytes"),
 	}
 }
 
@@ -45,19 +45,21 @@ func (m collectorMetrics) write(snapshot observations) {
 		m.memoryAvailable.Observe(float64(snapshot.memoryAvailable.value) * 1024)
 	}
 	for _, nic := range snapshot.interfaces {
+		labels := m.meter.LabelSet(metrix.Label{Key: interfaceLabel, Value: nic.name})
 		if nic.received.valid {
-			m.networkReceived.WithLabelValues(nic.name).Observe(float64(nic.received.value))
+			m.networkReceived.Observe(float64(nic.received.value), labels)
 		}
 		if nic.sent.valid {
-			m.networkSent.WithLabelValues(nic.name).Observe(float64(nic.sent.value))
+			m.networkSent.Observe(float64(nic.sent.value), labels)
 		}
 	}
 	for _, drive := range snapshot.drives {
+		labels := m.meter.LabelSet(metrix.Label{Key: driveLabel, Value: drive.drive})
 		if drive.used.valid {
-			m.diskUsed.WithLabelValues(drive.drive).Observe(float64(drive.used.value))
+			m.diskUsed.Observe(float64(drive.used.value), labels)
 		}
 		if drive.free.valid {
-			m.diskFree.WithLabelValues(drive.drive).Observe(float64(drive.free.value))
+			m.diskFree.Observe(float64(drive.free.value), labels)
 		}
 	}
 }
