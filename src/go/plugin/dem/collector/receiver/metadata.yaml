@@ -78,6 +78,10 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: Select the DEM image on Docker
+            description: |
+              If your Netdata Agent runs in Docker, use a `-dem` image such as `netdata/netdata:stable-dem`.
+              See [Enable DEM in Docker](/packaging/docker/README.md#enable-dem-in-docker).
           - title: Make the receiver reachable over HTTPS
             description: |
               Visitors' browsers must reach the receiver at a public HTTPS address; browsers do not let HTTPS pages send

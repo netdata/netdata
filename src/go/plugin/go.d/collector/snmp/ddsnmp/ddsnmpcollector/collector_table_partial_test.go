@@ -4,15 +4,16 @@ package ddsnmpcollector
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -20,16 +21,16 @@ import (
 )
 
 func TestTableCollector_Collect_SuccessfulEmptyWalkIsPartialSuccess(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	profile := profileWithTwoTableMetrics()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.2.2", nil)
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", errors.New("timeout"))
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
 	var stats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &stats)
+	metrics, err := collector.collect(context.Background(), profile, &stats)
 
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
@@ -39,16 +40,16 @@ func TestTableCollector_Collect_SuccessfulEmptyWalkIsPartialSuccess(t *testing.T
 }
 
 func TestTableCollector_Collect_AllWalksFailedStillErrors(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	profile := profileWithTwoTableMetrics()
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.2.2", errors.New("interface timeout"))
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", errors.New("IP timeout"))
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
 	var stats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &stats)
+	metrics, err := collector.collect(context.Background(), profile, &stats)
 
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "interface timeout")
@@ -60,7 +61,7 @@ func TestTableCollector_Collect_AllWalksFailedStillErrors(t *testing.T) {
 }
 
 func TestTableCollector_Collect_PartialWalkWarningIsRateLimitedPerProfile(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	profileA := profileWithTwoTableMetrics()
@@ -72,10 +73,10 @@ func TestTableCollector_Collect_PartialWalkWarningIsRateLimitedPerProfile(t *tes
 	}
 
 	var logs bytes.Buffer
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(&logs), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(&logs), false)
 	for _, profile := range []*ddsnmp.Profile{profileA, profileA, profileB} {
 		var stats ddsnmp.CollectionStats
-		metrics, err := collector.collect(profile, &stats)
+		metrics, err := collector.collect(context.Background(), profile, &stats)
 		require.NoError(t, err)
 		assert.Empty(t, metrics)
 		assert.Equal(t, int64(1), stats.SNMP.TablesWalked)
@@ -87,7 +88,7 @@ func TestTableCollector_Collect_PartialWalkWarningIsRateLimitedPerProfile(t *tes
 }
 
 func TestTableCollector_Collect_CachedProcessingWarningIsRateLimitedPerProfile(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -100,22 +101,22 @@ func TestTableCollector_Collect_CachedProcessingWarningIsRateLimitedPerProfile(t
 	}}
 	profileA := createTestProfile("cached-processing-a.yaml", metricsConfig)
 	profileB := createTestProfile("cached-processing-b.yaml", metricsConfig)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{createCounter32PDU(metricOID, 1)})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{createCounter32PDU(metricOID, 1)})
 	for range 4 {
-		expectSNMPGet(mockHandler, []string{metricOID}, []gosnmp.SnmpPDU{createStringPDU(metricOID, "not-a-number")})
-		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{createStringPDU(metricOID, "not-a-number")})
+		expectSNMPGet(mockHandler, []string{metricOID}, []gosnmp.VarBind{createStringPDU(metricOID, "not-a-number")})
+		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{createStringPDU(metricOID, "not-a-number")})
 	}
 
 	var logs bytes.Buffer
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(time.Hour, 0), logger.NewWithWriter(&logs), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.NewWithWriter(&logs), false)
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profileA, &initialStats)
+	metrics, err := collector.collect(context.Background(), profileA, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 
 	for _, profile := range []*ddsnmp.Profile{profileA, profileA, profileB, profileB} {
 		var stats ddsnmp.CollectionStats
-		metrics, err = collector.collect(profile, &stats)
+		metrics, err = collector.collect(context.Background(), profile, &stats)
 		require.NoError(t, err)
 		assert.Empty(t, metrics)
 		assert.Equal(t, int64(1), stats.Errors.Processing.Table)
@@ -134,7 +135,7 @@ func TestTableCollector_Collect_CachedProcessingWarningIsRateLimitedPerProfile(t
 }
 
 func TestTableCollector_Collect_EmptyTableIsNotCachedAsHit(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const tableOID = "1.3.6.1.2.1.2.2"
@@ -146,10 +147,10 @@ func TestTableCollector_Collect_EmptyTableIsNotCachedAsHit(t *testing.T) {
 		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, nil)
 	}
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	for range 2 {
 		var stats ddsnmp.CollectionStats
-		metrics, err := collector.collect(profile, &stats)
+		metrics, err := collector.collect(context.Background(), profile, &stats)
 		require.NoError(t, err)
 		assert.Empty(t, metrics)
 		assert.Equal(t, int64(0), stats.TableCache.Hits)
@@ -160,7 +161,7 @@ func TestTableCollector_Collect_EmptyTableIsNotCachedAsHit(t *testing.T) {
 }
 
 func TestTableCollector_Collect_EmptyTableInvalidatesStaleCache(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -178,24 +179,24 @@ func TestTableCollector_Collect_EmptyTableInvalidatesStaleCache(t *testing.T) {
 			Symbols: []ddprofiledefinition.SymbolConfig{{OID: "1.3.6.1.2.1.2.2.1.16", Name: "ifOutOctets"}},
 		},
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createCounter32PDU(metricOID1, 1),
 		createCounter32PDU(metricOID2, 2),
 	})
-	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{}, nil).AnyTimes()
+	mockHandler.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&gosnmp.Message{}, nil).AnyTimes()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, nil)
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, nil)
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 
 	var transitionStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &transitionStats)
+	metrics, err = collector.collect(context.Background(), profile, &transitionStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 	assert.Equal(t, int64(0), transitionStats.TableCache.Hits)
@@ -206,7 +207,7 @@ func TestTableCollector_Collect_EmptyTableInvalidatesStaleCache(t *testing.T) {
 	require.False(t, cache.isConfigCached(profile.Definition.Metrics[1]))
 
 	var emptyStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &emptyStats)
+	metrics, err = collector.collect(context.Background(), profile, &emptyStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 	assert.Equal(t, int64(0), emptyStats.TableCache.Hits)
@@ -216,7 +217,7 @@ func TestTableCollector_Collect_EmptyTableInvalidatesStaleCache(t *testing.T) {
 }
 
 func TestTableCollector_Collect_TagOnlyRowsAreNotCached(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -225,16 +226,16 @@ func TestTableCollector_Collect_TagOnlyRowsAreNotCached(t *testing.T) {
 	)
 	profile := profileWithSameTableTag()
 	for range 2 {
-		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 			createStringPDU(tagOID, "255.255.255.0"),
 		})
 	}
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 	for range 2 {
 		var stats ddsnmp.CollectionStats
-		metrics, err := collector.collect(profile, &stats)
+		metrics, err := collector.collect(context.Background(), profile, &stats)
 		require.NoError(t, err)
 		assert.Empty(t, metrics)
 		assert.Equal(t, int64(0), stats.Metrics.Rows)
@@ -247,21 +248,21 @@ func TestTableCollector_Collect_TagOnlyRowsAreNotCached(t *testing.T) {
 }
 
 func TestTableCollector_Collect_TagOnlyRowsAreExcludedFromMixedTable(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const tableOID = "1.3.6.1.2.1.4.20"
 	profile := profileWithSameTableTag()
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.2.1.4.20.1.2.192.0.2.1", 17),
 		createStringPDU("1.3.6.1.2.1.4.20.1.3.192.0.2.1", "255.255.255.0"),
 		createStringPDU("1.3.6.1.2.1.4.20.1.3.192.0.2.2", "255.255.255.0"),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 	var stats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &stats)
+	metrics, err := collector.collect(context.Background(), profile, &stats)
 
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
@@ -276,7 +277,7 @@ func TestTableCollector_Collect_TagOnlyRowsAreExcludedFromMixedTable(t *testing.
 }
 
 func TestTableCollector_Collect_TagOnlyTransitionInvalidatesStaleCache(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -285,28 +286,28 @@ func TestTableCollector_Collect_TagOnlyTransitionInvalidatesStaleCache(t *testin
 		tagOID    = "1.3.6.1.2.1.4.20.1.3.192.0.2.1"
 	)
 	profile := profileWithSameTableTag()
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createGauge32PDU(metricOID, 17),
 		createStringPDU(tagOID, "255.255.255.0"),
 	})
 	expectSNMPGet(mockHandler, []string{metricOID}, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createStringPDU(tagOID, "255.255.255.0"),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createStringPDU(tagOID, "255.255.255.0"),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 
 	var transitionStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &transitionStats)
+	metrics, err = collector.collect(context.Background(), profile, &transitionStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 	assert.Equal(t, int64(0), transitionStats.Metrics.Rows)
@@ -317,7 +318,7 @@ func TestTableCollector_Collect_TagOnlyTransitionInvalidatesStaleCache(t *testin
 	assert.False(t, cache.isConfigCached(profile.Definition.Metrics[0]))
 
 	var tagOnlyStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &tagOnlyStats)
+	metrics, err = collector.collect(context.Background(), profile, &tagOnlyStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 	assert.Equal(t, int64(0), tagOnlyStats.TableCache.Hits)
@@ -327,7 +328,7 @@ func TestTableCollector_Collect_TagOnlyTransitionInvalidatesStaleCache(t *testin
 }
 
 func TestTableCollector_Collect_PartialCachedResponseFallsBackAndPrunesRows(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -338,33 +339,33 @@ func TestTableCollector_Collect_PartialCachedResponseFallsBackAndPrunesRows(t *t
 		tagOID2    = "1.3.6.1.2.1.4.20.1.3.192.0.2.2"
 	)
 	profile := profileWithSameTableTag()
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createGauge32PDU(metricOID1, 17),
 		createGauge32PDU(metricOID2, 18),
 		createStringPDU(tagOID1, "255.255.255.0"),
 		createStringPDU(tagOID2, "255.255.255.0"),
 	})
-	expectSNMPGet(mockHandler, []string{metricOID1, metricOID2}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{metricOID1, metricOID2}, []gosnmp.VarBind{
 		createGauge32PDU(metricOID1, 19),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createGauge32PDU(metricOID1, 20),
 		createStringPDU(tagOID1, "255.255.255.128"),
 	})
-	expectSNMPGet(mockHandler, []string{metricOID1}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{metricOID1}, []gosnmp.VarBind{
 		createGauge32PDU(metricOID1, 21),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 
 	var transitionStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &transitionStats)
+	metrics, err = collector.collect(context.Background(), profile, &transitionStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.EqualValues(t, 20, metrics[0].Value)
@@ -383,7 +384,7 @@ func TestTableCollector_Collect_PartialCachedResponseFallsBackAndPrunesRows(t *t
 	assert.NotContains(t, cachedOIDs, "192.0.2.2")
 
 	var cachedStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &cachedStats)
+	metrics, err = collector.collect(context.Background(), profile, &cachedStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.EqualValues(t, 21, metrics[0].Value)
@@ -396,7 +397,7 @@ func TestTableCollector_Collect_PartialCachedResponseFallsBackAndPrunesRows(t *t
 }
 
 func TestTableCollector_Collect_EmptySourceFetchesCachedDependencyWhenItBecomesActive(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -407,24 +408,24 @@ func TestTableCollector_Collect_EmptySourceFetchesCachedDependencyWhenItBecomesA
 	)
 	profile := profileWithCrossTableOnlyTag()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyRowOID, "Power Supply 1"),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 110),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyRowOID, "Power Supply 1"),
 	})
-	expectSNMPGet(mockHandler, []string{sourceMetricOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{sourceMetricOID}, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 120),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var emptyStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &emptyStats)
+	metrics, err := collector.collect(context.Background(), profile, &emptyStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 	assert.Equal(t, int64(2), emptyStats.TableCache.Misses)
@@ -432,7 +433,7 @@ func TestTableCollector_Collect_EmptySourceFetchesCachedDependencyWhenItBecomesA
 	assert.True(t, cache.isConfigCached(profile.Definition.Metrics[1]))
 
 	var activeStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &activeStats)
+	metrics, err = collector.collect(context.Background(), profile, &activeStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Equal(t, map[string]string{"ent_descr": "Power Supply 1"}, metrics[0].Tags)
@@ -443,7 +444,7 @@ func TestTableCollector_Collect_EmptySourceFetchesCachedDependencyWhenItBecomesA
 	assert.Equal(t, int64(0), activeStats.SNMP.TablesCached)
 
 	var cachedStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &cachedStats)
+	metrics, err = collector.collect(context.Background(), profile, &cachedStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.EqualValues(t, 120, metrics[0].Value)
@@ -455,7 +456,7 @@ func TestTableCollector_Collect_EmptySourceFetchesCachedDependencyWhenItBecomesA
 }
 
 func TestTableCollector_Collect_EmptySourceKeepsCachedDependencyWithoutRewalking(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -464,21 +465,21 @@ func TestTableCollector_Collect_EmptySourceKeepsCachedDependencyWithoutRewalking
 	)
 	profile := profileWithCrossTableOnlyTag()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyOID+".1", "Power Supply 1"),
 	})
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, nil)
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 
 	var emptyStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &emptyStats)
+	metrics, err = collector.collect(context.Background(), profile, &emptyStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 	assert.Equal(t, int64(1), emptyStats.TableCache.Hits)
@@ -490,7 +491,7 @@ func TestTableCollector_Collect_EmptySourceKeepsCachedDependencyWithoutRewalking
 }
 
 func TestTableCollector_Collect_FailedOnDemandDependencyDoesNotCacheIncompleteTags(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -501,30 +502,30 @@ func TestTableCollector_Collect_FailedOnDemandDependencyDoesNotCacheIncompleteTa
 	)
 	profile := profileWithCrossTableOnlyTag()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyRowOID, "Power Supply 1"),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 110),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, dependencyOID, errors.New("timeout"))
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 120),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyRowOID, "Power Supply 1"),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 
 	var failedStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &failedStats)
+	metrics, err = collector.collect(context.Background(), profile, &failedStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Empty(t, metrics[0].Tags)
@@ -537,7 +538,7 @@ func TestTableCollector_Collect_FailedOnDemandDependencyDoesNotCacheIncompleteTa
 	assert.False(t, cache.isConfigCached(profile.Definition.Metrics[1]))
 
 	var recoveredStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &recoveredStats)
+	metrics, err = collector.collect(context.Background(), profile, &recoveredStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.EqualValues(t, 120, metrics[0].Value)
@@ -546,7 +547,7 @@ func TestTableCollector_Collect_FailedOnDemandDependencyDoesNotCacheIncompleteTa
 }
 
 func TestTableCollector_Collect_ColdFailedDependencyDoesNotCacheIncompleteTags(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -556,22 +557,22 @@ func TestTableCollector_Collect_ColdFailedDependencyDoesNotCacheIncompleteTags(t
 		dependencyRowOID = dependencyOID + ".1"
 	)
 	profile := profileWithCrossTableOnlyTag()
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 110),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, dependencyOID, errors.New("timeout"))
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 120),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyRowOID, "Power Supply 1"),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var failedStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &failedStats)
+	metrics, err := collector.collect(context.Background(), profile, &failedStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Empty(t, metrics[0].Tags)
@@ -583,7 +584,7 @@ func TestTableCollector_Collect_ColdFailedDependencyDoesNotCacheIncompleteTags(t
 	assert.False(t, cache.isConfigCached(profile.Definition.Metrics[1]))
 
 	var recoveredStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &recoveredStats)
+	metrics, err = collector.collect(context.Background(), profile, &recoveredStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.EqualValues(t, 120, metrics[0].Value)
@@ -597,7 +598,7 @@ func TestTableCollector_Collect_ColdFailedDependencyDoesNotCacheIncompleteTags(t
 }
 
 func TestTableCollector_Collect_OnDemandDependencyIsWalkedOncePerCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -617,27 +618,27 @@ func TestTableCollector_Collect_OnDemandDependencyIsWalkedOncePerCollection(t *t
 	}
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyOID+".1", "Power Supply 1"),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceTableOID+".1.1.1", 110),
 		createGauge32PDU(sourceTableOID+".1.2.1", 12),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyOID+".1", "Power Supply 1"),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 
 	var activeStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &activeStats)
+	metrics, err = collector.collect(context.Background(), profile, &activeStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 	for _, metric := range metrics {
@@ -650,7 +651,7 @@ func TestTableCollector_Collect_OnDemandDependencyIsWalkedOncePerCollection(t *t
 }
 
 func TestTableCollector_Collect_FreshSymbolDependencyIsAuthoritativeForAllConfigs(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -661,26 +662,26 @@ func TestTableCollector_Collect_FreshSymbolDependencyIsAuthoritativeForAllConfig
 	)
 	profile := profileWithSymbolBearingCrossTableTag()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 110),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 20),
 	})
 
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 
 	var activeStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &activeStats)
+	metrics, err = collector.collect(context.Background(), profile, &activeStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 	for _, metric := range metrics {
@@ -703,7 +704,7 @@ func TestTableCollector_Collect_FreshSymbolDependencyIsAuthoritativeForAllConfig
 }
 
 func TestTableCollector_Collect_DependencyRefreshSettlesReverseChainOnly(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -754,25 +755,25 @@ func TestTableCollector_Collect_DependencyRefreshSettlesReverseChainOnly(t *test
 		tableCOID: 30,
 		tableDOID: 40,
 	} {
-		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 			createGauge32PDU(metricOID(tableOID), value),
 		})
 	}
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 4)
 
-	expectSNMPGet(mockHandler, []string{metricOID(tableAOID)}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{metricOID(tableAOID)}, []gosnmp.VarBind{
 		createGauge32PDU(metricOID(tableAOID), 11),
 	})
-	expectSNMPGet(mockHandler, []string{metricOID(tableBOID)}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{metricOID(tableBOID)}, []gosnmp.VarBind{
 		createGauge32PDU(metricOID(tableBOID), 21),
 	})
 	expectSNMPGet(mockHandler, []string{metricOID(tableCOID)}, nil)
-	expectSNMPGet(mockHandler, []string{metricOID(tableDOID)}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{metricOID(tableDOID)}, []gosnmp.VarBind{
 		createGauge32PDU(metricOID(tableDOID), 41),
 	})
 	for tableOID, value := range map[string]uint{
@@ -780,13 +781,13 @@ func TestTableCollector_Collect_DependencyRefreshSettlesReverseChainOnly(t *test
 		tableBOID: 200,
 		tableCOID: 300,
 	} {
-		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 			createGauge32PDU(metricOID(tableOID), value),
 		})
 	}
 
 	var transitionStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &transitionStats)
+	metrics, err = collector.collect(context.Background(), profile, &transitionStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 4)
 	byName := make(map[string]ddsnmp.Metric, len(metrics))
@@ -808,7 +809,7 @@ func TestTableCollector_Collect_DependencyRefreshSettlesReverseChainOnly(t *test
 }
 
 func TestTableCollector_Collect_ResolvesWholeTableBeforeEmittingCachedConfigs(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -826,27 +827,27 @@ func TestTableCollector_Collect_ResolvesWholeTableBeforeEmittingCachedConfigs(t 
 			Symbols: []ddprofiledefinition.SymbolConfig{{OID: tableOID + ".1.16", Name: "ifOutOctets"}},
 		},
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createCounter32PDU(metricOID1, 10),
 		createCounter32PDU(metricOID2, 20),
 	})
-	expectSNMPGet(mockHandler, []string{metricOID1}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{metricOID1}, []gosnmp.VarBind{
 		createCounter32PDU(metricOID1, 11),
 	})
 	expectSNMPGet(mockHandler, []string{metricOID2}, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createCounter32PDU(metricOID1, 12),
 		createCounter32PDU(metricOID2, 22),
 	})
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 
 	var transitionStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &transitionStats)
+	metrics, err = collector.collect(context.Background(), profile, &transitionStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 	values := make(map[string]int64, len(metrics))
@@ -863,7 +864,7 @@ func TestTableCollector_Collect_ResolvesWholeTableBeforeEmittingCachedConfigs(t 
 }
 
 func TestTableCollector_Collect_FailedFallbackIsOneTableMiss(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -881,21 +882,21 @@ func TestTableCollector_Collect_FailedFallbackIsOneTableMiss(t *testing.T) {
 			Symbols: []ddprofiledefinition.SymbolConfig{{OID: tableOID + ".1.16", Name: "ifOutOctets"}},
 		},
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createCounter32PDU(metricOID1, 10),
 		createCounter32PDU(metricOID2, 20),
 	})
 	expectSNMPGet(mockHandler, []string{metricOID1}, nil)
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, tableOID, errors.New("fallback timeout"))
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 
 	var failedStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &failedStats)
+	metrics, err = collector.collect(context.Background(), profile, &failedStats)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "fallback timeout")
 	assert.Empty(t, metrics)
@@ -907,7 +908,7 @@ func TestTableCollector_Collect_FailedFallbackIsOneTableMiss(t *testing.T) {
 }
 
 func TestTableCollector_Collect_CachedAuxiliaryDoesNotMaskAllFailedSources(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -918,20 +919,20 @@ func TestTableCollector_Collect_CachedAuxiliaryDoesNotMaskAllFailedSources(t *te
 	profile := profileWithTwoSourcesAndAuxiliary()
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID1, nil)
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID2, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyOID+".1", "dependency"),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, sourceTableOID1, errors.New("source one timeout"))
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, sourceTableOID2, errors.New("source two timeout"))
 
-	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	var initialStats ddsnmp.CollectionStats
-	metrics, err := collector.collect(profile, &initialStats)
+	metrics, err := collector.collect(context.Background(), profile, &initialStats)
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
 
 	var failedStats ddsnmp.CollectionStats
-	metrics, err = collector.collect(profile, &failedStats)
+	metrics, err = collector.collect(context.Background(), profile, &failedStats)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "source one timeout")
 	assert.ErrorContains(t, err, "source two timeout")

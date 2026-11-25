@@ -50,6 +50,26 @@ static bool status_file_io_check(const char *directory, const char *filename, ch
     return true;
 }
 
+static void status_file_io_unlink(const char *directory, const char *filename) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    if(!directory || !*directory)
+        return;
+
+    char dst[FILENAME_MAX];
+    if(strlen(directory) + 1 + strlen(filename) >= sizeof(dst))
+        return; // never unlink a truncated path
+
+    size_t len = 0;
+    len = strcatz(dst, len, directory, sizeof(dst));
+    if(!len || dst[len - 1] != '/')
+        len = strcatz(dst, len, "/", sizeof(dst));
+    len = strcatz(dst, len, filename, sizeof(dst));
+
+    unlink(dst);
+}
+
 static void status_file_io_remove_obsolete(const char *protected_dir, const char *filename) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -57,21 +77,22 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
     if(__atomic_exchange_n(&status_file_io_obsolete_removed, true, __ATOMIC_RELAXED))
         return;
 
-    char dst[FILENAME_MAX];
-
     status_file_io_fallback_dirs_update();
     for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
-        if(strcmp(status_file_io_fallback_dirs[i], protected_dir) == 0)
-            continue;
-
-        size_t len = 0;
-        len = strcatz(dst, len, status_file_io_fallback_dirs[i], sizeof(dst));
-        if(!len || dst[len - 1] != '/')
-            len = strcatz(dst, len, "/", sizeof(dst));
-        len = strcatz(dst, len, filename, sizeof(dst));
-
-        unlink(dst);
+        if(strcmp(status_file_io_fallback_dirs[i], protected_dir) != 0)
+            status_file_io_unlink(status_file_io_fallback_dirs[i], filename);
     }
+
+    errno_clear();
+}
+
+void status_file_io_remove(const char *filename) {
+    // Removes empty copies too: the loader skips them, a power loss can leave them.
+    status_file_io_unlink(netdata_configured_varlib_dir, filename);
+
+    status_file_io_fallback_dirs_update();
+    for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++)
+        status_file_io_unlink(status_file_io_fallback_dirs[i], filename);
 
     errno_clear();
 }
@@ -109,7 +130,7 @@ bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     return false;
 }
 
-static bool status_file_io_save_this(const char *directory, const char *filename, const uint8_t *data, size_t size) {
+static bool status_file_io_save_this(const char *directory, const char *filename, const uint8_t *data, size_t size, bool sync_file) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -199,7 +220,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Fsync to ensure data is written to disk */
-    if (fsync(fd) == -1) {
+    if (sync_file && fsync(fd) == -1) {
         close(fd);
         unlink(temp);
         return false;
@@ -227,7 +248,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     return true;
 }
 
-bool status_file_io_save(const char *filename, const void *data, size_t size, bool log) {
+bool status_file_io_save(const char *filename, const void *data, size_t size, bool log, bool sync_file) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
@@ -235,7 +256,7 @@ bool status_file_io_save(const char *filename, const void *data, size_t size, bo
 
     // Try primary directory first
     bool saved = false;
-    if (status_file_io_save_this(netdata_configured_varlib_dir, filename, data, size)) {
+    if (status_file_io_save_this(netdata_configured_varlib_dir, filename, data, size, sync_file)) {
         status_file_io_remove_obsolete(netdata_configured_varlib_dir, filename);
         saved = true;
     }
@@ -247,7 +268,7 @@ bool status_file_io_save(const char *filename, const void *data, size_t size, bo
         // Try each fallback directory until successful
         status_file_io_fallback_dirs_update();
         for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
-            if (status_file_io_save_this(status_file_io_fallback_dirs[i], filename, data, size)) {
+            if (status_file_io_save_this(status_file_io_fallback_dirs[i], filename, data, size, sync_file)) {
                 if(log)
                     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Saved status file in fallback %s", status_file_io_fallback_dirs[i]);
 

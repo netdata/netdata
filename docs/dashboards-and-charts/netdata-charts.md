@@ -1,6 +1,6 @@
 # Netdata Charts
 
-Netdata charts provide **real-time, per-second metrics** to help you troubleshoot and explore your infrastructure with high-resolution insights.
+Netdata charts provide **real-time, per-second metrics** to help you troubleshoot and explore your systems and applications with high-resolution insights.
 
 ## What Makes Netdata Charts Special
 
@@ -464,4 +464,4 @@ Adjust the height of a chart to fit your analysis needs:
 
 This allows you to expand charts for more detailed analysis or condense them for a broader dashboard view.
 
-*Netdata charts combine clarity, flexibility, and interactivity, designed to help you focus on what matters most in your infrastructure.*
+*Netdata charts combine clarity, flexibility, and interactivity, designed to help you focus on what matters most in your stack.*

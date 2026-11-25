@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -20,8 +20,8 @@ import (
 
 var errNoTextDateValue = errors.New("text_date: no timestamp value")
 
-func getMetricTypeFromPDUType(pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
-	switch pdu.Type {
+func getMetricTypeFromPDUType(pdu gosnmp.VarBind) ddprofiledefinition.ProfileMetricType {
+	switch pdu.Value.Type() {
 	case gosnmp.Counter32, gosnmp.Counter64:
 		// Counters are submitted as rates by default
 		return ddprofiledefinition.ProfileMetricTypeRate
@@ -31,22 +31,19 @@ func getMetricTypeFromPDUType(pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMet
 	case gosnmp.TimeTicks:
 		// TimeTicks (hundredths of a second) are typically static or slow changing values
 		return ddprofiledefinition.ProfileMetricTypeGauge
-	case gosnmp.IPAddress, gosnmp.OctetString, gosnmp.ObjectIdentifier, gosnmp.BitString:
+	case gosnmp.IPAddress, gosnmp.OctetString, gosnmp.ObjectIdentifier:
 		// String-like types typically get converted to a numeric value to represent presence (1)
 		// or some extraction of numeric info from the string
-		return ddprofiledefinition.ProfileMetricTypeGauge
-	case gosnmp.Boolean:
-		// Boolean values (true/false) fit naturally as gauges (1/0)
 		return ddprofiledefinition.ProfileMetricTypeGauge
 	default:
 		return ddprofiledefinition.ProfileMetricTypeGauge
 	}
 }
 
-func convPhysAddressToString(pdu gosnmp.SnmpPDU) (string, error) {
-	address, ok := pdu.Value.([]uint8)
+func convPhysAddressToString(pdu gosnmp.VarBind) (string, error) {
+	address, ok := pdu.Value.Bytes()
 	if !ok {
-		return "", fmt.Errorf("physAddress is not a []uint8 or []byte but %T", pdu.Value)
+		return "", fmt.Errorf("physAddress is not an OctetString but %v", pdu.Value.Type())
 	}
 
 	parts := make([]string, 0, len(address))
@@ -56,7 +53,7 @@ func convPhysAddressToString(pdu gosnmp.SnmpPDU) (string, error) {
 	return strings.Join(parts, ":"), nil
 }
 
-func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
+func convPduToStringf(pdu gosnmp.VarBind, format string) (string, error) {
 	switch format {
 	case "mac_address":
 		return convPhysAddressToString(pdu)
@@ -70,9 +67,9 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 		return strconv.FormatInt(value, 10), nil
 	case "hex":
 		// Convert any value to hex string
-		bs, ok := pdu.Value.([]byte)
+		bs, ok := pdu.Value.Bytes()
 		if !ok {
-			return "", fmt.Errorf("cannot convert %T to hex", pdu.Value)
+			return "", fmt.Errorf("cannot convert %v to hex", pdu.Value.Type())
 		}
 		return hex.EncodeToString(bs), nil
 	case "snmp_dateandtime":
@@ -105,23 +102,17 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 	}
 }
 
-func isEmptyOctetStringPDU(pdu gosnmp.SnmpPDU) bool {
-	switch v := pdu.Value.(type) {
-	case []byte:
-		return len(v) == 0
-	case string:
-		return v == ""
-	default:
-		return false
-	}
+func isEmptyOctetStringPDU(pdu gosnmp.VarBind) bool {
+	bs, ok := pdu.Value.Bytes()
+	return ok && len(bs) == 0
 }
 
-func convNumericPduToInt64f(pdu gosnmp.SnmpPDU, format string) (int64, error) {
+func convNumericPduToInt64f(pdu gosnmp.VarBind, format string) (int64, error) {
 	if !isPduNumericType(pdu) {
-		return 0, fmt.Errorf("cannot convert %T to numeric value", pdu.Value)
+		return 0, fmt.Errorf("cannot convert %v to numeric value", pdu.Value.Type())
 	}
 
-	value := gosnmp.ToBigInt(pdu.Value).Int64()
+	value := pduInt64(pdu.Value)
 
 	switch format {
 	case "uint32":
@@ -133,16 +124,23 @@ func convNumericPduToInt64f(pdu gosnmp.SnmpPDU, format string) (int64, error) {
 	return value, nil
 }
 
-func convPduToDateAndTimeUnix(pdu gosnmp.SnmpPDU) (int64, error) {
-	var bs []byte
+// pduInt64 reads an integer value as int64: a Counter64 above 2^63-1 keeps its
+// low 64 bits, and the Opaque floats, which the metric path reads itself
+// (valueProcessor), read 0, as the untyped integer conversion did.
+func pduInt64(v gosnmp.Value) int64 {
+	if n, ok := v.Int64(); ok {
+		return n
+	}
+	if n, ok := v.Uint64(); ok {
+		return int64(n)
+	}
+	return 0
+}
 
-	switch v := pdu.Value.(type) {
-	case []byte:
-		bs = v
-	case string:
-		bs = []byte(v)
-	default:
-		return 0, fmt.Errorf("cannot convert %T to SNMP DateAndTime", pdu.Value)
+func convPduToDateAndTimeUnix(pdu gosnmp.VarBind) (int64, error) {
+	bs, ok := pdu.Value.Bytes()
+	if !ok {
+		return 0, fmt.Errorf("cannot convert %v to SNMP DateAndTime", pdu.Value.Type())
 	}
 
 	if len(bs) != 8 && len(bs) != 11 {
@@ -193,67 +191,39 @@ func convPduToDateAndTimeUnix(pdu gosnmp.SnmpPDU) (int64, error) {
 	return tm.Unix(), nil
 }
 
-func convPduToString(pdu gosnmp.SnmpPDU) (string, error) {
-	switch pdu.Type {
+func convPduToString(pdu gosnmp.VarBind) (string, error) {
+	switch pdu.Value.Type() {
 	case gosnmp.NoSuchObject, gosnmp.NoSuchInstance, gosnmp.Null:
-		return "", fmt.Errorf("object not available: %v", pdu.Type)
+		return "", fmt.Errorf("object not available: %v", pdu.Value.Type())
 	case gosnmp.OctetString:
-		var bs []byte
-		switch v := pdu.Value.(type) {
-		case []byte:
-			bs = v
-		case string:
-			return v, nil
-		default:
-			return "", fmt.Errorf("OctetString has unexpected type %T", pdu.Value)
-		}
-
+		bs, _ := pdu.Value.Bytes()
 		if utf8.Valid(bs) {
 			return strings.ToValidUTF8(string(bs), "�"), nil
 		}
 		return hex.EncodeToString(bs), nil
-	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32, gosnmp.Uinteger32, gosnmp.TimeTicks:
-		return gosnmp.ToBigInt(pdu.Value).String(), nil
+	case gosnmp.Counter32, gosnmp.Integer, gosnmp.Gauge32, gosnmp.Uinteger32, gosnmp.TimeTicks:
+		v, _ := pdu.Value.Int64()
+		return strconv.FormatInt(v, 10), nil
+	case gosnmp.Counter64:
+		v, _ := pdu.Value.Uint64()
+		return strconv.FormatUint(v, 10), nil
 	case gosnmp.IPAddress:
-		switch v := pdu.Value.(type) {
-		case []byte:
-			if len(v) == 4 {
-				return fmt.Sprintf("%d.%d.%d.%d", v[0], v[1], v[2], v[3]), nil
-			} else if len(v) == 16 {
-				parts := make([]string, 0, 8)
-				for i := 0; i < 16; i += 2 {
-					parts = append(parts, fmt.Sprintf("%02x%02x", v[i], v[i+1]))
-				}
-				return strings.Join(parts, ":"), nil
-			}
-			return hex.EncodeToString(v), nil
-		case string:
-			return v, nil
-		default:
-			return "", fmt.Errorf("IPAddress has unexpected type %T", pdu.Value)
+		ip, _ := pdu.Value.IP()
+		if !ip.IsValid() {
+			// An empty IpAddress, which some devices send.
+			return "", errors.New("IPAddress has unexpected type <nil>")
 		}
+		return ip.String(), nil
 	case gosnmp.ObjectIdentifier:
-		v, ok := pdu.Value.(string)
-		if !ok {
-			return "", fmt.Errorf("ObjectIdentifier is not a string but %T", pdu.Value)
-		}
+		v, _ := pdu.Value.OID()
 		return strings.TrimPrefix(v, "."), nil
-	case gosnmp.Boolean:
-		b, ok := pdu.Value.(bool)
-		if !ok {
-			return "", fmt.Errorf("boolean is not a bool but %T", pdu.Value)
-		}
-		if b {
-			return "true", nil
-		}
-		return "false", nil
 	default:
-		return fmt.Sprintf("%v", pdu.Value), nil
+		return pdu.Value.String(), nil
 	}
 }
 
-func isPduWithData(pdu gosnmp.SnmpPDU) bool {
-	switch pdu.Type {
+func isPduWithData(pdu gosnmp.VarBind) bool {
+	switch pdu.Value.Type() {
 	case gosnmp.NoSuchObject,
 		gosnmp.NoSuchInstance,
 		gosnmp.Null,
@@ -264,8 +234,8 @@ func isPduWithData(pdu gosnmp.SnmpPDU) bool {
 	}
 }
 
-func isPduNumericType(pdu gosnmp.SnmpPDU) bool {
-	switch pdu.Type {
+func isPduNumericType(pdu gosnmp.VarBind) bool {
+	switch pdu.Value.Type() {
 	case gosnmp.Counter32,
 		gosnmp.Counter64,
 		gosnmp.Integer,

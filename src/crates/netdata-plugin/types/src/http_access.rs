@@ -30,9 +30,7 @@
 //!   mask, http-access.c) and for the view/edit words of the CONFIG line.
 //! - serde/JSON: serializes as the raw u32 bit pattern (a decimal number)
 //!   and deserializes dropping unknown bits — the form
-//!   FunctionDeclaration/FunctionCall carry through serde; the
-//!   configDeclaration viewAccess/editAccess members are decimal u32 numbers
-//!   too, written by netdata-plugin-schema and read back by types::config.
+//!   FunctionDeclaration/FunctionCall carry through serde.
 //!
 //! Parsing is lax, mirroring the agent's strtoull-based helpers:
 //! [`HttpAccess::from_slice`] accepts hex (with or without `0x`) and the
@@ -170,9 +168,7 @@ impl HttpAccess {
     }
 
     /// Build from raw bits, dropping undefined bits (`from_bits_truncate`).
-    /// Used for the configDeclaration viewAccess/editAccess values
-    /// (types::config, netdata-plugin-schema) and `FunctionDeclaration::new`'s
-    /// empty default.
+    /// Used for `FunctionDeclaration::new`'s empty default.
     pub fn from_u32(value: u32) -> Self {
         Self::from_bits_truncate(value & Self::ALL.bits())
     }
@@ -186,8 +182,7 @@ impl From<u32> for HttpAccess {
     }
 }
 
-/// The raw bit pattern — what netdata-plugin-schema writes into the
-/// configDeclaration viewAccess/editAccess JSON members.
+/// The raw bit pattern.
 impl From<HttpAccess> for u32 {
     fn from(access: HttpAccess) -> Self {
         access.bits()

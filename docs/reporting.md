@@ -1,6 +1,6 @@
 # Reporting
 
-Extract infrastructure insights for stakeholders, leadership, and external tools. Netdata provides four ways to create reports—from asking a simple question to exporting raw metrics into your existing business intelligence stack.
+Turn observability data into insights for stakeholders, leadership, and external tools. Netdata provides four ways to create reports—from asking a plain-language question to exporting raw metrics into your existing business intelligence stack.
 
 ## Methods overview
 
@@ -13,7 +13,7 @@ Extract infrastructure insights for stakeholders, leadership, and external tools
 
 ## AI Insights
 
-Ask Netdata anything about your infrastructure in plain language and receive an executive-ready report. No configuration required—just describe what you need.
+Ask Netdata anything about your systems and applications in plain language and receive an executive-ready report. No configuration required—just describe what you need.
 
 ### When to use it
 
@@ -45,7 +45,7 @@ Scheduled reports run automatically and deliver results to your email and the In
 
 ### Example prompts
 
-**Weekly infrastructure health:**
+**Weekly health report:**
 ```
 Generate a weekly infrastructure summary for services A, B, and C.
 Include major incidents, anomalies, capacity risks, and recommended follow-ups.
@@ -72,14 +72,14 @@ factors, and remediation recommendations.
 
 ## AI Assistants (MCP)
 
-Connect your AI assistant directly to Netdata using the Model Context Protocol (MCP). Ask questions in natural language and receive answers based on live infrastructure data.
+Connect your AI assistant directly to Netdata using the Model Context Protocol (MCP). Ask questions in natural language and receive answers based on live observability data.
 
 MCP is available in two ways:
 
-- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (Paid plan)
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — access to all your nodes (Paid plan)
 - **Agent/Parent MCP** on every Netdata Agent and Parent (v2.6.0+) — direct local access (free, open-source)
 
-AI assistants can query metrics, alerts, logs, and live system information across your entire infrastructure.
+AI assistants can query metrics, alerts, logs, and live system information across all your nodes.
 
 ### Supported AI clients
 
@@ -117,16 +117,16 @@ Once connected, ask natural language questions:
 
 ### Availability
 
-- **Cloud MCP**: Available on Paid plans — infrastructure-wide access, zero local setup
+- **Cloud MCP**: Available on Paid plans — access to all your nodes, zero local setup
 - **Agent/Parent MCP**: Available on all plans (v2.6.0+) — free, open-source, direct local access
-- Unlimited queries with no per-query charges
+- No per-query charges
 - Requires API key (Cloud token or local API key) for access
 
 See [Netdata MCP](/docs/netdata-ai/mcp/README.md) for detailed setup instructions.
 
 ## Grafana integration
 
-Connect Grafana to Netdata Cloud for infrastructure-wide dashboards. Use Grafana's visualization capabilities with Netdata's real-time metrics.
+Connect Grafana to Netdata Cloud for dashboards across all your nodes. Use Grafana's visualization capabilities with Netdata's real-time metrics.
 
 ### When to use it
 
@@ -154,7 +154,7 @@ Generate API tokens from Netdata Cloud under **User Settings** → **API Tokens*
 
 ## Export to business intelligence tools
 
-Export metrics from Netdata to external databases and business intelligence platforms. You can query data from individual Agents or use Netdata Cloud to aggregate metrics from your entire infrastructure.
+Export metrics from Netdata to external databases and business intelligence platforms. You can query data from individual Agents or use Netdata Cloud to aggregate metrics from all your nodes.
 
 ### Supported BI platforms
 
@@ -176,7 +176,7 @@ Netdata integrates with popular business intelligence tools through several path
 
 #### Netdata Cloud API (recommended)
 
-The Netdata Cloud API lets you query metrics from all your nodes through a single endpoint. This is the simplest approach for multi-node infrastructure.
+The Netdata Cloud API lets you query metrics from all your nodes through a single endpoint. This is the most direct approach for many nodes.
 
 1. Generate an API token from **User Settings** → **API Tokens**
 2. Use the token to authenticate requests to `https://app.netdata.cloud/api/v2/data`
@@ -193,7 +193,7 @@ curl -H 'Accept: application/json' \
      'https://app.netdata.cloud/api/v2/nodes'
 ```
 
-The Cloud API returns aggregated data from all nodes in your infrastructure, making it ideal for BI tools that need a unified view.
+The Cloud API returns aggregated data from all your nodes, making it ideal for BI tools that need a unified view.
 
 #### Prometheus endpoint (single-node)
 

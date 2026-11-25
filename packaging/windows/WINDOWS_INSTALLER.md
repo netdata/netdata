@@ -1,6 +1,6 @@
 # Install Netdata on Windows
 
-Netdata provides a simple Windows installer for quick setup.
+Netdata provides a native Windows installer (MSI).
 
 ## Supported Windows Versions and Requirements
 

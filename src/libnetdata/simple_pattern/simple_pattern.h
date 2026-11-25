@@ -48,6 +48,7 @@ void simple_pattern_free(SIMPLE_PATTERN *list);
 void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
 int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 char *simple_pattern_iterate(SIMPLE_PATTERN **p);
+size_t simple_pattern_exact_entries(SIMPLE_PATTERN *p, size_t max_len);
 
 // check if string contains pattern wildcards (*, ! prefix, or separators)
 bool simple_pattern_contains_wildcards(const char *str, const char *separators);

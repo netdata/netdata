@@ -5,7 +5,7 @@ package snmpsd
 import (
 	"fmt"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
@@ -126,25 +126,20 @@ func (c *Config) validateAndParse() ([]subnet, error) {
 	return subnets, nil
 }
 
-func setCredential(client gosnmp.Handler, cred CredentialConfig) {
-	switch snmputils.ParseSNMPVersion(cred.Version) {
-	case gosnmp.Version1:
-		client.SetVersion(gosnmp.Version1)
-		client.SetCommunity(cred.Community)
-	case gosnmp.Version2c:
-		client.SetVersion(gosnmp.Version2c)
-		client.SetCommunity(cred.Community)
+func setCredential(cfg *gosnmp.Config, cred CredentialConfig) {
+	switch ver := snmputils.ParseSNMPVersion(cred.Version); ver {
+	case gosnmp.Version1, gosnmp.Version2c:
+		cfg.Version, cfg.Community = ver, cred.Community
 	case gosnmp.Version3:
-		client.SetVersion(gosnmp.Version3)
-		client.SetSecurityModel(gosnmp.UserSecurityModel)
-		client.SetMsgFlags(snmputils.ParseSNMPv3SecurityLevel(cred.SecurityLevel))
-		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
-			UserName:                 cred.UserName,
-			AuthenticationProtocol:   snmputils.ParseSNMPv3AuthProtocol(cred.AuthProtocol),
-			AuthenticationPassphrase: cred.AuthPassphrase,
-			PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(cred.PrivacyProtocol),
-			PrivacyPassphrase:        cred.PrivacyPassphrase,
-		})
-		client.SetContextName(cred.ContextName)
+		cfg.Version = gosnmp.Version3
+		cfg.SecurityLevel = snmputils.ParseSNMPv3SecurityLevel(cred.SecurityLevel)
+		cfg.User = gosnmp.User{
+			Name:           cred.UserName,
+			AuthProtocol:   snmputils.ParseSNMPv3AuthProtocol(cred.AuthProtocol),
+			AuthPassphrase: cred.AuthPassphrase,
+			PrivProtocol:   snmputils.ParseSNMPv3PrivProtocol(cred.PrivacyProtocol),
+			PrivPassphrase: cred.PrivacyPassphrase,
+		}
+		cfg.ContextName = cred.ContextName
 	}
 }

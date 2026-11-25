@@ -11,9 +11,8 @@
 //!
 //! The engine is protocol-agnostic. Its drivers are the run loops that receive
 //! function calls: the `otel-ledger` worker (`LedgerRequest::Call`, dispatched
-//! in its `rpc::dispatch`), the `otel-legacy-logs` worker
-//! (`LegacyLogsRequest::Call`, dispatched in its own run loop) and the
-//! `otel-ingestor` worker (through the shared [`crate::driver::CallDriver`]).
+//! in its `rpc::dispatch`) and the `otel-ingestor` worker (through the shared
+//! [`crate::driver::CallDriver`]).
 //! Each builds a
 //! [`FunctionContext`] per call with the transaction id, a fresh
 //! [`CancellationToken`], and a per-call `mpsc::UnboundedSender<Message>` the
@@ -202,7 +201,7 @@ impl FunctionCallContext {
 
 /// Per-call input the driver hands to [`RawFunctionHandler::handle_raw`],
 /// built by the run loops that receive function calls (the ledger's
-/// `rpc::dispatch`, the legacy-logs worker's dispatcher).
+/// `rpc::dispatch`, the ingestor's `CallDriver`).
 pub struct FunctionContext {
     /// The routed call; `timeout` is not enforced by the engine (see
     /// [`RawFunctionHandler::handle_raw`]).

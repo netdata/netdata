@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -38,7 +38,7 @@ func isMissingOID(client snmputils.ScalarClient, missing map[string]bool, oid st
 	return missing[oid]
 }
 
-func (c *diagnosticClient) recordMissing(pdu gosnmp.SnmpPDU) {
+func (c *diagnosticClient) recordMissing(pdu gosnmp.VarBind) {
 	source := c.SourceRecorder()
 	if source == nil || c.negative == nil {
 		return
@@ -59,7 +59,7 @@ func (c *diagnosticClient) recordMissing(pdu gosnmp.SnmpPDU) {
 	}
 	c.negative.causes[oid] = AcquisitionNegativeCause{
 		ContextID: operation.ContextID, Operation: operation.Ordinal, ObservedAt: operation.StartedAt,
-		PDU: ddsnmp.SourcePDU{OID: strings.Clone(pdu.Name), Type: uint8(pdu.Type), Value: sourceValue(pdu.Value)},
+		PDU: ddsnmp.SourcePDU{OID: strings.Clone(pdu.Name), Type: uint8(pdu.Value.Type()), Value: sourceValue(pdu.Value)},
 	}
 }
 

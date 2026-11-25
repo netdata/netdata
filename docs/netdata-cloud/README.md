@@ -4,7 +4,7 @@ Netdata Cloud is a powerful service that transforms your standalone Netdata Agen
 
 :::info
 
-By serving as a lightweight control plane, Netdata Cloud provides you with:
+By serving as a control plane that is not in the data path, Netdata Cloud provides you with:
 
 - **Seamless coordination** across multiple teams and environments
 - **Unified visibility** across cloud providers and data centers
@@ -20,7 +20,7 @@ By serving as a lightweight control plane, Netdata Cloud provides you with:
 flowchart TB
    NC("**Netdata Cloud**<br/>Horizontal scalability<br/>Role based access<br/>Access from anywhere<br/>Central dispatch of<br/>Alert notifications<br/>Custom Dashboards<br/>Advanced customization")
 
-Users("**Unified Dashboards**<br/>across the infrastructure,<br/>multi-cloud, hybrid-cloud")
+Users("**Unified Dashboards**<br/>across the stack,<br/>multi-cloud, hybrid-cloud")
 
 Notifications("**Alert Notifications**<br/>Slack, e-mail,<br/> Mobile App,<br/>PagerDuty, and more")
 
@@ -60,7 +60,7 @@ Netdata Cloud provides you with the following features, on top of what the Agent
 
 | Feature                                                                                                                 | Description                                                                                                                                                                                                                                                               |
 |:------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Horizontal Scalability**                                                                                              | • Scale your observability infrastructure effortlessly<br/>• Add [Parents and Children](/docs/deployment-guides/deployment-with-centralization-points.md) as needed<br/>• Manage all nodes from a single [Space](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md) |
+| **Horizontal Scalability**                                                                                              | • Scale from one node to 100,000+ nodes<br/>• Add [Parents and Children](/docs/deployment-guides/deployment-with-centralization-points.md) as needed<br/>• Manage all nodes from a single [Space](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md) |
 | [**Role-Based Access Control (RBAC)**](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) | • Fine-grained access management<br/>• Control team member privileges across your Space<br/>• Secure, role-appropriate access to monitoring data                                                                                                                          |
 | **Global Remote Access**                                                                                                | • Access your monitoring from anywhere<br/>• No VPN configuration required<br/>• Secure access to local dashboards while data stays on premises                                                                                                                           |
 | **Centralized Alert Management**                                                                                        | • Unified alert dispatch from a central location<br/>• Cloud-specific alerts and monitoring<br/>• Mobile push notifications via [Netdata Mobile App](/integrations/cloud-notifications/integrations/netdata_mobile_app.md) (paid plans)                                   |

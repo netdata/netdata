@@ -863,8 +863,18 @@ size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2)
     RRDLABEL *label;
     RRDLABEL_SRC ls;
 
-    spinlock_lock(&labels1->spinlock);
-    spinlock_lock(&labels2->spinlock);
+    // The same two label sets reach here in opposite order from different threads: health
+    // evaluating an alert on chart A passes (A, chart B a variable resolved on), while
+    // /api/v1/alarm_variables for chart A passes (B, A) for each alert on B it lists.
+    // Take the locks in address order to avoid an AB/BA deadlock.
+    RRDLABELS *first = labels1, *second = labels2;
+    if ((uintptr_t)first > (uintptr_t)second) {
+        first = labels2;
+        second = labels1;
+    }
+
+    spinlock_lock(&first->spinlock);
+    spinlock_lock(&second->spinlock);
 
     size_t count = 0;
     lfe_start_nolock(labels2, label, ls)
@@ -875,8 +885,8 @@ size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2)
     }
     lfe_done_nolock();
 
-    spinlock_unlock(&labels2->spinlock);
-    spinlock_unlock(&labels1->spinlock);
+    spinlock_unlock(&second->spinlock);
+    spinlock_unlock(&first->spinlock);
     return count;
 }
 
@@ -2321,6 +2331,113 @@ static int rrdlabels_unittest_subset(void) {
 #undef UT_EXPECT
 }
 
+// Two threads compare the same two label sets with the arguments swapped, as HEALTH and
+// /api/v1/alarm_variables do for an alert on one chart that references another.
+struct rrdlabels_unittest_common_count_thread {
+    RRDLABELS *labels1;
+    RRDLABELS *labels2;
+    bool stop;
+    bool finished;
+    size_t iterations;
+    size_t wrong;
+};
+
+static void rrdlabels_unittest_common_count_worker(void *ptr) {
+    struct rrdlabels_unittest_common_count_thread *t = ptr;
+    while(!__atomic_load_n(&t->stop, __ATOMIC_RELAXED)) {
+        if(rrdlabels_common_count(t->labels1, t->labels2) != 1)
+            t->wrong++;
+        __atomic_add_fetch(&t->iterations, 1, __ATOMIC_RELAXED);
+    }
+    __atomic_store_n(&t->finished, true, __ATOMIC_RELEASE);
+}
+
+static bool rrdlabels_unittest_common_count_all(struct rrdlabels_unittest_common_count_thread *t, size_t n, bool finished) {
+    for(size_t i = 0; i < n; i++) {
+        if(finished ? !__atomic_load_n(&t[i].finished, __ATOMIC_ACQUIRE)
+                    : !__atomic_load_n(&t[i].iterations, __ATOMIC_RELAXED))
+            return false;
+    }
+    return true;
+}
+
+static int rrdlabels_unittest_common_count_lock_order(void) {
+    int errors = 0;
+    RRDLABELS *a = rrdlabels_create();
+    RRDLABELS *b = rrdlabels_create();
+    rrdlabels_add(a, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(a, "k2", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(a, "k3", "v3", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(b, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(b, "k2", "other", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(b, "k4", "v4", RRDLABEL_SRC_CONFIG);
+
+    struct rrdlabels_unittest_common_count_thread t[2] = {
+        { .labels1 = a, .labels2 = b },
+        { .labels1 = b, .labels2 = a },
+    };
+    ND_THREAD *threads[2] = { NULL, NULL };
+    size_t started = 0;
+    for(; started < 2; started++) {
+        threads[started] = nd_thread_create("LBLORDER", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_MANUAL_JOIN,
+                                            rrdlabels_unittest_common_count_worker, &t[started]);
+        if(!threads[started])
+            break;
+    }
+
+    if(started == 2) {
+        // wait until both workers are comparing, then let them race
+        for(size_t waited = 0; waited < 1000 && !rrdlabels_unittest_common_count_all(t, 2, false); waited++)
+            sleep_usec(10 * USEC_PER_MS);
+
+        if(rrdlabels_unittest_common_count_all(t, 2, false))
+            sleep_usec(3 * USEC_PER_SEC);
+        else {
+            fprintf(stderr, "rrdlabels common count: the test threads did not start comparing\n");
+            errors++;
+        }
+    }
+    else {
+        fprintf(stderr, "rrdlabels common count: cannot create the test threads\n");
+        errors++;
+    }
+
+    for(size_t i = 0; i < started; i++)
+        __atomic_store_n(&t[i].stop, true, __ATOMIC_RELAXED);
+
+    // a worker stuck on its second lock never sees stop
+    for(size_t waited = 0; waited < 1000 && !rrdlabels_unittest_common_count_all(t, started, true); waited++)
+        sleep_usec(10 * USEC_PER_MS);
+
+    if(!rrdlabels_unittest_common_count_all(t, started, true)) {
+        // The workers spin on the label locks forever, so nothing can be freed or joined, and
+        // a normal return would free the label ARAL under them. Exit at once.
+        fprintf(stderr, "rrdlabels common count: test threads did not stop within 10 seconds "
+                        "(deadlock with swapped arguments?)\n");
+        fflush(stderr);
+        _exit(1);
+    }
+
+    for(size_t i = 0; i < started; i++) {
+        if(nd_thread_join(threads[i]) != 0) {
+            fprintf(stderr, "rrdlabels common count: cannot join test thread %zu\n", i);
+            errors++;
+        }
+        if(!t[i].iterations) {
+            fprintf(stderr, "rrdlabels common count: test thread %zu never ran\n", i);
+            errors++;
+        }
+        if(t[i].wrong) {
+            fprintf(stderr, "rrdlabels common count: %zu wrong results\n", t[i].wrong);
+            errors++;
+        }
+    }
+
+    rrdlabels_destroy(a);
+    rrdlabels_destroy(b);
+    return errors;
+}
+
 int rrdlabels_unittest(void) {
     int errors = 0;
 
@@ -2335,6 +2452,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_change_detection();
     errors += rrdlabels_unittest_subset();
     errors += rrdlabels_unittest_pattern_check();
+    errors += rrdlabels_unittest_common_count_lock_order();
 
     fprintf(stderr, "%d errors found\n", errors);
 

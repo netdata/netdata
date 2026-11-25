@@ -202,7 +202,7 @@ remote_storage:
   [Monitor the OpenTelemetry plugin](/docs/opentelemetry/otlp-ingestion.md#monitor-the-opentelemetry-plugin).
 - The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
   rules, such as an S3 lifecycle expiration rule.
-- This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
+- This is how to keep long retention on low-cost storage: keep days locally with a small `max_age`, keep months or years in object
   storage, and query both from the same Logs tab.
 - Earlier versions kept a logs-only cache at `<base_dir>/logs/remote-read`. With offloading enabled, the Agent moves it
   to `<base_dir>/remote-read` at startup. If `<base_dir>/remote-read` already exists, or the move fails (for example,

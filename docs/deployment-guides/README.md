@@ -6,8 +6,8 @@ Get Netdata up and running in your infrastructure. Choose a deployment method th
 
 :::tip Getting Started
 
-- **Testing Netdata?** → [Docker deployment](/packaging/docker/README.md) (2 minutes, easy cleanup)
-- **Monitoring one server?** → [Standalone installation](/docs/deployment-guides/standalone-deployment.md) (1 minute, upgradeable)
+- **Evaluating Netdata?** → [Docker deployment](/packaging/docker/README.md) (2 minutes)
+- **Starting with one system?** → [Standalone installation](/docs/deployment-guides/standalone-deployment.md) (1 minute, upgradeable)
 - **Production ready?** → [Parent-Child setup](/docs/deployment-guides/deployment-with-centralization-points.md) (recommended)
 
 :::
@@ -16,9 +16,9 @@ Get Netdata up and running in your infrastructure. Choose a deployment method th
 
 ### Standalone
 
-Single Netdata Agent monitoring one system. Perfect for getting started or monitoring individual servers.
+A Netdata Agent that collects, stores, alerts and serves dashboards on its own, with or without a Parent. Every Agent is a complete observability node.
 
-**Best for:** Testing or simple single-server monitoring
+**Best for:** Evaluation, single systems, isolated sites, or any node that must keep working on its own
 
 **Setup time:** < 1 minute
 
@@ -60,8 +60,8 @@ Run Netdata in containers for quick testing. Note: Some features are limited com
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
 | **Production servers**  | [Parent-Child](/docs/deployment-guides/deployment-with-centralization-points.md)                                                                                   | Best data persistence, resource optimization, and high availability |
 | **Kubernetes**          | [Helm Chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)                                                                   | Required for K8s API access and pod metadata collection             |
-| **Testing/Development** | [Standalone](/docs/deployment-guides/standalone-deployment.md) or [Docker](/packaging/docker/README.md)                                                            | Quick setup, easy to remove                                         |
-| **Single server**       | [Standalone](/docs/deployment-guides/standalone-deployment.md) (upgrade to [Parent-Child](/docs/deployment-guides/deployment-with-centralization-points.md) later) | Start simple, upgrade when ready for production                     |
+| **Testing/Development** | [Standalone](/docs/deployment-guides/standalone-deployment.md) or [Docker](/packaging/docker/README.md)                                                            | Quick to set up and remove                                          |
+| **Single server**       | [Standalone](/docs/deployment-guides/standalone-deployment.md) (upgrade to [Parent-Child](/docs/deployment-guides/deployment-with-centralization-points.md) later) | Fully functional on its own; add a Parent for centralization        |
 
 :::warning Important Notes
 

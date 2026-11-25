@@ -3,14 +3,15 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -37,12 +38,12 @@ func huaweiIPv4TestPeer() huaweiIndexPeer {
 	}
 }
 
-func huaweiIndexPDUs(peers ...huaweiIndexPeer) []gosnmp.SnmpPDU {
-	var pdus []gosnmp.SnmpPDU
+func huaweiIndexPDUs(peers ...huaweiIndexPeer) []gosnmp.VarBind {
+	var pdus []gosnmp.VarBind
 	for _, peer := range peers {
 		for _, column := range []struct {
 			oid string
-			pdu gosnmp.SnmpPDU
+			pdu gosnmp.VarBind
 		}{
 			{huaweiTestRoot + "1.1.6", createStringPDU("", peer.vrfName)},
 			{huaweiTestRoot + "2.1.1", createGauge32PDU("", uint(peer.version))},
@@ -62,27 +63,26 @@ func huaweiIndexPDUs(peers ...huaweiIndexPeer) []gosnmp.SnmpPDU {
 }
 
 type huaweiWalkInput struct {
-	pdus            []gosnmp.SnmpPDU
+	pdus            []gosnmp.VarBind
 	forbiddenPrefix string
 }
 
 func newHuaweiIndexCollector(t *testing.T, input *huaweiWalkInput) *Collector {
 	t.Helper()
 	profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.Table.OID != "" })
-	_, handler := setupMockHandler(t)
-	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	handler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
+	_, handler := setupMockSession(t)
+	handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 		if input.forbiddenPrefix != "" {
 			require.False(t, strings.HasPrefix(oid, input.forbiddenPrefix), "unproved dependency WALK: %s", oid)
 		}
-		return snmprecPDUsWithPrefix(input.pdus, oid+"."), nil
+		return snmprecPDUsWithPrefix(input.pdus, oid+"."), gosnmp.WalkEnd{}, nil
 	}).AnyTimes()
-	return New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	return New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 }
 
 func collectHuaweiIndexRows(t *testing.T, collector *Collector) []ddsnmp.BGPRow {
 	t.Helper()
-	result, err := collector.Collect()
+	result, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	return result[0].BGPRows
@@ -142,24 +142,25 @@ func TestHuaweiIndexIdentity_AllLoadedRowGroups(t *testing.T) {
 // Target tables cannot prove process ownership, even when numeric instance IDs
 // and peer addresses happen to match. Statistics must not depend on them.
 func TestHuaweiIndexIdentity_StatisticsIndependentOfOtherTables(t *testing.T) {
-	for name, tc := range map[string]struct{ pdus []gosnmp.SnmpPDU }{
+	for name, tc := range map[string]struct{ pdus []gosnmp.VarBind }{
 		"absent":                {},
 		"matching numeric IDs":  {pdus: huaweiIndexPDUs(huaweiIPv4TestPeer())},
 		"different numeric IDs": {pdus: huaweiIndexPDUs(huaweiIndexPeer{familyIndex: "99.1.1.1.4.192.0.2.1", sessionIndex: "99.1.4.192.0.2.1", neighbor: "192.0.2.1", remoteAS: 65099, version: 5, description: "unrelated"})},
 	} {
 		t.Run(name, func(t *testing.T) {
 			profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.ID == "huawei-bgp-peer-statistics" })
-			pdus := append([]gosnmp.SnmpPDU{}, tc.pdus...)
+			pdus := append([]gosnmp.VarBind{}, tc.pdus...)
 			for process := 0; process < 3; process++ {
 				for column := 4; column <= 9; column++ {
 					pdus = append(pdus, createCounter32PDU(fmt.Sprintf("%s7.1.%d.%d.7.4.192.0.2.1", huaweiTestRoot, column, process), uint(process*100+column)))
 				}
 			}
-			_, handler := setupMockHandler(t)
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().BulkWalkAll(huaweiTestRoot + "7").DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) { return snmprecPDUsWithPrefix(pdus, oid+"."), nil }).AnyTimes()
+			_, handler := setupMockSession(t)
+			handler.EXPECT().BulkWalkAll(gomock.Any(), huaweiTestRoot+"7", gomock.Any()).DoAndReturn(func(_ context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+				return snmprecPDUsWithPrefix(pdus, oid+"."), gosnmp.WalkEnd{}, nil
+			}).AnyTimes()
 			// No WALK for peer/family/session tables is allowed by this expectation.
-			collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 			rows := collectHuaweiIndexRows(t, collector)
 			require.Len(t, rows, 3)
 			for process := 0; process < 3; process++ {
@@ -192,9 +193,8 @@ func TestHuaweiIndexIdentity_ConfiguredProcessCannotFallBackToAS(t *testing.T) {
 	profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.ID == "huawei-bgp-peer-statistics" })
 	profile.Definition.BGP[0].Identity.ProcessID = ddprofiledefinition.BGPValueConfig{Index: 100}
 	profile.Definition.BGP[0].Identity.RemoteAS = ddprofiledefinition.BGPValueConfig{Value: "65001"}
-	_, handler := setupMockHandler(t)
-	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	handler.EXPECT().BulkWalkAll(huaweiTestRoot+"7").Return([]gosnmp.SnmpPDU{createCounter32PDU(huaweiTestRoot+"7.1.4.0.7.4.192.0.2.1", 11)}, nil).AnyTimes()
-	collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	_, handler := setupMockSession(t)
+	handler.EXPECT().BulkWalkAll(gomock.Any(), huaweiTestRoot+"7", gomock.Any()).Return([]gosnmp.VarBind{createCounter32PDU(huaweiTestRoot+"7.1.4.0.7.4.192.0.2.1", 11)}, gosnmp.WalkEnd{}, nil).AnyTimes()
+	collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 	assert.Empty(t, collectHuaweiIndexRows(t, collector))
 }

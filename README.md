@@ -6,11 +6,11 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">Full-stack observability. Every metric, every second.</h3>
+<h3 align="center">Full-stack observability: the AI SRE that learns your stack!</h3>
 <p align="center">
   <b>Metrics · Logs · Traces · Flows · Topology</b><br/>
   Infrastructure · APM · NPM · DBM · RUM · Synthetics · Cloud · AI<br/>
-  OpenTelemetry · SNMP · NetFlow/IPFIX/sFlow · IPMI · Redfish · 800+ integrations
+  OpenTelemetry · SNMP · NetFlow/IPFIX/sFlow · IPMI · Redfish · 2,000+ integrations
 </p>
 
 <br />
@@ -58,10 +58,10 @@ Netdata is distributed and real-time. Netdata Agents collect, store and analyze 
 **Netdata Design:**
 
 * **Understanding over traffic lights** – Monitoring tells you that something is wrong; observability tells you why. Netdata gives you both, from the same data.
-* **Everything, every second, affordably** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
+* **Everything, every second** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
 * **Independent hubs, not a central database** – Data stays close to where it is created, in independent hubs you place where they make sense. Netdata Cloud unifies and correlates them, and Netdata scales to 100,000+ nodes.
 * **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
-* **Machine learning as evidence, not alerts** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.
+* **Machine learning that models your entire stack** – Every metric is scored for anomalies every second. Clusters of anomalies reveal hidden dependencies, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
 * **AI at the core** – Machine learning, a scoring engine and AI work together to deliver automated root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
 * **Expertise built in** – No query language and nothing to administer: the expertise is built into the product, so the whole team can investigate.
 * **Configured your way** – Automatic first, then as code, from the dashboard, or both.
@@ -88,14 +88,14 @@ According to the [University of Amsterdam study](https://www.ivanomalavolta.com/
 
 | Area                                    | What you get                                                                                                     |
 |-----------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| **Infrastructure monitoring**           | Systems, containers, Kubernetes, virtualization and hardware through 800+ integrations, per second               |
+| **Infrastructure monitoring**           | Systems, containers, Kubernetes, virtualization and hardware through 2,000+ integrations, per second             |
 | **Application performance monitoring**  | Find any trace by ID, filter traces by any attribute, and see latency percentiles and errors for any slice of traffic, with service maps and browser sessions linked to backend traces. Traces stay on your infrastructure. |
 | **Digital experience monitoring**       | Real user monitoring with Core Web Vitals and JavaScript errors, Playwright journeys, Lighthouse audits, uptime   |
-| **Network performance monitoring**      | Zero-configuration SNMP with 1,700+ device profiles, L2/L3 topology, NetFlow/IPFIX/sFlow, SNMP traps, BGP         |
+| **Network performance monitoring**      | Zero-configuration SNMP with 1,750+ device profiles, L2/L3 topology, NetFlow/IPFIX/sFlow, SNMP traps, BGP         |
 | **Database monitoring**                 | 50+ databases and managed services, with live top-query views on 12 engines                                     |
 | **Logs monitoring**                     | systemd-journal, Windows Event Log and macOS unified logs queried in place on every node, with no shipping or extra storage |
 | **Logs management**                      | Collect logs from any source through OpenTelemetry and syslog, search every field, and explore with facets and histograms. Logs are acknowledged only once safely on disk and are searchable as they arrive, with retention and offload to your own S3 storage. |
-| **Cloud monitoring**                    | 31 AWS services and 38 Azure services through their native monitoring APIs                                       |
+| **Cloud monitoring**                    | 31 AWS services through CloudWatch, 38 Azure services through Azure Monitor, and Google Cloud                     |
 | **Endpoint and edge monitoring**        | Windows, macOS, IoT and embedded devices with the same Agent                                                     |
 | **Alerting**                            | 1,100+ stock alerts, your own alerts as code, from the UI or generated by AI, 30+ notification integrations      |
 | **Machine learning and AI**             | Anomaly detection on every metric, Netdata AI investigations, MCP servers for any AI assistant                   |
@@ -135,7 +135,7 @@ With Netdata you can monitor all these components across platforms:
 |                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   |         Yes<small><br/>`Hyper-V`</small>          |
 |                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 | **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
-|                              **Cloud Services**<small><br/>AWS and Azure native monitoring</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|                              **Cloud Services**<small><br/>AWS, Azure and Google Cloud</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |                       **Custom Applications**<small><br/>OpenMetrics and StatsD</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |                      **OpenTelemetry (OTLP)**<small><br/>Metrics, logs and traces over gRPC and HTTP</small>|               Yes                |    -    |  Yes  |                         -                         |
 
@@ -290,7 +290,7 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 
 | Capability                   | Description                                                                                                                                   |
 |------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Collection**               | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• SNMP devices, NetFlow/IPFIX/sFlow, SNMP traps<br>• OpenMetrics, StatsD, and OpenTelemetry (OTLP metrics, logs and traces)<br>• Real user monitoring and synthetic checks |
+| **Collection**               | • 2,000+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• SNMP devices, NetFlow/IPFIX/sFlow, SNMP traps<br>• OpenMetrics, StatsD, and OpenTelemetry (OTLP metrics, logs and traces)<br>• Real user monitoring and synthetic checks |
 | **Resolution**               | • Per-second collection<br>• Real-time visualization with 1-second latency<br>• High-resolution metrics                                       |
 | **Machine Learning**         | • ML models trained at the edge<br>• Automatic anomaly detection per metric<br>• Scoring engine that ranks what changed in any time window     |
 | **Logs Monitoring**          | • systemd-journal, Windows Event Log and macOS unified logs queried in place<br>• No log shipping, pipelines or extra storage<br>• Rich log visualization |
@@ -300,8 +300,8 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 | **Visualization**            | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
 | **Alerting**                 | • 1,100+ stock alerts and your own<br>• Multiple notification methods<br>• Evaluated on every Agent, without Netdata Cloud                    |
 | **AI and MCP**               | • MCP server on every Agent and Parent<br>• Any AI assistant can query metrics, logs, alerts and live views                                   |
-| **Operations**               | • Auto-detection<br>• Zero-touch ML<br>• Easy scalability<br>• CI/CD friendly                                                                 |
-| **Extensibility**            | • Modular architecture<br>• Easy to customize<br>• Integrates with existing tools                                                             |
+| **Operations**               | • Auto-detection<br>• Zero-touch ML<br>• Scales to 100,000+ nodes<br>• CI/CD friendly                                                                 |
+| **Extensibility**            | • Modular architecture<br>• Configurable as code, from the UI, or both<br>• Integrates with existing tools                                                             |
 
 ---
 
@@ -429,7 +429,7 @@ With Netdata you can store all metrics on your infrastructure—no sampling, no 
 
 * High-resolution metrics by default
 * ML per metric, not shared models
-* Unlimited scalability without skyrocketing cost
+* Scales to 100,000+ nodes without skyrocketing cost
 
 </details>
 

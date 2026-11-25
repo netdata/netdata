@@ -59,12 +59,6 @@ typedef struct {
 } NV_REMOTE_ACTOR;
 
 typedef struct {
-    uint64_t sockets;
-    char ip[INET6_ADDRSTRLEN];
-    char address_space[16];
-} NV_LOCAL_IP;
-
-typedef struct {
     uint64_t pid;
     uint64_t ppid;
     uint64_t uid;
@@ -142,11 +136,8 @@ typedef enum {
 typedef struct {
     DICTIONARY *process_actors;
     DICTIONARY *remote_actors;
-    DICTIONARY *local_ips;
-    DICTIONARY *endpoint_owners_exact;
-    DICTIONARY *endpoint_owners_exact_any_ns;
-    DICTIONARY *endpoint_owners_service;
-    DICTIONARY *endpoint_owners_service_any_ns;
+    DICTIONARY *local_ips;          // set of local IP texts (membership and count only)
+    DICTIONARY *endpoint_owners;    // NV_ENDPOINT_OWNER by topology_endpoint_owner_key()
     DICTIONARY *links;
     DICTIONARY *container_field_snapshot;
     DICTIONARY *pid_starttime_cache;
@@ -164,12 +155,32 @@ typedef struct {
 
 typedef struct {
     size_t process_actor_count;
-    size_t socket_link_count;
     size_t local_ip_count;
     size_t endpoint_actor_count;
     size_t ownership_link_count;
     char host_actor_id[NV_TOPOLOGY_KEY_MAX];
 } NV_TOPOLOGY_RENDER_STATE;
+
+// Copy src into dst, truncating to dst_size - 1 characters; NULL src gives an empty string.
+static void topology_strncpy(char *dst, size_t dst_size, const char *src) {
+    strncpyz(dst, src ? src : "", dst_size - 1);
+}
+
+// Every dictionary here is private to one request and keyed by a string.
+static DICTIONARY *topology_dict_create(size_t value_size) {
+    return dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, value_size);
+}
+
+// Make room for one more element in a growable array; returns the (possibly moved) array.
+static void *topology_array_reserve(void *array, size_t used, size_t *size, size_t element_size) {
+    if(used == *size) {
+        *size = *size ? *size * 2 : 16;
+        array = reallocz(array, *size * element_size);
+    }
+    return array;
+}
+
 static NV_TOPOLOGY_ABORT_STATUS topology_function_abort_state(usec_t *stop_monotonic_ut, bool *cancelled)
 {
     if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))
@@ -271,9 +282,6 @@ static inline const char *network_viewer_machine_guid(void) {
     return (guid && *guid) ? guid : NULL;
 }
 static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
-    if(!opts)
-        return;
-
     memset(opts, 0, sizeof(*opts));
     opts->detailed = false; // default: aggregated graph view
     opts->group_by = NV_TOPOLOGY_GROUP_BY_PROCESS_NAME;
@@ -287,18 +295,12 @@ static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
 }
 
 static inline bool topology_sockets_any_enabled(const NV_TOPOLOGY_OPTIONS *opts) {
-    if(!opts)
-        return false;
-
     return (opts->sockets_listening ||
             opts->sockets_inbound ||
             opts->sockets_outbound);
 }
 
 static inline bool topology_protocols_any_enabled(const NV_TOPOLOGY_OPTIONS *opts) {
-    if(!opts)
-        return false;
-
     return (opts->protocols_ipv4_tcp ||
             opts->protocols_ipv6_tcp ||
             opts->protocols_ipv4_udp ||
@@ -306,9 +308,6 @@ static inline bool topology_protocols_any_enabled(const NV_TOPOLOGY_OPTIONS *opt
 }
 
 static void topology_options_finalize(NV_TOPOLOGY_OPTIONS *opts) {
-    if(!opts)
-        return;
-
     if(!topology_sockets_any_enabled(opts)) {
         opts->sockets_listening = true;
         opts->sockets_inbound = true;
@@ -327,7 +326,7 @@ static void topology_apply_option_param(
     NV_TOPOLOGY_PARSE_STATE *state,
     const char *param)
 {
-    if(!opts || !state || !param || !*param)
+    if(!param || !*param)
         return;
 
     if(strcmp(param, "info") == 0) {
@@ -440,9 +439,6 @@ static void topology_apply_option_param(
     }
 }
 static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *opts) {
-    if(!opts)
-        return;
-
     topology_options_defaults(opts);
     if(!function || !*function)
         return;
@@ -474,7 +470,7 @@ static void topology_apply_payload_key_value(
     const char *key,
     const char *value)
 {
-    if(!opts || !state || !key || !*key || !value || !*value)
+    if(!*key || !*value)
         return;
 
     if(strcmp(key, "info") == 0) {
@@ -564,7 +560,7 @@ static bool topology_apply_payload_member(
 }
 
 static bool topology_parse_payload_options(BUFFER *payload, NV_TOPOLOGY_OPTIONS *opts, BUFFER *error) {
-    if(!payload || !buffer_strlen(payload) || !opts)
+    if(!payload || !buffer_strlen(payload))
         return true;
 
     struct json_tokener *tokener = json_tokener_new();
@@ -661,7 +657,7 @@ static inline bool topology_ip_belongs_to_self(const NV_TOPOLOGY_CONTEXT *ctx, c
             return true;
     }
 
-    if(ctx && ctx->local_ips && ip && *ip && dictionary_get(ctx->local_ips, ip))
+    if(dictionary_get(ctx->local_ips, ip))
         return true;
 
     return false;
@@ -669,9 +665,6 @@ static inline bool topology_ip_belongs_to_self(const NV_TOPOLOGY_CONTEXT *ctx, c
 
 
 static inline void topology_pid_lookup_key(char *dst, size_t dst_size, uint64_t pid) {
-    if(!dst || !dst_size)
-        return;
-
     snprintf(dst, dst_size, "pid=%llu", (unsigned long long)pid);
 }
 
@@ -719,26 +712,8 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
 
     return false;
 }
-#elif defined(OS_FREEBSD)
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#include <sys/user.h>
-#include <netinet/tcp_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
-    if(starttime)
-        *starttime = 0;
-
-    return false;
-}
 #elif defined(OS_MACOS)
-#include <libproc.h>
-#include <netinet/tcp_var.h>
-#include <netinet/udp_var.h>
-#include <sys/proc_info.h>
-#include <sys/sysctl.h>
-
+// libproc.h and sys/proc_info.h come with the local-sockets macOS backend
 static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     if(!pid || !starttime || pid > (uint64_t)INT_MAX)
         return false;
@@ -755,12 +730,8 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     return true;
 }
 #else
-
-
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
-    if(starttime)
-        *starttime = 0;
-
+    *starttime = 0;
     return false;
 }
 #endif
@@ -787,24 +758,39 @@ uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_cache, u
 }
 
 
-// ip != NULL builds an exact key (ip+port); ip == NULL builds a service key (port only).
-static void topology_endpoint_owner_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, const char *ip, uint16_t port, bool include_ns) {
-    if(!dst || !dst_size)
-        return;
+// Endpoint owners live in one dictionary under four disjoint key shapes, tried in this order:
+// exact ip+port in the socket's namespace, exact ip+port in any namespace, then (service lookups only)
+// port in the socket's namespace, port in any namespace. The first owner registered for a key wins.
+typedef enum {
+    NV_ENDPOINT_OWNER_KEY_EXACT_NS = 0,
+    NV_ENDPOINT_OWNER_KEY_EXACT_ANY_NS,
+    NV_ENDPOINT_OWNER_KEY_SERVICE_NS,
+    NV_ENDPOINT_OWNER_KEY_SERVICE_ANY_NS,
+} NV_ENDPOINT_OWNER_KEY;
 
-    if(ip) {
-        if(include_ns)
+static void topology_endpoint_owner_key(
+    char *dst, size_t dst_size, NV_ENDPOINT_OWNER_KEY shape,
+    uint64_t net_ns_inode, uint16_t protocol, const char *ip, uint16_t port) {
+    switch(shape) {
+        case NV_ENDPOINT_OWNER_KEY_EXACT_NS:
             snprintf(dst, dst_size, "ns=%llu|proto=%u|ip=%s|port=%u",
                      (unsigned long long)net_ns_inode, (unsigned)protocol, ip, (unsigned)port);
-        else
+            break;
+        case NV_ENDPOINT_OWNER_KEY_EXACT_ANY_NS:
             snprintf(dst, dst_size, "proto=%u|ip=%s|port=%u", (unsigned)protocol, ip, (unsigned)port);
-    } else {
-        if(include_ns)
+            break;
+        case NV_ENDPOINT_OWNER_KEY_SERVICE_NS:
             snprintf(dst, dst_size, "ns=%llu|proto=%u|port=%u",
                      (unsigned long long)net_ns_inode, (unsigned)protocol, (unsigned)port);
-        else
+            break;
+        case NV_ENDPOINT_OWNER_KEY_SERVICE_ANY_NS:
             snprintf(dst, dst_size, "proto=%u|port=%u", (unsigned)protocol, (unsigned)port);
+            break;
     }
+}
+
+static inline bool topology_endpoint_owner_ip_is_exact(const char *ip) {
+    return ip && *ip && strcmp(ip, "*") != 0;
 }
 
 static void topology_register_endpoint_owner(
@@ -816,7 +802,7 @@ static void topology_register_endpoint_owner(
     const NV_PROCESS_ACTOR *pa,
     bool service_candidate
 ) {
-    if(!ctx || !pa || !port)
+    if(!port)
         return;
 
     NV_ENDPOINT_OWNER owner = {
@@ -826,29 +812,17 @@ static void topology_register_endpoint_owner(
         .net_ns_inode = pa->net_ns_inode,
         .starttime = pa->starttime,
     };
-    snprintf(owner.process, sizeof(owner.process), "%s", pa->process);
+    topology_strncpy(owner.process, sizeof(owner.process), pa->process);
 
+    bool exact = topology_endpoint_owner_ip_is_exact(ip);
     char key[NV_TOPOLOGY_KEY_MAX];
-    if(ip && *ip && strcmp(ip, "*") != 0) {
-        if(ctx->endpoint_owners_exact) {
-            topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
-            dictionary_set(ctx->endpoint_owners_exact, key, &owner, sizeof(owner));
-        }
-        if(ctx->endpoint_owners_exact_any_ns) {
-            topology_endpoint_owner_key(key, sizeof(key), 0, protocol, ip, port, false);
-            dictionary_set(ctx->endpoint_owners_exact_any_ns, key, &owner, sizeof(owner));
-        }
-    }
+    for(NV_ENDPOINT_OWNER_KEY shape = NV_ENDPOINT_OWNER_KEY_EXACT_NS; shape <= NV_ENDPOINT_OWNER_KEY_SERVICE_ANY_NS; shape++) {
+        bool exact_shape = shape <= NV_ENDPOINT_OWNER_KEY_EXACT_ANY_NS;
+        if(exact_shape ? !exact : !service_candidate)
+            continue;
 
-    if(service_candidate) {
-        if(ctx->endpoint_owners_service) {
-            topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, NULL, port, true);
-            dictionary_set(ctx->endpoint_owners_service, key, &owner, sizeof(owner));
-        }
-        if(ctx->endpoint_owners_service_any_ns) {
-            topology_endpoint_owner_key(key, sizeof(key), 0, protocol, NULL, port, false);
-            dictionary_set(ctx->endpoint_owners_service_any_ns, key, &owner, sizeof(owner));
-        }
+        topology_endpoint_owner_key(key, sizeof(key), shape, net_ns_inode, protocol, ip, port);
+        dictionary_set(ctx->endpoint_owners, key, &owner, sizeof(owner));
     }
 }
 
@@ -860,51 +834,26 @@ static NV_ENDPOINT_OWNER *topology_lookup_endpoint_owner(
     uint16_t port,
     bool allow_service_fallback
 ) {
-    if(!ctx || !port)
+    if(!port)
         return NULL;
 
+    bool exact = topology_endpoint_owner_ip_is_exact(ip);
     char key[NV_TOPOLOGY_KEY_MAX];
-    NV_ENDPOINT_OWNER *owner = NULL;
+    for(NV_ENDPOINT_OWNER_KEY shape = NV_ENDPOINT_OWNER_KEY_EXACT_NS; shape <= NV_ENDPOINT_OWNER_KEY_SERVICE_ANY_NS; shape++) {
+        bool exact_shape = shape <= NV_ENDPOINT_OWNER_KEY_EXACT_ANY_NS;
+        if(exact_shape ? !exact : !allow_service_fallback)
+            continue;
 
-    if(ip && *ip && strcmp(ip, "*") != 0) {
-        if(ctx->endpoint_owners_exact) {
-            topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
-            owner = dictionary_get(ctx->endpoint_owners_exact, key);
-            if(owner)
-                return owner;
-        }
-
-        if(ctx->endpoint_owners_exact_any_ns) {
-            topology_endpoint_owner_key(key, sizeof(key), 0, protocol, ip, port, false);
-            owner = dictionary_get(ctx->endpoint_owners_exact_any_ns, key);
-            if(owner)
-                return owner;
-        }
-    }
-
-    if(!allow_service_fallback)
-        return NULL;
-
-    if(ctx->endpoint_owners_service) {
-        topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, NULL, port, true);
-        owner = dictionary_get(ctx->endpoint_owners_service, key);
-        if(owner)
-            return owner;
-    }
-
-    if(ctx->endpoint_owners_service_any_ns) {
-        topology_endpoint_owner_key(key, sizeof(key), 0, protocol, NULL, port, false);
-        owner = dictionary_get(ctx->endpoint_owners_service_any_ns, key);
+        topology_endpoint_owner_key(key, sizeof(key), shape, net_ns_inode, protocol, ip, port);
+        NV_ENDPOINT_OWNER *owner = dictionary_get(ctx->endpoint_owners, key);
         if(owner)
             return owner;
     }
 
     return NULL;
 }
-static void topology_encode_identifier_component(char *dst, size_t dst_size, const char *src) {
-    if(!dst || !dst_size)
-        return;
 
+static void topology_encode_identifier_component(char *dst, size_t dst_size, const char *src) {
     const uint8_t *s = (const uint8_t *)((src && *src) ? src : "[unknown]");
     size_t written = 0;
 
@@ -928,12 +877,9 @@ static void topology_encode_identifier_component(char *dst, size_t dst_size, con
 }
 
 static void topology_actor_id_for_host(const NV_TOPOLOGY_CONTEXT *ctx, char *dst, size_t dst_size) {
-    if(!dst || !dst_size)
-        return;
-
-    if(ctx && ctx->machine_guid[0])
+    if(ctx->machine_guid[0])
         snprintf(dst, dst_size, "netdata-machine-guid:%s", ctx->machine_guid);
-    else if(ctx && ctx->hostname[0])
+    else if(ctx->hostname[0])
         snprintf(dst, dst_size, "hostname:%s", ctx->hostname);
     else
         snprintf(dst, dst_size, "host:unknown");
@@ -949,19 +895,16 @@ static void topology_actor_id_for_process(
     char *dst,
     size_t dst_size
 ) {
-    if(!dst || !dst_size)
-        return;
-
-    const char *node_identity = (ctx && ctx->machine_guid[0]) ? ctx->machine_guid : (ctx && ctx->hostname[0] ? ctx->hostname : "unknown");
+    const char *node_identity = ctx->machine_guid[0] ? ctx->machine_guid : (ctx->hostname[0] ? ctx->hostname : "unknown");
     const char *safe_process = (process && *process) ? process : "[unknown]";
-    if(ctx && ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER) {
+    if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER) {
         char encoded_container[NV_TOPOLOGY_ENCODED_NAME_MAX];
         topology_encode_identifier_component(
             encoded_container, sizeof(encoded_container),
             (container_name && *container_name) ? container_name : safe_process);
         snprintf(dst, dst_size, "container:%s|name=%s", node_identity, encoded_container);
     }
-    else if(ctx && ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PROCESS_NAME) {
+    else if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PROCESS_NAME) {
         char encoded_process[NV_TOPOLOGY_ENCODED_NAME_MAX];
         topology_encode_identifier_component(encoded_process, sizeof(encoded_process), safe_process);
         snprintf(dst, dst_size, "process:%s|comm=%s", node_identity, encoded_process);
@@ -977,9 +920,6 @@ static void topology_actor_id_for_process(
 
 static void topology_user_actor_name(uid_t uid, char *dst, size_t dst_size)
 {
-    if(!dst || !dst_size)
-        return;
-
     dst[0] = '\0';
     if(uid == UID_UNSET)
         return;
@@ -1000,9 +940,6 @@ static bool topology_user_slice_actor_name(
     char *dst,
     size_t dst_size)
 {
-    if(!dst || !dst_size)
-        return false;
-
     dst[0] = '\0';
 
     uint32_t path_uid = NIPC_UID_UNSET;
@@ -1020,9 +957,6 @@ static bool topology_container_fields_apply_user_slice(
     uid_t process_uid,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
 {
-    if(!fields)
-        return false;
-
     char name[NV_TOPOLOGY_USERNAME_MAX];
     if(!topology_user_slice_actor_name(cgroup_path, process_uid, name, sizeof(name)))
         return false;
@@ -1042,9 +976,6 @@ static void topology_container_fields_fill(
     const char *process,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
 {
-    if(!fields)
-        return;
-
     const char *fallback = (process && *process) ? process : "[unknown]";
     nv_container_fields_set_process_fallback(fields, fallback);
 
@@ -1144,19 +1075,13 @@ static void topology_container_fields_snapshot(
     const char *process,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
 {
-    topology_container_fields_snapshot_from_cache(
-        ctx ? ctx->container_field_snapshot : NULL, pid, starttime, uid, process, fields);
+    topology_container_fields_snapshot_from_cache(ctx->container_field_snapshot, pid, starttime, uid, process, fields);
 }
 static bool topology_process_name_is_unknown(const char *process_name) {
     return !process_name || !*process_name || strcmp(process_name, "[unknown]") == 0;
 }
 
-static void topology_actor_id_for_remote_endpoint(const NV_TOPOLOGY_CONTEXT *ctx, const char *ip, const char *address_space, char *dst, size_t dst_size) {
-    if(!dst || !dst_size)
-        return;
-
-    (void)ctx;
-    (void)address_space;
+static void topology_actor_id_for_remote_endpoint(const char *ip, char *dst, size_t dst_size) {
     if(ip && *ip)
         snprintf(dst, dst_size, "ip:%s", ip);
     else
@@ -1170,12 +1095,9 @@ static void topology_process_display_name(
     char *dst,
     size_t dst_size
 ) {
-    if(!dst || !dst_size)
-        return;
-
     const char *safe_process = (process_name && *process_name) ? process_name : "[unknown]";
-    if(ctx && ctx->options.group_by != NV_TOPOLOGY_GROUP_BY_PID)
-        snprintf(dst, dst_size, "%s", safe_process);
+    if(ctx->options.group_by != NV_TOPOLOGY_GROUP_BY_PID)
+        topology_strncpy(dst, dst_size, safe_process);
     else
         snprintf(dst, dst_size, "%s[%llu]", safe_process, (unsigned long long)pid);
 }
@@ -1193,9 +1115,6 @@ static const char *topology_group_by_id(NV_TOPOLOGY_GROUP_BY group_by)
     }
 }
 static bool topology_socket_direction_selected(const NV_TOPOLOGY_CONTEXT *ctx, SOCKET_DIRECTION direction) {
-    if(!ctx)
-        return false;
-
     switch(direction) {
         case SOCKET_DIRECTION_LISTEN:
             return ctx->options.sockets_listening;
@@ -1212,8 +1131,6 @@ static bool topology_socket_direction_selected(const NV_TOPOLOGY_CONTEXT *ctx, S
 
 static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, void *data) {
     NV_TOPOLOGY_CONTEXT *ctx = data;
-    if(!ctx)
-        return;
 
     if(topology_abort_iteration_checkpoint(ctx->sockets_total) &&
        topology_context_check_abort(ctx) != NV_TOPOLOGY_ABORT_NONE)
@@ -1263,24 +1180,18 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         CACHED_USERNAME cu = cached_username_get_by_uid(n->uid);
         const char *cached_username = string2str(cu.username);
         if(cached_username && *cached_username)
-            snprintf(username, sizeof(username), "%s", cached_username);
+            topology_strncpy(username, sizeof(username), cached_username);
         cached_username_release(cu);
     }
 #if defined(OS_WINDOWS)
     // Windows has no uid namespace; the backend resolves the SID account name.
     else if(n->win_username[0])
-        snprintf(username, sizeof(username), "%s", n->win_username);
+        topology_strncpy(username, sizeof(username), n->win_username);
 #endif
 
-    if(local_ip[0] && !topology_ip_is_unspecified(local_ip)) {
-        NV_LOCAL_IP *local_actor = dictionary_get(ctx->local_ips, local_ip);
-        if(!local_actor) {
-            NV_LOCAL_IP tmp = { 0 };
-            snprintf(tmp.ip, sizeof(tmp.ip), "%s", local_ip);
-            snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", local_address_space);
-            local_actor = dictionary_set(ctx->local_ips, local_ip, &tmp, sizeof(tmp));
-        }
-        local_actor->sockets++;
+    if(local_ip[0] && !topology_ip_is_unspecified(local_ip) && !dictionary_get(ctx->local_ips, local_ip)) {
+        bool present = true;
+        dictionary_set(ctx->local_ips, local_ip, &present, sizeof(present));
     }
 
     if(hidden_listen_socket) {
@@ -1291,7 +1202,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
             .net_ns_inode = n->net_ns_inode,
             .starttime = starttime,
         };
-        snprintf(hidden_owner.process, sizeof(hidden_owner.process), "%s", process_name);
+        topology_strncpy(hidden_owner.process, sizeof(hidden_owner.process), process_name);
         topology_register_endpoint_owner(ctx, n->net_ns_inode, n->local.protocol, local_ip, n->local.port, &hidden_owner, true);
         ctx->skipped_sockets++;
         return;
@@ -1316,13 +1227,13 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         tmp.uid = n->uid;
         tmp.net_ns_inode = n->net_ns_inode;
         tmp.starttime = starttime;
-        snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
-        snprintf(tmp.username, sizeof(tmp.username), "%s", username);
-        snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
-        snprintf(tmp.local_ip, sizeof(tmp.local_ip), "%s", local_ip);
-        snprintf(tmp.local_address_space, sizeof(tmp.local_address_space), "%s", local_address_space);
+        topology_strncpy(tmp.process, sizeof(tmp.process), process_name);
+        topology_strncpy(tmp.username, sizeof(tmp.username), username);
+        topology_strncpy(tmp.namespace_type, sizeof(tmp.namespace_type), namespace_type);
+        topology_strncpy(tmp.local_ip, sizeof(tmp.local_ip), local_ip);
+        topology_strncpy(tmp.local_address_space, sizeof(tmp.local_address_space), local_address_space);
         if(cmdline && *cmdline)
-            snprintf(tmp.cmdline, sizeof(tmp.cmdline), "%s", cmdline);
+            topology_strncpy(tmp.cmdline, sizeof(tmp.cmdline), cmdline);
         pa = dictionary_set(ctx->process_actors, process_key, &tmp, sizeof(tmp));
     }
     pa->sockets++;
@@ -1331,11 +1242,11 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     if(!pa->starttime && starttime)
         pa->starttime = starttime;
     if(topology_process_name_is_unknown(pa->process) && !topology_process_name_is_unknown(process_name))
-        snprintf(pa->process, sizeof(pa->process), "%s", process_name);
+        topology_strncpy(pa->process, sizeof(pa->process), process_name);
     if(!pa->cmdline[0] && cmdline && *cmdline)
-        snprintf(pa->cmdline, sizeof(pa->cmdline), "%s", cmdline);
+        topology_strncpy(pa->cmdline, sizeof(pa->cmdline), cmdline);
     if((!pa->local_ip[0] || topology_ip_is_unspecified(pa->local_ip)) && local_ip[0] && !topology_ip_is_unspecified(local_ip))
-        snprintf(pa->local_ip, sizeof(pa->local_ip), "%s", local_ip);
+        topology_strncpy(pa->local_ip, sizeof(pa->local_ip), local_ip);
 
     bool service_candidate = (n->direction == SOCKET_DIRECTION_LISTEN ||
                               n->direction == SOCKET_DIRECTION_INBOUND ||
@@ -1363,16 +1274,16 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     uint16_t server_port = 0;
 
     if(process_is_client) {
-        snprintf(client_ip, sizeof(client_ip), "%s", local_ip);
-        snprintf(server_ip, sizeof(server_ip), "%s", remote_ip);
+        topology_strncpy(client_ip, sizeof(client_ip), local_ip);
+        topology_strncpy(server_ip, sizeof(server_ip), remote_ip);
         client_address_space = local_address_space;
         server_address_space = remote_address_space;
         client_port = n->local.port;
         server_port = n->remote.port;
     }
     else {
-        snprintf(client_ip, sizeof(client_ip), "%s", remote_ip);
-        snprintf(server_ip, sizeof(server_ip), "%s", local_ip);
+        topology_strncpy(client_ip, sizeof(client_ip), remote_ip);
+        topology_strncpy(server_ip, sizeof(server_ip), local_ip);
         client_address_space = remote_address_space;
         server_address_space = local_address_space;
         client_port = n->remote.port;
@@ -1384,12 +1295,12 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     bool endpoint_is_self = topology_ip_belongs_to_self(ctx, endpoint_ip, endpoint_address_space);
     if(!endpoint_is_self) {
         char endpoint_actor_key[NV_TOPOLOGY_KEY_MAX];
-        topology_actor_id_for_remote_endpoint(ctx, endpoint_ip, endpoint_address_space, endpoint_actor_key, sizeof(endpoint_actor_key));
+        topology_actor_id_for_remote_endpoint(endpoint_ip, endpoint_actor_key, sizeof(endpoint_actor_key));
         NV_REMOTE_ACTOR *ra = dictionary_get(ctx->remote_actors, endpoint_actor_key);
         if(!ra) {
             NV_REMOTE_ACTOR tmp = { 0 };
-            snprintf(tmp.ip, sizeof(tmp.ip), "%s", endpoint_ip);
-            snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", endpoint_address_space);
+            topology_strncpy(tmp.ip, sizeof(tmp.ip), endpoint_ip);
+            topology_strncpy(tmp.address_space, sizeof(tmp.address_space), endpoint_address_space);
             ra = dictionary_set(ctx->remote_actors, endpoint_actor_key, &tmp, sizeof(tmp));
         }
         ra->sockets++;
@@ -1420,19 +1331,19 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         tmp.process_port = n->local.port;
         tmp.protocol_id = n->local.protocol;
         tmp.process_is_client = process_is_client;
-        snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
-        snprintf(tmp.username, sizeof(tmp.username), "%s", username);
-        snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
-        snprintf(tmp.protocol, sizeof(tmp.protocol), "%s", socket_protocol_name(n->local.protocol));
-        snprintf(tmp.protocol_family, sizeof(tmp.protocol_family), "%s", socket_protocol_family_name(n));
-        snprintf(tmp.state, sizeof(tmp.state), "%s",
+        topology_strncpy(tmp.process, sizeof(tmp.process), process_name);
+        topology_strncpy(tmp.username, sizeof(tmp.username), username);
+        topology_strncpy(tmp.namespace_type, sizeof(tmp.namespace_type), namespace_type);
+        topology_strncpy(tmp.protocol, sizeof(tmp.protocol), socket_protocol_name(n->local.protocol));
+        topology_strncpy(tmp.protocol_family, sizeof(tmp.protocol_family), socket_protocol_family_name(n));
+        topology_strncpy(tmp.state, sizeof(tmp.state),
                  n->local.protocol == IPPROTO_TCP ? TCP_STATE_2str(n->state) : "stateless");
-        snprintf(tmp.client_ip, sizeof(tmp.client_ip), "%s", client_ip);
-        snprintf(tmp.server_ip, sizeof(tmp.server_ip), "%s", server_ip);
-        snprintf(tmp.client_address_space, sizeof(tmp.client_address_space), "%s", client_address_space);
-        snprintf(tmp.server_address_space, sizeof(tmp.server_address_space), "%s", server_address_space);
+        topology_strncpy(tmp.client_ip, sizeof(tmp.client_ip), client_ip);
+        topology_strncpy(tmp.server_ip, sizeof(tmp.server_ip), server_ip);
+        topology_strncpy(tmp.client_address_space, sizeof(tmp.client_address_space), client_address_space);
+        topology_strncpy(tmp.server_address_space, sizeof(tmp.server_address_space), server_address_space);
         if(cmdline && *cmdline)
-            snprintf(tmp.cmdline, sizeof(tmp.cmdline), "%s", cmdline);
+            topology_strncpy(tmp.cmdline, sizeof(tmp.cmdline), cmdline);
         link = dictionary_set(ctx->links, link_key, &tmp, sizeof(tmp));
     }
 
@@ -1453,29 +1364,13 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
 }
 
 static void topology_context_destroy(NV_TOPOLOGY_CONTEXT *ctx) {
-    if(!ctx)
-        return;
-
-    if(ctx->links)
-        dictionary_destroy(ctx->links);
-    if(ctx->container_field_snapshot)
-        dictionary_destroy(ctx->container_field_snapshot);
-    if(ctx->pid_starttime_cache)
-        dictionary_destroy(ctx->pid_starttime_cache);
-    if(ctx->endpoint_owners_service_any_ns)
-        dictionary_destroy(ctx->endpoint_owners_service_any_ns);
-    if(ctx->endpoint_owners_service)
-        dictionary_destroy(ctx->endpoint_owners_service);
-    if(ctx->endpoint_owners_exact_any_ns)
-        dictionary_destroy(ctx->endpoint_owners_exact_any_ns);
-    if(ctx->endpoint_owners_exact)
-        dictionary_destroy(ctx->endpoint_owners_exact);
-    if(ctx->local_ips)
-        dictionary_destroy(ctx->local_ips);
-    if(ctx->remote_actors)
-        dictionary_destroy(ctx->remote_actors);
-    if(ctx->process_actors)
-        dictionary_destroy(ctx->process_actors);
+    dictionary_destroy(ctx->links);
+    dictionary_destroy(ctx->container_field_snapshot);
+    dictionary_destroy(ctx->pid_starttime_cache);
+    dictionary_destroy(ctx->endpoint_owners);
+    dictionary_destroy(ctx->local_ips);
+    dictionary_destroy(ctx->remote_actors);
+    dictionary_destroy(ctx->process_actors);
 }
 static int nv_uint32_compar(const void *a, const void *b)
 {
@@ -1506,18 +1401,13 @@ void nv_pid_append(uint32_t **pids, size_t *count, size_t *capacity, pid_t pid)
     if (!pids || !count || !capacity || pid <= 0)
         return;
 
-    if (*count == *capacity) {
-        size_t new_capacity = *capacity ? *capacity * 2 : 64;
-        *pids = reallocz(*pids, new_capacity * sizeof(**pids));
-        *capacity = new_capacity;
-    }
-
+    *pids = topology_array_reserve(*pids, *count, capacity, sizeof(**pids));
     (*pids)[(*count)++] = (uint32_t)pid;
 }
 
 static NV_TOPOLOGY_ABORT_STATUS nv_warm_cache_from_topology_actors(NV_TOPOLOGY_CONTEXT *ctx)
 {
-    if (!ctx || !ctx->process_actors)
+    if(ctx->options.info_only)
         return NV_TOPOLOGY_ABORT_NONE;
 
     uint32_t *pids = NULL;
@@ -1563,15 +1453,11 @@ static bool topology_prepare_context(
     const NV_TOPOLOGY_OPTIONS *options,
     usec_t *stop_monotonic_ut,
     bool *cancelled) {
-    if(!ctx)
-        return false;
-
     memset(ctx, 0, sizeof(*ctx));
     ctx->now_ut = now_ut;
     ctx->stop_monotonic_ut = stop_monotonic_ut;
     ctx->cancelled = cancelled;
-    if(options)
-        ctx->options = *options;
+    ctx->options = *options;
 
     if(topology_context_check_abort(ctx) != NV_TOPOLOGY_ABORT_NONE)
         return false;
@@ -1579,29 +1465,20 @@ static bool topology_prepare_context(
     if(ctx->options.info_only)
         return true;
 
-    ctx->process_actors = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_PROCESS_ACTOR));
-    ctx->remote_actors = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_REMOTE_ACTOR));
-    ctx->local_ips = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_LOCAL_IP));
-    ctx->endpoint_owners_exact = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
-    ctx->endpoint_owners_exact_any_ns = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
-    ctx->endpoint_owners_service = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
-    ctx->endpoint_owners_service_any_ns = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
-    ctx->links = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_LINK));
-    ctx->container_field_snapshot = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_CONTAINER_FIELDS));
-    ctx->pid_starttime_cache = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_PID_STARTTIME_CACHE_ENTRY));
-
-    if(!(ctx->process_actors && ctx->remote_actors && ctx->local_ips &&
-         ctx->endpoint_owners_exact && ctx->endpoint_owners_exact_any_ns &&
-         ctx->endpoint_owners_service && ctx->endpoint_owners_service_any_ns &&
-         ctx->links && ctx->container_field_snapshot && ctx->pid_starttime_cache))
-        return false;
+    ctx->process_actors = topology_dict_create(sizeof(NV_PROCESS_ACTOR));
+    ctx->remote_actors = topology_dict_create(sizeof(NV_REMOTE_ACTOR));
+    ctx->local_ips = topology_dict_create(sizeof(bool));
+    ctx->endpoint_owners = topology_dict_create(sizeof(NV_ENDPOINT_OWNER));
+    ctx->links = topology_dict_create(sizeof(NV_TOPOLOGY_LINK));
+    ctx->container_field_snapshot = topology_dict_create(sizeof(NV_TOPOLOGY_CONTAINER_FIELDS));
+    ctx->pid_starttime_cache = topology_dict_create(sizeof(NV_PID_STARTTIME_CACHE_ENTRY));
 
     if(!os_hostname(ctx->hostname, sizeof(ctx->hostname), netdata_configured_host_prefix))
-        snprintf(ctx->hostname, sizeof(ctx->hostname), "%s", "localhost");
+        topology_strncpy(ctx->hostname, sizeof(ctx->hostname), "localhost");
 
     const char *machine_guid = network_viewer_machine_guid();
     if(machine_guid)
-        snprintf(ctx->machine_guid, sizeof(ctx->machine_guid), "%s", machine_guid);
+        topology_strncpy(ctx->machine_guid, sizeof(ctx->machine_guid), machine_guid);
 
     LS_STATE ls = {
         .config = {
@@ -1640,16 +1517,9 @@ static bool topology_prepare_context(
 }
 
 static void topology_render_state_init(NV_TOPOLOGY_RENDER_STATE *state, const NV_TOPOLOGY_CONTEXT *ctx) {
-    if(!state)
-        return;
-
     memset(state, 0, sizeof(*state));
-    if(!ctx)
-        return;
-
-    state->process_actor_count = ctx->process_actors ? dictionary_entries(ctx->process_actors) : 0;
-    state->socket_link_count = ctx->links ? dictionary_entries(ctx->links) : 0;
-    state->local_ip_count = ctx->local_ips ? dictionary_entries(ctx->local_ips) : 0;
+    state->process_actor_count = dictionary_entries(ctx->process_actors);
+    state->local_ip_count = dictionary_entries(ctx->local_ips);
     topology_actor_id_for_host(ctx, state->host_actor_id, sizeof(state->host_actor_id));
 }
 void network_viewer_finalize_response_buffer(BUFFER *wb, time_t now_s, time_t expires_delta_s) {
@@ -1898,19 +1768,7 @@ typedef struct {
     char local_address_space[16];
     char ip[INET6_ADDRSTRLEN];
     char address_space[16];
-    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
-    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
-    char cgroup_status[32];
-    char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
-    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
-    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
-    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX];
-    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
-    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
-    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
-    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
+    NV_TOPOLOGY_CONTAINER_FIELDS container; // its actor_type and from_cache are not emitted; `type` is the actor type
     char display_name[NV_TOPOLOGY_KEY_MAX];
     char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
     uint64_t pid;
@@ -1939,6 +1797,8 @@ typedef struct {
     uint32_t max_rcv_rtt_usec;
 } NV_TOPOLOGY_V1_GRAPH_LINK;
 
+// Rows that borrow a source point into the context dictionaries, which outlive the payload.
+
 typedef struct {
     uint64_t link;
     uint64_t src_actor;
@@ -1953,10 +1813,7 @@ typedef struct {
     uint64_t retransmissions;
     uint32_t max_rtt_usec;
     uint32_t max_rcv_rtt_usec;
-    char client_ip[INET6_ADDRSTRLEN];
-    char server_ip[INET6_ADDRSTRLEN];
-    char protocol[16];
-    char state[32];
+    const NV_TOPOLOGY_LINK *first; // the first merged link: client_ip, server_ip, protocol and state
 } NV_TOPOLOGY_V1_CONNECTION_ROW;
 
 typedef struct {
@@ -1968,34 +1825,13 @@ typedef struct {
 
 typedef struct {
     uint64_t actor;
-    uint64_t pid;
-    uint64_t ppid;
-    uint64_t uid;
-    uint64_t net_ns_inode;
-    char process[NV_TOPOLOGY_PROCESS_MAX];
-    char username[NV_TOPOLOGY_USERNAME_MAX];
-    char namespace_type[16];
-    char local_ip[INET6_ADDRSTRLEN];
-    char local_address_space[16];
-    char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
+    const NV_PROCESS_ACTOR *source;
 } NV_TOPOLOGY_V1_PROCESS_ROW;
 
 typedef struct {
     uint64_t actor;
     uint64_t pid;
-    char cgroup_status[32];
-    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
-    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
-    char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
-    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
-    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
-    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
-    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX];
-    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
-    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
-    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
+    NV_TOPOLOGY_CONTAINER_FIELDS fields;
 } NV_TOPOLOGY_V1_CGROUP_ROW;
 
 typedef struct {
@@ -2024,57 +1860,40 @@ _Static_assert(20 + 4 * (1 + 20 + 1) +
                sizeof(((NV_TOPOLOGY_V1_ACTOR_LABEL *)NULL)->kind) <= NV_TOPOLOGY_KEY_MAX,
                "the label dedup key must fit NV_TOPOLOGY_KEY_MAX");
 
+// A growable array of rows, in insertion order, with an optional index from a string key to the row number.
+#define NV_TOPOLOGY_V1_TABLE(type) struct { type *rows; size_t used; size_t size; DICTIONARY *index; }
+
+typedef NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_CORRELATION_ROW) NV_TOPOLOGY_V1_CORRELATION_TABLE;
+
 typedef struct {
-    NV_TOPOLOGY_V1_ACTOR *actors;
-    size_t actors_used;
-    size_t actors_size;
-
-    NV_TOPOLOGY_V1_GRAPH_LINK *links;
-    size_t links_used;
-    size_t links_size;
-
-    NV_TOPOLOGY_V1_SOCKET_EVIDENCE *evidence;
-    size_t evidence_used;
-    size_t evidence_size;
-
-    NV_TOPOLOGY_V1_CONNECTION_ROW *connections;
-    size_t connections_used;
-    size_t connections_size;
-
-    NV_TOPOLOGY_V1_PORT_ROW *ports;
-    size_t ports_used;
-    size_t ports_size;
-
-    NV_TOPOLOGY_V1_PROCESS_ROW *processes;
-    size_t processes_used;
-    size_t processes_size;
-
-    NV_TOPOLOGY_V1_CGROUP_ROW *cgroups;
-    size_t cgroups_used;
-    size_t cgroups_size;
-
-    NV_TOPOLOGY_V1_CORRELATION_ROW *correlation_points;
-    size_t correlation_points_used;
-    size_t correlation_points_size;
-
-    NV_TOPOLOGY_V1_CORRELATION_ROW *correlation_claims;
-    size_t correlation_claims_used;
-    size_t correlation_claims_size;
-
-    NV_TOPOLOGY_V1_ACTOR_LABEL *labels;
-    size_t labels_used;
-    size_t labels_size;
-
-    DICTIONARY *actor_index;
-    DICTIONARY *graph_link_index;
-    DICTIONARY *connection_index;
-    DICTIONARY *port_index;
-    DICTIONARY *process_index;
-    DICTIONARY *cgroup_index;
-    DICTIONARY *correlation_point_index;
-    DICTIONARY *correlation_claim_index;
-    DICTIONARY *label_index;
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_ACTOR) actors;              // by actor id
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_GRAPH_LINK) links;          // by src|dst|type|protocol|state
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_SOCKET_EVIDENCE) evidence;  // not indexed
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_CONNECTION_ROW) connections;
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_PORT_ROW) ports;
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_PROCESS_ROW) processes;
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_CGROUP_ROW) cgroups;
+    NV_TOPOLOGY_V1_CORRELATION_TABLE correlation_points;
+    NV_TOPOLOGY_V1_CORRELATION_TABLE correlation_claims;
+    NV_TOPOLOGY_V1_TABLE(NV_TOPOLOGY_V1_ACTOR_LABEL) labels;        // by the label dedup key
 } NV_TOPOLOGY_V1_PAYLOAD;
+
+// The table macros evaluate `t` several times: pass a plain pointer, never an expression with side effects.
+
+// Append a zeroed row and evaluate to its address.
+#define NV_TOPOLOGY_V1_TABLE_APPEND(t) \
+    ((t)->rows = topology_array_reserve((t)->rows, (t)->used, &(t)->size, sizeof(*(t)->rows)), \
+     memset(&(t)->rows[(t)->used], 0, sizeof(*(t)->rows)), \
+     &(t)->rows[(t)->used++])
+
+// Append a zeroed row, index it under key, and evaluate to its address.
+#define NV_TOPOLOGY_V1_TABLE_ADD_KEYED(t, key) \
+    (topology_v1_index_add((t)->index, (key), (t)->used), NV_TOPOLOGY_V1_TABLE_APPEND(t))
+
+#define NV_TOPOLOGY_V1_TABLE_FREE(t) do { \
+    freez((t)->rows);                     \
+    dictionary_destroy((t)->index);       \
+} while(0)
 
 typedef struct {
     const char **values;
@@ -2089,65 +1908,56 @@ typedef struct {
     DICTIONARY *index;
 } NV_TOPOLOGY_V1_STRING_COLUMN;
 
-static void topology_v1_strncpy(char *dst, size_t dst_size, const char *src) {
-    if(!dst || !dst_size)
-        return;
-
-    strncpyz(dst, src ? src : "", dst_size - 1);
+static void topology_v1_index_add(DICTIONARY *index, const char *key, uint64_t row) {
+    dictionary_set(index, key, &row, sizeof(row));
 }
 
-static void topology_v1_actor_index_set(NV_TOPOLOGY_V1_PAYLOAD *payload, const char *actor_id, uint64_t index) {
-    dictionary_set(payload->actor_index, actor_id, &index, sizeof(index));
-}
-
-static bool topology_v1_actor_index_get(NV_TOPOLOGY_V1_PAYLOAD *payload, const char *actor_id, uint64_t *index) {
-    uint64_t *stored = dictionary_get(payload->actor_index, actor_id);
+static bool topology_v1_index_find(DICTIONARY *index, const char *key, uint64_t *row) {
+    uint64_t *stored = dictionary_get(index, key);
     if(!stored)
         return false;
 
-    if(index)
-        *index = *stored;
+    if(row)
+        *row = *stored;
 
     return true;
 }
 
-static NV_TOPOLOGY_V1_ACTOR *topology_v1_add_actor(NV_TOPOLOGY_V1_PAYLOAD *payload, const char *actor_id) {
-    if(payload->actors_used == payload->actors_size) {
-        size_t new_size = payload->actors_size ? payload->actors_size * 2 : 32;
-        payload->actors = reallocz(payload->actors, new_size * sizeof(*payload->actors));
-        payload->actors_size = new_size;
-    }
+static void topology_v1_init(NV_TOPOLOGY_V1_PAYLOAD *payload) {
+    *payload = (NV_TOPOLOGY_V1_PAYLOAD){ 0 };
+    payload->actors.index = topology_dict_create(sizeof(uint64_t));
+    payload->links.index = topology_dict_create(sizeof(uint64_t));
+    payload->connections.index = topology_dict_create(sizeof(uint64_t));
+    payload->ports.index = topology_dict_create(sizeof(uint64_t));
+    payload->processes.index = topology_dict_create(sizeof(uint64_t));
+    payload->cgroups.index = topology_dict_create(sizeof(uint64_t));
+    payload->correlation_points.index = topology_dict_create(sizeof(uint64_t));
+    payload->correlation_claims.index = topology_dict_create(sizeof(uint64_t));
+    payload->labels.index = topology_dict_create(sizeof(uint64_t));
+}
 
-    NV_TOPOLOGY_V1_ACTOR *actor = &payload->actors[payload->actors_used];
-    *actor = (NV_TOPOLOGY_V1_ACTOR){ 0 };
-    topology_v1_strncpy(actor->id, sizeof(actor->id), actor_id);
-    topology_v1_actor_index_set(payload, actor_id, payload->actors_used);
-    payload->actors_used++;
+static void topology_v1_free(NV_TOPOLOGY_V1_PAYLOAD *payload) {
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->actors);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->links);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->evidence);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->connections);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->ports);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->processes);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->cgroups);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->correlation_points);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->correlation_claims);
+    NV_TOPOLOGY_V1_TABLE_FREE(&payload->labels);
+}
+
+static bool topology_v1_actor_index_get(NV_TOPOLOGY_V1_PAYLOAD *payload, const char *actor_id, uint64_t *index) {
+    return topology_v1_index_find(payload->actors.index, actor_id, index);
+}
+
+static NV_TOPOLOGY_V1_ACTOR *topology_v1_add_actor(NV_TOPOLOGY_V1_PAYLOAD *payload, const char *actor_id, uint64_t *index) {
+    *index = payload->actors.used;
+    NV_TOPOLOGY_V1_ACTOR *actor = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->actors, actor_id);
+    topology_strncpy(actor->id, sizeof(actor->id), actor_id);
     return actor;
-}
-
-static NV_TOPOLOGY_V1_GRAPH_LINK *topology_v1_add_graph_link(NV_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->links_used == payload->links_size) {
-        size_t new_size = payload->links_size ? payload->links_size * 2 : 64;
-        payload->links = reallocz(payload->links, new_size * sizeof(*payload->links));
-        payload->links_size = new_size;
-    }
-
-    NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links[payload->links_used++];
-    *link = (NV_TOPOLOGY_V1_GRAPH_LINK){ 0 };
-    return link;
-}
-
-static NV_TOPOLOGY_V1_SOCKET_EVIDENCE *topology_v1_add_socket_evidence(NV_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->evidence_used == payload->evidence_size) {
-        size_t new_size = payload->evidence_size ? payload->evidence_size * 2 : 256;
-        payload->evidence = reallocz(payload->evidence, new_size * sizeof(*payload->evidence));
-        payload->evidence_size = new_size;
-    }
-
-    NV_TOPOLOGY_V1_SOCKET_EVIDENCE *row = &payload->evidence[payload->evidence_used++];
-    *row = (NV_TOPOLOGY_V1_SOCKET_EVIDENCE){ 0 };
-    return row;
 }
 
 static void topology_v1_add_connection_row(
@@ -2155,9 +1965,6 @@ static void topology_v1_add_connection_row(
     uint64_t src_actor,
     uint64_t dst_actor,
     const NV_TOPOLOGY_LINK *source) {
-    if(!payload || !payload->connection_index || !source)
-        return;
-
     char key[NV_TOPOLOGY_KEY_MAX];
     snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%s|%s",
               src_actor,
@@ -2165,38 +1972,23 @@ static void topology_v1_add_connection_row(
               source->protocol,
               source->state);
 
-    uint64_t *stored = dictionary_get(payload->connection_index, key);
-    if(stored) {
-        NV_TOPOLOGY_V1_CONNECTION_ROW *row = &payload->connections[*stored];
-        row->socket_count += source->sockets;
-        row->retransmissions += source->retransmissions;
-        if(row->max_rtt_usec < source->max_rtt_usec)
-            row->max_rtt_usec = source->max_rtt_usec;
-        if(row->max_rcv_rtt_usec < source->max_rcv_rtt_usec)
-            row->max_rcv_rtt_usec = source->max_rcv_rtt_usec;
-        return;
+    NV_TOPOLOGY_V1_CONNECTION_ROW *row;
+    uint64_t index;
+    if(topology_v1_index_find(payload->connections.index, key, &index))
+        row = &payload->connections.rows[index];
+    else {
+        row = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->connections, key);
+        row->src_actor = src_actor;
+        row->dst_actor = dst_actor;
+        row->first = source;
     }
 
-    if(payload->connections_used == payload->connections_size) {
-        size_t new_size = payload->connections_size ? payload->connections_size * 2 : 256;
-        payload->connections = reallocz(payload->connections, new_size * sizeof(*payload->connections));
-        payload->connections_size = new_size;
-    }
-
-    uint64_t index = payload->connections_used;
-    NV_TOPOLOGY_V1_CONNECTION_ROW *row = &payload->connections[payload->connections_used++];
-    *row = (NV_TOPOLOGY_V1_CONNECTION_ROW){ 0 };
-    row->src_actor = src_actor;
-    row->dst_actor = dst_actor;
-    row->socket_count = source->sockets;
-    row->retransmissions = source->retransmissions;
-    row->max_rtt_usec = source->max_rtt_usec;
-    row->max_rcv_rtt_usec = source->max_rcv_rtt_usec;
-    topology_v1_strncpy(row->client_ip, sizeof(row->client_ip), source->client_ip);
-    topology_v1_strncpy(row->server_ip, sizeof(row->server_ip), source->server_ip);
-    topology_v1_strncpy(row->protocol, sizeof(row->protocol), source->protocol);
-    topology_v1_strncpy(row->state, sizeof(row->state), source->state);
-    dictionary_set(payload->connection_index, key, &index, sizeof(index));
+    row->socket_count += source->sockets;
+    row->retransmissions += source->retransmissions;
+    if(row->max_rtt_usec < source->max_rtt_usec)
+        row->max_rtt_usec = source->max_rtt_usec;
+    if(row->max_rcv_rtt_usec < source->max_rcv_rtt_usec)
+        row->max_rcv_rtt_usec = source->max_rcv_rtt_usec;
 }
 
 static void topology_v1_add_port_row(
@@ -2205,7 +1997,7 @@ static void topology_v1_add_port_row(
     const char *protocol,
     uint64_t port,
     uint64_t socket_count) {
-    if(!payload || !payload->port_index || !port || !socket_count)
+    if(!port || !socket_count)
         return;
 
     char key[NV_TOPOLOGY_KEY_MAX];
@@ -2214,27 +2006,17 @@ static void topology_v1_add_port_row(
               protocol ? protocol : "",
               port);
 
-    uint64_t *stored = dictionary_get(payload->port_index, key);
-    if(stored) {
-        payload->ports[*stored].socket_count += socket_count;
+    uint64_t index;
+    if(topology_v1_index_find(payload->ports.index, key, &index)) {
+        payload->ports.rows[index].socket_count += socket_count;
         return;
     }
 
-    if(payload->ports_used == payload->ports_size) {
-        size_t new_size = payload->ports_size ? payload->ports_size * 2 : 256;
-        payload->ports = reallocz(payload->ports, new_size * sizeof(*payload->ports));
-        payload->ports_size = new_size;
-    }
-
-    uint64_t index = payload->ports_used;
-    NV_TOPOLOGY_V1_PORT_ROW *row = &payload->ports[payload->ports_used++];
-    *row = (NV_TOPOLOGY_V1_PORT_ROW){ 0 };
+    NV_TOPOLOGY_V1_PORT_ROW *row = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->ports, key);
     row->actor = actor;
     row->port = port;
     row->socket_count = socket_count;
-    topology_v1_strncpy(row->protocol, sizeof(row->protocol), protocol);
-
-    dictionary_set(payload->port_index, key, &index, sizeof(index));
+    topology_strncpy(row->protocol, sizeof(row->protocol), protocol);
 }
 
 static void topology_v1_add_process_row(
@@ -2242,38 +2024,19 @@ static void topology_v1_add_process_row(
     uint64_t actor,
     const NV_PROCESS_ACTOR *source)
 {
-    if(!payload || !payload->process_index || !source || !source->pid)
+    if(!source->pid)
         return;
 
     char key[NV_TOPOLOGY_KEY_MAX];
     snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%"PRIu64,
               actor, (uint64_t)source->pid, source->net_ns_inode);
 
-    if(dictionary_get(payload->process_index, key))
+    if(topology_v1_index_find(payload->processes.index, key, NULL))
         return;
 
-    if(payload->processes_used == payload->processes_size) {
-        size_t new_size = payload->processes_size ? payload->processes_size * 2 : 128;
-        payload->processes = reallocz(payload->processes, new_size * sizeof(*payload->processes));
-        payload->processes_size = new_size;
-    }
-
-    uint64_t index = payload->processes_used;
-    NV_TOPOLOGY_V1_PROCESS_ROW *row = &payload->processes[payload->processes_used++];
-    *row = (NV_TOPOLOGY_V1_PROCESS_ROW){ 0 };
+    NV_TOPOLOGY_V1_PROCESS_ROW *row = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->processes, key);
     row->actor = actor;
-    row->pid = source->pid;
-    row->ppid = source->ppid;
-    row->uid = source->uid;
-    row->net_ns_inode = source->net_ns_inode;
-    topology_v1_strncpy(row->process, sizeof(row->process), source->process);
-    topology_v1_strncpy(row->username, sizeof(row->username), source->username);
-    topology_v1_strncpy(row->namespace_type, sizeof(row->namespace_type), source->namespace_type);
-    topology_v1_strncpy(row->local_ip, sizeof(row->local_ip), source->local_ip);
-    topology_v1_strncpy(row->local_address_space, sizeof(row->local_address_space), source->local_address_space);
-    topology_v1_strncpy(row->cmdline, sizeof(row->cmdline), source->cmdline);
-
-    dictionary_set(payload->process_index, key, &index, sizeof(index));
+    row->source = source;
 }
 
 static void topology_v1_add_cgroup_row(
@@ -2282,42 +2045,20 @@ static void topology_v1_add_cgroup_row(
     uint64_t pid,
     const NV_TOPOLOGY_CONTAINER_FIELDS *fields)
 {
-    if(!payload || !payload->cgroup_index || !fields || !pid)
+    if(!pid)
         return;
 
     char key[NV_TOPOLOGY_KEY_MAX];
     snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%s|%s|%s",
               actor, pid, fields->cgroup_status, fields->cgroup_path, fields->container_name);
 
-    if(dictionary_get(payload->cgroup_index, key))
+    if(topology_v1_index_find(payload->cgroups.index, key, NULL))
         return;
 
-    if(payload->cgroups_used == payload->cgroups_size) {
-        size_t new_size = payload->cgroups_size ? payload->cgroups_size * 2 : 128;
-        payload->cgroups = reallocz(payload->cgroups, new_size * sizeof(*payload->cgroups));
-        payload->cgroups_size = new_size;
-    }
-
-    uint64_t index = payload->cgroups_used;
-    NV_TOPOLOGY_V1_CGROUP_ROW *row = &payload->cgroups[payload->cgroups_used++];
-    *row = (NV_TOPOLOGY_V1_CGROUP_ROW){ 0 };
+    NV_TOPOLOGY_V1_CGROUP_ROW *row = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->cgroups, key);
     row->actor = actor;
     row->pid = pid;
-    topology_v1_strncpy(row->cgroup_status, sizeof(row->cgroup_status), fields->cgroup_status);
-    topology_v1_strncpy(row->cgroup_path, sizeof(row->cgroup_path), fields->cgroup_path);
-    topology_v1_strncpy(row->cgroup_name, sizeof(row->cgroup_name), fields->cgroup_name);
-    topology_v1_strncpy(row->container_name, sizeof(row->container_name), fields->container_name);
-    topology_v1_strncpy(row->orchestrator, sizeof(row->orchestrator), fields->orchestrator);
-    topology_v1_strncpy(row->actor_kind, sizeof(row->actor_kind), fields->actor_kind);
-    topology_v1_strncpy(row->k8s_pod_name, sizeof(row->k8s_pod_name), fields->k8s_pod_name);
-    topology_v1_strncpy(row->k8s_namespace, sizeof(row->k8s_namespace), fields->k8s_namespace);
-    topology_v1_strncpy(row->k8s_workload, sizeof(row->k8s_workload), fields->k8s_workload);
-    topology_v1_strncpy(row->docker_container_name, sizeof(row->docker_container_name), fields->docker_container_name);
-    topology_v1_strncpy(row->docker_image, sizeof(row->docker_image), fields->docker_image);
-    topology_v1_strncpy(row->systemd_unit_name, sizeof(row->systemd_unit_name), fields->systemd_unit_name);
-    topology_v1_strncpy(row->systemd_unit_kind, sizeof(row->systemd_unit_kind), fields->systemd_unit_kind);
-
-    dictionary_set(payload->cgroup_index, key, &index, sizeof(index));
+    row->fields = *fields;
 }
 
 static void topology_v1_add_actor_label_ex(
@@ -2329,7 +2070,7 @@ static void topology_v1_add_actor_label_ex(
     const char *kind,
     bool has_value_index,
     uint64_t value_index) {
-    if(!payload || !key || !*key || !value || !*value)
+    if(!key || !*key || !value || !*value)
         return;
 
     NV_TOPOLOGY_V1_ACTOR_LABEL label = {
@@ -2337,36 +2078,26 @@ static void topology_v1_add_actor_label_ex(
         .has_value_index = has_value_index,
         .value_index = value_index,
     };
-    topology_v1_strncpy(label.key, sizeof(label.key), key);
-    topology_v1_strncpy(label.value, sizeof(label.value), value);
-    topology_v1_strncpy(label.source, sizeof(label.source), source ? source : NETWORK_TOPOLOGY_SOURCE);
-    topology_v1_strncpy(label.kind, sizeof(label.kind), kind ? kind : "attribute");
+    topology_strncpy(label.key, sizeof(label.key), key);
+    topology_strncpy(label.value, sizeof(label.value), value);
+    topology_strncpy(label.source, sizeof(label.source), source ? source : NETWORK_TOPOLOGY_SOURCE);
+    topology_strncpy(label.kind, sizeof(label.kind), kind ? kind : "attribute");
 
     // deduplicate on the fields as stored, so labels that would be emitted identically are kept once
-    if(payload->label_index) {
-        char index_key[NV_TOPOLOGY_KEY_MAX];
-        snprintfz(index_key, sizeof(index_key), "%"PRIu64"|%zu:%s|%zu:%s|%zu:%s|%zu:%s",
-                  actor,
-                  strlen(label.key), label.key,
-                  strlen(label.value), label.value,
-                  strlen(label.source), label.source,
-                  strlen(label.kind), label.kind);
-        if(dictionary_get(payload->label_index, index_key))
-            return;
+    char index_key[NV_TOPOLOGY_KEY_MAX];
+    snprintfz(index_key, sizeof(index_key), "%"PRIu64"|%zu:%s|%zu:%s|%zu:%s|%zu:%s",
+              actor,
+              strlen(label.key), label.key,
+              strlen(label.value), label.value,
+              strlen(label.source), label.source,
+              strlen(label.kind), label.kind);
+    if(topology_v1_index_find(payload->labels.index, index_key, NULL))
+        return;
 
-        bool stored = true;
-        dictionary_set(payload->label_index, index_key, &stored, sizeof(stored));
-    }
-
-    if(payload->labels_used == payload->labels_size) {
-        size_t new_size = payload->labels_size ? payload->labels_size * 2 : 128;
-        payload->labels = reallocz(payload->labels, new_size * sizeof(*payload->labels));
-        payload->labels_size = new_size;
-    }
-
-    payload->labels[payload->labels_used++] = label;
+    *NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->labels, index_key) = label;
 }
 
+// Empty values are dropped.
 static void topology_v1_add_actor_label(
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t actor,
@@ -2387,17 +2118,6 @@ static void topology_v1_add_actor_label_uint(
     topology_v1_add_actor_label(payload, actor, key, buffer, kind);
 }
 
-static void topology_v1_add_actor_label_if_set(
-    NV_TOPOLOGY_V1_PAYLOAD *payload,
-    uint64_t actor,
-    const char *key,
-    const char *value,
-    const char *kind)
-{
-    if(value && *value)
-        topology_v1_add_actor_label(payload, actor, key, value, kind);
-}
-
 static void topology_v1_enrich_process_actor_from_cache(
     const NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_V1_PAYLOAD *payload,
@@ -2405,14 +2125,11 @@ static void topology_v1_enrich_process_actor_from_cache(
     NV_TOPOLOGY_V1_ACTOR *actor,
     uint32_t pid,
     uint64_t starttime,
-    uid_t uid,
+    const NV_TOPOLOGY_CONTAINER_FIELDS *fields,
     bool fill_actor_fields)
 {
-    if(!ctx || !payload || !actor || !pid)
+    if(!pid)
         return;
-
-    NV_TOPOLOGY_CONTAINER_FIELDS fields = { 0 };
-    topology_container_fields_snapshot(ctx, pid, starttime, uid, actor->process, &fields);
 
     bool have_cached = false;
     NV_APPS_LOOKUP_FIELDS cached;
@@ -2420,64 +2137,44 @@ static void topology_v1_enrich_process_actor_from_cache(
     if(ctx->options.label_whitelist && nv_cache_lookup_pid(pid, starttime, &cached))
         have_cached = true;
 
-    if(fill_actor_fields) {
-        topology_v1_strncpy(actor->cgroup_status, sizeof(actor->cgroup_status), fields.cgroup_status);
-        topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), fields.cgroup_path);
-        topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), fields.cgroup_name);
-        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), fields.container_name);
-        topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), fields.orchestrator);
-        topology_v1_strncpy(actor->k8s_pod_name, sizeof(actor->k8s_pod_name), fields.k8s_pod_name);
-        topology_v1_strncpy(actor->k8s_namespace, sizeof(actor->k8s_namespace), fields.k8s_namespace);
-        topology_v1_strncpy(actor->k8s_workload, sizeof(actor->k8s_workload), fields.k8s_workload);
-        topology_v1_strncpy(actor->docker_container_name, sizeof(actor->docker_container_name), fields.docker_container_name);
-        topology_v1_strncpy(actor->docker_image, sizeof(actor->docker_image), fields.docker_image);
-        topology_v1_strncpy(actor->systemd_unit_name, sizeof(actor->systemd_unit_name), fields.systemd_unit_name);
-        topology_v1_strncpy(actor->systemd_unit_kind, sizeof(actor->systemd_unit_kind), fields.systemd_unit_kind);
-        topology_v1_strncpy(actor->actor_kind, sizeof(actor->actor_kind), fields.actor_kind);
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_v1_strncpy(actor->type, sizeof(actor->type), fields.actor_type);
-    }
+    if(fill_actor_fields)
+        actor->container = *fields;
 
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_status", fields.cgroup_status, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_path", fields.cgroup_path, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_name", fields.cgroup_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "cgroup_status", fields->cgroup_status, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "cgroup_path", fields->cgroup_path, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "cgroup_name", fields->cgroup_name, "attribute");
     if(!(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER &&
-         strcmp(actor->container_name, fields.container_name) == 0))
-        topology_v1_add_actor_label_if_set(payload, actor_index, "container_name", fields.container_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "orchestrator", fields.orchestrator, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_pod_name", fields.k8s_pod_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_namespace", fields.k8s_namespace, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_workload", fields.k8s_workload, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_container_name", fields.docker_container_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_image", fields.docker_image, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_name", fields.systemd_unit_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_kind", fields.systemd_unit_kind, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "actor_kind", fields.actor_kind, "attribute");
+         strcmp(actor->container.container_name, fields->container_name) == 0))
+        topology_v1_add_actor_label(payload, actor_index, "container_name", fields->container_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "orchestrator", fields->orchestrator, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "k8s_pod_name", fields->k8s_pod_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "k8s_namespace", fields->k8s_namespace, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "k8s_workload", fields->k8s_workload, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "docker_container_name", fields->docker_container_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "docker_image", fields->docker_image, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "systemd_unit_name", fields->systemd_unit_name, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "systemd_unit_kind", fields->systemd_unit_kind, "attribute");
+    topology_v1_add_actor_label(payload, actor_index, "actor_kind", fields->actor_kind, "attribute");
 
-    if(have_cached && ctx->options.label_whitelist) {
+    if(have_cached) {
         for(uint16_t i = 0; i < cached.cgroup_label_count; i++) {
             const char *key = cached.cgroup_labels[i].key;
             const char *value = cached.cgroup_labels[i].value;
             if(key && value && simple_pattern_matches(ctx->options.label_whitelist, key))
                 topology_v1_add_actor_label_ex(payload, actor_index, key, value, "cgroups", "label", false, 0);
         }
-    }
-
-    if(have_cached)
         nv_cache_lookup_fields_free(&cached);
+    }
 }
 
 static void topology_v1_add_correlation_row(
-    NV_TOPOLOGY_V1_CORRELATION_ROW **rows,
-    size_t *rows_used,
-    size_t *rows_size,
-    DICTIONARY *index,
+    NV_TOPOLOGY_V1_CORRELATION_TABLE *table,
     uint64_t actor,
     const char *protocol,
     const char *address_space,
     const char *ip,
     uint64_t port) {
-    if(!rows || !rows_used || !rows_size || !index || !port || topology_ip_is_unspecified(ip))
+    if(!port || topology_ip_is_unspecified(ip))
         return;
 
     char key[NV_TOPOLOGY_KEY_MAX];
@@ -2485,107 +2182,18 @@ static void topology_v1_add_correlation_row(
               actor,
               protocol ? protocol : "",
               address_space ? address_space : "",
-              ip ? ip : "",
+              ip,
               port);
 
-    if(dictionary_get(index, key))
+    if(topology_v1_index_find(table->index, key, NULL))
         return;
 
-    if(*rows_used == *rows_size) {
-        size_t new_size = *rows_size ? *rows_size * 2 : 256;
-        *rows = reallocz(*rows, new_size * sizeof(**rows));
-        *rows_size = new_size;
-    }
-
-    NV_TOPOLOGY_V1_CORRELATION_ROW *row = &(*rows)[(*rows_used)++];
-    *row = (NV_TOPOLOGY_V1_CORRELATION_ROW){ 0 };
+    NV_TOPOLOGY_V1_CORRELATION_ROW *row = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(table, key);
     row->actor = actor;
     row->port = port;
-    topology_v1_strncpy(row->protocol, sizeof(row->protocol), protocol);
-    topology_v1_strncpy(row->address_space, sizeof(row->address_space), address_space);
-    topology_v1_strncpy(row->ip, sizeof(row->ip), ip);
-
-    bool stored = true;
-    dictionary_set(index, key, &stored, sizeof(stored));
-}
-
-static void topology_v1_add_correlation_claim_endpoint(
-    NV_TOPOLOGY_V1_PAYLOAD *payload,
-    uint64_t actor,
-    const char *protocol,
-    const char *address_space,
-    const char *ip,
-    uint64_t port) {
-    if(!payload)
-        return;
-
-    topology_v1_add_correlation_row(
-        &payload->correlation_claims,
-        &payload->correlation_claims_used,
-        &payload->correlation_claims_size,
-        payload->correlation_claim_index,
-        actor,
-        protocol,
-        address_space,
-        ip,
-        port);
-}
-
-static void topology_v1_add_correlation_point_endpoint(
-    NV_TOPOLOGY_V1_PAYLOAD *payload,
-    uint64_t actor,
-    const char *protocol,
-    const char *address_space,
-    const char *ip,
-    uint64_t port) {
-    if(!payload)
-        return;
-
-    topology_v1_add_correlation_row(
-        &payload->correlation_points,
-        &payload->correlation_points_used,
-        &payload->correlation_points_size,
-        payload->correlation_point_index,
-        actor,
-        protocol,
-        address_space,
-        ip,
-        port);
-}
-
-static void topology_v1_free(NV_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(!payload)
-        return;
-
-    freez(payload->actors);
-    freez(payload->links);
-    freez(payload->evidence);
-    freez(payload->connections);
-    freez(payload->ports);
-    freez(payload->processes);
-    freez(payload->cgroups);
-    freez(payload->correlation_points);
-    freez(payload->correlation_claims);
-    freez(payload->labels);
-    if(payload->actor_index)
-        dictionary_destroy(payload->actor_index);
-    if(payload->graph_link_index)
-        dictionary_destroy(payload->graph_link_index);
-    if(payload->connection_index)
-        dictionary_destroy(payload->connection_index);
-    if(payload->port_index)
-        dictionary_destroy(payload->port_index);
-    if(payload->process_index)
-        dictionary_destroy(payload->process_index);
-    if(payload->cgroup_index)
-        dictionary_destroy(payload->cgroup_index);
-    if(payload->correlation_point_index)
-        dictionary_destroy(payload->correlation_point_index);
-    if(payload->correlation_claim_index)
-        dictionary_destroy(payload->correlation_claim_index);
-    if(payload->label_index)
-        dictionary_destroy(payload->label_index);
-    *payload = (NV_TOPOLOGY_V1_PAYLOAD){ 0 };
+    topology_strncpy(row->protocol, sizeof(row->protocol), protocol);
+    topology_strncpy(row->address_space, sizeof(row->address_space), address_space);
+    topology_strncpy(row->ip, sizeof(row->ip), ip);
 }
 
 static bool topology_v1_should_emit_endpoint_actor(
@@ -2605,15 +2213,17 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
     if(abort_status != NV_TOPOLOGY_ABORT_NONE)
         return abort_status;
 
-    NV_TOPOLOGY_V1_ACTOR *self = topology_v1_add_actor(payload, state->host_actor_id);
-    topology_v1_strncpy(self->type, sizeof(self->type), "self");
-    topology_v1_strncpy(self->machine_guid, sizeof(self->machine_guid), ctx->machine_guid);
-    topology_v1_strncpy(self->hostname, sizeof(self->hostname), ctx->hostname);
-    topology_v1_strncpy(self->display_name, sizeof(self->display_name), ctx->hostname);
+    const NV_TOPOLOGY_GROUP_BY group_by = ctx->options.group_by;
+
+    uint64_t self_index;
+    NV_TOPOLOGY_V1_ACTOR *self = topology_v1_add_actor(payload, state->host_actor_id, &self_index);
+    topology_strncpy(self->type, sizeof(self->type), "self");
+    topology_strncpy(self->machine_guid, sizeof(self->machine_guid), ctx->machine_guid);
+    topology_strncpy(self->hostname, sizeof(self->hostname), ctx->hostname);
+    topology_strncpy(self->display_name, sizeof(self->display_name), ctx->hostname);
     self->sockets = ctx->sockets_total;
     self->local_ip_count = state->local_ip_count;
     self->has_local_ip_count = true;
-    uint64_t self_index = payload->actors_used - 1;
     topology_v1_add_actor_label(payload, self_index, "display_name", self->display_name, "attribute");
     topology_v1_add_actor_label(payload, self_index, "type", self->type, "metadata");
     topology_v1_add_actor_label(payload, self_index, "hostname", self->hostname, "identity");
@@ -2621,6 +2231,9 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
     topology_v1_add_actor_label_uint(payload, self_index, "socket_count", self->sockets, "metric");
     topology_v1_add_actor_label_uint(payload, self_index, "local_ip_count", self->local_ip_count, "metric");
 
+    // Several processes can map to one actor (by name or by container). The first one creates it;
+    // every one adds its sockets, process/cgroup rows and labels. The label order is part of the
+    // output (it drives the dict/values codec choice), so enrichment keeps its position per path.
     NV_PROCESS_ACTOR *pa;
     size_t actor_iteration = 0;
     dfe_start_read(ctx->process_actors, pa) {
@@ -2629,7 +2242,6 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
             return abort_status;
 
         char actor_id[NV_TOPOLOGY_KEY_MAX];
-        char display_name[NV_TOPOLOGY_KEY_MAX];
         NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
         topology_container_fields_snapshot(ctx, (uint32_t)pa->pid, pa->starttime, pa->uid, pa->process, &container_fields);
 
@@ -2639,135 +2251,100 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
             pa->uid,
             pa->net_ns_inode,
             pa->process,
-            ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER ? container_fields.container_name : NULL,
+            group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER ? container_fields.container_name : NULL,
             actor_id,
             sizeof(actor_id));
 
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_v1_strncpy(display_name, sizeof(display_name), container_fields.container_name);
+        uint64_t actor_index;
+        NV_TOPOLOGY_V1_ACTOR *actor;
+        bool created = !topology_v1_actor_index_get(payload, actor_id, &actor_index);
+        if(created) {
+            actor = topology_v1_add_actor(payload, actor_id, &actor_index);
+            topology_strncpy(
+                actor->type, sizeof(actor->type),
+                group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER ? container_fields.actor_type : "process");
+            topology_strncpy(actor->machine_guid, sizeof(actor->machine_guid), ctx->machine_guid);
+            topology_strncpy(actor->hostname, sizeof(actor->hostname), ctx->hostname);
+            if(group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
+                topology_strncpy(actor->display_name, sizeof(actor->display_name), container_fields.container_name);
+            else
+                topology_process_display_name(ctx, pa->process, pa->pid, actor->display_name, sizeof(actor->display_name));
+
+            switch(group_by) {
+                case NV_TOPOLOGY_GROUP_BY_PID:
+                    topology_strncpy(actor->process, sizeof(actor->process), pa->process);
+                    topology_strncpy(actor->username, sizeof(actor->username), pa->username);
+                    topology_strncpy(actor->namespace_type, sizeof(actor->namespace_type), pa->namespace_type);
+                    topology_strncpy(actor->local_ip, sizeof(actor->local_ip), pa->local_ip);
+                    topology_strncpy(actor->local_address_space, sizeof(actor->local_address_space), pa->local_address_space);
+                    topology_strncpy(actor->cmdline, sizeof(actor->cmdline), pa->cmdline);
+                    topology_v1_enrich_process_actor_from_cache(
+                        ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, &container_fields, true);
+                    actor->pid = (uint64_t)pa->pid;
+                    actor->ppid = (uint64_t)pa->ppid;
+                    actor->uid = (uint64_t)pa->uid;
+                    actor->net_ns_inode = pa->net_ns_inode;
+                    actor->has_pid = true;
+                    actor->has_ppid = true;
+                    actor->has_uid = true;
+                    actor->has_net_ns_inode = true;
+                    break;
+
+                case NV_TOPOLOGY_GROUP_BY_PROCESS_NAME:
+                    topology_strncpy(actor->process, sizeof(actor->process), pa->process);
+                    break;
+
+                case NV_TOPOLOGY_GROUP_BY_CONTAINER:
+                    actor->container = container_fields;
+                    break;
+            }
+        }
         else
-            topology_process_display_name(ctx, pa->process, pa->pid, display_name, sizeof(display_name));
+            actor = &payload->actors.rows[actor_index];
 
-        const char *pid_label_kind = ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID ? "identity" : "attribute";
-        uint64_t actor_index = 0;
-        if(topology_v1_actor_index_get(payload, actor_id, &actor_index)) {
-            payload->actors[actor_index].sockets += pa->sockets;
-            topology_v1_add_process_row(payload, actor_index, pa);
-            topology_v1_add_cgroup_row(payload, actor_index, pa->pid, &container_fields);
-            topology_v1_enrich_process_actor_from_cache(
-                ctx, payload, actor_index, &payload->actors[actor_index], (uint32_t)pa->pid, pa->starttime, pa->uid, false);
-            if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-                topology_v1_add_actor_label_if_set(payload, actor_index, "process", pa->process, "attribute");
-            topology_v1_add_actor_label_if_set(payload, actor_index, "username", pa->username, "attribute");
-            topology_v1_add_actor_label_if_set(payload, actor_index, "cmdline", pa->cmdline, "attribute");
-            topology_v1_add_actor_label_if_set(payload, actor_index, "namespace_type", pa->namespace_type, "attribute");
-            topology_v1_add_actor_label_if_set(payload, actor_index, "local_ip", pa->local_ip, "attribute");
-            topology_v1_add_actor_label_if_set(payload, actor_index, "local_address_space", pa->local_address_space, "attribute");
-            topology_v1_add_actor_label_uint(payload, actor_index, "pid", (uint64_t)pa->pid, pid_label_kind);
-            topology_v1_add_actor_label_uint(payload, actor_index, "ppid", (uint64_t)pa->ppid, "attribute");
-            topology_v1_add_actor_label_uint(payload, actor_index, "uid", (uint64_t)pa->uid, "attribute");
-            topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", pa->net_ns_inode, pid_label_kind);
-            continue;
-        }
-
-        NV_TOPOLOGY_V1_ACTOR *actor = topology_v1_add_actor(payload, actor_id);
-        topology_v1_strncpy(
-            actor->type, sizeof(actor->type),
-            ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER ? container_fields.actor_type : "process");
-        topology_v1_strncpy(actor->machine_guid, sizeof(actor->machine_guid), ctx->machine_guid);
-        topology_v1_strncpy(actor->hostname, sizeof(actor->hostname), ctx->hostname);
-        topology_v1_strncpy(actor->display_name, sizeof(actor->display_name), display_name);
-        actor_index = payload->actors_used - 1;
-
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID) {
-            topology_v1_strncpy(actor->process, sizeof(actor->process), pa->process);
-            topology_v1_strncpy(actor->username, sizeof(actor->username), pa->username);
-            topology_v1_strncpy(actor->namespace_type, sizeof(actor->namespace_type), pa->namespace_type);
-            topology_v1_strncpy(actor->local_ip, sizeof(actor->local_ip), pa->local_ip);
-            topology_v1_strncpy(actor->local_address_space, sizeof(actor->local_address_space), pa->local_address_space);
-            topology_v1_strncpy(actor->cmdline, sizeof(actor->cmdline), pa->cmdline);
-            topology_v1_enrich_process_actor_from_cache(
-                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, true);
-            actor->pid = (uint64_t)pa->pid;
-            actor->ppid = (uint64_t)pa->ppid;
-            actor->uid = (uint64_t)pa->uid;
-            actor->net_ns_inode = pa->net_ns_inode;
-            actor->has_pid = true;
-            actor->has_ppid = true;
-            actor->has_uid = true;
-            actor->has_net_ns_inode = true;
-        }
-        else if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PROCESS_NAME) {
-            topology_v1_strncpy(actor->process, sizeof(actor->process), pa->process);
-        }
-        else {
-            topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), container_fields.container_name);
-            topology_v1_strncpy(actor->cgroup_status, sizeof(actor->cgroup_status), container_fields.cgroup_status);
-            topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), container_fields.cgroup_path);
-            topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), container_fields.cgroup_name);
-            topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), container_fields.orchestrator);
-            topology_v1_strncpy(actor->k8s_pod_name, sizeof(actor->k8s_pod_name), container_fields.k8s_pod_name);
-            topology_v1_strncpy(actor->k8s_namespace, sizeof(actor->k8s_namespace), container_fields.k8s_namespace);
-            topology_v1_strncpy(actor->k8s_workload, sizeof(actor->k8s_workload), container_fields.k8s_workload);
-            topology_v1_strncpy(actor->docker_container_name, sizeof(actor->docker_container_name), container_fields.docker_container_name);
-            topology_v1_strncpy(actor->docker_image, sizeof(actor->docker_image), container_fields.docker_image);
-            topology_v1_strncpy(actor->systemd_unit_name, sizeof(actor->systemd_unit_name), container_fields.systemd_unit_name);
-            topology_v1_strncpy(actor->systemd_unit_kind, sizeof(actor->systemd_unit_kind), container_fields.systemd_unit_kind);
-            topology_v1_strncpy(actor->actor_kind, sizeof(actor->actor_kind), container_fields.actor_kind);
-        }
-
-        actor->sockets = pa->sockets;
+        actor->sockets += pa->sockets;
         topology_v1_add_process_row(payload, actor_index, pa);
         topology_v1_add_cgroup_row(payload, actor_index, pa->pid, &container_fields);
 
-        topology_v1_add_actor_label(payload, actor_index, "display_name", actor->display_name, "attribute");
-        topology_v1_add_actor_label(payload, actor_index, "type", actor->type, "metadata");
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_v1_add_actor_label(payload, actor_index, "container_name", actor->container_name, "identity");
+        if(created) {
+            topology_v1_add_actor_label(payload, actor_index, "display_name", actor->display_name, "attribute");
+            topology_v1_add_actor_label(payload, actor_index, "type", actor->type, "metadata");
+            if(group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
+                topology_v1_add_actor_label(payload, actor_index, "container_name", actor->container.container_name, "identity");
+            else
+                topology_v1_add_actor_label(payload, actor_index, "process", actor->process, "identity");
+        }
         else
-            topology_v1_add_actor_label(payload, actor_index, "process", actor->process, "identity");
+            topology_v1_enrich_process_actor_from_cache(
+                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, &container_fields, false);
 
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_v1_add_actor_label_if_set(payload, actor_index, "process", pa->process, "attribute");
-        topology_v1_add_actor_label_if_set(payload, actor_index, "username", pa->username, "attribute");
-        topology_v1_add_actor_label_if_set(payload, actor_index, "cmdline", pa->cmdline, "attribute");
-        topology_v1_add_actor_label_if_set(payload, actor_index, "namespace_type", pa->namespace_type, "attribute");
-        topology_v1_add_actor_label_if_set(payload, actor_index, "local_ip", pa->local_ip, "attribute");
-        topology_v1_add_actor_label_if_set(payload, actor_index, "local_address_space", pa->local_address_space, "attribute");
+        const char *pid_label_kind = group_by == NV_TOPOLOGY_GROUP_BY_PID ? "identity" : "attribute";
+        if(group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
+            topology_v1_add_actor_label(payload, actor_index, "process", pa->process, "attribute");
+        topology_v1_add_actor_label(payload, actor_index, "username", pa->username, "attribute");
+        topology_v1_add_actor_label(payload, actor_index, "cmdline", pa->cmdline, "attribute");
+        topology_v1_add_actor_label(payload, actor_index, "namespace_type", pa->namespace_type, "attribute");
+        topology_v1_add_actor_label(payload, actor_index, "local_ip", pa->local_ip, "attribute");
+        topology_v1_add_actor_label(payload, actor_index, "local_address_space", pa->local_address_space, "attribute");
         topology_v1_add_actor_label_uint(payload, actor_index, "pid", (uint64_t)pa->pid, pid_label_kind);
         topology_v1_add_actor_label_uint(payload, actor_index, "ppid", (uint64_t)pa->ppid, "attribute");
         topology_v1_add_actor_label_uint(payload, actor_index, "uid", (uint64_t)pa->uid, "attribute");
         topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", pa->net_ns_inode, pid_label_kind);
 
-        if(ctx->options.group_by != NV_TOPOLOGY_GROUP_BY_PID)
+        if(created && group_by != NV_TOPOLOGY_GROUP_BY_PID)
             topology_v1_enrich_process_actor_from_cache(
-                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, false);
-
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID) {
-            topology_v1_add_actor_label(payload, actor_index, "username", actor->username, "attribute");
-            topology_v1_add_actor_label(payload, actor_index, "cmdline", actor->cmdline, "attribute");
-            topology_v1_add_actor_label(payload, actor_index, "namespace_type", actor->namespace_type, "attribute");
-            topology_v1_add_actor_label(payload, actor_index, "local_ip", actor->local_ip, "attribute");
-            topology_v1_add_actor_label(payload, actor_index, "local_address_space", actor->local_address_space, "attribute");
-        }
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
-            topology_v1_add_actor_label_uint(payload, actor_index, "pid", actor->pid, "identity");
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
-            topology_v1_add_actor_label_uint(payload, actor_index, "ppid", actor->ppid, "attribute");
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
-            topology_v1_add_actor_label_uint(payload, actor_index, "uid", actor->uid, "attribute");
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID)
-            topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", actor->net_ns_inode, "identity");
+                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, &container_fields, false);
     }
     dfe_done(pa);
 
-    for(uint64_t i = 0; i < payload->actors_used; i++) {
+    for(uint64_t i = 0; i < payload->actors.used; i++) {
         if(topology_abort_iteration_checkpoint((size_t)i) &&
            (abort_status = topology_context_check_abort(ctx)) != NV_TOPOLOGY_ABORT_NONE)
             return abort_status;
 
-        if(strcmp(payload->actors[i].type, "process") == 0 || strcmp(payload->actors[i].type, "container") == 0)
-            topology_v1_add_actor_label_uint(payload, i, "socket_count", payload->actors[i].sockets, "metric");
+        const NV_TOPOLOGY_V1_ACTOR *actor = &payload->actors.rows[i];
+        if(strcmp(actor->type, "process") == 0 || strcmp(actor->type, "container") == 0)
+            topology_v1_add_actor_label_uint(payload, i, "socket_count", actor->sockets, "metric");
     }
 
     NV_REMOTE_ACTOR *ra;
@@ -2784,15 +2361,15 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
             continue;
 
         char actor_id[NV_TOPOLOGY_KEY_MAX];
-        topology_actor_id_for_remote_endpoint(ctx, ra->ip, ra->address_space, actor_id, sizeof(actor_id));
+        topology_actor_id_for_remote_endpoint(ra->ip, actor_id, sizeof(actor_id));
 
-        NV_TOPOLOGY_V1_ACTOR *actor = topology_v1_add_actor(payload, actor_id);
-        topology_v1_strncpy(actor->type, sizeof(actor->type), "endpoint");
-        topology_v1_strncpy(actor->ip, sizeof(actor->ip), ra->ip);
-        topology_v1_strncpy(actor->address_space, sizeof(actor->address_space), ra->address_space);
-        topology_v1_strncpy(actor->display_name, sizeof(actor->display_name), ra->ip);
+        uint64_t actor_index;
+        NV_TOPOLOGY_V1_ACTOR *actor = topology_v1_add_actor(payload, actor_id, &actor_index);
+        topology_strncpy(actor->type, sizeof(actor->type), "endpoint");
+        topology_strncpy(actor->ip, sizeof(actor->ip), ra->ip);
+        topology_strncpy(actor->address_space, sizeof(actor->address_space), ra->address_space);
+        topology_strncpy(actor->display_name, sizeof(actor->display_name), ra->ip);
         actor->sockets = ra->sockets;
-        uint64_t actor_index = payload->actors_used - 1;
         topology_v1_add_actor_label(payload, actor_index, "display_name", actor->display_name, "attribute");
         topology_v1_add_actor_label(payload, actor_index, "type", actor->type, "metadata");
         topology_v1_add_actor_label(payload, actor_index, "ip", actor->ip, "identity");
@@ -2832,13 +2409,11 @@ static bool topology_v1_process_actor_index(
 }
 
 static bool topology_v1_endpoint_actor_index(
-    const NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     const char *ip,
-    const char *address_space,
     uint64_t *index) {
     char actor_id[NV_TOPOLOGY_KEY_MAX];
-    topology_actor_id_for_remote_endpoint(ctx, ip, address_space, actor_id, sizeof(actor_id));
+    topology_actor_id_for_remote_endpoint(ip, actor_id, sizeof(actor_id));
     return topology_v1_actor_index_get(payload, actor_id, index);
 }
 
@@ -2856,18 +2431,17 @@ static uint64_t topology_v1_graph_link_get_or_add(
               protocol ? protocol : "",
               state ? state : "");
 
-    uint64_t *stored = dictionary_get(payload->graph_link_index, key);
-    if(stored)
-        return *stored;
+    uint64_t index;
+    if(topology_v1_index_find(payload->links.index, key, &index))
+        return index;
 
-    uint64_t index = payload->links_used;
-    NV_TOPOLOGY_V1_GRAPH_LINK *link = topology_v1_add_graph_link(payload);
+    index = payload->links.used;
+    NV_TOPOLOGY_V1_GRAPH_LINK *link = NV_TOPOLOGY_V1_TABLE_ADD_KEYED(&payload->links, key);
     link->src_actor = src_actor;
     link->dst_actor = dst_actor;
-    topology_v1_strncpy(link->type, sizeof(link->type), type);
-    topology_v1_strncpy(link->protocol, sizeof(link->protocol), protocol);
-    topology_v1_strncpy(link->state, sizeof(link->state), state);
-    dictionary_set(payload->graph_link_index, key, &index, sizeof(index));
+    topology_strncpy(link->type, sizeof(link->type), type);
+    topology_strncpy(link->protocol, sizeof(link->protocol), protocol);
+    topology_strncpy(link->state, sizeof(link->state), state);
     return index;
 }
 
@@ -2912,7 +2486,7 @@ static bool topology_v1_socket_peer_actor_index(
 
     if(is_correlation_point)
         *is_correlation_point = true;
-    return topology_v1_endpoint_actor_index(ctx, payload, ip, address_space, actor);
+    return topology_v1_endpoint_actor_index(payload, ip, actor);
 }
 
 static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
@@ -2940,7 +2514,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
 
         uint64_t link_index = topology_v1_graph_link_get_or_add(
             payload, host_actor, process_actor, "ownership", "ownership", "active");
-        NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links[link_index];
+        NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links.rows[link_index];
         link->socket_count += pa->sockets;
         state->ownership_link_count++;
     }
@@ -2981,18 +2555,18 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
             continue;
 
         if(source->process_is_client) {
-            topology_v1_add_correlation_claim_endpoint(
-                payload, client_actor, source->protocol, source->client_address_space, source->client_ip, source->client_port);
+            topology_v1_add_correlation_row(
+                &payload->correlation_claims, client_actor, source->protocol, source->client_address_space, source->client_ip, source->client_port);
             if(server_is_correlation_point)
-                topology_v1_add_correlation_point_endpoint(
-                    payload, server_actor, source->protocol, source->server_address_space, source->server_ip, source->server_port);
+                topology_v1_add_correlation_row(
+                    &payload->correlation_points, server_actor, source->protocol, source->server_address_space, source->server_ip, source->server_port);
         }
         else {
-            topology_v1_add_correlation_claim_endpoint(
-                payload, server_actor, source->protocol, source->server_address_space, source->server_ip, source->server_port);
+            topology_v1_add_correlation_row(
+                &payload->correlation_claims, server_actor, source->protocol, source->server_address_space, source->server_ip, source->server_port);
             if(client_is_correlation_point)
-                topology_v1_add_correlation_point_endpoint(
-                    payload, client_actor, source->protocol, source->client_address_space, source->client_ip, source->client_port);
+                topology_v1_add_correlation_row(
+                    &payload->correlation_points, client_actor, source->protocol, source->client_address_space, source->client_ip, source->client_port);
         }
 
         topology_v1_add_port_row(
@@ -3008,7 +2582,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
             payload, client_actor, server_actor,
             (client_is_correlation_point || server_is_correlation_point) ? "endpoint_socket" : "socket",
             source->protocol, source->state);
-        NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links[link_index];
+        NV_TOPOLOGY_V1_GRAPH_LINK *link = &payload->links.rows[link_index];
         link->evidence_count++;
         link->socket_count += source->sockets;
         link->retransmissions += source->retransmissions;
@@ -3018,7 +2592,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
             link->max_rcv_rtt_usec = source->max_rcv_rtt_usec;
 
         if(ctx->options.detailed) {
-            NV_TOPOLOGY_V1_SOCKET_EVIDENCE *row = topology_v1_add_socket_evidence(payload);
+            NV_TOPOLOGY_V1_SOCKET_EVIDENCE *row = NV_TOPOLOGY_V1_TABLE_APPEND(&payload->evidence);
             row->link = link_index;
             row->src_actor = client_actor;
             row->dst_actor = server_actor;
@@ -3107,47 +2681,30 @@ static void topology_v1_string_column_init(NV_TOPOLOGY_V1_STRING_COLUMN *column,
     *column = (NV_TOPOLOGY_V1_STRING_COLUMN){
         .rows = rows,
         .indexes = rows ? callocz(rows, sizeof(*column->indexes)) : NULL,
-        .index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL,
-            sizeof(uint64_t)),
+        .index = topology_dict_create(sizeof(uint64_t)),
     };
 }
 
 static void topology_v1_string_column_free(NV_TOPOLOGY_V1_STRING_COLUMN *column) {
-    if(!column)
-        return;
-
     freez(column->values);
     freez(column->indexes);
-    if(column->index)
-        dictionary_destroy(column->index);
+    dictionary_destroy(column->index);
     *column = (NV_TOPOLOGY_V1_STRING_COLUMN){ 0 };
 }
 
 static void topology_v1_string_column_add(NV_TOPOLOGY_V1_STRING_COLUMN *column, const char *value) {
-    if(!column || column->rows_used >= column->rows)
+    if(column->rows_used >= column->rows)
         return;
 
     const char *stored_value = (value && *value) ? value : NULL;
     const char *key = stored_value ? stored_value : "\001";
     uint64_t index = 0;
-    uint64_t *stored = column->index ? dictionary_get(column->index, key) : NULL;
 
-    if(stored) {
-        index = *stored;
-    }
-    else {
+    if(!topology_v1_index_find(column->index, key, &index)) {
         index = column->values_used;
-        if(column->values_used == column->values_size) {
-            size_t new_size = column->values_size ? column->values_size * 2 : 16;
-            column->values = reallocz(column->values, new_size * sizeof(*column->values));
-            column->values_size = new_size;
-        }
-
+        column->values = topology_array_reserve(column->values, column->values_used, &column->values_size, sizeof(*column->values));
         column->values[column->values_used++] = stored_value;
-        if(column->index)
-            dictionary_set(column->index, key, &index, sizeof(index));
+        topology_v1_index_add(column->index, key, index);
 
         column->unique_json_size += topology_v1_string_json_size(stored_value);
         if(column->values_used > 1)
@@ -3558,9 +3115,7 @@ static bool topology_v1_actor_type_is_grouped_runtime(const char *actor_type)
 
 static void topology_v1_emit_modal_label_identification(
     BUFFER *wb,
-    const char *actor_type,
-    NV_TOPOLOGY_GROUP_BY group_by) {
-    (void)group_by;
+    const char *actor_type) {
 
     buffer_json_member_add_object(wb, "identification");
     {
@@ -3678,10 +3233,10 @@ static bool topology_v1_label_matches_actor_type(
     const NV_TOPOLOGY_V1_PAYLOAD *payload,
     const NV_TOPOLOGY_V1_ACTOR_LABEL *label,
     const char *actor_type) {
-    if(!payload || !label || !actor_type || label->actor >= payload->actors_used)
+    if(label->actor >= payload->actors.used)
         return false;
 
-    return strcmp(payload->actors[label->actor].type, actor_type) == 0;
+    return strcmp(payload->actors.rows[label->actor].type, actor_type) == 0;
 }
 
 static bool topology_v1_search_label_key_exists(const char **keys, size_t keys_used, const char *key) {
@@ -3705,9 +3260,9 @@ static void topology_v1_emit_actor_search_label_keys(
     size_t dynamic_keys_used = 0;
     size_t dynamic_keys_size = 0;
 
-    if(topology_v1_actor_type_has_process_enrichment(actor_type) && payload) {
-        for(size_t i = 0; i < payload->labels_used; i++) {
-            const NV_TOPOLOGY_V1_ACTOR_LABEL *label = &payload->labels[i];
+    if(topology_v1_actor_type_has_process_enrichment(actor_type)) {
+        for(size_t i = 0; i < payload->labels.used; i++) {
+            const NV_TOPOLOGY_V1_ACTOR_LABEL *label = &payload->labels.rows[i];
             if(strcmp(label->source, "cgroups") != 0 || strcmp(label->kind, "label") != 0)
                 continue;
 
@@ -3717,10 +3272,7 @@ static void topology_v1_emit_actor_search_label_keys(
             if(topology_v1_search_label_key_exists(dynamic_keys, dynamic_keys_used, label->key))
                 continue;
 
-            if(dynamic_keys_used == dynamic_keys_size) {
-                dynamic_keys_size = dynamic_keys_size ? dynamic_keys_size * 2 : 16;
-                dynamic_keys = reallocz(dynamic_keys, dynamic_keys_size * sizeof(*dynamic_keys));
-            }
+            dynamic_keys = topology_array_reserve(dynamic_keys, dynamic_keys_used, &dynamic_keys_size, sizeof(*dynamic_keys));
             dynamic_keys[dynamic_keys_used++] = label->key;
         }
     }
@@ -3780,7 +3332,6 @@ static void topology_v1_emit_actor_type(
     const char *layout_repulsion,
     bool show_port_bullets,
     const char *port_table,
-    NV_TOPOLOGY_GROUP_BY group_by,
     bool detailed,
     const char *label_column_a,
     const char *label_column_b) {
@@ -3922,7 +3473,7 @@ static void topology_v1_emit_actor_type(
                 buffer_json_member_add_object(wb, "labels");
                 {
                     buffer_json_member_add_string(wb, "table", "actor_labels");
-                    topology_v1_emit_modal_label_identification(wb, id, group_by);
+                    topology_v1_emit_modal_label_identification(wb, id);
                 }
                 buffer_json_object_close(wb);
                 buffer_json_member_add_object(wb, "mini_topology");
@@ -4054,13 +3605,12 @@ static void topology_v1_emit_runtime_actor_type(
     const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE *type,
     const char *const *container_scopes,
     size_t container_scopes_count,
-    NV_TOPOLOGY_GROUP_BY group_by,
     bool detailed)
 {
     topology_v1_emit_actor_type(
         wb, payload, type->id, "container_name", NULL, container_scopes, container_scopes_count,
         type->label, "primary", type->icon, "actor", true, "metric", "socket_count", "normal", "normal", true,
-        "socket_ports", group_by, detailed, "display_name", "container_name");
+        "socket_ports", detailed, "display_name", "container_name");
 }
 
 static void topology_v1_emit_link_type(
@@ -4152,7 +3702,7 @@ static void topology_v1_emit_type_registry(
     BUFFER *wb,
     const NV_TOPOLOGY_V1_PAYLOAD *payload,
     NV_TOPOLOGY_GROUP_BY group_by,
-    bool detailed __maybe_unused) {
+    bool detailed) {
     static const char *const self_scopes[] = { "node" };
     static const char *const process_scopes[] = { "process_name", "pid" };
     static const char *const container_scopes[] = { "container" };
@@ -4171,22 +3721,19 @@ static void topology_v1_emit_type_registry(
             topology_v1_emit_actor_type(
                 wb, payload, "self", "machine_guid", "hostname", self_scopes, _countof(self_scopes),
                 "This host", "self", "self", "actor", true, "fixed", NULL, "emphasized", "strongest", false, NULL,
-                group_by,
                 detailed,
                 "display_name", "hostname");
             topology_v1_emit_actor_type(
                 wb, payload, "process", process_merge_a, process_merge_b, process_scopes, _countof(process_scopes),
                 "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
                 detailed,
                 "display_name", "process");
             for(size_t i = 0; i < _countof(topology_runtime_actor_types); i++)
                 topology_v1_emit_runtime_actor_type(
-                    wb, payload, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
+                    wb, payload, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), detailed);
             topology_v1_emit_actor_type(
                 wb, payload, "endpoint", "ip", "address_space", NULL, 0,
                 "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
-                group_by,
                 detailed,
                 "display_name", "ip");
         }
@@ -4521,7 +4068,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_actor_table(
 
     buffer_json_member_add_object(wb, "actors");
     {
-        buffer_json_member_add_uint64(wb, "rows", payload->actors_used);
+        buffer_json_member_add_uint64(wb, "rows", payload->actors.used);
         buffer_json_member_add_array(wb, "columns");
         topology_v1_emit_actor_columns(wb);
         buffer_json_array_close(wb);
@@ -4529,21 +4076,21 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_actor_table(
 
 #define NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(member) do { \
             topology_v1_values_start(wb); \
-            for(size_t i = 0; i < payload->actors_used; i++) { \
+            for(size_t i = 0; i < payload->actors.used; i++) { \
                 if(topology_abort_iteration_checkpoint(i) && \
                    (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
                     return abort_status; \
-                buffer_json_add_array_item_string(wb, payload->actors[i].member[0] ? payload->actors[i].member : NULL); \
+                buffer_json_add_array_item_string(wb, payload->actors.rows[i].member[0] ? payload->actors.rows[i].member : NULL); \
             } \
             topology_v1_values_end(wb); \
         } while(0)
 #define NV_TOPOLOGY_V1_ACTOR_UINT_VALUES(member, has_member) do { \
             topology_v1_values_start(wb); \
-            for(size_t i = 0; i < payload->actors_used; i++) { \
+            for(size_t i = 0; i < payload->actors.used; i++) { \
                 if(topology_abort_iteration_checkpoint(i) && \
                    (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
                     return abort_status; \
-                topology_v1_add_nullable_uint(wb, payload->actors[i].has_member, payload->actors[i].member); \
+                topology_v1_add_nullable_uint(wb, payload->actors.rows[i].has_member, payload->actors.rows[i].member); \
             } \
             topology_v1_values_end(wb); \
         } while(0)
@@ -4565,27 +4112,27 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_actor_table(
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(local_address_space);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(ip);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(address_space);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_status);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_path);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_name);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container_name);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(orchestrator);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(k8s_pod_name);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(k8s_namespace);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(k8s_workload);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(docker_container_name);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(docker_image);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(systemd_unit_name);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(systemd_unit_kind);
-        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(actor_kind);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.cgroup_status);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.cgroup_path);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.cgroup_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.container_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.orchestrator);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.k8s_pod_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.k8s_namespace);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.k8s_workload);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.docker_container_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.docker_image);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.systemd_unit_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.systemd_unit_kind);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container.actor_kind);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(display_name);
 
         topology_v1_values_start(wb);
-        for(size_t i = 0; i < payload->actors_used; i++) {
+        for(size_t i = 0; i < payload->actors.used; i++) {
             if(topology_abort_iteration_checkpoint(i) &&
                (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
                 return abort_status;
-            buffer_json_add_array_item_uint64(wb, payload->actors[i].sockets);
+            buffer_json_add_array_item_uint64(wb, payload->actors.rows[i].sockets);
         }
         topology_v1_values_end(wb);
 
@@ -4656,22 +4203,22 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_link_table(
 
     buffer_json_member_add_object(wb, "links");
     {
-        buffer_json_member_add_uint64(wb, "rows", payload->links_used);
+        buffer_json_member_add_uint64(wb, "rows", payload->links.used);
         buffer_json_member_add_array(wb, "columns");
         topology_v1_emit_link_columns(wb);
         buffer_json_array_close(wb);
         buffer_json_member_add_array(wb, "values");
 
-        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, src_actor);
-        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, dst_actor);
-        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links, payload->links_used, type);
-        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links, payload->links_used, protocol);
-        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links, payload->links_used, state);
-        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, evidence_count);
-        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, socket_count);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links.rows, payload->links.used, src_actor);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links.rows, payload->links.used, dst_actor);
+        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links.rows, payload->links.used, type);
+        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links.rows, payload->links.used, protocol);
+        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links.rows, payload->links.used, state);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links.rows, payload->links.used, evidence_count);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links.rows, payload->links.used, socket_count);
 #if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
-        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, retransmissions);
-        NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->links, payload->links_used, max_rtt_usec, max_rcv_rtt_usec);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links.rows, payload->links.used, retransmissions);
+        NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->links.rows, payload->links.used, max_rtt_usec, max_rcv_rtt_usec);
 #endif
 
         buffer_json_array_close(wb);
@@ -4697,16 +4244,16 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                 buffer_json_member_add_string(wb, "type", "socket_ports");
                 buffer_json_member_add_object(wb, "table");
                 {
-                    buffer_json_member_add_uint64(wb, "rows", payload->ports_used);
+                    buffer_json_member_add_uint64(wb, "rows", payload->ports.used);
                     buffer_json_member_add_array(wb, "columns");
                     topology_v1_emit_socket_port_columns(wb);
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports, payload->ports_used, actor);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports, payload->ports_used, port);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->ports, payload->ports_used, protocol);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports, payload->ports_used, socket_count);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports.rows, payload->ports.used, actor);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports.rows, payload->ports.used, port);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->ports.rows, payload->ports.used, protocol);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports.rows, payload->ports.used, socket_count);
 
                     buffer_json_array_close(wb);
                 }
@@ -4719,23 +4266,23 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                 buffer_json_member_add_string(wb, "type", "processes");
                 buffer_json_member_add_object(wb, "table");
                 {
-                    buffer_json_member_add_uint64(wb, "rows", payload->processes_used);
+                    buffer_json_member_add_uint64(wb, "rows", payload->processes.used);
                     buffer_json_member_add_array(wb, "columns");
                     topology_v1_emit_process_detail_columns(wb);
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, actor);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, pid);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, ppid);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, uid);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, net_ns_inode);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, process);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, username);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, namespace_type);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, local_ip);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, local_address_space);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, cmdline);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes.rows, payload->processes.used, actor);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes.rows, payload->processes.used, source->pid);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes.rows, payload->processes.used, source->ppid);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes.rows, payload->processes.used, source->uid);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes.rows, payload->processes.used, source->net_ns_inode);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes.rows, payload->processes.used, source->process);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes.rows, payload->processes.used, source->username);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes.rows, payload->processes.used, source->namespace_type);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes.rows, payload->processes.used, source->local_ip);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes.rows, payload->processes.used, source->local_address_space);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes.rows, payload->processes.used, source->cmdline);
 
                     buffer_json_array_close(wb);
                 }
@@ -4748,27 +4295,27 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                 buffer_json_member_add_string(wb, "type", "cgroups");
                 buffer_json_member_add_object(wb, "table");
                 {
-                    buffer_json_member_add_uint64(wb, "rows", payload->cgroups_used);
+                    buffer_json_member_add_uint64(wb, "rows", payload->cgroups.used);
                     buffer_json_member_add_array(wb, "columns");
                     topology_v1_emit_cgroup_detail_columns(wb);
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->cgroups, payload->cgroups_used, actor);
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->cgroups, payload->cgroups_used, pid);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, cgroup_status);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, cgroup_path);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, cgroup_name);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, container_name);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, orchestrator);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, actor_kind);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, k8s_pod_name);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, k8s_namespace);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, k8s_workload);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, docker_container_name);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, docker_image);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, systemd_unit_name);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, systemd_unit_kind);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->cgroups.rows, payload->cgroups.used, actor);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->cgroups.rows, payload->cgroups.used, pid);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.cgroup_status);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.cgroup_path);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.cgroup_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.container_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.orchestrator);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.actor_kind);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.k8s_pod_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.k8s_namespace);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.k8s_workload);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.docker_container_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.docker_image);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.systemd_unit_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups.rows, payload->cgroups.used, fields.systemd_unit_kind);
 
                     buffer_json_array_close(wb);
                 }
@@ -4781,24 +4328,24 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                 buffer_json_member_add_string(wb, "type", "actor_labels");
                 buffer_json_member_add_object(wb, "table");
                 {
-                    buffer_json_member_add_uint64(wb, "rows", payload->labels_used);
+                    buffer_json_member_add_uint64(wb, "rows", payload->labels.used);
                     buffer_json_member_add_array(wb, "columns");
                     topology_v1_emit_actor_label_columns(wb);
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->labels, payload->labels_used, actor);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, key);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, value);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, source);
-                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, kind);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->labels.rows, payload->labels.used, actor);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels.rows, payload->labels.used, key);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels.rows, payload->labels.used, value);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels.rows, payload->labels.used, source);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels.rows, payload->labels.used, kind);
 
                     topology_v1_values_start(wb);
-                    for(size_t i = 0; i < payload->labels_used; i++) {
+                    for(size_t i = 0; i < payload->labels.used; i++) {
                         if(topology_abort_iteration_checkpoint(i) &&
                            (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
                             return abort_status;
-                        topology_v1_add_nullable_uint(wb, payload->labels[i].has_value_index, payload->labels[i].value_index);
+                        topology_v1_add_nullable_uint(wb, payload->labels.rows[i].has_value_index, payload->labels.rows[i].value_index);
                     }
                     topology_v1_values_end(wb);
 
@@ -4810,7 +4357,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
         }
         buffer_json_object_close(wb);
 
-        if(payload->connections_used) {
+        if(payload->connections.used) {
             buffer_json_member_add_object(wb, "relationship");
             {
                 buffer_json_member_add_object(wb, "connections");
@@ -4818,22 +4365,22 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                     buffer_json_member_add_string(wb, "type", "connections");
                     buffer_json_member_add_object(wb, "table");
                     {
-                        buffer_json_member_add_uint64(wb, "rows", payload->connections_used);
+                        buffer_json_member_add_uint64(wb, "rows", payload->connections.used);
                         buffer_json_member_add_array(wb, "columns");
                         topology_v1_emit_connection_columns(wb);
                         buffer_json_array_close(wb);
                         buffer_json_member_add_array(wb, "values");
 
-                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, src_actor);
-                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, dst_actor);
-                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, client_ip);
-                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, server_ip);
-                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, protocol);
-                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, state);
-                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, socket_count);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections.rows, payload->connections.used, src_actor);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections.rows, payload->connections.used, dst_actor);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections.rows, payload->connections.used, first->client_ip);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections.rows, payload->connections.used, first->server_ip);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections.rows, payload->connections.used, first->protocol);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections.rows, payload->connections.used, first->state);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections.rows, payload->connections.used, socket_count);
 #if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
-                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, retransmissions);
-                        NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->connections, payload->connections_used, max_rtt_usec, max_rcv_rtt_usec);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections.rows, payload->connections.used, retransmissions);
+                        NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->connections.rows, payload->connections.used, max_rtt_usec, max_rcv_rtt_usec);
 #endif
 
                         buffer_json_array_close(wb);
@@ -4864,33 +4411,33 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_evidence_table(
             buffer_json_member_add_string(wb, "type", "socket");
             buffer_json_member_add_object(wb, "table");
             {
-                buffer_json_member_add_uint64(wb, "rows", payload->evidence_used);
+                buffer_json_member_add_uint64(wb, "rows", payload->evidence.used);
                 buffer_json_member_add_array(wb, "columns");
                 topology_v1_emit_socket_evidence_columns(wb);
                 buffer_json_array_close(wb);
                 buffer_json_member_add_array(wb, "values");
 
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, link);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, src_actor);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, dst_actor);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->client_ip);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->client_port);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->server_ip);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->server_port);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->protocol);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->protocol_family);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->state);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->namespace_type);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->client_address_space);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->server_address_space);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->pid);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->uid);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->net_ns_inode);
-                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->process);
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->sockets);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, link);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, src_actor);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, dst_actor);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->client_ip);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->client_port);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->server_ip);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->server_port);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->protocol);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->protocol_family);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->state);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->namespace_type);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->client_address_space);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->server_address_space);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->pid);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->uid);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->net_ns_inode);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence.rows, payload->evidence.used, source->process);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->sockets);
 #if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
-                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->retransmissions);
-                NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->evidence, payload->evidence_used, source->max_rtt_usec, source->max_rcv_rtt_usec);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence.rows, payload->evidence.used, source->retransmissions);
+                NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->evidence.rows, payload->evidence.used, source->max_rtt_usec, source->max_rcv_rtt_usec);
 #endif
 
                 buffer_json_array_close(wb);
@@ -5014,14 +4561,14 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_correlation(
 
         buffer_json_member_add_object(wb, "points");
         abort_status = topology_v1_emit_correlation_table(
-            wb, payload->correlation_points, payload->correlation_points_used, ctx);
+            wb, payload->correlation_points.rows, payload->correlation_points.used, ctx);
         if(abort_status != NV_TOPOLOGY_ABORT_NONE)
             return abort_status;
         buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "claims");
         abort_status = topology_v1_emit_correlation_table(
-            wb, payload->correlation_claims, payload->correlation_claims_used, ctx);
+            wb, payload->correlation_claims.rows, payload->correlation_claims.used, ctx);
         if(abort_status != NV_TOPOLOGY_ABORT_NONE)
             return abort_status;
         buffer_json_object_close(wb);
@@ -5031,7 +4578,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_correlation(
 }
 
 static NV_TOPOLOGY_ABORT_STATUS topology_write_data(BUFFER *wb, NV_TOPOLOGY_CONTEXT *ctx) {
-    if(!ctx || ctx->options.info_only || !ctx->process_actors || !ctx->remote_actors || !ctx->local_ips || !ctx->links)
+    if(ctx->options.info_only)
         return NV_TOPOLOGY_ABORT_NONE;
 
     NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
@@ -5041,42 +4588,8 @@ static NV_TOPOLOGY_ABORT_STATUS topology_write_data(BUFFER *wb, NV_TOPOLOGY_CONT
     NV_TOPOLOGY_RENDER_STATE state;
     topology_render_state_init(&state, ctx);
 
-    NV_TOPOLOGY_V1_PAYLOAD topology = {
-        .actor_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(uint64_t)),
-        .graph_link_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(uint64_t)),
-        .connection_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(uint64_t)),
-        .port_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(uint64_t)),
-        .process_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(uint64_t)),
-        .cgroup_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(uint64_t)),
-        .correlation_point_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(bool)),
-        .correlation_claim_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(bool)),
-        .label_index = dictionary_create_advanced(
-            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(bool)),
-    };
-
-    if(!topology.actor_index || !topology.graph_link_index || !topology.connection_index || !topology.port_index ||
-       !topology.process_index || !topology.cgroup_index ||
-       !topology.correlation_point_index || !topology.correlation_claim_index || !topology.label_index) {
-        topology_v1_free(&topology);
-        return NV_TOPOLOGY_ABORT_NONE;
-    }
+    NV_TOPOLOGY_V1_PAYLOAD topology;
+    topology_v1_init(&topology);
 
     abort_status = topology_v1_collect_actors(ctx, &state, &topology);
     if(abort_status != NV_TOPOLOGY_ABORT_NONE)
@@ -5178,16 +4691,16 @@ static NV_TOPOLOGY_ABORT_STATUS topology_write_data(BUFFER *wb, NV_TOPOLOGY_CONT
             buffer_json_member_add_boolean(wb, "protocol_ipv6_udp", ctx->options.protocols_ipv6_udp);
             buffer_json_member_add_uint64(wb, "sockets_total", ctx->sockets_total);
             buffer_json_member_add_uint64(wb, "sockets_without_remote_endpoint", ctx->skipped_sockets);
-            buffer_json_member_add_uint64(wb, "actors", topology.actors_used);
+            buffer_json_member_add_uint64(wb, "actors", topology.actors.used);
             buffer_json_member_add_uint64(wb, "local_process_actors", state.process_actor_count);
             buffer_json_member_add_uint64(wb, "endpoint_actors", state.endpoint_actor_count);
-            buffer_json_member_add_uint64(wb, "links", topology.links_used);
-            buffer_json_member_add_uint64(wb, "socket_evidence_rows", topology.evidence_used);
-            buffer_json_member_add_uint64(wb, "socket_port_rows", topology.ports_used);
-            buffer_json_member_add_uint64(wb, "process_rows", topology.processes_used);
-            buffer_json_member_add_uint64(wb, "cgroup_rows", topology.cgroups_used);
-            buffer_json_member_add_uint64(wb, "correlation_points", topology.correlation_points_used);
-            buffer_json_member_add_uint64(wb, "correlation_claims", topology.correlation_claims_used);
+            buffer_json_member_add_uint64(wb, "links", topology.links.used);
+            buffer_json_member_add_uint64(wb, "socket_evidence_rows", topology.evidence.used);
+            buffer_json_member_add_uint64(wb, "socket_port_rows", topology.ports.used);
+            buffer_json_member_add_uint64(wb, "process_rows", topology.processes.used);
+            buffer_json_member_add_uint64(wb, "cgroup_rows", topology.cgroups.used);
+            buffer_json_member_add_uint64(wb, "correlation_points", topology.correlation_points.used);
+            buffer_json_member_add_uint64(wb, "correlation_claims", topology.correlation_claims.used);
             buffer_json_member_add_uint64(wb, "ownership_links", state.ownership_link_count);
         }
         buffer_json_object_close(wb);
@@ -5203,8 +4716,6 @@ cleanup:
 // Ownership is transferred to the caller; do not use CLEAN_BUFFER on the return value.
 BUFFER *nv_response_preamble(void) {
     BUFFER *wb = buffer_create(0, NULL);
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     return wb;
 }

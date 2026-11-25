@@ -3,13 +3,14 @@
 package receiver
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/netip"
-	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
@@ -22,7 +23,10 @@ const (
 	EventListenerBufferDegraded
 	EventDynamicEngineIDRegistered
 	EventInformResponseFailed
-	EventDiscoveryReportFailed
+	// EventReportFailed is a failed write of an SNMPv3 Report: the receiver's
+	// answer to discovery, to an engine ID it has no user for, or to an
+	// authenticated message outside its time window.
+	EventReportFailed
 )
 
 type ErrorKind string
@@ -56,6 +60,10 @@ type Datagram struct {
 	Peer   *net.UDPAddr
 }
 
+// DecodeFailure is a datagram the receiver could not decode. SniffedVersion
+// and EngineID come from its unauthenticated header (gosnmp.ReadEnvelope):
+// none when the header does not parse; EngineID is hex, empty when the message
+// names none.
 type DecodeFailure struct {
 	Data           []byte
 	PeerIP         net.IP
@@ -65,6 +73,7 @@ type DecodeFailure struct {
 	Err            error
 	SniffedVersion model.SnmpVersion
 	VersionKnown   bool
+	EngineID       string
 	auditAdmitted  bool
 }
 
@@ -77,24 +86,26 @@ type Receiver struct {
 	policy Policy
 	report Reporter
 
-	listener           *listener
-	allowlist          *allowlist
-	rateLimiter        *rateLimiter
-	v3SecTable         *gosnmp.SnmpV3SecurityParametersTable
-	usmUserLevels      []usmUserLevel
-	engineIDs          map[string]struct{}
-	engineBoots        *engineBoots
-	localEngineID      *localEngineID
-	dynamicEngineIDReg *dynamicEngineIDRegistry
-	rollbackState      func()
+	listener    *listener
+	allowlist   *allowlist
+	rateLimiter *rateLimiter
+	// receiver decodes every datagram: SNMPv1 and SNMPv2c with no users, SNMPv3
+	// with the users PrepareV3 registers.
+	receiver      *gosnmp.Receiver
+	engineIDs     [][]byte
+	engineBoots   *engineBoots
+	localEngineID *localEngineID
+	rollbackState func()
 }
 
 func New(policy Policy, report Reporter) *Receiver {
+	plain, _ := gosnmp.NewReceiver(gosnmp.ReceiverConfig{})
 	return &Receiver{
 		policy:      policy,
 		report:      report,
 		allowlist:   newAllowlist(policy.sourceAllowlist, policy.communities),
 		rateLimiter: newRateLimiter(policy.rateLimit.Enabled, policy.rateLimit.PerSourcePPS, policy.rateLimit.Mode),
+		receiver:    plain,
 	}
 }
 
@@ -126,6 +137,10 @@ func IsConfigPreparationError(err error) bool {
 func configPreparationError(err error) error  { return &preparationError{err: err, config: true} }
 func startupPreparationError(err error) error { return &preparationError{err: err} }
 
+// PrepareV3 builds the job's SNMPv3 receiver: the configured users, registered
+// with their engines and the local engine ID, and the local engine (its engine
+// ID and boots). Configuration errors come before the engine boots are raised,
+// so a bad configuration burns no boot.
 func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 	if !r.policy.V3Enabled() {
 		return nil
@@ -148,16 +163,6 @@ func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 		cleanupCreatedEngineState(paths, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
 	}
 
-	table, err := buildSnmpV3SecurityTable(r.policy.users, r.policy.dynamicEngineID)
-	if err != nil {
-		rollback()
-		return configPreparationError(err)
-	}
-	usmUserLevels, err := newUSMUserLevels(r.policy.users)
-	if err != nil {
-		rollback()
-		return configPreparationError(err)
-	}
 	engineIDs, err := buildEngineIDWhitelist(r.policy.engineIDWhitelist)
 	if err != nil {
 		rollback()
@@ -168,7 +173,17 @@ func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 		rollback()
 		return startupPreparationError(err)
 	}
-	if err := registerUSMUsersWithLocalEngineID(table, r.policy.users, localEngineID.bytes()); err != nil {
+	users, learnUsers, err := receiverUsers(r.policy.users, engineIDs, localEngineID.bytes(), r.policy.dynamicEngineID)
+	if err != nil {
+		rollback()
+		return configPreparationError(err)
+	}
+	cfg := gosnmp.ReceiverConfig{Users: users}
+	if r.policy.dynamicEngineID && len(learnUsers) > 0 {
+		cfg.LearnUsers, cfg.MaxLearned = learnUsers, r.policy.dynamicEngineIDMax
+	}
+	// Without the local engine, the receiver checks the users only.
+	if _, err := gosnmp.NewReceiver(cfg); err != nil {
 		rollback()
 		return configPreparationError(err)
 	}
@@ -177,26 +192,18 @@ func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 		rollback()
 		return startupPreparationError(err)
 	}
+	cfg.EngineID, cfg.EngineBoots = localEngineID.bytes(), uint32(engineBoots.bootsValue())
+	receiver, err := gosnmp.NewReceiver(cfg)
+	if err != nil {
+		rollback()
+		return startupPreparationError(err)
+	}
 
-	r.v3SecTable = table
-	r.usmUserLevels = usmUserLevels
+	r.receiver = receiver
 	r.engineIDs = engineIDs
 	r.localEngineID = localEngineID
 	r.engineBoots = engineBoots
 	r.rollbackState = rollback
-	if r.policy.dynamicEngineID && table != nil {
-		known := make(map[dynamicEngineIDKey]struct{})
-		for _, user := range r.policy.users {
-			if user.EngineID == "" {
-				continue
-			}
-			known[dynamicEngineIDKey{
-				engineIDHex: strings.ToLower(strings.TrimSpace(user.EngineID)),
-				username:    user.Username,
-			}] = struct{}{}
-		}
-		r.dynamicEngineIDReg = newDynamicEngineIDRegistry(table, r.policy.dynamicEngineIDMax, known, r.policy.users)
-	}
 	return nil
 }
 
@@ -248,63 +255,70 @@ func (r *Receiver) Process(datagram Datagram) Result {
 		return Result{}
 	}
 
-	sniffedVersion, versionKnown := sniffSNMPVersion(data)
+	// The unauthenticated header: the version for the policy and the decode
+	// budget, the engine ID for the checks below and the decode-error entry.
+	envelope, envelopeErr := gosnmp.ReadEnvelope(data)
+	var sniffedVersion model.SnmpVersion
+	versionKnown := false
+	if envelopeErr == nil {
+		sniffedVersion, envelopeErr = snmpVersion(envelope.Version)
+		versionKnown = envelopeErr == nil
+	}
 	if versionKnown && !r.versionAllowed(sniffedVersion) {
 		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
+	engineID := envelope.SecurityParameters.AuthoritativeEngineID
+	if r.policy.dynamicEngineID && versionKnown && sniffedVersion == model.SnmpVersionV3 &&
+		len(engineID) > 0 && (isAllByte(engineID, 0x00) || isAllByte(engineID, 0xff)) {
+		// Such engine IDs are never registered (parseEngineIDHex), so a job
+		// learns none of them.
+		r.reportError(ErrorUnknownEngine)
+		return Result{}
+	}
 
 	trustedRelay := r.trustedRelaySource(decodePeerIP)
-	packetContext, err := r.decodeTrapWithSharedTable(data, decodePeerIP, trustedRelay)
+	packetContext, response, err := decodeTrapWithOptions(data, versionKnown && sniffedVersion == model.SnmpVersionV3, decodePeerIP, r.receiver, decodeOptions{trustedRelay: trustedRelay})
+	if packetContext != nil {
+		// An engine the receiver learned stays learned whatever Netdata decides.
+		r.reportLearned(packetContext.Notification)
+	}
 	if err != nil {
+		// A Report answers a rejected SNMPv3 message: send it after one
+		// rate-limit token, since its source can be forged and it can be larger
+		// than the message.
+		if response != nil && datagram.Conn != nil && datagram.Peer != nil {
+			allowed, checked := r.allowRateLimitedPacket(datagram.Peer)
+			rateLimitChecked = rateLimitChecked || checked
+			if !allowed {
+				return Result{}
+			}
+			if err := r.writeResponse(datagram, response); err != nil {
+				r.reportEvent(Event{Type: EventReportFailed, Err: err})
+			}
+		}
 		kind := classifyDecodeError(err)
-		if r.v3SecTable != nil {
-			rawContext, rawErr := extractRawV3Context(data)
-			if rawErr == nil && rawContext != nil {
-				if r.policy.dynamicEngineID && !rawContext.reportable {
-					retryContext, checked, dropped := r.tryDynamicRetry(data, decodePeerIP, datagram.Peer, rawContext, trustedRelay)
-					rateLimitChecked = rateLimitChecked || checked
-					if dropped {
-						return Result{}
-					}
-					if retryContext != nil {
-						packetContext = retryContext
-						err = nil
-					}
-				} else if rawContext.discoveryProbe() && datagram.Conn != nil && datagram.Peer != nil {
-					allowed, checked := r.allowRateLimitedPacket(datagram.Peer)
-					rateLimitChecked = rateLimitChecked || checked
-					if !allowed {
-						return Result{}
-					}
-					r.sendDiscoveryReport(rawContext, datagram.Conn, datagram.Peer)
-				}
-			}
+		r.reportError(kind)
+		failure := &DecodeFailure{
+			Data:           data,
+			PeerIP:         decodePeerIP,
+			Conn:           datagram.Conn,
+			Peer:           datagram.Peer,
+			Kind:           kind,
+			Err:            err,
+			SniffedVersion: sniffedVersion,
+			VersionKnown:   versionKnown,
+			auditAdmitted:  rateLimitChecked,
 		}
-		if err != nil {
-			if shouldExtractEngineIDOnDecodeError(kind) {
-				engineIDHex, ok, extractErr := extractSNMPv3EngineIDHex(data)
-				if extractErr == nil && ok && !engineIDHexAllowed(engineIDHex, r.engineIDs) {
-					kind = ErrorUnknownEngine
-				}
-			}
-			r.reportError(kind)
-			return Result{DecodeFailure: &DecodeFailure{
-				Data:           data,
-				PeerIP:         decodePeerIP,
-				Conn:           datagram.Conn,
-				Peer:           datagram.Peer,
-				Kind:           kind,
-				Err:            err,
-				SniffedVersion: sniffedVersion,
-				VersionKnown:   versionKnown,
-				auditAdmitted:  rateLimitChecked,
-			}}
+		if versionKnown && len(engineID) > 0 {
+			failure.EngineID = hex.EncodeToString(engineID)
 		}
+		return Result{DecodeFailure: failure}
 	}
 
 	r.reportEvent(Event{Type: EventDecoded})
 	pdu := packetContext.PDU
+	msg := &packetContext.Notification.Message
 	if !r.versionAllowed(pdu.Version) {
 		r.reportError(ErrorDroppedPolicy)
 		return Result{}
@@ -313,31 +327,14 @@ func (r *Receiver) Process(datagram Datagram) Result {
 		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
-	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 && !r.v3SecurityAllowed(packetContext.Packet) {
-		r.reportError(ErrorUSMFailure)
+	if pdu.Version == model.SnmpVersionV3 && pdu.PduType != model.PduTypeInform && r.trapNamesUnauthorizedLocalEngine(msg) {
+		r.reportError(ErrorUnknownEngine)
 		return Result{}
 	}
-	if !r.ensureDynamicEngineIDRegistered(packetContext) {
-		return Result{}
-	}
-	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 {
-		if pdu.PduType == model.PduTypeInform {
-			if !r.localEngineIDMatches(packetContext.Packet.SecurityParameters) {
-				r.reportError(ErrorUnknownEngine)
-				return Result{}
-			}
-		} else if !isEngineIDAllowed(packetContext.Packet.SecurityParameters, r.engineIDs) {
-			r.reportError(ErrorUnknownEngine)
-			return Result{}
-		}
-	}
-
-	if pdu.PduType == model.PduTypeInform && packetContext.Packet != nil && datagram.Conn != nil && datagram.Peer != nil {
-		var localEngineID []byte
-		if r.localEngineID != nil {
-			localEngineID = r.localEngineID.bytes()
-		}
-		if err := sendInformResponse(datagram.Conn, datagram.Peer, packetContext.Packet, r.engineBoots, localEngineID); err != nil {
+	// An accepted INFORM is acknowledged before the rate limit, so a rate-limited
+	// INFORM is still acked while its content is dropped.
+	if pdu.PduType == model.PduTypeInform && response != nil && datagram.Conn != nil && datagram.Peer != nil {
+		if err := r.writeResponse(datagram, response); err != nil {
 			r.reportEvent(Event{Type: EventInformResponseFailed, Err: err})
 		}
 	}
@@ -348,6 +345,58 @@ func (r *Receiver) Process(datagram Datagram) Result {
 		}
 	}
 	return Result{PDU: packetContext.PDU}
+}
+
+// reportLearned reports the engine the receiver learned from n, if it did.
+func (r *Receiver) reportLearned(n *gosnmp.Notification) {
+	if n == nil || !n.Learned {
+		return
+	}
+	r.reportEvent(Event{
+		Type:     EventDynamicEngineIDRegistered,
+		EngineID: hex.EncodeToString(n.Message.SecurityParameters.AuthoritativeEngineID),
+		Username: n.Message.SecurityParameters.UserName,
+	})
+}
+
+// trapNamesUnauthorizedLocalEngine reports a static job's trap that names the
+// job's own engine ID, which the receiver decodes with the users registered
+// there for informs: it is authorized only when that engine is whitelisted.
+func (r *Receiver) trapNamesUnauthorizedLocalEngine(msg *gosnmp.Message) bool {
+	if r.policy.dynamicEngineID || r.localEngineID == nil {
+		return false
+	}
+	engineID := msg.SecurityParameters.AuthoritativeEngineID
+	if !bytes.Equal(engineID, r.localEngineID.bytes()) {
+		return false
+	}
+	for _, allowed := range r.engineIDs {
+		if bytes.Equal(engineID, allowed) {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *Receiver) writeResponse(datagram Datagram, response []byte) error {
+	_, err := datagram.Conn.WriteToUDP(response, datagram.Peer)
+	return err
+}
+
+func (r *Receiver) allowRateLimitedPacket(peer *net.UDPAddr) (bool, bool) {
+	if r.rateLimiter == nil || peer == nil {
+		return true, false
+	}
+	srcAddr, ok := udpPeerAddr(peer)
+	if !ok {
+		return true, false
+	}
+	allowed, mode := r.rateLimiter.allow(srcAddr)
+	if allowed {
+		return true, true
+	}
+	r.reportError(ErrorRateLimited)
+	return mode != rateLimitModeDrop, true
 }
 
 func (r *Receiver) AdmitDecodeErrorAudit(failure *DecodeFailure) bool {
@@ -401,32 +450,8 @@ func (r *Receiver) trustedRelaySource(peerIP net.IP) bool {
 	return false
 }
 
-func shouldExtractEngineIDOnDecodeError(kind ErrorKind) bool {
-	switch kind {
-	case ErrorAuthFailure, ErrorUSMFailure, ErrorUnknownEngine:
-		return true
-	default:
-		return false
-	}
-}
-
-func (r *Receiver) localEngineIDMatches(parameters gosnmp.SnmpV3SecurityParameters) bool {
-	if r.localEngineID == nil || parameters == nil {
-		return false
-	}
-	usm, ok := parameters.(*gosnmp.UsmSecurityParameters)
-	return ok && r.localEngineID.equalRaw(usm.AuthoritativeEngineID)
-}
-
 func (r *Receiver) reportError(kind ErrorKind) {
 	r.reportEvent(Event{Type: EventError, ErrorKind: kind})
-}
-
-func (r *Receiver) dynamicPairs() int {
-	if r.dynamicEngineIDReg == nil {
-		return 0
-	}
-	return r.dynamicEngineIDReg.size()
 }
 
 func (r *Receiver) reportEvent(event Event) {

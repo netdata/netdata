@@ -53,11 +53,9 @@ jobs:
         run: |
           mcp-publisher login github-oidc
 
-      - name: Validate server.json (dry run)
+      - name: Validate server.json
         id: validate
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mcp-publisher publish server.json --dry-run
+        run: mcp-publisher validate server.json
 
       - name: Publish to registry
         id: publish

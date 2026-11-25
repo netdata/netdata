@@ -59,6 +59,7 @@ jobs:
             packaging/installer/tests/test_snmp_diagnostics.py
             packaging/installer/tests/test_install_state.py
             packaging/installer/tests/test_prepare_fleet.py
+            packaging/installer/tests/test_topology_stock_delivery.py
             packaging/installer/tests/test_*ipmi*.py
             packaging/docker/**
             packaging/makeself/**
@@ -483,6 +484,8 @@ jobs:
           echo "$RUNNER_TEMP/ipmi-test-tools/bin" >> "$GITHUB_PATH"
       - name: Run IPMI packaging and Docker tests
         run: python3 -m unittest discover packaging/installer/tests 'test_*ipmi*.py' -v
+      - name: Run shared topology stock installation tests
+        run: python3 packaging/installer/tests/test_topology_stock_delivery.py -v
 
   prepare-fleet:
     needs: changes

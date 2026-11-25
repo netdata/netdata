@@ -21,7 +21,7 @@ This guide covers how to move a node from one Space to another without removing 
 
 You might need to move a node to a different Space when:
 
-- Reorganizing your infrastructure monitoring structure
+- Reorganizing your Rooms and nodes
 - Transferring node ownership between teams or departments
 - Consolidating multiple Spaces into one
 

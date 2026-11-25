@@ -22,9 +22,9 @@ function(netdata_fixup_system_processor)
   )
 
   if(return_code EQUAL 0)
-    # Keep only the machine part of the triple. Stripping the trailing newline
-    # matters: consumers that interpolate CMAKE_SYSTEM_PROCESSOR into a
-    # delimiter-anchored regex (dlib does) never match a value that ends in one.
+    # Keep only the machine part of the triple. The trailing newline must be
+    # stripped too: a regex that matches CMAKE_SYSTEM_PROCESSOR against
+    # delimiters fails when the value ends in a newline.
     string(REGEX REPLACE "-.*$" "" output_data "${output_data}")
     set(CMAKE_SYSTEM_PROCESSOR "${output_data}" PARENT_SCOPE)
   else()
@@ -202,30 +202,6 @@ function(extract_gzipped_tarball tarball target)
          INPUT "${tarball}"
          DESTINATION "${target}")
   endif()
-endfunction()
-
-# Precompile python code in the specified directory relative to the
-# CMake install prefix at install time.
-# This must be called _after_ the install directive for the python code
-# in the specified directory
-function(precompile_python dir component)
-  find_package(Python3)
-
-  if(NOT Python3_Interpreter_FOUND)
-    message(STATUS "Could not find Python3, skipping precompilation of Python code.")
-    return()
-  endif()
-
-  set(prefix [=[${CMAKE_INSTALL_PREFIX}]=])
-
-  install(
-    CODE "message(STATUS \"Precompiling Python3 code in ${prefix}/${dir}\")"
-    COMPONENT ${component}
-  )
-  install(
-    CODE "execute_process(COMMAND \"${Python3_EXECUTABLE}\" -O -m compileall -j0 -o2 \"${prefix}/${dir}\" WORKING_DIRECTORY \"${prefix}/${dir}\")"
-    COMPONENT ${component}
-  )
 endfunction()
 
 # Load the URL and hash for a vendored component

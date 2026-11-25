@@ -1,13 +1,13 @@
 # Metrics Tab and Single Node Tabs
 
-The **Metrics tab** provides real-time, per-second time series charts for all nodes in a Room. It helps you visualize, explore, and troubleshoot metrics across your entire infrastructure in one place.
+The **Metrics tab** provides real-time, per-second time series charts for all nodes in a Room. It helps you visualize, explore, and troubleshoot metrics across all your nodes in one place.
 
 You can also view **single-node dashboards**, which offer the same charts but are focused on a single node. You can access these dashboards from most places in the Netdata UI, often by clicking the name of a node.
 
 From the Metrics tab, you can also access:
 
 - The **Integrations tab**
-- **Metric Correlations** to identify related metrics and uncover patterns across your infrastructure
+- **Metric Correlations** to identify related metrics and uncover patterns across your stack
 
 :::note
 

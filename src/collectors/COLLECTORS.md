@@ -2,7 +2,7 @@
 
 # Monitor anything with Netdata
 
-**850+ integrations. Zero configuration. Deploy anywhere.**
+**2,000+ integrations. Zero configuration. Deploy anywhere.**
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in real-time, interactive charts. The following list includes all the integrations where Netdata can gather metrics from.
 
@@ -10,7 +10,7 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 
 ### Why Teams Choose Us
 
-- ✅ **850+ integrations** automatically discovered and configured
+- ✅ **2,000+ integrations** automatically discovered and configured
 - ✅ **Zero configuration** required - monitors start collecting data immediately
 - ✅ **No vendor lock-in** - Deploy anywhere, own your data
 - ✅ **1-second resolution** - Real-time visibility, not delayed averages
@@ -18,7 +18,7 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 
 ### Find Your Technology
 
-**Select your primary infrastructure to jump directly to relevant integrations:**
+**Select your technology to jump directly to relevant integrations:**
 
 **Cloud & Infrastructure:**
 [AWS](#cloud-and-devops) • [Azure](#cloud-and-devops) • [GCP](#cloud-and-devops) • [Kubernetes](#containers-and-vms) • [Docker](#containers-and-vms) • [VMware](#containers-and-vms)
@@ -35,10 +35,10 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 **Operating Systems:**
 [Linux](#operating-systems) • [Windows](#operating-systems) • [macOS](#operating-systems) • [FreeBSD](#operating-systems)
 
-**Don't see what you need?** We support [Prometheus endpoints](#beyond-the-850-integrations), [SNMP devices](#networking), [StatsD](#beyond-the-850-integrations), and [custom data sources](#beyond-the-850-integrations).
+**Don't see what you need?** We support [Prometheus endpoints](#beyond-the-2000-integrations), [SNMP devices](#networking), [StatsD](#beyond-the-2000-integrations), and [custom data sources](#beyond-the-2000-integrations).
 
 
-## Beyond the 850+ integrations
+## Beyond the 2,000+ integrations
 
 Netdata can monitor virtually any application through generic collectors:
 
@@ -329,7 +329,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 
 | Integration | Description |
 |-------------|-------------|
-| [Amazon CloudWatch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) | Monitor AWS infrastructure through Amazon CloudWatch. |
+| [Amazon CloudWatch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) | Monitor AWS resources and services through Amazon CloudWatch. |
 | [AWS EC2 Compute instances](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_ec2_compute_instances.md) | Monitor Amazon EC2 inventory and capacity information exposed by AWS EC2 Exporter. |
 | [AWS Quota](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) | Monitor AWS Service Quotas exposed by aws_quota_exporter. |
 | [Azure API Management](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_api_management.md) | :::info |
@@ -359,7 +359,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Azure Log Analytics Workspace](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_log_analytics_workspace.md) | :::info |
 | [Azure Logic Apps Workflow](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_logic_apps_workflow.md) | :::info |
 | [Azure Machine Learning Workspace](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_machine_learning_workspace.md) | :::info |
-| [Azure Monitor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) | This collector provides real-time visibility into your Azure infrastructure by collecting platform metrics from the Azure Monitor Metrics API. |
+| [Azure Monitor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) | This collector provides real-time visibility into your Azure resources by collecting platform metrics from the Azure Monitor Metrics API. |
 | [Azure MySQL Flexible Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_mysql_flexible_server.md) | :::info |
 | [Azure NAT Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_nat_gateway.md) | :::info |
 | [Azure PostgreSQL Flexible Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_postgresql_flexible_server.md) | :::info |

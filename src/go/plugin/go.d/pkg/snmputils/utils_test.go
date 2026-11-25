@@ -5,15 +5,15 @@ package snmputils
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSNMPv3SecurityLevel(t *testing.T) {
 	tests := map[string]struct {
-		auth gosnmp.SnmpV3AuthProtocol
-		priv gosnmp.SnmpV3PrivProtocol
-		want gosnmp.SnmpV3MsgFlags
+		auth gosnmp.AuthProtocol
+		priv gosnmp.PrivProtocol
+		want gosnmp.SecurityLevel
 	}{
 		"no auth, no priv": {
 			auth: gosnmp.NoAuth,
@@ -57,20 +57,20 @@ func TestSnmpClientConnInfo(t *testing.T) {
 		authPass  = "test-auth-passphrase-secret"
 		privPass  = "test-priv-passphrase-secret"
 	)
-	usm := func(auth gosnmp.SnmpV3AuthProtocol, priv gosnmp.SnmpV3PrivProtocol) *gosnmp.UsmSecurityParameters {
-		return &gosnmp.UsmSecurityParameters{
-			UserName:                 "netdata-user",
-			AuthenticationProtocol:   auth,
-			AuthenticationPassphrase: authPass,
-			PrivacyProtocol:          priv,
-			PrivacyPassphrase:        privPass,
+	usm := func(auth gosnmp.AuthProtocol, priv gosnmp.PrivProtocol) gosnmp.User {
+		return gosnmp.User{
+			Name:           "netdata-user",
+			AuthProtocol:   auth,
+			AuthPassphrase: authPass,
+			PrivProtocol:   priv,
+			PrivPassphrase: privPass,
 		}
 	}
 
 	tests := map[string]struct {
-		version     gosnmp.SnmpVersion
-		msgFlags    gosnmp.SnmpV3MsgFlags
-		secParams   *gosnmp.UsmSecurityParameters
+		version     gosnmp.Version
+		msgFlags    gosnmp.SecurityLevel
+		user        gosnmp.User
 		contextName string
 		want        string
 	}{
@@ -83,50 +83,40 @@ func TestSnmpClientConnInfo(t *testing.T) {
 			want:    "hostname='127.0.0.1',port='161',snmp_version='2c'",
 		},
 		"v3 noAuthNoPriv": {
-			version:   gosnmp.Version3,
-			msgFlags:  gosnmp.NoAuthNoPriv,
-			secParams: usm(gosnmp.NoAuth, gosnmp.NoPriv),
+			version:  gosnmp.Version3,
+			msgFlags: gosnmp.NoAuthNoPriv,
+			user:     usm(gosnmp.NoAuth, gosnmp.NoPriv),
 			want: "hostname='127.0.0.1',port='161',snmp_version='3',security_level='NoAuthNoPriv'," +
 				"username='netdata-user',auth_protocol='NoAuth',priv_protocol='NoPriv'",
 		},
 		"v3 authNoPriv": {
-			version:   gosnmp.Version3,
-			msgFlags:  gosnmp.AuthNoPriv,
-			secParams: usm(gosnmp.SHA256, gosnmp.NoPriv),
+			version:  gosnmp.Version3,
+			msgFlags: gosnmp.AuthNoPriv,
+			user:     usm(gosnmp.SHA256, gosnmp.NoPriv),
 			want: "hostname='127.0.0.1',port='161',snmp_version='3',security_level='AuthNoPriv'," +
 				"username='netdata-user',auth_protocol='SHA256',priv_protocol='NoPriv'",
 		},
 		"v3 authPriv with context name": {
 			version:     gosnmp.Version3,
 			msgFlags:    gosnmp.AuthPriv,
-			secParams:   usm(gosnmp.SHA512, gosnmp.AES256C),
+			user:        usm(gosnmp.SHA512, gosnmp.AES256C),
 			contextName: "netdata-context",
 			want: "hostname='127.0.0.1',port='161',snmp_version='3',security_level='AuthPriv'," +
 				"username='netdata-user',auth_protocol='SHA512',priv_protocol='AES256C',context_name='netdata-context'",
-		},
-		"v3 authPriv with the Reportable flag set by Connect": {
-			version:   gosnmp.Version3,
-			msgFlags:  gosnmp.AuthPriv | gosnmp.Reportable,
-			secParams: usm(gosnmp.SHA, gosnmp.AES),
-			want: "hostname='127.0.0.1',port='161',snmp_version='3',security_level='AuthPriv'," +
-				"username='netdata-user',auth_protocol='SHA',priv_protocol='AES'",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := gosnmp.NewHandler()
-			client.SetTarget("127.0.0.1")
-			client.SetPort(161)
-			client.SetVersion(tc.version)
-			client.SetCommunity(community)
-			client.SetMsgFlags(tc.msgFlags)
-			if tc.secParams != nil {
-				client.SetSecurityParameters(tc.secParams)
-			}
-			client.SetContextName(tc.contextName)
-
-			info := SnmpClientConnInfo(client)
+			info := SnmpClientConnInfo(gosnmp.Config{
+				Target:        "127.0.0.1",
+				Port:          161,
+				Version:       tc.version,
+				Community:     community,
+				SecurityLevel: tc.msgFlags,
+				User:          tc.user,
+				ContextName:   tc.contextName,
+			})
 
 			assert.Equal(t, tc.want, info)
 			for _, secret := range []string{community, authPass, privPass} {

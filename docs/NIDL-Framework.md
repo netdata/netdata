@@ -4,13 +4,13 @@
 
 The Netdata NIDL (Nodes, Instances, Dimensions, Labels) framework is the foundational data model that underpins Netdata's approach to observability. It defines how metrics are structured, collected, stored, and presented, enabling an interactive and intuitive analysis experience without the need for a query language.
 
-For **users**, NIDL transforms raw data into an explorable, multi-dimensional view of their infrastructure. For **developers**, NIDL provides a strict set of guidelines for metric design, ensuring that collected data automatically translates into meaningful and actionable dashboards.
+For **users**, NIDL transforms raw data into an explorable, multi-dimensional view of their systems and applications. For **developers**, NIDL provides a strict set of guidelines for metric design, ensuring that collected data automatically translates into meaningful and actionable dashboards.
 
 This document serves as both an introduction to the NIDL framework for all Netdata users and a fundamental guide for developers contributing to Netdata's data collection.
 
 ## NIDL for Users: Interactive Observability
 
-Imagine your infrastructure's performance data as a complex, multi-dimensional cube. Traditional monitoring tools often require you to learn a specialized query language to extract insights from this cube. Netdata, through the NIDL framework, provides intuitive controls to slice, dice, and examine this cube from any angle using simple dropdown menus.
+Imagine your observability data as a complex, multi-dimensional cube. Traditional monitoring tools often require you to learn a specialized query language to extract insights from this cube. Netdata, through the NIDL framework, provides intuitive controls to slice, dice, and examine this cube from any angle using simple dropdown menus.
 
 ### The NIDL Components
 
@@ -85,7 +85,7 @@ NIDL makes deliberate UX choices to maintain simplicity and clarity. These aren'
 
 2. **Single Context per Chart**: Each chart displays metrics from one context only. While the engine can query multiple contexts simultaneously, combining them would require complex UI controls that could overwhelm users.
 
-3. **Continuous Evolution**: While NIDL controls already enhance and simplify advanced analytics for the vast majority of use cases, Netdata is continuously evolving. Like all monitoring solutions, we identify areas for improvement and actively work to address them.
+3. **Continuous Evolution**: While NIDL controls already enhance and simplify advanced analytics for the vast majority of use cases, Netdata is continuously evolving. Like any engineered system, we identify areas for improvement and actively work to address them.
 
 ### Ongoing Enhancements
 
@@ -97,7 +97,7 @@ We've identified several areas where Netdata dashboards can be enhanced to cover
 
 3. **Persistent Virtual Metrics**: Allow complex calculations to be saved as new time-series, making advanced analytics reusable and shareable
 
-These improvements are part of Netdata's commitment to making infrastructure monitoring both powerful and accessible. We continuously refine the balance between capability and simplicity based on real-world usage and community feedback.
+These improvements are part of Netdata's commitment to making observability both powerful and approachable. We keep moving complexity out of your way and into the product, based on real-world usage and community feedback.
 
 ## NIDL for Developers: The Engineering Discipline
 
@@ -107,7 +107,7 @@ For Netdata developers, understanding and adhering to the NIDL framework is para
 
 *   **Algorithmic Dashboards**: Netdata's dashboards are not static configurations; they are algorithmic outputs driven by the metadata embedded in your collected metrics. Your annotations guide this algorithm.
 *   **No Second Chances**: Mistakes in metric design cannot be easily rectified later through UI configuration. The integrity of the NIDL framework depends on correct data structuring at the source.
-*   **User Experience**: Your design decisions directly impact a user's ability to understand, troubleshoot, and gain insights from their infrastructure. Confusing charts lead to frustration and missed issues.
+*   **User Experience**: Your design decisions directly impact a user's ability to understand, troubleshoot, and gain insights from their systems and applications. Confusing charts lead to frustration and missed issues.
 
 ### Core Principles for NIDL-Compliant Collectors
 

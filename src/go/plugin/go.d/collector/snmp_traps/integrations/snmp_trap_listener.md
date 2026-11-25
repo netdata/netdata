@@ -188,8 +188,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | **SNMPv3** | [usm_users](#option-snmpv3-usm-users) | SNMPv3 USM users with auth and privacy protocols. | [] | no |
 |  | engine_id_whitelist | Static SNMPv3 engine IDs accepted for v3 Trap PDUs (hex strings). Required when v3 is enabled and `dynamic_engine_id_discovery` is disabled. | [] | no |
 |  | local_engine_id | Receiver-local SNMPv3 engine ID for v3 INFORM authentication (hex string, 5-32 bytes). When omitted, Netdata generates and persists a stable per-job value. |  | no |
-|  | dynamic_engine_id_discovery | When enabled, the listener discovers v3 Trap sender engine IDs at runtime and hot-registers new (engineID, username) pairs after the retry authenticates and decodes a v3 Trap. Static `engine_id_whitelist` must be empty. | no | no |
-|  | dynamic_engine_id_max_pairs | Maximum in-memory dynamic (engineID, username) pairs per job. 0 or unset uses the default of 4096. | 4096 | no |
+|  | dynamic_engine_id_discovery | When enabled, the listener learns v3 Trap sender engine IDs at runtime, one (engineID, username) pair at a time, from the first unreportable v3 Trap a configured user of that name accepts. Static `engine_id_whitelist` must be empty. | no | no |
+|  | dynamic_engine_id_max_pairs | Maximum in-memory dynamic (engineID, username) pairs per job. 0 or unset uses the default of 4096. Past it, a trap from an unlearned engine counts as `unknown_engine_id`, and one of a new user name at a learned engine as `usm_failures`. | 4096 | no |
 | **Enrichment** | reverse_dns | Optional source-IP PTR annotation emitted as `TRAP_REVERSE_DNS`. Disabled by default and not used for authoritative identity. | enabled: false | no |
 | **Security** | [source](#option-security-source) | Source-attribution controls for forwarded traps. UDP peer is authoritative unless the peer matches an explicit trusted relay CIDR. | trusted_relays: [] | no |
 |  | allowlist | Pre-decode source-IP CIDR allowlist. Empty accepts IPv4 and IPv6 from all sources. | source_cidrs: ["0.0.0.0/0", "::/0"] | no |
@@ -421,8 +421,8 @@ jobs:
 ###### Dynamic engine ID discovery
 
 For environments where v3 sender engine IDs are not known in advance.
-The listener discovers them at runtime from raw SNMPv3 context and hot-registers
-new (engineID, username) pairs after the first successful authentication and decode.
+The listener learns them at runtime, one (engineID, username) pair at a time,
+from the first v3 Trap that a configured user of that name accepts.
 The USM user omits `engine_id`; the whitelist must be empty.
 
 
@@ -688,11 +688,25 @@ In dynamic mode, the first accepted `(engineID, username)` pair increments this 
 operator visibility. Repeated or rejected increments usually indicate cap exhaustion,
 invalid sender state, or an unauthorized sender.
 
+An INFORM must name the job's local engine ID (`local_engine_id`); one naming another engine
+ID counts here. Senders learn the local engine ID from the Report the job sends to an engine ID
+discovery request; each such request also counts here once, as RFC 3414's
+`usmStatsUnknownEngineIDs` does, and writes a decode-error entry.
+
 
 #### USM authentication failures
 
 Check that the USM user's `auth_proto`, `auth_key`, `priv_proto`, and `priv_key` match the
 sender device's configuration. Verify engine ID matches. Use Netdata secret references for keys.
+
+After a job restart, each sender's first authenticated INFORM counts once in `usm_failures`:
+the job's engine boots rise at every start, the INFORM falls outside the time window, and the
+sender resynchronizes from the Report it gets.
+
+Authenticated traps are checked against their sender engine's latest message: a trap with fewer
+engine boots, or more than 150 seconds behind it (a replay included), counts in `usm_failures`.
+Devices that share an engine ID and credentials (cloned hosts), or that do not raise their engine
+boots at a restart, lose traps this way until the job restarts; give each device its own engine ID.
 
 
 #### journal retention eating disk space

@@ -11,7 +11,7 @@ When setting up Parents, consider the following:
 | **System Volume**                           | The number of monitored systems      | Larger infrastructures may need multiple Parents to maintain performance                         |
 | **Data Transfer Costs**                     | Bandwidth usage between environments | Strategic placement reduces egress bandwidth costs in multi-cloud or hybrid environments         |
 | **Usability Without Netdata Cloud**         | Standalone operation considerations  | Fewer Parents simplifies access and management                                                   |
-| **Optimized Deployment with Netdata Cloud** | Cloud integration benefits           | Provides complete infrastructure view with optimized security, cost, and operational controls    |
+| **Optimized Deployment with Netdata Cloud** | Cloud integration benefits           | Provides a complete view of all nodes with optimized security, cost, and operational controls    |
 | **Data Retention & Metric Volume**          | Disk planning for Parent nodes       | Estimate disk needs based on total metrics streamed from children and configured retention tiers |
 
 ## Deployment Optimization Factors
@@ -177,7 +177,7 @@ Netdata provides several benefits over other observability solutions:
 | **Optimized Cost & Performance**  | Distributed workloads                      | Prevents bottlenecks and improves resource efficiency                                                                                                                                                                               |
 | **Ease of Use**                   | Minimal setup and maintenance              | Reduces complexity and operational overhead                                                                                                                                                                                         |
 | **On-Prem Control**               | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud. For a fully self-hosted control plane, see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) |
-| **Comprehensive Observability**   | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning                                                                                                                                                               |
+| **Comprehensive Observability**   | Segmented deployment with unified view     | Deep visibility with tailored retention, alerts, and machine learning                                                                                                                                                               |
 | **Predictable Capacity Planning** | Published per-metric storage cost          | Allows accurate disk and hardware sizing for Parents                                                                                                                                                                                |
 
 :::tip

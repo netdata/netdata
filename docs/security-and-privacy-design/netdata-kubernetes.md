@@ -1,6 +1,6 @@
 # Netdata Container Security Considerations
 
-Netdata provides powerful, real-time performance monitoring and health visibility, offering deep insights essential for managing modern infrastructure, particularly dynamic containerized environments like Kubernetes. Its high-granularity metrics and comprehensive system overview help teams troubleshoot issues quickly and optimize performance effectively.
+Netdata provides full-stack, real-time observability, offering deep insights essential for operating modern systems and applications, particularly dynamic containerized environments like Kubernetes. Its high-granularity metrics and comprehensive system overview help teams troubleshoot issues quickly and optimize performance effectively.
 
 To deliver observability that extends beyond the agent's own container to encompass the entire host system and other running containers, the Netdata agent ('child' pods in a typical Kubernetes deployment) requires specific access to host resources. This access typically involves mounting certain host paths (usually read-only), utilizing host namespaces (like the PID and Network namespaces), and leveraging specific Linux capabilities (such as `SYS_PTRACE` or `SYS_ADMIN` for certain advanced features).
 
@@ -57,9 +57,9 @@ Netdata `child` agents (running on each monitored node) are designed with minima
 - **Recommended Cloud Integration:** The typical and recommended approach, especially for managing multiple nodes or clusters, involves securely connecting the `parent` pods **outbound** to Netdata Cloud.
 - **Centralized RBAC via Cloud:** Netdata Cloud serves as the primary user interface and provides essential access control mechanisms. This includes **Role-Based Access Control (RBAC)**, allowing administrators to:
     - Manage users and team memberships.
-    - Segment the infrastructure into "rooms" (by service, component type, location, etc)
+    - Segment your nodes into "rooms" (by service, component type, location, etc)
     - Assign roles with differing permission levels.
-    - Associate users with infrastructure, by granting users access to specific "rooms".
+    - Associate users with nodes, by granting users access to specific "rooms".
 
 ### Security Benefits
 

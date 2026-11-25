@@ -2,7 +2,9 @@
 
 #include "ml_config.h"
 
+#include <algorithm>
 #include <cmath>
+#include <string>
 
 static void ml_config_migrate() {
     const char *config_section_ml = CONFIG_SECTION_ML;

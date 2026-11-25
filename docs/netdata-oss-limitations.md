@@ -21,7 +21,7 @@ Netdata functions can expose sensitive system information:
 - **System logs** may contain application errors, security events, and debugging information with sensitive context
 - **Database queries** can reveal query patterns, table structures, and potentially sensitive data in error messages
 
-Without authentication, anyone who can reach the Netdata dashboard could access this information. The access control system ensures that sensitive data is only available to authenticated users who belong to the same Netdata Cloud Space as the monitored infrastructure.
+Without authentication, anyone who can reach the Netdata dashboard could access this information. The access control system ensures that sensitive data is only available to authenticated users who belong to the same Netdata Cloud Space as the monitored nodes.
 
 ## Feature Availability by Access Level
 
@@ -34,8 +34,8 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Charts and dashboards              |      ✓      |     ✓      |     ✓     |
 | Anomaly detection (ML)             |      ✓      |     ✓      |     ✓     |
 | Alert notifications                |      ✓      |     ✓      |     ✓     |
-| Node dashboard access              |   5 nodes   |  5 nodes   | Unlimited |
-| Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
+| Nodes in one multi-node dashboard  |   5 nodes   |  5 nodes   | No limit  |
+| Custom dashboards                  | 1 per agent | 1 per room | No limit  |
 
 ### Functions (Live Tab)
 
@@ -97,7 +97,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 Netdata provides MCP in two ways:
 
-- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (requires a Paid plan)
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — access to all your nodes (requires a Paid plan)
 - **Agent/Parent MCP** — available directly at Netdata Agents and Parents, free and open-source
 
 When accessing Netdata via Agent/Parent MCP:
@@ -131,18 +131,20 @@ Dynamic Configuration requires a paid plan:
 
 ### Increase Node Limits
 
-The 5-node limit applies to both **Anonymous** and **Community** users, on Netdata Cloud dashboards and on the local dashboard of Agents and Parents. You can:
+The 5-node limit counts the nodes that one dashboard shows. It applies to both **Anonymous** and **Community** users, on the dashboards that show several nodes: Netdata Cloud, and the local dashboard of a Parent showing its Children. It does not limit how many Agents you run: a standalone Agent's dashboard shows that one node, so you can run any number of standalone Agents, each with its own dashboard, free and without signing in.
 
-1. **Upgrade to a paid plan** for unlimited nodes
+To see more than 5 nodes in one dashboard, you can:
+
+1. **Upgrade to a paid plan** to remove the node limit
 2. **Select preferred nodes** to choose which 5 nodes stay accessible
 
 This limit is a **plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On a dashboard that shows more nodes than your limit, a node outside your preferred nodes shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
 
-The local dashboard of an Agent or Parent gets the limit of your plan from Netdata Cloud. When the Agent is not connected to Netdata Cloud, or Netdata Cloud cannot be reached, the local dashboard applies the 5-node limit.
+The local dashboard of a Parent gets the limit of your plan from Netdata Cloud. When the Parent is not connected to Netdata Cloud, or Netdata Cloud cannot be reached, its local dashboard applies the 5-node limit to the nodes it shows.
 
 ```mermaid
 flowchart LR
-    subgraph S["Streaming — unlimited nodes"]
+    subgraph S["Streaming — no node limit"]
         C1["Child 1"] --> P["Parent"]
         CN["Child 2..N"] --> P
     end
@@ -176,8 +178,8 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, Topology Maps, RUM, Browser Tests, DEM History Status** | Blocked     | Blocked       | Full access |
 | **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
-| **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
-| **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
+| **Nodes per Multi-Node Dashboard** | 5 nodes | 5 nodes | No limit |
+| **Custom Dashboards**     | 1 per agent | 1 per room    | No limit    |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or use a paid plan or an active trial for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests and DEM history status. A paid plan also provides full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or use a paid plan or an active trial for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests and DEM history status. A paid plan also provides full configuration control and no node limit.

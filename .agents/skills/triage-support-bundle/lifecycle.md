@@ -34,6 +34,11 @@ A distinctive state worth recognising: no process exists, but the status file st
 That is unclean termination - the agent never got to update the file. The summary raises it
 explicitly.
 
+A kill during shutdown (for example `docker stop` past its grace period): the status file says
+exiting and holds the first shutdown save, made before any step; the last step the shutdown watcher
+recorded is in the shutdown progress record when it passes the checks in `./bundle-map.md` (persistent
+state). No usable progress record means the kill came before a step was recorded, or the record was lost.
+
 ## Resource use
 
 The bundle is built to remove the "send a screenshot" round trip.

@@ -10,21 +10,32 @@
 include_guard()
 
 if(ENABLE_PLUGIN_CUPS)
+    # A module counts only if pkg-config also returned its libraries: since CMake 4.5,
+    # pkg_check_modules() reports a module found when --modversion succeeds, even if
+    # --libs fails (e.g. a Requires.private package is not installed).
     pkg_check_modules(CUPS libcups)
-    if(NOT CUPS_FOUND)
+    if(NOT CUPS_FOUND OR NOT CUPS_LIBRARIES)
         pkg_check_modules(CUPS cups)
-        if(NOT CUPS_FOUND)
-                find_program(CUPS_CONFIG cups-config)
-                if(CUPS_CONFIG)
-                        execute_process(COMMAND ${CUPS_CONFIG} --api-version OUTPUT_VARIABLE CUPS_API_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-                        if(CUPS_API_VERSION VERSION_LESS "1.7")
-                                set(CUPS_FOUND False)
-                        else()
-                                execute_process(COMMAND ${CUPS_CONFIG} --cflags OUTPUT_VARIABLE CUPS_CFLAGS_OTHER OUTPUT_STRIP_TRAILING_WHITESPACE)
-                                execute_process(COMMAND ${CUPS_CONFIG} --libs OUTPUT_VARIABLE CUPS_LIBRARIES OUTPUT_STRIP_TRAILING_WHITESPACE)
-                                set(CUPS_FOUND True)
-                        endif()
+    endif()
+
+    if(NOT CUPS_FOUND OR NOT CUPS_LIBRARIES)
+        set(CUPS_FOUND False)
+        find_program(CUPS_CONFIG cups-config)
+        if(CUPS_CONFIG)
+            execute_process(COMMAND ${CUPS_CONFIG} --api-version
+                            OUTPUT_VARIABLE CUPS_API_VERSION RESULT_VARIABLE _cups_api_rc
+                            OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if(_cups_api_rc EQUAL 0 AND CUPS_API_VERSION VERSION_GREATER_EQUAL "1.7")
+                execute_process(COMMAND ${CUPS_CONFIG} --cflags
+                                OUTPUT_VARIABLE CUPS_CFLAGS_OTHER RESULT_VARIABLE _cups_cflags_rc
+                                OUTPUT_STRIP_TRAILING_WHITESPACE)
+                execute_process(COMMAND ${CUPS_CONFIG} --libs
+                                OUTPUT_VARIABLE CUPS_LIBRARIES RESULT_VARIABLE _cups_libs_rc
+                                OUTPUT_STRIP_TRAILING_WHITESPACE)
+                if(_cups_cflags_rc EQUAL 0 AND _cups_libs_rc EQUAL 0 AND CUPS_LIBRARIES)
+                    set(CUPS_FOUND True)
                 endif()
+            endif()
         endif()
     endif()
 

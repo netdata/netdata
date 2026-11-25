@@ -267,15 +267,14 @@ typedef struct _query_metric {
     STORAGE_POINT query_points;
 
     struct {
-        uint32_t slot;
-        uint32_t first_slot;
-        STRING *id;
-        STRING *name;
-        STRING *units;
+        uint32_t slot;          // the dimension of the returned RRDR (QUERY_METRIC_NOT_GROUPED_SLOT when dropped)
+        uint32_t first_slot;    // the dimension of the first group-by pass
     } grouped_as;
 
     usec_t duration_ut;
 } QUERY_METRIC;
+
+#define QUERY_METRIC_NOT_GROUPED_SLOT UINT32_MAX
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 #define MAX_QUERY_GROUP_BY_PASSES 2
@@ -748,6 +747,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 size_t query_scope_hosts_pin(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                              RRDHOST ***hosts, struct query_versions *versions);
 void query_scope_hosts_unpin(RRDHOST **hosts, size_t count);
+int query_scope_unittest(void);
 
 typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 typedef bool (*foreach_stop_cb_t)(void *data);  // optional: true stops a scan, also over entries the scope rejects

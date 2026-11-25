@@ -18,7 +18,7 @@ An anomaly is an unusual pattern, behavior, or event in your system's operations
    
 3. Monitor resource usage:
    
-   You can use the Anomalies tab in Netdata to dive deeper into what could be triggering anomalies in your infrastructure.
+   You can use the Anomalies tab in Netdata to dive deeper into what could be triggering anomalies across your stack.
    
 4. Adjust thresholds or address the underlying issue:
 

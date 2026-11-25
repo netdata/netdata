@@ -26,10 +26,12 @@ const (
 	ModePreloaded Mode = "preloaded"
 )
 
-// DefaultMode is set to native by DEB/RPM builds. Other installations use
-// explicitly installed managed bundles unless an administrator selects a preload.
-// It stays a plain string because the linker's -X flag only sets string variables.
+// DefaultMode is set to native by DEB/RPM builds and preloaded by complete DEM images.
+// DefaultMode and DefaultPreloadPath are strings for the linker's -X flag.
 var DefaultMode = string(ModeManaged)
+
+// DefaultPreloadPath is set by complete DEM images to the root of the bundled runtime.
+var DefaultPreloadPath string
 
 const day = 24 * time.Hour
 
@@ -47,12 +49,16 @@ type Config struct {
 
 // DefaultConfig takes the store allowance and previous-generation grace from the runtime store defaults.
 func DefaultConfig() Config {
-	return Config{
+	cfg := Config{
 		Mode:                  Mode(DefaultMode),
 		ReleaseURL:            defaultReleaseURL(AgentRelease(), runtime.GOARCH),
 		MaxBytes:              browserruntime.DefaultMaxBytes,
 		PreviousRetentionDays: int(browserruntime.DefaultPreviousRetention / day),
 	}
+	if cfg.Mode == ModePreloaded {
+		cfg.PreloadPath = DefaultPreloadPath
+	}
+	return cfg
 }
 
 // AgentRelease is the canonical build identity, independent of display/native

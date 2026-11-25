@@ -5,6 +5,8 @@
 
 #include "ml_queue.h"
 
+#include <vector>
+
 typedef struct {
     nd_uuid_t metric_uuid;
     ml_kmeans_inlined_t inlined_kmeans;

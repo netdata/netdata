@@ -58,8 +58,8 @@ inherited from its callers and repository or organization configuration variable
 without a separate GitHub deployment environment.
 It emits `dem-runtime-publication-receipt` only after successful
 publication. The shared companion check verifies the publishing job,
-both architectures and exact identity. Ordinary source/static/Docker lanes consume
-this small receipt; native jobs additionally consume and verify the actual payload.
+both architectures and exact identity. Source, static and regular Docker lanes consume
+this small receipt. Native packaging and DEM Docker jobs also consume and verify the actual payload.
 Only same-repository manual release invocations or the scheduled central release
 can supply this receipt; pull-request build artifacts are excluded.
 Source/static/Windows and base-image compilation can run before companion
@@ -77,6 +77,29 @@ These helpers do not provide a global transaction across R2, registries or packa
 repositories. A partial immutable upload can already exist
 when a job fails; retry the same authenticated inputs to finish it. Never replace
 immutable bytes or bypass signature checks to recover.
+
+## DEM Docker image assembly
+
+The regular and DEM image targets share the common Agent build. The regular target excludes
+DEM. The DEM target builds the plugin and uses the existing portable runtime output for
+amd64 or arm64. The same registries publish both variants. DEM tags add `-dem` to the
+corresponding stable, nightly and version tags.
+
+For release builds, the Docker job checks the successful companion publication receipt
+and reads the same-run portable runtime artifact. It verifies the artifact bytes, checks
+the exact version, channel, source and architecture, and pairs the archive with the
+published signed descriptor and canonical public keyring. The build receives those inputs
+offline through a dedicated BuildKit context. It verifies and seals the runtime at its
+final path, `/opt/netdata-dem-runtime`, then validates the result as Netdata's service
+account. The DEM target installs the stock IP-intelligence databases with their metadata
+and attribution at `/usr/share/netdata/topology-ip-intel`.
+
+The signing key stays with the release publisher. The Docker workflow owns the single
+unpublished companion build for relevant PRs and master pushes, using the existing runtime
+builder with disposable signing keys and stock database fixtures. Image assembly reuses
+the candidate descriptor and public key that qualified that same architecture's companion;
+only those two public files are passed in a separate CI artifact retained as long as the runtime bytes. The release
+workflow verifies public artifacts.
 
 ## Exact CI artifacts and native preparation
 

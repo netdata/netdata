@@ -17,6 +17,11 @@ const queryCorpusStorageTiers = 3
 
 func waitChartsRetention(t *testing.T, host string, charts ...fixture.Chart) {
 	t.Helper()
+	waitChartsRetentionOn(t, td, host, charts...)
+}
+
+func waitChartsRetentionOn(t *testing.T, d *daemon.Daemon, host string, charts ...fixture.Chart) {
+	t.Helper()
 	// A sibling can satisfy context retention before this chart arrives.
 	for _, chart := range charts {
 		params := daemon.DataParams(chart.Context, chart.FirstT()-1, chart.LastT(), 1)
@@ -24,7 +29,7 @@ func waitChartsRetention(t *testing.T, host string, charts ...fixture.Chart) {
 		params.Set("options", "jsonwrap|unaligned")
 		deadline := time.Now().Add(15 * time.Second)
 		for {
-			doc, err := td.DataV3(host, params)
+			doc, err := d.DataV3(host, params)
 			if err == nil {
 				retention, ok := daemon.QueryRetention(doc)
 				if ok && retention.FirstEntry == chart.FirstT() && retention.LastEntry == chart.LastT() {

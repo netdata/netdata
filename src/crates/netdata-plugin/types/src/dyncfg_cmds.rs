@@ -1,12 +1,10 @@
 #![allow(dead_code)]
 //! The dyncfg command vocabulary: [`DynCfgCmds`], the bitflag set naming the
 //! operations a dynamic-configuration entry supports. It is the `cmds` field
-//! of [`ConfigDeclaration`](crate::ConfigDeclaration), parsed from a schema's
-//! `configDeclaration.cmds` JSON string and emitted as one word of the
-//! pluginsd CONFIG line.
+//! of [`ConfigDeclaration`](crate::ConfigDeclaration), emitted as one word of
+//! the pluginsd CONFIG line.
 //!
-//! Wire form: lowercase names, pipe-separated ("get | schema") — what the
-//! schema crate writes into the `cmds` JSON member and what
+//! Wire form: lowercase names, pipe-separated ("get | schema") — what
 //! netdata-plugin-protocol's CONFIG encoder puts in the `cmds` word (run
 //! through the encoder's `quote_if_needed`, which quotes it when it contains
 //! spaces). The agent parses that word with
@@ -17,8 +15,6 @@
 //! `DYNCFG_CMDS` enum (src/libnetdata/inicfg/dyncfg.h) bit-for-bit, so the
 //! u32 conversions interoperate.
 //!
-//! Parsing here is stricter than the agent: an unknown name rejects the
-//! whole input, while `dyncfg_cmds2id` silently skips unrecognized words.
 //! Registration caveat, outside this type: the CONFIG encoder sends the
 //! action word uppercase ("CREATE"), while the agent matches it
 //! case-sensitively against lowercase "create" (pluginsd_config,
@@ -28,7 +24,6 @@
 
 use bitflags::bitflags;
 use std::fmt;
-use std::str::FromStr;
 
 bitflags! {
     /// Rendered on the wire by `Display` / [`Self::to_pipe_separated`]; the
@@ -66,59 +61,6 @@ impl DynCfgCmds {
             Self::USERCONFIG => Some("userconfig"),
             _ => None,
         }
-    }
-
-    /// Parse a single command name to its flag. Matching is lowercase and
-    /// exact (whitespace is trimmed first); anything else is `None`.
-    pub fn from_cmd_name(name: &str) -> Option<Self> {
-        match name.trim() {
-            "get" => Some(Self::GET),
-            "schema" => Some(Self::SCHEMA),
-            "update" => Some(Self::UPDATE),
-            "add" => Some(Self::ADD),
-            "test" => Some(Self::TEST),
-            "remove" => Some(Self::REMOVE),
-            "enable" => Some(Self::ENABLE),
-            "disable" => Some(Self::DISABLE),
-            "restart" => Some(Self::RESTART),
-            "userconfig" => Some(Self::USERCONFIG),
-            _ => None,
-        }
-    }
-
-    /// Parse a command list that separates names with spaces, pipes, or both:
-    /// "get | schema", "get schema restart" and "get|schema|restart" all
-    /// parse. Unknown names reject the whole input; an empty (or
-    /// all-whitespace) string yields the empty set. (Why both separators are
-    /// accepted, and how the agent parses the result, is in the module docs.)
-    pub fn from_str_multi(s: &str) -> Option<Self> {
-        let s = s.trim();
-        if s.is_empty() {
-            return Some(Self::empty());
-        }
-
-        let mut result = Self::empty();
-
-        for part in s.split([' ', '|']) {
-            let part = part.trim();
-            if part.is_empty() {
-                continue;
-            }
-
-            match Self::from_cmd_name(part) {
-                Some(flag) => result |= flag,
-                None => return None,
-            }
-        }
-
-        Some(result)
-    }
-
-    /// Parse from raw bytes (a wire word before UTF-8 decoding): invalid
-    /// UTF-8 is `None`, otherwise as [`Self::from_str_multi`].
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        let s = std::str::from_utf8(bytes).ok()?;
-        Self::from_str_multi(s)
     }
 
     /// Render space-separated ("get schema restart"), the form the C agent
@@ -195,16 +137,6 @@ impl fmt::Display for DynCfgCmds {
     }
 }
 
-/// Delegates to [`Self::from_str_multi`]; `Err` is the unit type, so a
-/// failure carries no diagnostic detail.
-impl FromStr for DynCfgCmds {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_str_multi(s).ok_or(())
-    }
-}
-
 /// Build from raw bits; unknown bits are silently dropped by
 /// `from_bits_truncate`.
 impl From<u32> for DynCfgCmds {
@@ -238,92 +170,6 @@ mod tests {
     }
 
     #[test]
-    fn test_from_cmd_name() {
-        assert_eq!(DynCfgCmds::from_cmd_name("get"), Some(DynCfgCmds::GET));
-        assert_eq!(
-            DynCfgCmds::from_cmd_name("schema"),
-            Some(DynCfgCmds::SCHEMA)
-        );
-        assert_eq!(
-            DynCfgCmds::from_cmd_name("userconfig"),
-            Some(DynCfgCmds::USERCONFIG)
-        );
-        assert_eq!(
-            DynCfgCmds::from_cmd_name("  restart  "),
-            Some(DynCfgCmds::RESTART)
-        );
-        assert_eq!(DynCfgCmds::from_cmd_name("invalid"), None);
-    }
-
-    #[test]
-    fn test_from_str_multi_pipe_separated() {
-        let result = DynCfgCmds::from_str_multi("get | schema | restart").unwrap();
-        assert_eq!(
-            result,
-            DynCfgCmds::GET | DynCfgCmds::SCHEMA | DynCfgCmds::RESTART
-        );
-
-        let result = DynCfgCmds::from_str_multi("get|schema|restart").unwrap();
-        assert_eq!(
-            result,
-            DynCfgCmds::GET | DynCfgCmds::SCHEMA | DynCfgCmds::RESTART
-        );
-    }
-
-    #[test]
-    fn test_from_str_multi_space_separated() {
-        let result = DynCfgCmds::from_str_multi("get schema restart").unwrap();
-        assert_eq!(
-            result,
-            DynCfgCmds::GET | DynCfgCmds::SCHEMA | DynCfgCmds::RESTART
-        );
-
-        let result = DynCfgCmds::from_str_multi("  get   schema   restart  ").unwrap();
-        assert_eq!(
-            result,
-            DynCfgCmds::GET | DynCfgCmds::SCHEMA | DynCfgCmds::RESTART
-        );
-    }
-
-    #[test]
-    fn test_from_str_multi_mixed_separators() {
-        let result = DynCfgCmds::from_str_multi("get | schema restart").unwrap();
-        assert_eq!(
-            result,
-            DynCfgCmds::GET | DynCfgCmds::SCHEMA | DynCfgCmds::RESTART
-        );
-    }
-
-    #[test]
-    fn test_from_str_multi_single_command() {
-        let result = DynCfgCmds::from_str_multi("get").unwrap();
-        assert_eq!(result, DynCfgCmds::GET);
-    }
-
-    #[test]
-    fn test_from_str_multi_empty() {
-        let result = DynCfgCmds::from_str_multi("").unwrap();
-        assert_eq!(result, DynCfgCmds::empty());
-
-        let result = DynCfgCmds::from_str_multi("   ").unwrap();
-        assert_eq!(result, DynCfgCmds::empty());
-    }
-
-    #[test]
-    fn test_from_str_multi_invalid() {
-        assert_eq!(DynCfgCmds::from_str_multi("get | invalid | schema"), None);
-        assert_eq!(DynCfgCmds::from_str_multi("invalid"), None);
-    }
-
-    #[test]
-    fn test_from_slice() {
-        let result = DynCfgCmds::from_slice(b"get | schema").unwrap();
-        assert_eq!(result, DynCfgCmds::GET | DynCfgCmds::SCHEMA);
-
-        assert_eq!(DynCfgCmds::from_slice(&[0xFF, 0xFE]), None); // Invalid UTF-8
-    }
-
-    #[test]
     fn test_to_space_separated() {
         let cmds = DynCfgCmds::GET | DynCfgCmds::SCHEMA | DynCfgCmds::RESTART;
         assert_eq!(cmds.to_space_separated(), "get schema restart");
@@ -345,14 +191,6 @@ mod tests {
     fn test_display() {
         let cmds = DynCfgCmds::GET | DynCfgCmds::SCHEMA;
         assert_eq!(format!("{}", cmds), "get | schema");
-    }
-
-    #[test]
-    fn test_from_str_trait() {
-        let cmds: DynCfgCmds = "get | schema".parse().unwrap();
-        assert_eq!(cmds, DynCfgCmds::GET | DynCfgCmds::SCHEMA);
-
-        assert!("invalid".parse::<DynCfgCmds>().is_err());
     }
 
     #[test]

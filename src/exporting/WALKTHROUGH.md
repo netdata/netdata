@@ -250,7 +250,7 @@ in that dashboard. Fill in the query like we did above and save.
 
 ## Conclusion
 
-There you have it, a complete systems monitoring stack which is very easy to deploy. From here I would begin to
+There you have it: Netdata exporting metrics to Prometheus and Grafana. From here I would begin to
 understand how Prometheus and a service discovery mechanism such as Consul can play together nicely. My current prod
 deployments automatically register Netdata services into Consul and Prometheus automatically begins to scrape them. Once
 achieved you do not have to think about the monitoring system until Prometheus cannot keep up with your scale. Once this

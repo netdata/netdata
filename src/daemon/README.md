@@ -1,6 +1,6 @@
 # Daemon
 
-The Netdata Daemon, often referred to as the Netdata Agent, controls the entire operation of the monitoring system. This document provides an overview of command-line options, debugging, and troubleshooting.
+The Netdata Daemon, often referred to as the Netdata Agent, controls the entire operation of the Netdata Agent. This document provides an overview of command-line options, debugging, and troubleshooting.
 
 ## Command-Line Options
 

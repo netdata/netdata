@@ -8,7 +8,7 @@ By filtering your standard Netdata dashboard to **display only the most relevant
 
 :::
 
-Since it leverages every available metric in your infrastructure with up to 1-second granularity, **Metric Correlations provides you with highly accurate insights**.
+Since it leverages every available metric across your stack with up to 1-second granularity, **Metric Correlations provides you with highly accurate insights**.
 
 ## Using Metric Correlations
 
@@ -215,7 +215,7 @@ Sample response showing the percentage of time each metric was anomalous:
 
 :::tip
 
-You can programmatically access this data to build custom dashboards or alerts based on anomaly patterns in your infrastructure.
+You can programmatically access this data to build custom dashboards or alerts based on anomaly patterns across your stack.
 
 :::
 

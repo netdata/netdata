@@ -11,6 +11,7 @@ int init_opentsdb_http_instance(struct instance *instance);
 void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len);
 int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host);
 int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host);
+int format_chart_opentsdb(struct instance *instance, RRDSET *st);
 
 int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM *rd);
 int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *rd);

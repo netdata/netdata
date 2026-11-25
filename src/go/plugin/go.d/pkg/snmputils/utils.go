@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
-func ParseSNMPVersion(version string) gosnmp.SnmpVersion {
+func ParseSNMPVersion(version string) gosnmp.Version {
 	switch version {
 	case "0", "1":
 		return gosnmp.Version1
@@ -22,7 +22,7 @@ func ParseSNMPVersion(version string) gosnmp.SnmpVersion {
 	}
 }
 
-func ParseSNMPv3SecurityLevel(level string) gosnmp.SnmpV3MsgFlags {
+func ParseSNMPv3SecurityLevel(level string) gosnmp.SecurityLevel {
 	switch level {
 	case "1", "none", "noAuthNoPriv", "":
 		return gosnmp.NoAuthNoPriv
@@ -37,7 +37,7 @@ func ParseSNMPv3SecurityLevel(level string) gosnmp.SnmpV3MsgFlags {
 
 // SNMPv3SecurityLevel returns the USM security level the given protocols provide. Privacy without
 // authentication is not a valid USM level, so it yields NoAuthNoPriv.
-func SNMPv3SecurityLevel(auth gosnmp.SnmpV3AuthProtocol, priv gosnmp.SnmpV3PrivProtocol) gosnmp.SnmpV3MsgFlags {
+func SNMPv3SecurityLevel(auth gosnmp.AuthProtocol, priv gosnmp.PrivProtocol) gosnmp.SecurityLevel {
 	switch {
 	case auth == 0 || auth == gosnmp.NoAuth:
 		return gosnmp.NoAuthNoPriv
@@ -48,7 +48,7 @@ func SNMPv3SecurityLevel(auth gosnmp.SnmpV3AuthProtocol, priv gosnmp.SnmpV3PrivP
 	}
 }
 
-func ParseSNMPv3AuthProtocol(protocol string) gosnmp.SnmpV3AuthProtocol {
+func ParseSNMPv3AuthProtocol(protocol string) gosnmp.AuthProtocol {
 	switch protocol {
 	case "1", "none", "noAuth", "":
 		return gosnmp.NoAuth
@@ -69,7 +69,7 @@ func ParseSNMPv3AuthProtocol(protocol string) gosnmp.SnmpV3AuthProtocol {
 	}
 }
 
-func ParseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
+func ParseSNMPv3PrivProtocol(protocol string) gosnmp.PrivProtocol {
 	switch protocol {
 	case "1", "none", "noPriv", "":
 		return gosnmp.NoPriv
@@ -90,24 +90,20 @@ func ParseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
 	}
 }
 
-// SnmpClientConnInfo describes the client's connection settings for logging. It omits secrets: the community and
-// the USM passphrases. gosnmp's SecurityParameters().Description() includes both passphrases, so the SNMPv3 part is
-// built from individual fields instead.
-func SnmpClientConnInfo(c gosnmp.Handler) string {
+// SnmpClientConnInfo describes a client configuration for logging. It omits
+// secrets: the community and the USM passphrases.
+func SnmpClientConnInfo(cfg gosnmp.Config) string {
 	var info strings.Builder
-	fmt.Fprintf(&info, "hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version())
-	if c.Version() != gosnmp.Version3 {
+	fmt.Fprintf(&info, "hostname='%s',port='%d',snmp_version='%s'", cfg.Target, cfg.Port, cfg.Version)
+	if cfg.Version != gosnmp.Version3 {
 		return info.String()
 	}
 
-	// Connect adds the Reportable flag to SNMPv3 clients; it is not part of the security level.
-	fmt.Fprintf(&info, ",security_level='%s'", c.MsgFlags()&^gosnmp.Reportable)
-	if sp, ok := c.SecurityParameters().(*gosnmp.UsmSecurityParameters); ok {
-		fmt.Fprintf(&info, ",username='%s',auth_protocol='%s',priv_protocol='%s'",
-			sp.UserName, sp.AuthenticationProtocol, sp.PrivacyProtocol)
-	}
-	if ctx := c.ContextName(); ctx != "" {
-		fmt.Fprintf(&info, ",context_name='%s'", ctx)
+	fmt.Fprintf(&info, ",security_level='%s'", cfg.SecurityLevel)
+	fmt.Fprintf(&info, ",username='%s',auth_protocol='%s',priv_protocol='%s'",
+		cfg.User.Name, cfg.User.AuthProtocol, cfg.User.PrivProtocol)
+	if cfg.ContextName != "" {
+		fmt.Fprintf(&info, ",context_name='%s'", cfg.ContextName)
 	}
 	return info.String()
 }

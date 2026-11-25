@@ -28,7 +28,7 @@
 //!
 //! Crate-private (`mod transport` in `lib.rs`): used only by `lib.rs` and
 //! `mux.rs`. External ferryboat users (the otel-plugin supervisor and its
-//! worker crates otel-ingestor, otel-ledger and otel-legacy-logs, plus
+//! worker crates otel-ingestor and otel-ledger, plus
 //! file-lifecycle's WAL→ledger link) go through the public
 //! `Connection`/`Listener`/`Endpoint` API.
 #[cfg(unix)]

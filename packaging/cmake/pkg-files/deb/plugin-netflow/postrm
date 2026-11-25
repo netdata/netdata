@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+# The Agent owns the listener process; unlinking its executable does not stop it.
+if [ "$1" = remove ] && [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ] &&
+   command -v deb-systemd-invoke >/dev/null 2>&1; then
+    deb-systemd-invoke try-restart netdata.service || true
+fi
+
+exit 0

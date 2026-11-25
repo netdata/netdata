@@ -657,6 +657,9 @@ void pulse_dbengine_do(bool extended) {
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
+    // the total below includes the metrics registry, also when the extended charts are off
+    if(main_mrg)
+        mrg_get_statistics(main_mrg, &mrg_stats);
 
     struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
 
@@ -682,7 +685,6 @@ void pulse_dbengine_do(bool extended) {
     dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
     dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
     dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
-    mrg_get_statistics(main_mrg, &mrg_stats);
 
     int priority = 135000;
     {

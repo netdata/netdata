@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
@@ -617,8 +617,16 @@ func TestJobHandleDatagramRejectsUnknownV3EngineID(t *testing.T) {
 
 	c.handleDatagram(testDatagram(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}))
 
-	if len(writer.entries) != 0 {
-		t.Fatalf("expected unknown engine ID to drop trap, got %d entries", len(writer.entries))
+	// The job has no user for the engine: the trap does not decode.
+	if len(writer.entries) != 1 {
+		t.Fatalf("entries = %d, want one decode-error entry", len(writer.entries))
+	}
+	entry := writer.entries[0]
+	if entry.ReportType != model.ReportTypeDecodeError || entry.DecodeError == nil {
+		t.Fatalf("entry = %+v, want a decode-error entry", entry)
+	}
+	if entry.DecodeError.Kind != "unknown_engine_id" || entry.DecodeError.EngineID != testEngineIDHex {
+		t.Fatalf("decode error = %+v, want unknown_engine_id from %s", entry.DecodeError, testEngineIDHex)
 	}
 	assertJobMetric(t, c.telemetry, jobName, "snmp_trap_errors_unknown_engine_id", 1)
 }
@@ -689,10 +697,9 @@ func TestJobHandleDatagramAllowsNativeIPv6SourceCIDR(t *testing.T) {
 func TestJobHandleDatagramUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.T) {
 	trap := testColdStartTrap("security", "warning", "coldStart from {{source_ip}}")
 	index := setSingleTestTrap(t, trap)
-	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
+	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.VarBind{
 		Name:  model.SNMPTrapAddressOID,
-		Type:  gosnmp.IPAddress,
-		Value: "192.0.2.20",
+		Value: gosnmp.IPAddressValue(netip.MustParseAddr("192.0.2.20")),
 	})
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 

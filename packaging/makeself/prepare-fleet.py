@@ -25,6 +25,7 @@ from pathlib import Path, PurePosixPath
 PLUGIN = 'usr/libexec/netdata/plugins.d/'
 CONF = 'usr/lib/netdata/conf.d/'
 # Only dedicated stock paths belong here. Shared helpers and unknown files survive.
+# Keep topology-ip-intel data for DEM/RUM even when NetFlow is removed.
 CAPS = {
     'apps': ([PLUGIN + 'apps.plugin', CONF + 'apps_groups.conf'], []),
     'debugfs': ([PLUGIN + 'debugfs.plugin'], []),
@@ -38,7 +39,7 @@ CAPS = {
                  CONF + 'schema.d/systemd-journal%3Amonitored-directories.json'], []),
     'otel': ([PLUGIN + 'otel-plugin', CONF + 'otel.yaml', CONF + 'otel.d'], []),
     'netflow': ([PLUGIN + 'netflow-plugin', CONF + 'netflow.yaml',
-                 CONF + 'topology-ip-intel.yaml', 'usr/share/netdata/topology-ip-intel',
+                 CONF + 'topology-ip-intel.yaml',
                  'usr/sbin/topology-ip-intel-downloader'], []),
     'dashboard': (['usr/share/netdata/web'], []),
     'python': ([PLUGIN + 'python.d.plugin', 'usr/libexec/netdata/python.d',

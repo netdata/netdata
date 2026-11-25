@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,10 +23,9 @@ func TestTableTagProcessor_ProcessTag_Uint32Format(t *testing.T) {
 			Name:   "bgpPeerRemoteAs",
 			Format: "uint32",
 		},
-	}, gosnmp.SnmpPDU{
+	}, gosnmp.VarBind{
 		Name:  "1.3.6.1.2.1.15.3.1.9.169.254.1.1",
-		Type:  gosnmp.Integer,
-		Value: -94967296,
+		Value: gosnmp.IntegerValue(-94967296),
 	}, ta)
 
 	require.NoError(t, err)

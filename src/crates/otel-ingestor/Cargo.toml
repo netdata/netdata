@@ -18,7 +18,6 @@ ferryboat = { workspace = true }
 flatten-otel = { workspace = true }
 ng-flatten = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
-netdata-plugin-types = { workspace = true }
 
 # WAL writing
 file-registry = { workspace = true }

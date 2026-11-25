@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,17 +39,19 @@ func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) 
 	device.set(createIntegerPDU(cdpCacheTableOID+".1.3.5.1", 1))
 	device.set(createIntegerPDU(cdpCacheTableOID+".1.3.6.2", 1))
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
 
 	for range 2 {
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Empty(t, results[0].Metrics)
@@ -67,7 +70,7 @@ func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) 
 }
 
 func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStructureCache(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -77,8 +80,8 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	)
 
 	pdu := createPDU(rowOID, gosnmp.OctetString, []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{pdu})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{pdu})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{pdu})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{pdu})
 
 	profile := &ddsnmp.Profile{
 		SourceFile: "topology-presence-profile.yaml",
@@ -110,8 +113,8 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 
 	cache := newTableCache(time.Hour, 0)
 	collector := &Collector{
-		scalarCollector: newScalarCollector(mockHandler, make(map[string]bool), logger.New()),
-		tableCollector:  newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false),
+		scalarCollector: newScalarCollector(mockHandler, testRequests, make(map[string]bool), logger.New()),
+		tableCollector:  newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false),
 	}
 
 	expected := []ddsnmp.Metric{
@@ -127,7 +130,7 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	}
 
 	var walkStats ddsnmp.CollectionStats
-	walkMetrics, err := collector.collectTopologyMetrics(profile, &walkStats)
+	walkMetrics, err := collector.collectTopologyMetrics(context.Background(), profile, &walkStats)
 	require.NoError(t, err)
 	require.Equal(t, expected, walkMetrics)
 	require.Equal(t, int64(1), walkStats.SNMP.WalkRequests)
@@ -135,7 +138,7 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	require.Equal(t, int64(0), walkStats.SNMP.TablesCached)
 
 	var secondWalkStats ddsnmp.CollectionStats
-	secondWalkMetrics, err := collector.collectTopologyMetrics(profile, &secondWalkStats)
+	secondWalkMetrics, err := collector.collectTopologyMetrics(context.Background(), profile, &secondWalkStats)
 	require.NoError(t, err)
 	require.Equal(t, expected, secondWalkMetrics)
 	require.Equal(t, int64(1), secondWalkStats.SNMP.WalkRequests)
@@ -172,16 +175,18 @@ func TestCollector_CollectTopologyMetrics_DependencyOnlyRouteWaitsForAnchorRows(
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 
 	device := newStatefulSNMPDevice()
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Empty(t, results[0].TopologyMetrics)
@@ -224,16 +229,18 @@ func TestCollector_CollectTopologyMetrics_DependencyWithSymbolOwnerRemainsEager(
 	}
 
 	device := newStatefulSNMPDevice()
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Empty(t, results[0].TopologyMetrics)

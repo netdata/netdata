@@ -116,8 +116,9 @@
           "properties": {
             "username": {
               "title": "Username",
-              "description": "SNMPv3 USM security name (user).",
-              "type": "string"
+              "description": "SNMPv3 USM security name (user), at most 32 octets.",
+              "type": "string",
+              "maxLength": 32
             },
             "engine_id": {
               "title": "Engine ID",
@@ -170,13 +171,13 @@
       },
       "dynamic_engine_id_discovery": {
         "title": "Dynamic engine ID discovery",
-        "description": "When enabled, the listener discovers v3 Trap sender engine IDs at runtime from raw SNMPv3 context, and hot-registers new (engineID, username) pairs after the retry authenticates and decodes a v3 Trap. Static engine_id_whitelist must be empty. Dynamic registrations are in-memory, capped by dynamic_engine_id_max_pairs, and not persisted across restarts. Discovery is skipped for reportable SNMPv3 messages so confirmed-class traffic cannot enter the sender-registration path.",
+        "description": "When enabled, the listener learns v3 Trap sender engine IDs at runtime, one (engineID, username) pair at a time, from the first unreportable v3 Trap a configured user of that name accepts. Static engine_id_whitelist must be empty. Learned pairs are in-memory, capped by dynamic_engine_id_max_pairs, and not persisted across restarts. Reportable SNMPv3 messages are never learned, so confirmed-class traffic cannot enter the sender-registration path.",
         "type": "boolean",
         "default": false
       },
       "dynamic_engine_id_max_pairs": {
         "title": "Dynamic engine ID maximum pairs",
-        "description": "Maximum in-memory dynamic (engineID, username) pairs per job. When 0 or unset, uses the default of 4096. Once the cap is full, new dynamic pairs are rejected with an unknown_engine_id counter increment while existing pairs continue to work.",
+        "description": "Maximum in-memory dynamic (engineID, username) pairs per job. When 0 or unset, uses the default of 4096. Once the cap is full, existing pairs continue to work; a trap from an unlearned engine counts as unknown_engine_id, and one of a new user name at a learned engine as usm_failures.",
         "type": "integer",
         "minimum": 0,
         "default": 4096

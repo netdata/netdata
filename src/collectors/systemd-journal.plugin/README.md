@@ -387,7 +387,7 @@ No additional configuration is required for this plugin to operate on supported 
 | **Keep Netdata up to date** | Ensures plugin compatibility and performance optimizations |
 | **Monitor disk usage** of journal files | Prevents performance issues caused by excessive log volume |
 | **Verify** journal file **locations** | Confirms the plugin can access the intended sources |
-| **Review** source selections **periodically** | Adjusts scope as infrastructure changes |
+| **Review** source selections **periodically** | Adjusts scope as the environment changes |
 
 ### Changing the journal directories at runtime
 

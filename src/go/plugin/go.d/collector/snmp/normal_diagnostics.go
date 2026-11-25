@@ -7,7 +7,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
@@ -20,7 +19,7 @@ type normalDiagnostics struct {
 	sequence       uint64
 	current        *normalAttempt
 	recorder       *ddsnmpcollector.SourceRecorder
-	client         gosnmp.Handler
+	client         snmputils.Client
 	initialization []*ddsnmp.SourceOperation
 	latest, failed *normalAttempt
 	bgpSources     map[string][]*ddsnmp.SourceOperation
@@ -58,7 +57,7 @@ func (c *Collector) wrapNormalClient() {
 	}
 	n.client = c.snmpClient
 	c.snmpClient = n.recorder.Wrap(n.client)
-	if collector, ok := c.ddSnmpColl.(interface{ SetSNMPClient(gosnmp.Handler) }); ok {
+	if collector, ok := c.ddSnmpColl.(interface{ SetSNMPClient(snmputils.Client) }); ok {
 		collector.SetSNMPClient(c.snmpClient)
 	}
 }
@@ -97,7 +96,7 @@ func (c *Collector) finishNormalAttempt(err error, samples map[string]int64) {
 	n.recorder = nil
 	if n.client != nil {
 		c.snmpClient = n.client
-		if collector, ok := c.ddSnmpColl.(interface{ SetSNMPClient(gosnmp.Handler) }); ok {
+		if collector, ok := c.ddSnmpColl.(interface{ SetSNMPClient(snmputils.Client) }); ok {
 			collector.SetSNMPClient(n.client)
 		}
 		n.client = nil

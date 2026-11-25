@@ -207,6 +207,7 @@ struct instance {
 
     BUFFER *labels_buffer;
     BUFFER *metric_prefix_buffer;
+    BUFFER *chart_prefix_buffer;
 
     time_t after;
     time_t before;

@@ -125,23 +125,10 @@ static int health_silencers_json_read_callback(JSON_ENTRY *e)
 {
     switch(e->type) {
         case JSON_OBJECT:
-#ifndef ENABLE_JSONC
-            e->callback_function = health_silencers_json_read_callback;
-            if(strcmp(e->name,"")) {
-                // init silencer
-                netdata_log_debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
-#endif
-                e->callback_data = create_silencer();
-                if(e->callback_data) {
-                    health_silencers_add_unsafe(e->callback_data);
-                }
-#ifndef ENABLE_JSONC
+            e->callback_data = create_silencer();
+            if(e->callback_data) {
+                health_silencers_add_unsafe(e->callback_data);
             }
-#endif
-            break;
-
-        case JSON_ARRAY:
-            e->callback_function = health_silencers_json_read_callback;
             break;
 
         case JSON_STRING:
@@ -161,6 +148,7 @@ static int health_silencers_json_read_callback(JSON_ENTRY *e)
             silencers->all_alarms=e->data.boolean?1:0;
             break;
 
+        case JSON_ARRAY:
         case JSON_NUMBER:
         case JSON_NULL:
             break;
@@ -403,39 +391,28 @@ void health_set_silencers_filename(void) {
 }
 
 void health_silencers_init(void) {
-    FILE *fd = fopen(health_silencers_filename(), "r");
-    if (fd) {
-        fseek(fd, 0 , SEEK_END);
-        off_t length = (off_t) ftell(fd);
-        fseek(fd, 0 , SEEK_SET);
+    const char *filename = health_silencers_filename();
 
-        if (length > 0 && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
-            char *str = mallocz((length+1)* sizeof(char));
-            if(str) {
-                size_t copied;
-                copied = fread(str, sizeof(char), length, fd);
-                if (copied == (length* sizeof(char))) {
-                    str[length] = 0x00;
-                    rw_spinlock_write_lock(&silencers_rw_spinlock);
-                    json_parse(str, NULL, health_silencers_json_read_callback);
-                    rw_spinlock_write_unlock(&silencers_rw_spinlock);
-                    netdata_log_info("Parsed health silencers file %s", health_silencers_filename());
-                } else {
-                    netdata_log_error("Cannot read the data from health silencers file %s", health_silencers_filename());
-                }
-                freez(str);
-            }
-        } else {
-            netdata_log_error("Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
-                              health_silencers_filename(),
-                              (int64_t)length,
-                              HEALTH_SILENCERS_MAX_FILE_LEN);
-        }
-        fclose(fd);
-    } else {
-        netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.",
-                         health_silencers_filename());
+    if (access(filename, F_OK) != 0 && errno == ENOENT) {
+        netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.", filename);
+        return;
     }
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    if (!read_txt_file_to_buffer(filename, wb, HEALTH_SILENCERS_MAX_FILE_LEN - 1)) {
+        netdata_log_error("Cannot read health silencers file %s, or it is larger than %d bytes.",
+                          filename, HEALTH_SILENCERS_MAX_FILE_LEN - 1);
+        return;
+    }
+
+    rw_spinlock_write_lock(&silencers_rw_spinlock);
+    int rc = json_parse(wb->buffer, NULL, health_silencers_json_read_callback);
+    rw_spinlock_write_unlock(&silencers_rw_spinlock);
+
+    if (rc == JSON_OK)
+        netdata_log_info("Parsed health silencers file %s", filename);
+    else
+        netdata_log_error("Cannot parse health silencers file %s", filename);
 }
 
 static SILENCE_TYPE health_silencers_check_silenced_unsafe(RRDCALC *rc, const char *host) {

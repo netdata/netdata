@@ -24,7 +24,7 @@ import (
 func setupPlan(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	var out, diagnostic bytes.Buffer
-	err := runRuntimeCommand(context.Background(), append([]string{"setup-plan"}, args...), nil, &out, &diagnostic)
+	err := runRuntimeCommand(context.Background(), append([]string{"setup-plan"}, args...), &out, &diagnostic)
 	return out.String(), err
 }
 
@@ -276,4 +276,19 @@ func TestRuntimeSetupPlanBuildOwnershipCannotBeChangedByRuntimeConfig(t *testing
 		assert.True(t, strings.HasPrefix(out, "netdata-dem-runtime-setup-v1\nnative-package\n"), out)
 		assert.NoDirExists(t, root)
 	}
+}
+
+func TestRuntimeSetupPlanImageDefaultsUseStandaloneOwnership(t *testing.T) {
+	mode, path := runtimehost.DefaultMode, runtimehost.DefaultPreloadPath
+	t.Cleanup(func() { runtimehost.DefaultMode, runtimehost.DefaultPreloadPath = mode, path })
+	dir := t.TempDir()
+	root := filepath.Join(dir, "image-runtime")
+	runtimehost.DefaultMode, runtimehost.DefaultPreloadPath = string(runtimehost.ModePreloaded), root
+	canonical, err := browserruntime.CanonicalRoot(root)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("history: {days: 14}\n"), 0600))
+	out, err := setupPlan(t, "--config-dir", dir)
+	require.NoError(t, err)
+	assert.Equal(t, "netdata-dem-runtime-setup-v1\nstandalone\npreloaded\n"+canonical+"\n", out)
+	assert.NoDirExists(t, root)
 }

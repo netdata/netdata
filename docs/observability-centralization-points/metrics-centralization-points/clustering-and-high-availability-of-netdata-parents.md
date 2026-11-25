@@ -51,7 +51,7 @@ Netdata supports building Parent clusters of 2+ nodes. Clustering and high avail
 
 ### Data Distribution
 
-**When you set up a cluster, every Parent receives all metrics from every Child**, no matter which Parent the Child is connected to. Parents also share their data with each other, so you never lose visibility into your infrastructure.
+**When you set up a cluster, every Parent receives all metrics from every Child**, no matter which Parent the Child is connected to. Parents also share their data with each other, so you never lose visibility into your nodes.
 
 **When a Parent goes down, your Children automatically reconnect to another available Parent**. That Parent then shares the metrics with all other Parents in your cluster, keeping everything in sync.
 

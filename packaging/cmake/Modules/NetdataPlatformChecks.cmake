@@ -10,7 +10,7 @@
 #
 # Self-contained: every check_* command used below is made available by an include() in this file. It relies on nothing the including file happens to have done, which is what lets it be included this early.
 #
-# Nothing here creates a target or touches a directory property, so its position is free. It reads only CMAKE_SYSTEM_NAME (via the OS_* variables) and CMAKE_C_COMPILER_ID. The one thing it must stay ahead of is any consumer of the HAVE_* results, the earliest of which is the libnetdata link line.
+# Nothing here creates a target or touches a directory property, so its position is free. It reads only CMAKE_SYSTEM_NAME (via the OS_* variables) and CMAKE_C_COMPILER_ID. The one thing it must stay ahead of is any consumer of the HAVE_* results, the earliest of which is the stack-trace flag block in the root CMakeLists.txt: it reads HAVE_BACKTRACE right after this file is included.
 #
 
 include_guard()

@@ -12,13 +12,16 @@
 #      reads one; that is a constraint, not a preference. Every directory
 #      property that applies to the whole tree is also set in this phase -
 #      -D_GNU_SOURCE, the compiler and linker flags, HAVE_OSLOG - because a
-#      directory property only reaches targets created after the mutation -
-#      which is also why the stack-trace flag pair lives here and not lower:
-#      every target, bundled ones included, is instrumented on purpose.
+#      directory property only reaches targets created after the mutation.
+#      The stack-trace flags are the one exception, they follow phase 3.
 #   3. platform capability probes (NetdataPlatformChecks), ahead of every
 #      bundled subproject so that our HAVE_* macros are answered by our own
 #      probes: check_* results share one cache namespace with every project
-#      configured as a subdirectory, and the first writer wins.
+#      configured as a subdirectory, and the first writer wins. The
+#      stack-trace flags come right after the probes, because -rdynamic
+#      depends on HAVE_BACKTRACE, and still ahead of phase 5, where the
+#      earliest target is created: every target, bundled ones included, is
+#      instrumented on purpose.
 #   4. the install layout (NetdataInstallLayout): every path once, as a
 #      *_DEST/*_DIR pair, plus the host-owned destinations.
 #   5. toolchains and code generation: Rust/corrosion (NetdataRust), Go
@@ -111,23 +114,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 include(NetdataCompilerFlags)
 
-# Stack-trace flags for EVERY target, ours and bundled alike. Placed here -
-# before any bundled subproject exists - because add_compile_options sets a
-# directory property that reaches only targets created after the mutation.
-# The flags used to sit between the bundling calls, splitting the bundled
-# code into an instrumented half and an uninstrumented half by accident of
-# statement order; instrumenting everything was decided deliberately, on the
-# measurement that it costs zero bytes of shipped .text on the default build
-# and keeps a crash inside bundled code (sqlite above all) readable.
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    # -fno-omit-frame-pointer = add frame pointers to all functions
-    # -funwind-tables = generate unwind tables for all functions
-    # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
-    add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
-    message(STATUS "Added compiler and linker flags for better stack trace support")
-endif()
-
 if(OS_MACOS)
   enable_language(OBJC)
   if(OSLOG AND FOUNDATION)
@@ -146,10 +132,11 @@ int main(void) { OSLogStore *store = nil; return store != nil; }
 endif()
 
 #
-# Platform capability probes. Placed here, immediately after the last of the
-# directory-property mutations above (NetdataPlatform's -D_GNU_SOURCE and include
-# paths, NetdataCompilerFlags - which also carries the mold link option - and
-# HAVE_OSLOG), and ahead of every dependency lookup and every bundled subproject.
+# Platform capability probes. Placed here, after the directory-property mutations
+# above (NetdataPlatform's -D_GNU_SOURCE and include paths, NetdataCompilerFlags -
+# which also carries the mold link option - and HAVE_OSLOG), and ahead of every
+# dependency lookup and every bundled subproject. The stack-trace flags are the
+# one directory property set after the probes, see the block below.
 #
 # Ahead of the subprojects matters: check_* results are cached in a namespace shared
 # with every project configured as a subdirectory, and the first writer wins. Running
@@ -157,6 +144,39 @@ endif()
 # inherited from whichever vendor happened to configure earlier.
 #
 include(NetdataPlatformChecks)
+
+# Stack-trace flags for EVERY target, ours and bundled alike. Placed here -
+# before any bundled subproject exists - because add_compile_options sets a
+# directory property that reaches only targets created after the mutation.
+# The flags used to sit between the bundling calls, splitting the bundled
+# code into an instrumented half and an uninstrumented half by accident of
+# statement order; instrumenting everything was decided deliberately, on the
+# measurement that it costs zero bytes of shipped .text on the default build
+# and keeps a crash inside bundled code (sqlite above all) readable.
+#
+# -rdynamic is the exception. The exported symbols are for the stack traces
+# Netdata writes itself (libbacktrace, libunwind or backtrace() from libc, see
+# src/libnetdata/stacktrace) and for Sentry. A build with none of them reports
+# "stack trace is not available" and has no use for them, while a link with
+# --gc-sections can no longer drop unused code because of them. So -rdynamic
+# is added only with one of these backends.
+#
+# HAVE_BACKTRACE comes from the platform probes, so this block sits below
+# them and not with the other directory properties further up. The probes do
+# not see directory properties, their results are the same either way. The
+# block has to stay above NetdataRust, which creates the earliest target.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # -fno-omit-frame-pointer = add frame pointers to all functions
+    # -funwind-tables = generate unwind tables for all functions
+    # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
+    add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
+    if(ENABLE_LIBBACKTRACE OR ENABLE_LIBUNWIND OR ENABLE_SENTRY OR HAVE_BACKTRACE)
+        add_link_options(-rdynamic)
+        message(STATUS "Added compiler and linker flags for better stack trace support")
+    else()
+        message(STATUS "Added compiler flags for better stack trace support, no -rdynamic without a stack trace backend")
+    endif()
+endif()
 
 # The install layout, then the toolchains, then every external library lookup.
 include(NetdataInstallLayout)
@@ -191,7 +211,6 @@ include(NetdataSnappy)
 include(NetdataOpenSSL)
 include(NetdataBacktrace)
 include(NetdataSQLite)
-include(NetdataDlib)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -219,13 +238,9 @@ if(ENABLE_SENTRY)
 endif()
 
 # The remaining bundled dependencies. The stack-trace flags that used to sit
-# between these calls - making their order load-bearing - moved up to the
-# compiler-flags phase, so every bundled target below is instrumented and the
-# calls are free to move.
-if(ENABLE_ML)
-  netdata_bundle_dlib()
-endif()
-
+# between these calls - making their order load-bearing - moved up to right
+# after the platform probes, so every bundled target below is instrumented and
+# the calls are free to move.
 if(ENABLE_LIBBACKTRACE)
     netdata_bundle_libbacktrace()
 endif()
@@ -302,6 +317,7 @@ include(NetdataPluginDem)
 include(NetdataIBMPlugin)
 include(NetdataPluginOTel)
 include(NetdataPluginNetflow)
+include(NetdataTopologyIPIntel)
 
 #
 # Generated config header, system files, and packaging.

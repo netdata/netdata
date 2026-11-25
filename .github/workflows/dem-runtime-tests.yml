@@ -59,13 +59,14 @@ jobs:
               - packaging/cmake/pkg-files/deb/netdata/prerm
               - src/dem-runtime/manifest.json
               - src/dem-runtime/runtime.json
+              - src/dem-runtime/README.md
               - src/dem-runtime/package*.json
               - src/go/tools/dem-runtime-release/**
               - src/go/plugin/dem/synthetic/browserruntime/**
               - src/go/go.mod
               - src/go/go.sum
               - '!src/go/**/*_test.go'
-              - '!**/*.md'
+              - '!src/go/**/*.md'
               - '!**/metadata.yaml'
             go:
               - .github/workflows/dem-runtime-tests.yml
@@ -97,17 +98,12 @@ jobs:
               - packaging/installer/netdata-updater.sh
               - packaging/installer/netdata-uninstaller.sh
               - packaging/installer/tests/test_dem_pair.py
-              - packaging/installer/tests/test_dem_docker_pair.py
               - packaging/installer/tests/test_updater_dem.py
               - packaging/installer/tests/test_updater_artifacts.py
               - packaging/installer/tests/test_static_install_callers.py
-              - packaging/docker/netdata-dem-docker*
-              - packaging/docker/Dockerfile
               - '!**/*.md'
             identity:
               - .github/workflows/dem-runtime-tests.yml
-              - packaging/docker/netdata-dem-docker
-              - packaging/docker/netdata-dem-docker-host.sh
               - packaging/installer/kickstart.sh
               - packaging/installer/netdata-dem-runtime.sh
               - packaging/installer/netdata-uninstaller.sh
@@ -203,7 +199,6 @@ jobs:
         if: needs.changes.outputs.installer == 'true'
         run: |
           python3 -m unittest discover -s packaging/installer/tests -p test_dem_pair.py -v
-          python3 -m unittest discover -s packaging/installer/tests -p test_dem_docker_pair.py -v
           python3 -m unittest discover -s packaging/installer/tests -p test_updater_dem.py -v
           python3 -m unittest discover -s packaging/installer/tests -p test_updater_artifacts.py -v
           python3 -m unittest discover -s packaging/installer/tests -p test_static_install_callers.py -v

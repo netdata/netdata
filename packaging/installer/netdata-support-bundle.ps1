@@ -1133,9 +1133,21 @@ if (Test-Path $LogDir) {
 # ============================================================================
 Show-Info 'collecting: state'
 Collect-SnmpDiagnostics
-$StatusFile = Join-Path $LibDir 'status-netdata.json'
-if (Test-Path $StatusFile) {
+# the agent writes these to the first writable of the state and cache dirs; the newest non-empty copy is the last record
+function Get-NewestStatusFile([string]$Name) {
+    @((Join-Path $LibDir $Name), (Join-Path $CacheDir $Name)) |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        ForEach-Object { Get-Item -LiteralPath $_ -Force } |
+        Where-Object { $_.Length -gt 0 -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+        Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
+}
+$StatusFile = Get-NewestStatusFile 'status-netdata.json'
+if ($StatusFile) {
     Save-File '06-state\status-file.json' 'Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)' $StatusFile
+}
+$ProgressFile = Get-NewestStatusFile 'status-netdata-progress.json'
+if ($ProgressFile) {
+    Save-File '06-state\status-progress.json' 'Daemon shutdown progress record: the step the agent was in when its shutdown was cut short (removed at startup)' $ProgressFile
 }
 if (Test-Path $LibDir) {
     # bearer_tokens FILENAMES are live API tokens - list only their count

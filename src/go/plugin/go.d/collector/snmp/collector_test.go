@@ -14,9 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -27,8 +25,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -152,23 +152,23 @@ func TestCollector_InitPassesSharedPingerConfig(t *testing.T) {
 
 func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP func(t *testing.T, m *snmpmock.MockHandler) *Collector
+		prepareSNMP func(t *testing.T, m *snmpmock.MockSession) *Collector
 	}{
 		"cleanup call does not panic on zero value collector": {
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockSession) *Collector {
 				return &Collector{}
 			},
 		},
 		"cleanup call does not panic if snmpClient not initialized": {
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockSession) *Collector {
 				collr := newTestSNMPCollector()
 				collr.Config = prepareV2Config()
-				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				setMockClientInitExpect(m)
 
 				require.NoError(t, collr.Init(context.Background()))
 
-				collr.snmpClient = nil
+				collr.snmpSession, collr.snmpClient = nil, nil
 
 				return collr
 			},
@@ -191,7 +191,7 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 	mockSNMP.EXPECT().Close().Return(nil).AnyTimes()
@@ -202,7 +202,7 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false
 	collr.snmpProfiles = []*ddsnmp.Profile{{}}
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return &mockDdSnmpCollector{}
 	}
@@ -381,7 +381,8 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		store := ddsnmp.NewDeviceStore()
 		collr := New(store)
 		collr.Config = prepareV2Config()
-		collr.newSnmpClient = func() gosnmp.Handler { panic("init panic") }
+		collr.Ping.Enabled = true
+		collr.newPinger = func(pinger.Config, *logger.Logger) (pinger.Client, error) { panic("init panic") }
 
 		require.Panics(t, func() { _ = collr.Init(context.Background()) })
 		cut := store.LifecycleCut()
@@ -397,13 +398,11 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		store := ddsnmp.NewDeviceStore()
 		collr := New(store)
 		collr.Config = prepareV2Config()
-		mockSNMP := snmpmock.NewMockHandler(ctrl)
-		mockSNMP.EXPECT().MaxOids().Return(20)
-		mockSNMP.EXPECT().Version().Return(gosnmp.Version2c)
-		mockSNMP.EXPECT().Get(gomock.Any()).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
+		mockSNMP := snmpmock.NewMockSession(ctrl)
+		mockSNMP.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, []string) (*gosnmp.Message, error) {
 			panic("check panic")
 		})
-		collr.snmpClient = mockSNMP
+		collr.snmpSession, collr.snmpClient = mockSNMP, mockSNMP
 		collr.beginDeviceLifecycle()
 
 		require.Panics(t, func() { _ = collr.Check(context.Background()) })
@@ -460,16 +459,15 @@ func TestCollector_CheckFailureUpdatesLifecycleWithoutTopologyRegistration(t *te
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
-	setMockClientSetterExpect(mockSNMP)
-	mockSNMP.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
+	mockSNMP := snmpmock.NewMockSession(ctrl)
+	mockSNMP.EXPECT().Connect(gomock.Any()).Return(errors.New("connect failed")).AnyTimes()
 
 	deviceStore := ddsnmp.NewDeviceStore()
 	collr := New(deviceStore)
 	collr.Config = prepareV2Config()
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 
 	require.NoError(t, collr.Init(context.Background()))
 	require.Error(t, collr.Check(context.Background()))
@@ -491,13 +489,13 @@ func TestCollector_LifecycleDiagnosticsFailOpenOnPanic(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 
 	collr := New(ddsnmp.NewDeviceStore())
 	collr.Config = prepareV2Config()
 	collr.deviceLifecycleStore = panickingDeviceLifecycleStore{}
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 
 	require.NotPanics(t, func() {
 		require.NoError(t, collr.Init(context.Background()))
@@ -534,7 +532,7 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
@@ -555,7 +553,7 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false
 	collr.snmpProfiles = []*ddsnmp.Profile{{}}
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return mockCollector }
 
 	require.NoError(t, collr.Init(context.Background()))
@@ -589,21 +587,19 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 	const sysObjectID = "1.3.6.1.4.1.41112"
 	const metadataOID = "1.3.6.1.4.1.41112.999.0"
-	handler := snmpmock.NewMockHandler(gomock.NewController(t))
-	handler.EXPECT().MaxOids().Return(20).AnyTimes()
-	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: sysObjectID},
-			{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("unifi-ap")},
+	handler := snmpmock.NewMockSession(gomock.NewController(t))
+	handler.EXPECT().Get(gomock.Any(), sysInfoOIDsForTest()).Return(&gosnmp.Message{
+		VarBinds: []gosnmp.VarBind{
+			{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue(sysObjectID)},
+			{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("unifi-ap"))},
 		},
 	}, nil).Times(1)
 	metadataCalls := 0
-	handler.EXPECT().Get([]string{metadataOID}).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
+	handler.EXPECT().Get(gomock.Any(), []string{metadataOID}).DoAndReturn(func(context.Context, []string) (*gosnmp.Message, error) {
 		metadataCalls++
-		return &gosnmp.SnmpPacket{
-			Variables: []gosnmp.SnmpPDU{
-				{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("profile-vendor")},
+		return &gosnmp.Message{
+			VarBinds: []gosnmp.VarBind{
+				{Name: metadataOID, Value: gosnmp.OctetStringValue([]byte("profile-vendor"))},
 			},
 		}, nil
 	}).Times(1)
@@ -614,7 +610,7 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 	collr.CreateVnode = true
 	collr.VnodeDeviceDownThreshold = 3
 	collr.LocalVnode.Labels = map[string]string{"model": "operator-model"}
-	collr.snmpClient = handler
+	collr.snmpSession, collr.snmpClient = handler, handler
 	collr.snmpProfiles = []*ddsnmp.Profile{
 		{SourceFile: "identity.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
 			Selector: ddprofiledefinition.SelectorSpec{
@@ -674,12 +670,12 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare func(m *snmpmock.MockHandler) *Collector
+		prepare func(m *snmpmock.MockSession) *Collector
 		wantErr bool
 	}{
 		"success: connects and reads sysInfo": {
 			wantErr: false,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
@@ -687,50 +683,46 @@ func TestCollector_Check(t *testing.T) {
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				return c
 			},
 		},
 
 		"success: chunks sysInfo by configured max OIDs": {
 			wantErr: false,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
-				setMockClientInitExpectWithMaxOids(m, 2)
+			prepare: func(m *snmpmock.MockSession) *Collector {
+				setMockClientInitExpect(m)
 				gomock.InOrder(
-					m.EXPECT().MaxOids().Return(2),
-					m.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
-								{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
+					m.EXPECT().Get(gomock.Any(), []string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
+						&gosnmp.Message{
+							VarBinds: []gosnmp.VarBind{
+								{Name: snmputils.OidSysDescr, Value: gosnmp.OctetStringValue([]byte("mock sysDescr"))},
 								{
 									Name:  snmputils.OidSysObject,
-									Value: ".1.3.6.1.4.1.14988.1",
-									Type:  gosnmp.ObjectIdentifier,
+									Value: gosnmp.ObjectIdentifierValue(".1.3.6.1.4.1.14988.1"),
 								},
 							},
 						},
 						nil,
 					),
-					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
+					m.EXPECT().Get(gomock.Any(), []string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
+						&gosnmp.Message{
+							VarBinds: []gosnmp.VarBind{
 								{
 									Name:  snmputils.OidSysContact,
-									Value: []byte("mock sysContact"),
-									Type:  gosnmp.OctetString,
+									Value: gosnmp.OctetStringValue([]byte("mock sysContact")),
 								},
-								{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
+								{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("mock sysName"))},
 							},
 						},
 						nil,
 					),
-					m.EXPECT().Get([]string{snmputils.OidSysLocation}).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
+					m.EXPECT().Get(gomock.Any(), []string{snmputils.OidSysLocation}).Return(
+						&gosnmp.Message{
+							VarBinds: []gosnmp.VarBind{
 								{
 									Name:  snmputils.OidSysLocation,
-									Value: []byte("mock sysLocation"),
-									Type:  gosnmp.OctetString,
+									Value: gosnmp.OctetStringValue([]byte("mock sysLocation")),
 								},
 							},
 						},
@@ -743,47 +735,45 @@ func TestCollector_Check(t *testing.T) {
 				c.Options.MaxOIDs = 2
 				c.CreateVnode = false
 				c.Ping.Enabled = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				return c
 			},
 		},
 
 		"failure: SNMP connect error": {
 			wantErr: true,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
-				setMockClientSetterExpect(m)
-				m.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
+			prepare: func(m *snmpmock.MockSession) *Collector {
+				m.EXPECT().Connect(gomock.Any()).Return(errors.New("connect failed")).AnyTimes()
 
 				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				return c
 			},
 		},
 
 		"failure: sysInfo query error": {
 			wantErr: true,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
-				m.EXPECT().MaxOids().Return(20)
 				m.EXPECT().
-					Get(sysInfoOIDsForTest()).
+					Get(gomock.Any(), sysInfoOIDsForTest()).
 					Return(nil, errors.New("query failed"))
 
 				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
 				c.CreateVnode = false
 				c.Ping.Enabled = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				return c
 			},
 		},
 
 		"success: ping_only with successful ping": {
 			wantErr: false,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
@@ -791,7 +781,7 @@ func TestCollector_Check(t *testing.T) {
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 					return &mockPingClient{
 						sample: pingSuccessSample(c.Hostname),
@@ -803,7 +793,7 @@ func TestCollector_Check(t *testing.T) {
 
 		"success: ping_only with recoverable ping error": {
 			wantErr: false,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
@@ -811,7 +801,7 @@ func TestCollector_Check(t *testing.T) {
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 					return &mockPingClient{
 						probeErr: errors.New("host unreachable"),
@@ -823,7 +813,7 @@ func TestCollector_Check(t *testing.T) {
 
 		"failure: ping_only with unrecoverable ping error": {
 			wantErr: true,
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
@@ -831,7 +821,7 @@ func TestCollector_Check(t *testing.T) {
 				c.Config = prepareV2Config()
 				c.PingOnly = true
 				c.CreateVnode = false
-				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 					return &mockPingClient{
 						probeErr: &pinger.ProbeError{
@@ -851,7 +841,7 @@ func TestCollector_Check(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockSNMP := snmpmock.NewMockHandler(ctrl)
+			mockSNMP := snmpmock.NewMockSession(ctrl)
 
 			collr := tc.prepare(mockSNMP)
 			require.NoError(t, collr.Init(context.Background()))
@@ -868,7 +858,7 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 	tests := map[string]struct {
-		pdus           []gosnmp.SnmpPDU
+		pdus           []gosnmp.VarBind
 		pingEnabled    bool
 		pingOnly       bool
 		manualProfiles []string
@@ -881,17 +871,17 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			wantErr: "SNMP system scalar query returned no PDUs",
 		},
 		"partial system query with ordinary ping enabled": {
-			pdus: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte("private description")},
-				{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("private hostname")},
+			pdus: []gosnmp.VarBind{
+				{Name: snmputils.OidSysDescr, Value: gosnmp.OctetStringValue([]byte("private description"))},
+				{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("private hostname"))},
 			},
 			pingEnabled: true,
 			wantErr:     "without sysObjectID",
 			wantAbsent:  []string{"private description", "private hostname"},
 		},
 		"unmatched system object": {
-			pdus: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.2.1.999"},
+			pdus: []gosnmp.VarBind{
+				{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue("1.3.6.1.2.1.999")},
 			},
 			manualProfiles: []string{"generic-device"},
 			wantErr:        "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
@@ -910,26 +900,26 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			manualProfiles: []string{"generic-device"},
 		},
 		"reported Cisco ASR identity": {
-			pdus: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9.1.1166"},
+			pdus: []gosnmp.VarBind{
+				{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.9.1.1166")},
 			},
 			wantSysObject: "1.3.6.1.4.1.9.1.1166",
 		},
 		"numeric OID text in octet string system object": {
-			pdus: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("1.3.6.1.4.1.9.1.1166")},
+			pdus: []gosnmp.VarBind{
+				{Name: snmputils.OidSysObject, Value: gosnmp.OctetStringValue([]byte("1.3.6.1.4.1.9.1.1166"))},
 			},
 			wantSysObject: "1.3.6.1.4.1.9.1.1166",
 		},
 		"non-OID octet string system object with manual profile": {
-			pdus: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("private device identifier")},
+			pdus: []gosnmp.VarBind{
+				{Name: snmputils.OidSysObject, Value: gosnmp.OctetStringValue([]byte("private device identifier"))},
 			},
 			manualProfiles: []string{"generic-device"},
 		},
 		"non-OID octet string system object without manual profile": {
-			pdus: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("private device identifier")},
+			pdus: []gosnmp.VarBind{
+				{Name: snmputils.OidSysObject, Value: gosnmp.OctetStringValue([]byte("private device identifier"))},
 			},
 			wantErr:    "sysObjectID of type OctetString that is not a numeric OID",
 			wantAbsent: []string{"private device identifier"},
@@ -944,11 +934,9 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			client := snmpmock.NewMockHandler(ctrl)
-			client.EXPECT().MaxOids().Return(20)
-			client.EXPECT().Version().Return(gosnmp.Version2c)
-			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
-				Variables: tc.pdus,
+			client := snmpmock.NewMockSession(ctrl)
+			client.EXPECT().Get(gomock.Any(), sysInfoOIDsForTest()).Return(&gosnmp.Message{
+				VarBinds: tc.pdus,
 			}, nil)
 
 			collr := newTestSNMPCollector()
@@ -957,7 +945,7 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			collr.Ping.Enabled = tc.pingEnabled
 			collr.PingOnly = tc.pingOnly
 			collr.ManualProfiles = tc.manualProfiles
-			collr.snmpClient = client
+			collr.snmpSession, collr.snmpClient = client, client
 
 			err := collr.Check(context.Background())
 			if tc.wantErr == "" {
@@ -990,12 +978,10 @@ func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().MaxOids().Return(20)
-	client.EXPECT().Version().Return(gosnmp.Version2c)
-	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
+	client := snmpmock.NewMockSession(ctrl)
+	client.EXPECT().Get(gomock.Any(), sysInfoOIDsForTest()).Return(&gosnmp.Message{
+		VarBinds: []gosnmp.VarBind{
+			{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.14988.1")},
 		},
 	}, nil).Times(1)
 
@@ -1003,12 +989,12 @@ func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
 	collr.Config = prepareV2Config()
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false
-	collr.snmpClient = client
+	collr.snmpSession, collr.snmpClient = client, client
 	collr.snmpProfiles = []*ddsnmp.Profile{{}}
 	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return &mockDdSnmpCollector{} }
 
 	require.NoError(t, collr.Check(context.Background()))
-	require.NoError(t, collr.ensureInitialized())
+	require.NoError(t, collr.ensureInitialized(context.Background()))
 	assert.Equal(t, "1.3.6.1.4.1.14988.1", collr.sysInfo.SysObjectID)
 }
 
@@ -1047,7 +1033,7 @@ func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
@@ -1059,7 +1045,7 @@ func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.CreateVnode = false
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 	collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 		return pingClient, nil
 	}
@@ -1077,11 +1063,11 @@ func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare func(m *snmpmock.MockHandler) *Collector
+		prepare func(m *snmpmock.MockSession) *Collector
 		want    map[string]int64
 	}{
 		"collects scalar metric": {
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
@@ -1090,7 +1076,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
 				collr.snmpProfiles = []*ddsnmp.Profile{{}} // non-empty to enable collectSNMP()
-				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 					return &mockDdSnmpCollector{
 						pms: []*ddsnmp.ProfileMetrics{
@@ -1147,7 +1133,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 		},
 		"collects table multivalue metric": {
-			prepare: func(m *snmpmock.MockHandler) *Collector {
+			prepare: func(m *snmpmock.MockSession) *Collector {
 				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
@@ -1156,7 +1142,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
 				collr.snmpProfiles = []*ddsnmp.Profile{{}}
-				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 					return &mockDdSnmpCollector{
 						pms: []*ddsnmp.ProfileMetrics{
@@ -1218,10 +1204,10 @@ func TestCollector_Collect(t *testing.T) {
 		},
 	}
 	tests["collects ping only metrics"] = struct {
-		prepare func(m *snmpmock.MockHandler) *Collector
+		prepare func(m *snmpmock.MockSession) *Collector
 		want    map[string]int64
 	}{
-		prepare: func(m *snmpmock.MockHandler) *Collector {
+		prepare: func(m *snmpmock.MockSession) *Collector {
 			setMockClientInitExpect(m)
 			setMockClientSysInfoExpect(m)
 
@@ -1229,7 +1215,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr.Config = prepareV2Config()
 			collr.PingOnly = true
 			collr.CreateVnode = false
-			collr.newSnmpClient = func() gosnmp.Handler { return m }
+			collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 			collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 				return &mockPingClient{
 					sample: pingSuccessSample(collr.Hostname),
@@ -1246,10 +1232,10 @@ func TestCollector_Collect(t *testing.T) {
 		},
 	}
 	tests["collects no ping metrics when probe gets no replies"] = struct {
-		prepare func(m *snmpmock.MockHandler) *Collector
+		prepare func(m *snmpmock.MockSession) *Collector
 		want    map[string]int64
 	}{
-		prepare: func(m *snmpmock.MockHandler) *Collector {
+		prepare: func(m *snmpmock.MockSession) *Collector {
 			setMockClientInitExpect(m)
 			setMockClientSysInfoExpect(m)
 
@@ -1257,7 +1243,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr.Config = prepareV2Config()
 			collr.PingOnly = true
 			collr.CreateVnode = false
-			collr.newSnmpClient = func() gosnmp.Handler { return m }
+			collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return m, nil }
 			collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 				return &mockPingClient{
 					sample: pingNoReplySample(collr.Hostname),
@@ -1274,7 +1260,7 @@ func TestCollector_Collect(t *testing.T) {
 			mockCtl := gomock.NewController(t)
 			defer mockCtl.Finish()
 
-			mockSNMP := snmpmock.NewMockHandler(mockCtl)
+			mockSNMP := snmpmock.NewMockSession(mockCtl)
 
 			collr := tc.prepare(mockSNMP)
 			require.NoError(t, collr.Init(context.Background()))
@@ -1291,7 +1277,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
@@ -1303,7 +1289,7 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	collr.Config = prepareV2Config()
 	collr.PingOnly = true
 	collr.CreateVnode = false
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 	collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 		return pingClient, nil
 	}
@@ -1335,7 +1321,7 @@ func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
@@ -1348,7 +1334,7 @@ func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	collr.CreateVnode = false
 	collr.Ping.Enabled = true
 	collr.snmpProfiles = []*ddsnmp.Profile{{}}
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 	collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 		return pingClient, nil
 	}
@@ -1681,7 +1667,7 @@ func TestCollector_Collect_LicensingAggregation(t *testing.T) {
 			mockCtl := gomock.NewController(t)
 			defer mockCtl.Finish()
 
-			mockSNMP := snmpmock.NewMockHandler(mockCtl)
+			mockSNMP := snmpmock.NewMockSession(mockCtl)
 			setMockClientInitExpect(mockSNMP)
 			setMockClientSysInfoExpect(mockSNMP)
 
@@ -1691,7 +1677,7 @@ func TestCollector_Collect_LicensingAggregation(t *testing.T) {
 			collr.CreateVnode = false
 			collr.Ping.Enabled = false
 			collr.snmpProfiles = []*ddsnmp.Profile{{}}
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+			collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 			collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 				pm := &ddsnmp.ProfileMetrics{
 					Source:      tc.source,
@@ -1722,12 +1708,12 @@ type mockDdSnmpCollector struct {
 	metadataCalls int
 }
 
-func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+func (m *mockDdSnmpCollector) Collect(context.Context) ([]*ddsnmp.ProfileMetrics, error) {
 	m.collectCalls++
 	return m.pms, m.err
 }
 
-func (m *mockDdSnmpCollector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+func (m *mockDdSnmpCollector) CollectDeviceMetadata(context.Context) (map[string]ddsnmp.MetaTag, error) {
 	m.metadataCalls++
 	return m.meta, nil
 }
@@ -1785,60 +1771,36 @@ func prepareV1Config() Config {
 	}
 }
 
-func mockInit(t *testing.T) (*snmpmock.MockHandler, func()) {
+func mockInit(t *testing.T) (*snmpmock.MockSession, func()) {
 	mockCtl := gomock.NewController(t)
 	cleanup := func() { mockCtl.Finish() }
-	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+	mockSNMP := snmpmock.NewMockSession(mockCtl)
 
 	return mockSNMP, cleanup
 }
 
-func setMockClientInitExpect(m *snmpmock.MockHandler) {
-	setMockClientSetterExpect(m)
-	m.EXPECT().Connect().Return(nil).AnyTimes()
+// setMockClientConnectExpect connects; the test answers the max-repetitions probe itself.
+func setMockClientConnectExpect(m *snmpmock.MockSession) {
+	m.EXPECT().Connect(gomock.Any()).Return(nil).AnyTimes()
 }
 
-func setMockClientInitExpectWithMaxOids(m *snmpmock.MockHandler, maxOids int) {
-	setMockClientSetterExpectWithoutMaxOids(m)
-	m.EXPECT().SetMaxOids(maxOids).Times(2)
-	m.EXPECT().Connect().Return(nil).AnyTimes()
+// setMockClientInitExpect connects and answers the max-repetitions probe of
+// SNMPv2c and SNMPv3 jobs with one system object, as a device supporting GETBULK.
+func setMockClientInitExpect(m *snmpmock.MockSession) {
+	m.EXPECT().Connect(gomock.Any()).Return(nil).AnyTimes()
+	m.EXPECT().BulkWalkAll(gomock.Any(), snmputils.RootOidMibSystem, gomock.Any()).Return([]gosnmp.VarBind{
+		{Name: snmputils.OidSysDescr, Value: gosnmp.OctetStringValue([]uint8("mock sysDescr"))},
+	}, gosnmp.WalkEnd{}, nil).AnyTimes()
 }
 
-func setMockClientSetterExpect(m *snmpmock.MockHandler) {
-	setMockClientSetterExpectWithoutMaxOids(m)
-	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
-}
-
-func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
-	m.EXPECT().Target().AnyTimes()
-	m.EXPECT().Port().AnyTimes()
-	m.EXPECT().Version().AnyTimes()
-	m.EXPECT().ContextName().AnyTimes()
-	m.EXPECT().Community().AnyTimes()
-	m.EXPECT().SetTarget(gomock.Any()).AnyTimes()
-	m.EXPECT().SetPort(gomock.Any()).AnyTimes()
-	m.EXPECT().SetRetries(gomock.Any()).AnyTimes()
-	m.EXPECT().SetMaxRepetitions(gomock.Any()).AnyTimes()
-	m.EXPECT().SetLogger(gomock.Any()).AnyTimes()
-	m.EXPECT().SetTimeout(gomock.Any()).AnyTimes()
-	m.EXPECT().SetCommunity(gomock.Any()).AnyTimes()
-	m.EXPECT().SetVersion(gomock.Any()).AnyTimes()
-	m.EXPECT().SetSecurityModel(gomock.Any()).AnyTimes()
-	m.EXPECT().SetMsgFlags(gomock.Any()).AnyTimes()
-	m.EXPECT().SetSecurityParameters(gomock.Any()).AnyTimes()
-	m.EXPECT().SetContextName(gomock.Any()).AnyTimes()
-	m.EXPECT().MaxRepetitions().Return(uint32(25)).AnyTimes()
-}
-
-func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().MaxOids().Return(20).MinTimes(1)
-	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
-			{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
-			{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
-			{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
-			{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
+func setMockClientSysInfoExpect(m *snmpmock.MockSession) {
+	m.EXPECT().Get(gomock.Any(), sysInfoOIDsForTest()).Return(&gosnmp.Message{
+		VarBinds: []gosnmp.VarBind{
+			{Name: snmputils.OidSysDescr, Value: gosnmp.OctetStringValue([]uint8("mock sysDescr"))},
+			{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue(".1.3.6.1.4.1.14988.1")},
+			{Name: snmputils.OidSysContact, Value: gosnmp.OctetStringValue([]uint8("mock sysContact"))},
+			{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]uint8("mock sysName"))},
+			{Name: snmputils.OidSysLocation, Value: gosnmp.OctetStringValue([]uint8("mock sysLocation"))},
 		},
 	}, nil).MinTimes(1)
 }
@@ -1888,24 +1850,22 @@ func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			handler := snmpmock.NewMockHandler(gomock.NewController(t))
-			handler.EXPECT().MaxOids().Return(20).AnyTimes()
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{}, nil)
-			var packet *gosnmp.SnmpPacket
+			handler := snmpmock.NewMockSession(gomock.NewController(t))
+			handler.EXPECT().Get(gomock.Any(), sysInfoOIDsForTest()).Return(&gosnmp.Message{}, nil)
+			var packet *gosnmp.Message
 			if tc.getErr == nil {
-				packet = &gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")},
+				packet = &gosnmp.Message{
+					VarBinds: []gosnmp.VarBind{
+						{Name: metadataOID, Value: gosnmp.OctetStringValue([]byte("SECRET invalid number"))},
 					},
 				}
 			}
-			handler.EXPECT().Get([]string{metadataOID}).Return(packet, tc.getErr).Times(tc.attempts)
+			handler.EXPECT().Get(gomock.Any(), []string{metadataOID}).Return(packet, tc.getErr).Times(tc.attempts)
 			collector := newTestSNMPCollector()
 			collector.Config = prepareV2Config()
 			collector.Ping.Enabled = false
 			collector.CreateVnode = true
-			collector.snmpClient = handler
+			collector.snmpSession, collector.snmpClient = handler, handler
 			fields := map[string]ddprofiledefinition.MetadataField{
 				"serial_number": {
 					Symbol: ddprofiledefinition.SymbolConfig{

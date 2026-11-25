@@ -1,8 +1,8 @@
-# Real-Time Monitoring: The Netdata Standard
+# Real-Time Observability: The Netdata Standard
 
 ## TL;DR
 
-Netdata defines what real-time monitoring truly means:  **1-second data collection and 1-second latency from collection to visualization**, providing a worst-case latency of less that 2 seconds from event to insight, at any scale. While most monitoring systems operate on 10–60-second intervals, Netdata provides  _true_  sub-2-second visibility without overhead. This difference is critical: most operational anomalies last under 10 seconds, which means traditional monitoring misses them completely.
+Netdata defines what real-time monitoring truly means:  **1-second data collection and 1-second latency from collection to visualization**, providing a worst-case latency of less than 2 seconds from event to insight, at any scale. While most monitoring systems operate on 10–60-second intervals, Netdata provides  _true_  sub-2-second visibility with low, measured overhead. This difference is critical: most operational anomalies last under 10 seconds, which means traditional monitoring misses them completely.
 
 With Netdata, organizations gain:
 
@@ -12,7 +12,7 @@ With Netdata, organizations gain:
 - **Security:**  Detect attacks unfolding in mere seconds.
 - **Operational Efficiency:**  Enable smarter autoscaling and container monitoring.
 
-In short: when every second matters, Netdata is the only monitoring solution proven to deliver real-time performance at global scale.
+In short: when every second matters, Netdata delivers per-second collection with under 2 seconds from event to dashboard, at global scale, where most observability platforms default to 10 to 60-second intervals.
 
 ---
 
@@ -162,9 +162,9 @@ In these cases, Netdata chooses a responsible interval that balances fidelity wi
 
 Netdata operates with the precision of a heartbeat. Unlike other solutions that treat missed collections as a normal network condition, Netdata is engineered as a watchdog: **metrics must be collected at their configured frequency**.
 
-A gap in the Netdata dashboard is not a visualization trick or a "network blip." It is a **persisted gap in the database** written to disk. It is a definitive signal that the system itself was under such severe stress that it could not service Netdata's lightweight collection process. If Netdata is missing samples, your application is almost certainly missing service-level objectives.
+A gap in the Netdata dashboard is not a visualization trick or a "network blip." It is a **persisted gap in the database** written to disk. It is a definitive signal that the system itself was under such severe stress that it could not service Netdata's collection process. If Netdata is missing samples, your application is almost certainly missing service-level objectives.
 
-This philosophy makes Netdata not just a monitoring tool, but a canary for system health itself.
+This philosophy makes Netdata not just an observability platform, but a canary for system health itself.
 
 ## Netdata's Real-Time Performance at Scale
 
@@ -203,7 +203,7 @@ Technically, yes, but practically, no. To match Netdata's data density:
 2. **Target Assault:** Frequent scraping would overwhelm the very applications it's meant to monitor.
 3. **Storage Inefficiency:** The Prometheus TSDB isn't optimized for this volume of per-second data.
 
-Our [stress test](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/) against a Prometheus stack at 4.6M metrics/s proved this: Netdata used **-37% CPU, -88% RAM, -13% bandwidth, and -97% disk I/O** while providing **40x longer retention** and **22x faster queries**.
+Our [stress test](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/) against a Prometheus stack at 4.6M metrics/s proved this: Netdata used **-37% CPU, -88% RAM, -13% bandwidth, and -97% disk I/O** while providing **15x longer per-second retention (up to 40x in lower tiers)** and **22x faster large queries**.
 
 ### The Datadog Reality
 
@@ -262,8 +262,8 @@ For default-settings sizing guidance (CPU, RAM, disk, and bandwidth) across diff
 
 - **Billions of Metrics:** Processes over 4.5 billion metrics per second across all installations.
 - **100% Sampling Rate:** No statistical sampling - every data point is captured.
-- **Unlimited Metrics:** No artificial limits or pricing tiers based on volume.
-- **Proven at Scale:** Monitors infrastructures with 100,000+ nodes seamlessly.
+- **No Limit on Metrics:** No artificial limits or pricing tiers based on volume.
+- **Proven at Scale:** Runs in deployments of 100,000+ nodes.
 
 ### Enterprise-Grade Reliability
 
@@ -277,7 +277,7 @@ It is common for large Netdata deployments to process millions of metrics per se
 ## Real-Time Monitoring FAQ
 
 **Q: Is Netdata truly real-time?**<br/>
-A: Yes. Netdata provides 1-second granularity monitoring with a total latency of 1-2 seconds from event to visualization, making it the fastest and only true real-time monitoring solution proven at scale. This is 10-60x faster than the typical "near real-time" solutions.
+A: Yes. Netdata provides 1-second granularity monitoring with a total latency of 1-2 seconds from event to visualization, at any scale. This is 10-60x faster than the typical "near real-time" solutions, which collect every 10 to 60 seconds.
 
 **Q: Why is 1-second resolution critical compared to 10 or 30-second?**<br/>
 A: Most operational anomalies have a duration of 2-10 seconds. With 30-second monitoring, you are blind to over 90% of incidents. With 10-second monitoring, you still miss roughly 50%. Netdata's 1-second monitoring captures the full spectrum of system behavior.
@@ -305,7 +305,7 @@ A: The trade-off is architectural complexity. Distributing intelligence to the e
 
 ## Summary
 
-Real-time monitoring is not a luxury - it is a fundamental requirement for operating modern, dynamic, and complex infrastructure. The difference between 1-second and 30-second visibility is the difference between preventing outages and merely documenting them.
+Real-time monitoring is not a luxury - it is a fundamental requirement for operating modern, dynamic, and complex systems and applications. The difference between 1-second and 30-second visibility is the difference between preventing outages and merely documenting them.
 
 Netdata doesn't just claim to be real-time; it defines the category through engineering excellence:
 
@@ -315,4 +315,4 @@ Netdata doesn't just claim to be real-time; it defines the category through engi
 - **Distributed Scale:** Provides real-time performance at any scale, from one node to one million.
 - **Production-Safe:** Engineered for efficiency that ensures it never becomes the problem it is designed to solve.
 
-When you need to see what is actually happening in your infrastructure right now - not a smoothed-over report of what happened a minute ago - you need Netdata. This is real-time monitoring. This is The Netdata Standard.
+When you need to see what is actually happening in your stack right now - not a smoothed-over report of what happened a minute ago - you need Netdata. This is real-time monitoring. This is The Netdata Standard.

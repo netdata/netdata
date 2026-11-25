@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Data-only component: CPack provides the staged tree and package relationships.
+Summary: @CPACK_RPM_PACKAGE_SUMMARY@
+Name: @CPACK_RPM_PACKAGE_NAME@
+Version: @CPACK_RPM_PACKAGE_VERSION@
+Release: @CPACK_RPM_PACKAGE_RELEASE@
+License: GPLv3+ and CC-BY-4.0
+Group: @CPACK_RPM_PACKAGE_GROUP@
+Vendor: @CPACK_RPM_PACKAGE_VENDOR@
+BuildRoot: %_topdir/@CPACK_PACKAGE_FILE_NAME@@CPACK_RPM_PACKAGE_COMPONENT_PART_PATH@
+@TMP_RPM_URL@
+@TMP_RPM_CONFLICTS@
+@TMP_RPM_BUILDARCH@
+@TMP_RPM_EPOCH@
+
+%define _rpmdir %_topdir/RPMS
+%define _srcrpmdir %_topdir/SRPMS
+@FILE_NAME_DEFINE@
+@CPACK_RPM_SPEC_MORE_DEFINE@
+@CPACK_RPM_COMPRESSION_TYPE_TMP@
+
+%description
+@CPACK_RPM_PACKAGE_DESCRIPTION@
+
+# Preserve CPack's staged payload across rpmbuild's build-root cleanup.
+%prep
+mv "$RPM_BUILD_ROOT" "%_topdir/ip-intel-data-buildroot"
+
+%install
+if [ -e "$RPM_BUILD_ROOT" ]; then
+    rm -rf "$RPM_BUILD_ROOT"
+fi
+mv "%_topdir/ip-intel-data-buildroot" "$RPM_BUILD_ROOT"
+
+%files
+%defattr(@TMP_DEFAULT_FILE_PERMISSIONS@,@TMP_DEFAULT_USER@,@TMP_DEFAULT_GROUP@,@TMP_DEFAULT_DIR_PERMISSIONS@)
+@CPACK_RPM_INSTALL_FILES@
+@CPACK_RPM_ABSOLUTE_INSTALL_FILES@
+@CPACK_RPM_USER_INSTALL_FILES@

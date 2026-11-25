@@ -67,7 +67,8 @@ We tested a single installation Netdata Parent and Prometheus, at **4.6 million 
 | **Disk I/O**                    | ~4.7 MiB/s total  | ~147 MiB/s total | 97% less I/O                                 |
 | **Per-second retention (1TiB)** | ~1.25 days        | ~2 hours         | 15x longer - 40x retention in lower tiers    |
 | **Sample completeness**         | ~100%             | ~93.7%           | Zero data loss                               |
-| **Query latency (2hr window)**  | ~0.11s            | ~1.8s            | 16x faster - 22x faster in long term queries |
+| **Large query (2 hours, 480k series)** | ~9.6s     | ~3.7 min         | 22x faster                                   |
+| **Per-second data (2 hours, `system.ram`)** | ~1.05s | ~1.83s      | 43% faster                                   |
 
 The benchmark measured ingestion, with machine learning and alerting disabled on Netdata. The sizing guidelines below budget more per metric because they include machine learning, alerts, queries and headroom.
 
@@ -79,9 +80,9 @@ The benchmark measured ingestion, with machine learning and alerting disabled on
 
 | Component  | Role                              | Resources (Standalone)                  | Resources (Offloaded)                  | Scale Factor             |
 |------------|-----------------------------------|-----------------------------------------|----------------------------------------|--------------------------|
-| **Agent**  | Edge collector                    | &lt;5% CPU, &lt;200 MiB RAM, disk I/O   | &lt;2% CPU, &lt;150 MiB RAM, zero disk | 3,000-20,000 metrics/sec |
+| **Agent**  | Edge collector                    | &lt;5% of one CPU core, ~200 MB RAM (ML enabled), disk I/O | &lt;2% of one CPU core, ~150 MB RAM, zero disk | 3,000-20,000 metrics/sec |
 | **Parent** | Workload distributor & aggregator | 10 cores, 40 GiB RAM per 1M metrics/sec | Same + ML training if enabled          | Linear scaling           |
-| **Cloud**  | Control plane & federation        | Minimal                                 | Minimal                                | Unlimited Parents        |
+| **Cloud**  | Control plane & federation        | Minimal                                 | Minimal                                | Any number of Parents    |
 
 :::note
 
@@ -119,7 +120,7 @@ With Parents, Agents can offload:
 - **Persistent Storage** - Agents run in RAM-only mode with zero disk I/O
 - **Dashboard Serving** - Parents handle all queries and visualizations
 
-A fully offloaded Agent uses &lt;2% CPU, &lt;150 MiB RAM, and zero disk I/O - a fraction of a standalone Agent.
+A fully offloaded Agent uses &lt;2% of one CPU core, about 150 MB RAM, and zero disk I/O - a fraction of a standalone Agent.
 
 ### ML Intelligence: Train Where It Makes Sense
 
@@ -259,13 +260,13 @@ Through intelligent workload distribution between Parents and Agents:
 
 - **ML trains where you have resources** (edge or Parents, your choice)
 - **Alerts run where they matter** (automation locally, monitoring centrally)
-- **Storage happens where it's cheap** (Parents, not production)
+- **Storage happens on Parents, not production systems**
 - **Millions of metrics per second is normal** (not heroic)
 - **HA doesn't multiply overhead** (intelligent clustering)
 
 This isn't just optimization. It's a fundamentally different architecture that recognizes observability shouldn't compete with your applications for resources.
 
-**Welcome to observability that makes your infrastructure better, not heavier.**
+**Welcome to observability that makes your stack better, not heavier.**
 
 ## FAQ
 
@@ -293,14 +294,14 @@ No. Agents alone may be enough. Parents are usually required when you have ephem
 <details>
 <summary><strong>How much overhead does Netdata introduce on my systems?</strong></summary><br/>
 
-Less than 5% CPU and ~200 MiB RAM per agent in standalone mode. Offloaded agents (streaming to a Parent) drop to less than 2% CPU and ~150 MiB RAM with zero disk I/O. Netdata is designed to be "polite citizen" to production workloads, so it spreads its workload across time and avoids all kinds of sudden and intense spikes.
+Less than 5% of one CPU core and about 200 MB RAM per agent in standalone mode, with machine learning enabled. Offloaded agents (streaming to a Parent) drop to less than 2% of one CPU core and about 150 MB RAM with zero disk I/O. Netdata is designed to be "polite citizen" to production workloads, so it spreads its workload across time and avoids all kinds of sudden and intense spikes.
 
 </details>
 
 <details>
 <summary><strong>How efficient is Netdata's storage?</strong></summary><br/>
 
-Tier 0 (per-second) is ~0.6 bytes/sample - the industry's most efficient. Tiers 1 & 2 keep per-minute and per-hour aggregates, letting you retain months or years of history cheaply.
+Tier 0 (per-second) is ~0.6 bytes/sample - the industry's most efficient. Tiers 1 & 2 keep per-minute and per-hour aggregates, letting you retain months or years of history on modest storage.
 
 </details>
 
@@ -333,7 +334,7 @@ Yes. Even Netdata Cloud SaaS itself (our commercial service) is such a single in
 </details>
 
 <details>
-<summary><strong>Do you promote per-second collection and unlimited metrics because your revenue depends on volume?</strong></summary><br/>
+<summary><strong>Do you promote per-second collection and no limit on metrics because your revenue depends on volume?</strong></summary><br/>
 
 No. Our commercial offerings are priced per node, with volume discounts (smaller price as the number of nodes increases). Our revenue is not related to the number of metrics or the volume of observability data collected or viewed. We designed Netdata for maximum performance at scale and volume for your benefit. Not ours.
 
@@ -355,7 +356,7 @@ There is some extra network latency involved, but this is usually small (a few m
 
 ## Next Steps
 
-- **[Deploy your first Agent](/docs/deployment-guides/standalone-deployment.md)** - Start monitoring in 60 seconds
+- **[Deploy your first Agent](/docs/deployment-guides/standalone-deployment.md)** - one-line install
 - **[Configure Parents](/docs/deployment-guides/deployment-with-centralization-points.md)** - Scale to hundreds of nodes
 - **[Design for Enterprise](/docs/netdata-complete-product-description.md#enterprise-deployment)** - Architect for thousands
 - **[Try Netdata Cloud](/docs/netdata-cloud/README.md)** - Unified visibility across everything

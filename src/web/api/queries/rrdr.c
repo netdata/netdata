@@ -89,6 +89,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->hgbc);
     onewayalloc_freez(owa, r->dgbc);
     onewayalloc_freez(owa, r->dgbs);
+    onewayalloc_freez(owa, r->cardinality.source_metric);
 
     if(r->dl) {
         for(size_t d = 0; d < r->d ;d++)

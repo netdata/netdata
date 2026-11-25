@@ -446,7 +446,8 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
 
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
-        OS_SYSTEM_MEMORY sm = os_system_memory(false);
+        // no I/O here (we hold the spinlock); without a recent sample, neither shrink nor grow
+        OS_SYSTEM_MEMORY sm = os_system_memory_cached(OS_SYSTEM_MEMORY_MAX_AGE_UT);
         if(OS_SYSTEM_MEMORY_OK(sm)) {
             // when the total exists, ram_available_bytes is also right
 

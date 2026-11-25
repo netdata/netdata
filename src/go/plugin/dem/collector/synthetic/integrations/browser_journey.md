@@ -112,34 +112,24 @@ the script makes.
 
 ### Prerequisites
 
-#### Install the browser runtime
+#### Set up the browser runtime
 
-Journeys and Lighthouse audits run in a separately installed browser runtime (Node.js, Chromium,
-Playwright and Lighthouse). Netdata never installs it on its own, and a job waits until it is
-installed. It needs Linux on amd64 or arm64.
+Journeys and Lighthouse audits use a browser runtime with Node.js, Chromium, Playwright and Lighthouse.
+It runs on Linux amd64 and arm64. Choose the setup for your Agent:
 
-| Netdata installation | Install the runtime with |
+| Netdata installation | Browser runtime setup |
 |:--|:--|
-| Native DEB or RPM packages | The optional `netdata-dem-runtime` package, installed with your package manager. It requires a running systemd host, stops the Agent during installation and restores its previous service state. |
-| Static or source installation | `kickstart.sh --install-dem-runtime` during an install or update, or the installed helper: `sudo /opt/netdata/usr/libexec/netdata/netdata-dem-runtime.sh install --agent /opt/netdata/usr/sbin/netdata --allow-download` (static paths). |
-| Docker (local, rootful) | `kickstart.sh --install-dem-runtime --docker-container NAME`, run on the Docker host. |
+| Native DEB or RPM packages | Install the optional `netdata-dem-runtime` package with your package manager. It requires systemd and restores the Agent's previous service state after installation. |
+| Static or source installation | Use `kickstart.sh --install-dem-runtime` during an install or update, or the installed host helper. Restart the Agent after first setup. |
+| Docker | Use a `-dem` image such as `netdata/netdata:stable-dem`. It includes a matching browser runtime. Follow the [Docker host preparation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md#docker-host-preparation) if your host restricts unprivileged user namespaces. |
 
-Static, source and Docker release builds default to the signed runtime matching the Agent version,
-channel and architecture. `runtime.release_url` in `dem.conf` can override that URL. Setup also prepares
-the host for Chromium's sandbox (an AppArmor allowance on Ubuntu 24.04). Installation verifies integrity
-and version compatibility. Local `runtime qualify` is optional.
-
-The [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md) covers offline installation,
-Docker requirements, updates and removal.
+For offline setup, updates and removal, see [Browser runtime host setup](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md).
 
 
-#### Restart Netdata to activate the runtime
+#### Check the runtime
 
-A running Agent keeps the runtime it found when it started. After the first installation, restart the
-Agent (`sudo systemctl restart netdata`) or the container (`docker restart NAME`). The native package
-restores the previous service state for you. Later updates replace Agent and runtime as a matching
-pair. Source/static installers coordinate that transition; Docker deployments must switch the pinned
-image and runtime selection together. There is no separate daily runtime update.
+Enabling a monitor does not download the runtime. The Agent uses the runtime it finds at startup.
+For Docker, pulling and recreating the container with a newer DEM image updates the Agent and runtime together.
 
 To check the runtime, run as the Netdata service account:
 
@@ -715,7 +705,7 @@ missing source path as an empty directory, which DEM rejects.
 
 **When**
 
-Static, source or Docker installation. The job stays waiting and never runs.
+Static or source installation. The job stays waiting and never runs.
 
 **Cause**
 
@@ -723,7 +713,7 @@ No browser runtime is installed, or it was installed after the Agent started.
 
 **Fix**
 
-Install the runtime (see Prerequisites), then restart the Agent or the container.
+Install the runtime (see Prerequisites), then restart the Agent.
 
 #### install the optional netdata-dem-runtime package and restart dem.plugin: matching browser runtime is not prepared
 
@@ -787,7 +777,7 @@ There is no public key to verify the release signature.
 
 Set `runtime.offline_keyring` in `dem.conf` to the absolute path of the Netdata release signing keyring, readable by the Netdata service account.
 
-#### Runtime installation or qualification fails with a Chromium sandbox error
+#### A browser job or runtime qualification fails with a Chromium sandbox error
 
 **Cause**
 
@@ -795,9 +785,9 @@ The host does not let an unprivileged process create the user namespaces Chromiu
 
 **Fix**
 
-Install the runtime with kickstart or the `netdata-dem-runtime.sh` helper, which prepare the AppArmor
-allowance; for Docker, use the documented container settings, including `apparmor=unconfined` on AppArmor
-hosts. Look for denials in the kernel log:
+On static/source installs, use kickstart or the `netdata-dem-runtime.sh` helper to prepare the host
+allowance. On Docker, follow [Docker host preparation](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md#docker-host-preparation).
+Check the kernel log for denials.
 
 ```bash
 sudo journalctl -k --since '10 minutes ago'

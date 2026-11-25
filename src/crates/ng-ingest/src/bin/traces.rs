@@ -116,14 +116,14 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let machine_id = journal_common::load_machine_id()
+    let machine_id = ng_ingest::host::load_machine_id()
         .context("failed to load machine id from /etc/machine-id")?;
     // Dev-only stand-in for the per-process instance id. Unlike the production
     // supervisor (which generates a fresh v4 UUID per process), this tool sources
     // the OS boot id so repeated dev runs within one boot produce a stable,
     // reproducible identity. It is intentionally NOT the per-process id the field
     // name implies — do not copy this into production code.
-    let instance_id = journal_common::load_boot_id()
+    let instance_id = ng_ingest::host::load_boot_id()
         .context("failed to load boot id from /proc/sys/kernel/random/boot_id")?;
     let identity = file_registry::Identity::new(
         file_registry::MachineId::new(machine_id).context("machine id must not be the nil UUID")?,

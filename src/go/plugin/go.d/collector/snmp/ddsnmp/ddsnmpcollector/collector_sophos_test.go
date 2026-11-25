@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -14,69 +15,69 @@ import (
 )
 
 func TestCollector_Collect_SophosLicensingProfile_PreservesRawStateAndExpiryOnScalarRows(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.1.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.1.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.1.1.0", 3),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.1.2.0", "2026-12-31"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.2.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.2.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.2.1.0", 4),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.2.2.0", "2026-11-30"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.3.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.3.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.3.1.0", 2),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.3.2.0", "N/A"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.4.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.4.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.4.1.0", 1),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.4.2.0", "2026-10-15"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.5.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.5.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.5.1.0", 3),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.5.2.0", "2027-01-20"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.6.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.6.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.6.1.0", 5),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.6.2.0", "2026-08-15"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.7.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.7.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.7.1.0", 3),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.7.2.0", "2026-09-01"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.8.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.8.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.8.1.0", 0),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.8.2.0", "Never"),
 	})
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.2604.5.1.5.9.1.0",
 		"1.3.6.1.4.1.2604.5.1.5.9.2.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.9.1.0", 3),
 		createStringPDU("1.3.6.1.4.1.2604.5.1.5.9.2.0", "2026-07-01"),
 	})
@@ -87,13 +88,15 @@ func TestCollector_Collect_SophosLicensingProfile_PreservesRawStateAndExpiryOnSc
 	require.Len(t, profile.Definition.Licensing, 9)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: "",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 

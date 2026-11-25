@@ -5,14 +5,14 @@ package snmpauth
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 )
 
 func TestApply(t *testing.T) {
 	for _, version := range []string{"", "1", "2c"} {
 		c := Config{Version: version, Credentials: &Community{Community: "test-secret"}}
-		client := &gosnmp.GoSNMP{}
+		client := &gosnmp.Config{}
 		require.NoError(t, c.Apply(client))
 		require.Equal(t, "test-secret", client.Community)
 		if version == "1" {
@@ -31,12 +31,12 @@ func TestApply(t *testing.T) {
 				u.PrivPassword = "test-priv"
 			}
 			c := Config{Version: "3", Credentials3: u}
-			client := &gosnmp.GoSNMP{}
+			client := &gosnmp.Config{}
 			require.NoError(t, c.Apply(client))
 			require.Equal(t, gosnmp.Version3, client.Version)
 			if level == "" {
-				require.Equal(t, gosnmp.AuthPriv, client.MsgFlags)
-				require.Equal(t, gosnmp.SHA512, client.SecurityParameters.(*gosnmp.UsmSecurityParameters).AuthenticationProtocol)
+				require.Equal(t, gosnmp.AuthPriv, client.SecurityLevel)
+				require.Equal(t, gosnmp.SHA512, client.User.AuthProtocol)
 			}
 		})
 	}
@@ -70,7 +70,7 @@ func TestNormalizeInactiveCredentials(t *testing.T) {
 					require.Error(t, got.Validate())
 					return
 				}
-				client := &gosnmp.GoSNMP{}
+				client := &gosnmp.Config{}
 				require.NoError(t, input.Apply(client))
 				if version != "3" {
 					require.Nil(t, got.Credentials3)
@@ -79,14 +79,14 @@ func TestNormalizeInactiveCredentials(t *testing.T) {
 				}
 				require.Nil(t, got.Credentials)
 				require.Equal(t, "context", got.ContextName())
-				usm := client.SecurityParameters.(*gosnmp.UsmSecurityParameters)
+				usm := client.User
 				if level == "noAuthNoPriv" {
 					require.Empty(t, got.Credentials3.AuthPassword)
-					require.Empty(t, usm.AuthenticationPassphrase)
+					require.Empty(t, usm.AuthPassphrase)
 				}
 				if level == "authNoPriv" || level == "noAuthNoPriv" {
 					require.Empty(t, got.Credentials3.PrivPassword)
-					require.Empty(t, usm.PrivacyPassphrase)
+					require.Empty(t, usm.PrivPassphrase)
 				}
 			})
 		}

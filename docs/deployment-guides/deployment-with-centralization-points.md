@@ -18,7 +18,7 @@ Parents give you centralized collection with distributed architecture benefits.
 
 ## What Parents Do
 
-Parents are specialized Netdata installations that you can configure to **receive, store, and process** observability data (metrics and logs) from multiple other systems in your infrastructure.
+Parents are specialized Netdata installations that you can configure to **receive, store, and process** observability data (metrics and logs) from multiple other systems.
 
 These Parents give you several core functions:
 

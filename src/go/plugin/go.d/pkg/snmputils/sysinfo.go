@@ -4,6 +4,8 @@ package snmputils
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +17,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
@@ -58,15 +60,10 @@ type SysInfoProbe struct {
 	SeenSysLocation bool
 }
 
-// ScalarClient is sufficient for system and device metadata acquisition.
-type ScalarClient interface {
-	Get([]string) (*gosnmp.SnmpPacket, error)
-	MaxOids() int
-	Version() gosnmp.SnmpVersion
-}
-
-func GetSysInfo(client ScalarClient) (*SysInfo, error) {
-	pdus, err := getSysInfoPDUs(client)
+// GetSysInfo reads the system group with requests of at most maxOIDs OIDs, as a
+// client of the given SNMP version.
+func GetSysInfo(ctx context.Context, client ScalarClient, version gosnmp.Version, maxOIDs int) (*SysInfo, error) {
+	pdus, err := getSysInfoPDUs(ctx, client, version, maxOIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +89,7 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 			si.Descr = sanitizeMetadata(si.Descr)
 		case OidSysObject:
 			si.Probe.SeenSysObjectID = true
-			si.Probe.SysObjectIDType = pdu.Type.String()
+			si.Probe.SysObjectIDType = pdu.Value.Type().String()
 			si.SysObjectID = sysObjectIDFromPDU(pdu)
 		case OidSysContact:
 			si.Probe.SeenSysContact = true
@@ -121,8 +118,8 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 // Some agents send the OID as OctetString text; accepting only OID syntax keeps other device text out of profile
 // matching and the collector's error and log diagnostics. An unusable value is treated as absent so manual
 // profiles still apply.
-func sysObjectIDFromPDU(pdu gosnmp.SnmpPDU) string {
-	if pdu.Type != gosnmp.ObjectIdentifier && pdu.Type != gosnmp.OctetString {
+func sysObjectIDFromPDU(pdu gosnmp.VarBind) string {
+	if t := pdu.Value.Type(); t != gosnmp.ObjectIdentifier && t != gosnmp.OctetString {
 		return ""
 	}
 	v, err := PduToString(pdu)
@@ -169,8 +166,7 @@ func sysInfoOIDs() []string {
 	}
 }
 
-func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
-	maxOids := client.MaxOids()
+func getSysInfoPDUs(ctx context.Context, client ScalarClient, version gosnmp.Version, maxOids int) ([]gosnmp.VarBind, error) {
 	if maxOids < 1 {
 		return nil, WithFailure(
 			fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids),
@@ -178,12 +174,10 @@ func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
 			"invalid_configuration",
 		)
 	}
-	version := client.Version()
-
 	oids := sysInfoOIDs()
-	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
+	pdus := make([]gosnmp.VarBind, 0, len(oids))
 	for chunk := range slices.Chunk(oids, maxOids) {
-		chunkPDUs, err := getSysInfoChunkPDUs(client, version, chunk)
+		chunkPDUs, err := getSysInfoChunkPDUs(ctx, client, version, chunk)
 		if err != nil {
 			return nil, err
 		}
@@ -192,36 +186,38 @@ func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
 	return pdus, nil
 }
 
-func getSysInfoChunkPDUs(client ScalarClient, version gosnmp.SnmpVersion, oids []string) ([]gosnmp.SnmpPDU, error) {
+func getSysInfoChunkPDUs(ctx context.Context, client ScalarClient, version gosnmp.Version, oids []string) ([]gosnmp.VarBind, error) {
 	for len(oids) > 0 {
-		packet, err := client.Get(oids)
-		if err != nil {
+		packet, err := client.Get(ctx, oids)
+		var status *gosnmp.StatusError
+		if err != nil && !errors.As(err, &status) {
 			return nil, WithFailure(fmt.Errorf("get SNMP system scalars: %w", err), "get", "")
 		}
-		if packet == nil {
-			return nil, WithFailure(fmt.Errorf("get SNMP system scalars: nil response"), "get", "nil_response")
+		if status == nil {
+			if packet == nil {
+				return nil, WithFailure(fmt.Errorf("get SNMP system scalars: nil response"), "get", "nil_response")
+			}
+			return packet.VarBinds, nil
 		}
 
-		switch packet.Error {
-		case gosnmp.NoError:
-			return packet.Variables, nil
+		switch status.Status {
 		case gosnmp.NoSuchName:
 			if version != gosnmp.Version1 {
 				return nil, WithPacketFailure(fmt.Errorf(
 					"get SNMP system scalars: unexpected response error %s for requested SNMP version %s (index %d)",
-					packet.Error,
+					status.Status,
 					version,
-					packet.ErrorIndex,
-				), "get", packet)
+					status.Index,
+				), "get", status)
 			}
-			idx := int(packet.ErrorIndex)
+			idx := int(status.Index)
 			if idx < 1 || idx > len(oids) {
 				return nil, WithPacketFailure(fmt.Errorf(
 					"get SNMP system scalars: response error %s with invalid error index %d for %d requested OIDs",
-					packet.Error,
-					packet.ErrorIndex,
+					status.Status,
+					status.Index,
 					len(oids),
-				), "get", packet)
+				), "get", status)
 			}
 
 			next := make([]string, 0, len(oids)-1)
@@ -231,9 +227,9 @@ func getSysInfoChunkPDUs(client ScalarClient, version gosnmp.SnmpVersion, oids [
 		default:
 			return nil, WithPacketFailure(fmt.Errorf(
 				"get SNMP system scalars: response error %s (index %d)",
-				packet.Error,
-				packet.ErrorIndex,
-			), "get", packet)
+				status.Status,
+				status.Index,
+			), "get", status)
 		}
 	}
 
@@ -459,24 +455,22 @@ func parseEnterpriseNumbers(r io.Reader) (map[string]string, error) {
 	return mapping, nil
 }
 
-func PduToString(pdu gosnmp.SnmpPDU) (string, error) {
-	switch pdu.Type {
+func PduToString(pdu gosnmp.VarBind) (string, error) {
+	switch pdu.Value.Type() {
 	case gosnmp.OctetString:
 		// TODO: this isn't reliable (e.g. physAddress we need hex.EncodeToString())
-		bs, ok := pdu.Value.([]byte)
-		if !ok {
-			return "", fmt.Errorf("OctetString is not a []byte but %T", pdu.Value)
-		}
+		bs, _ := pdu.Value.Bytes()
 		return strings.ToValidUTF8(string(bs), "�"), nil
-	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32:
-		return gosnmp.ToBigInt(pdu.Value).String(), nil
+	case gosnmp.Counter32, gosnmp.Integer, gosnmp.Gauge32:
+		v, _ := pdu.Value.Int64()
+		return strconv.FormatInt(v, 10), nil
+	case gosnmp.Counter64:
+		v, _ := pdu.Value.Uint64()
+		return strconv.FormatUint(v, 10), nil
 	case gosnmp.ObjectIdentifier:
-		v, ok := pdu.Value.(string)
-		if !ok {
-			return "", fmt.Errorf("ObjectIdentifier is not a string but %T", pdu.Value)
-		}
+		v, _ := pdu.Value.OID()
 		return strings.TrimPrefix(v, "."), nil
 	default:
-		return "", fmt.Errorf("unsupported type: '%v'", pdu.Type)
+		return "", fmt.Errorf("unsupported type: '%v'", pdu.Value.Type())
 	}
 }

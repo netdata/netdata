@@ -11,13 +11,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 type snmpFixture struct {
-	entries []gosnmp.SnmpPDU
-	byOID   map[string]gosnmp.SnmpPDU
+	entries []gosnmp.VarBind
+	byOID   map[string]gosnmp.VarBind
 }
 
 func mustLoadSNMPFixture(t *testing.T, path string) *snmpFixture {
@@ -29,7 +30,7 @@ func mustLoadSNMPFixture(t *testing.T, path string) *snmpFixture {
 	}
 	defer f.Close()
 
-	fixture := &snmpFixture{byOID: make(map[string]gosnmp.SnmpPDU)}
+	fixture := &snmpFixture{byOID: make(map[string]gosnmp.VarBind)}
 	scanner := bufio.NewScanner(f)
 	for lineNum := 1; scanner.Scan(); lineNum++ {
 		pdu, ok, err := parseSNMPFixtureLine(scanner.Text())
@@ -52,10 +53,10 @@ func mustLoadSNMPFixture(t *testing.T, path string) *snmpFixture {
 	return fixture
 }
 
-func parseSNMPFixtureLine(line string) (gosnmp.SnmpPDU, bool, error) {
+func parseSNMPFixtureLine(line string) (gosnmp.VarBind, bool, error) {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
-		return gosnmp.SnmpPDU{}, false, nil
+		return gosnmp.VarBind{}, false, nil
 	}
 
 	switch {
@@ -64,14 +65,14 @@ func parseSNMPFixtureLine(line string) (gosnmp.SnmpPDU, bool, error) {
 	case strings.Contains(line, " = "):
 		return parseSNMPWalkLine(line)
 	default:
-		return gosnmp.SnmpPDU{}, false, nil
+		return gosnmp.VarBind{}, false, nil
 	}
 }
 
-func parseSNMPRecLine(line string) (gosnmp.SnmpPDU, bool, error) {
+func parseSNMPRecLine(line string) (gosnmp.VarBind, bool, error) {
 	parts := strings.SplitN(line, "|", 3)
 	if len(parts) != 3 {
-		return gosnmp.SnmpPDU{}, false, fmt.Errorf("invalid snmprec line")
+		return gosnmp.VarBind{}, false, fmt.Errorf("invalid snmprec line")
 	}
 
 	oid := trimOID(parts[0])
@@ -80,111 +81,111 @@ func parseSNMPRecLine(line string) (gosnmp.SnmpPDU, bool, error) {
 
 	switch kind {
 	case "2":
-		v, err := strconv.ParseInt(raw, 10, 64)
+		v, err := strconv.ParseInt(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Integer, Value: int(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.IntegerValue(int32(v))}, true, nil
 	case "4":
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.OctetString, Value: []byte(raw)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.OctetStringValue([]byte(raw))}, true, nil
 	case "4x", "64x":
 		b, err := hex.DecodeString(raw)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.OctetString, Value: b}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.OctetStringValue([]byte(b))}, true, nil
 	case "6":
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.ObjectIdentifier, Value: raw}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.ObjectIdentifierValue(raw)}, true, nil
 	case "65":
 		v, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Counter32, Value: uint(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.Counter32Value(uint32(v))}, true, nil
 	case "66":
 		v, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Gauge32, Value: uint(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.Gauge32Value(uint32(v))}, true, nil
 	case "67":
 		v, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.TimeTicks, Value: uint32(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.TimeTicksValue(uint32(v))}, true, nil
 	case "70":
 		v, err := strconv.ParseUint(raw, 10, 64)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Counter64, Value: v}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.Counter64Value(uint64(v))}, true, nil
 	default:
-		return gosnmp.SnmpPDU{}, false, fmt.Errorf("unsupported snmprec type %q", kind)
+		return gosnmp.VarBind{}, false, fmt.Errorf("unsupported snmprec type %q", kind)
 	}
 }
 
-func parseSNMPWalkLine(line string) (gosnmp.SnmpPDU, bool, error) {
+func parseSNMPWalkLine(line string) (gosnmp.VarBind, bool, error) {
 	oid, rest, ok := strings.Cut(line, " = ")
 	if !ok {
-		return gosnmp.SnmpPDU{}, false, fmt.Errorf("invalid snmpwalk line")
+		return gosnmp.VarBind{}, false, fmt.Errorf("invalid snmpwalk line")
 	}
 	oid = trimOID(strings.TrimSpace(oid))
 	rest = strings.TrimSpace(rest)
 
 	if rest == `""` {
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.OctetString, Value: []byte{}}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.OctetStringValue([]byte{})}, true, nil
 	}
 
 	kind, raw, ok := strings.Cut(rest, ": ")
 	if !ok {
-		return gosnmp.SnmpPDU{}, false, fmt.Errorf("unsupported snmpwalk payload %q", rest)
+		return gosnmp.VarBind{}, false, fmt.Errorf("unsupported snmpwalk payload %q", rest)
 	}
 
 	raw = strings.TrimSpace(raw)
 	switch kind {
 	case "STRING":
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.OctetString, Value: []byte(stripQuotes(raw))}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.OctetStringValue([]byte(stripQuotes(raw)))}, true, nil
 	case "Hex-STRING":
 		b, err := hex.DecodeString(strings.ReplaceAll(raw, " ", ""))
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.OctetString, Value: b}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.OctetStringValue([]byte(b))}, true, nil
 	case "INTEGER":
-		v, err := strconv.ParseInt(stripEnumSuffix(raw), 10, 64)
+		v, err := strconv.ParseInt(stripEnumSuffix(raw), 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Integer, Value: int(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.IntegerValue(int32(v))}, true, nil
 	case "Gauge32":
 		v, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Gauge32, Value: uint(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.Gauge32Value(uint32(v))}, true, nil
 	case "Counter32":
 		v, err := strconv.ParseUint(raw, 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Counter32, Value: uint(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.Counter32Value(uint32(v))}, true, nil
 	case "Counter64":
 		v, err := strconv.ParseUint(raw, 10, 64)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Counter64, Value: v}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.Counter64Value(uint64(v))}, true, nil
 	case "Timeticks":
 		v, err := strconv.ParseUint(stripTimeticksValue(raw), 10, 32)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, false, err
+			return gosnmp.VarBind{}, false, err
 		}
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.TimeTicks, Value: uint32(v)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.TimeTicksValue(uint32(v))}, true, nil
 	case "OID":
-		return gosnmp.SnmpPDU{Name: oid, Type: gosnmp.ObjectIdentifier, Value: trimOID(raw)}, true, nil
+		return gosnmp.VarBind{Name: oid, Value: gosnmp.ObjectIdentifierValue(trimOID(raw))}, true, nil
 	default:
-		return gosnmp.SnmpPDU{}, false, fmt.Errorf("unsupported snmpwalk type %q", kind)
+		return gosnmp.VarBind{}, false, fmt.Errorf("unsupported snmpwalk type %q", kind)
 	}
 }
 
@@ -221,10 +222,10 @@ func stripTimeticksValue(s string) string {
 	return stripEnumSuffix(s)
 }
 
-func expectSNMPWalkFromFixture(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpVersion, fixture *snmpFixture, oid string) {
+func expectSNMPWalkFromFixture(mockHandler *snmpmock.MockSession, version gosnmp.Version, fixture *snmpFixture, oid string) {
 	root := trimOID(oid)
 	prefix := root + "."
-	pdus := make([]gosnmp.SnmpPDU, 0)
+	pdus := make([]gosnmp.VarBind, 0)
 	for _, pdu := range fixture.entries {
 		if pdu.Name == root || strings.HasPrefix(pdu.Name, prefix) {
 			pdus = append(pdus, pdu)
@@ -234,10 +235,10 @@ func expectSNMPWalkFromFixture(mockHandler *snmpmock.MockHandler, version gosnmp
 	expectSNMPWalk(mockHandler, version, root, pdus)
 }
 
-func mustExpectSNMPGetFromFixture(t *testing.T, mockHandler *snmpmock.MockHandler, fixture *snmpFixture, oids []string) {
+func mustExpectSNMPGetFromFixture(t *testing.T, mockHandler *snmpmock.MockSession, fixture *snmpFixture, oids []string) {
 	t.Helper()
 
-	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
+	pdus := make([]gosnmp.VarBind, 0, len(oids))
 	for _, oid := range oids {
 		trimmed := trimOID(oid)
 		pdu, ok := fixture.byOID[trimmed]
@@ -258,15 +259,5 @@ func TestParseSNMPWalkLine_IntegerEnumValue(t *testing.T) {
 	if !ok {
 		t.Fatal("expected fixture line to parse")
 	}
-	if pdu.Type != gosnmp.Integer {
-		t.Fatalf("unexpected PDU type: %v", pdu.Type)
-	}
-
-	value, ok := pdu.Value.(int)
-	if !ok {
-		t.Fatalf("unexpected value type %T", pdu.Value)
-	}
-	if value != 1 {
-		t.Fatalf("unexpected parsed value: got %d, want 1", value)
-	}
+	assert.Equal(t, gosnmp.IntegerValue(1), pdu.Value)
 }

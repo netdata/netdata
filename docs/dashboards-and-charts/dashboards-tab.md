@@ -1,6 +1,6 @@
 # Dashboards Tab
 
-With **Netdata Cloud**, you can build **custom dashboards** that target your infrastructure's unique needs. Dashboards help you centralize key metrics from any number of distributed systems, offering a clear, interactive overview of your infrastructure.
+With **Netdata Cloud**, you can build **custom dashboards** that target your environment's unique needs. Dashboards help you centralize key metrics from any number of distributed systems, offering a clear, interactive overview of your systems and applications.
 
 Click the **Dashboards** tab in any Room to get started.
 

@@ -102,7 +102,7 @@ Use one stable job identity for the MGR surface. If the active MGR moves, update
 
 For `ceph-exporter`, preserve each node's own job or virtual-node identity. Keep exporter jobs host-local rather than merging them across hosts.
 
-A Parent can receive streams from every Ceph Agent. Parenting changes where data is stored and queried, not the identity of each Ceph node: child charts retain their node scope, labels, and alert instances. Organize Netdata Cloud rooms by site, cluster, or role, then use the combined view for infrastructure-wide investigation.
+A Parent can receive streams from every Ceph Agent. Parenting changes where data is stored and queried, not the identity of each Ceph node: child charts retain their node scope, labels, and alert instances. Organize Netdata Cloud rooms by site, cluster, or role, then use the combined view to investigate across all clusters.
 
 ## Enable telemetry
 

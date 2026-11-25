@@ -201,9 +201,9 @@ that holds exactly one page (multi-integration directories keep their hand-writt
   `meta.monitored_instance.description`, then `Monitor <name>`; the `description-authoring.md` contract follows from
   that. `_render_tech_navigation` hardcodes the marketing navigation;
   `integrations/tests/test_collector_page_navigation.py` requires every target to be an emitted section anchor or
-  `#beyond-the-850-integrations` and pins the exact link list, so a category or heading change updates the mapping and
+  `#beyond-the-2000-integrations` and pins the exact link list, so a category or heading change updates the mapping and
   the test together, and because no workflow runs that test, run it by hand (`python3 -m unittest
-  integrations.tests.test_collector_page_navigation`). The "850+ integrations" header is a literal.
+  integrations.tests.test_collector_page_navigation`). The "2,000+ integrations" header is a literal.
 - `gen_doc_secrets_page.py` and `gen_doc_service_discovery_page.py` render `src/collectors/SECRETS.md` and
   `SERVICE-DISCOVERY.md` from the `secretstore` and `service_discovery` entries through `templates/secrets.md` and
   `templates/service_discovery.md` (the two templates `get_section_template_name` never returns); only the backends and

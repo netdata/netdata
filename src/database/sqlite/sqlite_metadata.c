@@ -2835,6 +2835,8 @@ static void start_metadata_hosts(uv_work_t *req)
 
     usec_t all_started_ut = now_monotonic_usec();
 
+    ctx_sql_flush(false);
+
     store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true, false);
 
     store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true, false);
@@ -3113,6 +3115,8 @@ static void metadata_event_loop(void *arg)
         sqlite_mark_teardown_unsafe(
             "a metadata worker outlived the shutdown wait and may still be using the databases");
 
+    ctx_sql_flush(true);
+
     store_alert_transitions(pending_alert_list, false, true);
     store_sql_statements(pending_sql_statement, false, true);
 
@@ -3242,6 +3246,17 @@ void metaqueue_ml_load_models(RRDDIM *rd)
 bool metadata_queue_load_host_context()
 {
     return queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, NULL, NULL);
+}
+
+// schedules a context's metadata cleanup on the calling thread, for the context write queue's flushers
+void metadata_schedule_ctx_cleanup_now(nd_uuid_t *host_uuid, const char *context)
+{
+    if (unlikely(!db_meta))
+        return;
+
+    sqlite3_stmt *res = NULL;
+    sql_schedule_host_ctx_cleanup(&res, host_uuid, context);
+    SQLITE_FINALIZE(res);
 }
 
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context)
