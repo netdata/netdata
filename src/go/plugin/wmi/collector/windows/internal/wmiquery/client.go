@@ -188,10 +188,6 @@ func (c *Client) logIn(act *activation.RemoteActivationResponse) error {
 	if err != nil {
 		return rpcFailure(ctx, "open WMI services interface", err)
 	}
-	c.enumeration, err = enumerator.NewEnumClassObjectClient(ctx, c.objects)
-	if err != nil {
-		return rpcFailure(ctx, "open WMI enumeration interface", err)
-	}
 	return nil
 }
 

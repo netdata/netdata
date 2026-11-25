@@ -204,6 +204,8 @@ func TestSafeMessageRedactsRawErrors(t *testing.T) {
 		SafeMessage(rpcFailure(ctx, "bind", fmt.Errorf("untrusted detail: %w", syscall.ECONNREFUSED))))
 	assert.Equal(t, "open namespace: RPC_E_ACCESS_DENIED (0x8001011b)",
 		SafeMessage(rpcFailure(ctx, "open namespace", fmt.Errorf("untrusted detail: %w", hresult.RpcEAccessDenied))))
+	rejection := &dcerpc.Result{DefResult: dcerpc.ProviderRejection, ProviderReason: dcerpc.AbstractSyntaxNotSupported}
+	assert.Equal(t, "read results: provider_rejection: abstract syntax not supported", SafeMessage(rpcFailure(ctx, "read results", fmt.Errorf("untrusted detail: %w", rejection))))
 	assert.Equal(t, "bind: RPC failed", SafeMessage(rpcFailure(ctx, "bind", errors.New("synthetic secret"))))
 	assert.Equal(t, "WMI collection timed out", SafeMessage(fmt.Errorf("untrusted detail: %w", context.DeadlineExceeded)))
 }

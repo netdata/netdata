@@ -9,6 +9,7 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/oiweiwei/go-msrpc/dcerpc"
 	rpcerrors "github.com/oiweiwei/go-msrpc/dcerpc/errors"
 	"github.com/oiweiwei/go-msrpc/msrpc/erref/hresult"
 	"github.com/oiweiwei/go-msrpc/msrpc/erref/win32"
@@ -63,16 +64,20 @@ func rpcFailure(ctx context.Context, operation string, err error) error {
 		return fmt.Errorf("%s: %w", operation, context.DeadlineExceeded)
 	}
 	var (
-		result  *hresult.Error
-		wmiCode *wmistatus.Error
-		rpcCode *rpcerrors.RPCError
-		winCode *win32.Error
-		rawCode *rpcerrors.Error
-		dnsErr  *net.DNSError
-		netErr  net.Error
-		authErr *gssapi.Error
+		presentation *dcerpc.Result
+		result       *hresult.Error
+		wmiCode      *wmistatus.Error
+		rpcCode      *rpcerrors.RPCError
+		winCode      *win32.Error
+		rawCode      *rpcerrors.Error
+		dnsErr       *net.DNSError
+		netErr       net.Error
+		authErr      *gssapi.Error
 	)
 	switch {
+	case errors.As(err, &presentation):
+		// Result.Error formats only the RPC result and provider reason enums.
+		return diagnostic(operation + ": " + presentation.Error())
 	case errors.As(err, &result):
 		return statusError(operation, result.Code)
 	case errors.As(err, &wmiCode):

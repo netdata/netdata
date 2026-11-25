@@ -44,12 +44,25 @@ func (c *Client) Query(ctx context.Context, wql string) ([]map[string]any, error
 	}
 	defer c.release(ref)
 
-	enum := c.enumeration.IPID(ctx, ref.IPID)
+	// A Windows exporter can reject this interface until ExecQuery has
+	// returned the first enumerator object.
+	enum := c.enumeration
+	if enum == nil {
+		enum, err = enumerator.NewEnumClassObjectClient(ctx, c.objects)
+		if err != nil {
+			return nil, rpcFailure(ctx, "open WMI enumeration interface", err)
+		}
+	}
 	deadline, _ := c.ctx.Deadline()
 	if queryDeadline, ok := ctx.Deadline(); ok && queryDeadline.Before(deadline) {
 		deadline = queryDeadline
 	}
-	return readPages(ctx, &c.orpc, deadline, enum.Next)
+	rows, err := readPages(ctx, &c.orpc, deadline, enum.IPID(ctx, ref.IPID).Next)
+	if err == nil {
+		// go-msrpc may report a rejected presentation only when Next is called.
+		c.enumeration = enum
+	}
+	return rows, err
 }
 
 type nextPage func(context.Context, *enumerator.NextRequest, ...dcerpc.CallOption) (*enumerator.NextResponse, error)
