@@ -305,3 +305,51 @@ func TestCollector_TimeoutNamesTheLimit(t *testing.T) {
 		assert.Equal(t, []string{queryCPU}, session.queries)
 	})
 }
+
+func TestCollector_SessionLostMidPoll(t *testing.T) {
+	lost := queryResult{
+		err: sessionFailure{errors.New("connection reset")},
+	}
+	for name, tc := range map[string]struct {
+		results     map[string]queryResult
+		wantErr     string
+		wantMetrics map[string]metrix.SampleValue
+	}{
+		"after a successful group, keep its samples and skip the inventory": {
+			results: map[string]queryResult{
+				queryCPU:     fixtureRows(map[string]any{"PercentProcessorTime": uint32(7)}),
+				queryMemory:  lost,
+				queryNetwork: lost,
+				queryDisk:    lost,
+			},
+			wantMetrics: map[string]metrix.SampleValue{"cpu_busy_percent": 7},
+		},
+		"after a refused query, report the query failures": {
+			results: map[string]queryResult{
+				queryCPU:     {err: errors.New("WS-Management fault")},
+				queryMemory:  lost,
+				queryNetwork: lost,
+				queryDisk:    lost,
+			},
+			wantErr: "no enabled WMI query group succeeded",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := configuredCollector()
+			session := &fakeSession{
+				results: tc.results,
+			}
+			c.newSession = func(context.Context) (querySession, error) { return session, nil }
+			require.NoError(t, c.Init(t.Context()))
+
+			metrics, err := collecttest.CollectScalarSeries(c)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantMetrics, metrics)
+			}
+			assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, session.queries)
+		})
+	}
+}

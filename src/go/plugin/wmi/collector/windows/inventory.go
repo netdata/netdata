@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
 )
 
 const (
@@ -51,25 +53,29 @@ func (c *Collector) refreshInventory(
 			setLabel(labels, "_system_ram_total", installedMemory(rows))
 		}},
 	}
+	// lost: the session failed, so every later query would fail the same way.
+	var lost bool
 	for _, provider := range providers {
-		if ctx.Err() != nil {
+		if lost || ctx.Err() != nil {
 			break
 		}
 		rows, err := session.Query(ctx, provider.query)
 		if err != nil {
 			c.logInventoryError(provider.name, err)
+			lost = wmiquery.SessionFailed(err)
 			continue
 		}
 		provider.apply(rows)
 	}
-	if fixedDrivesRead && ctx.Err() == nil {
+	if fixedDrivesRead && !lost && ctx.Err() == nil {
 		if capacity, err := diskCapacity(ctx, session, fixedDrives); err != nil {
 			c.logInventoryError("disk", err)
+			lost = wmiquery.SessionFailed(err)
 		} else {
 			setLabel(labels, "_system_disk_space", capacity)
 		}
 	}
-	if ctx.Err() == nil {
+	if !lost && ctx.Err() == nil {
 		if name, ip, err := defaultInterface(ctx, session); err != nil {
 			c.logInventoryError("default interface", err)
 		} else {

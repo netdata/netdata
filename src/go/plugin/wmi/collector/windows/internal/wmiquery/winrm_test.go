@@ -203,3 +203,36 @@ func TestWinRMRefusedConnection(t *testing.T) {
 	assert.True(t, SessionFailed(err))
 	assert.Equal(t, "WinRM request failed: connection refused", SafeMessage(err))
 }
+
+func TestWinRMQueryFailuresKeepTheSession(t *testing.T) {
+	const fault = `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><s:Fault>` +
+		`<s:Code><s:Value>s:Sender</s:Value></s:Code><s:Reason><s:Text xml:lang="en-US">sensitive-test-response</s:Text></s:Reason>` +
+		`</s:Fault></s:Body></s:Envelope>`
+	var requests int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, fault)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	session := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+		RootCAs: ca,
+	})
+	defer session.Close()
+
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := session.Query(canceled, "SELECT Name FROM Win32_ComputerSystem")
+	require.ErrorIs(t, err, context.Canceled)
+	assert.False(t, SessionFailed(err))
+
+	for range 2 {
+		_, err := session.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+		require.Error(t, err)
+		assert.False(t, SessionFailed(err))
+		assert.Equal(t, "WinRM returned a WS-Management fault", SafeMessage(err))
+	}
+	assert.Equal(t, 2, requests, "a fault or a canceled query must not stop later queries")
+}

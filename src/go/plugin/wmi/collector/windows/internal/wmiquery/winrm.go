@@ -35,6 +35,8 @@ type WinRMSession struct {
 	// failed keeps the first transport failure. A refused connection, an
 	// untrusted certificate or a rejected login fails every later request the
 	// same way, and repeating a rejected login counts toward account lockout.
+	// The session lasts one poll, so caching a rarer failure, such as a dropped
+	// keep-alive connection, costs at most the rest of that poll.
 	failed error
 }
 
@@ -148,7 +150,8 @@ func (s *WinRMSession) Query(ctx context.Context, wql string) ([]map[string]any,
 }
 
 // send posts one envelope. go-wsman returns WS-Management faults as data, so
-// every error here is a connection, TLS or HTTP status failure of the session.
+// every error here is a transport failure: connection, TLS, HTTP status or
+// reading the response.
 func (s *WinRMSession) send(ctx context.Context, request []byte) ([]byte, error) {
 	if s.failed != nil {
 		return nil, s.failed

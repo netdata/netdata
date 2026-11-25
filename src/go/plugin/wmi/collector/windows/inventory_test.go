@@ -166,3 +166,21 @@ func TestInventoryDisabledQueries(t *testing.T) {
 func TestInstalledMemoryRejectsOverflow(t *testing.T) {
 	assert.Empty(t, installedMemory([]map[string]any{{"capacity": uint64(math.MaxUint64)}, {"capacity": uint64(1)}}))
 }
+
+func TestInventoryStopsWhenSessionIsLost(t *testing.T) {
+	c := configuredCollector()
+	session := &fakeSession{
+		results: validQueryResults(),
+	}
+	session.results[queryOSInfo] = fixtureRows(map[string]any{"CSName": "FILE01"})
+	session.results[querySystemInfo] = queryResult{
+		err: sessionFailure{errors.New("connection reset")},
+	}
+	c.newSession = func(context.Context) (querySession, error) { return session, nil }
+	require.NoError(t, c.Init(t.Context()))
+
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk, queryOSInfo, querySystemInfo}, session.queries)
+	assert.Equal(t, "FILE01", c.VirtualNode().Hostname, "providers read before the failure are published")
+}

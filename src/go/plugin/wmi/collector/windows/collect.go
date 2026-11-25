@@ -61,7 +61,9 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		},
 	}
 
-	var succeeded bool
+	// reached: a query got an answer from the host. sessionLost: the session
+	// failed, so later queries and the inventory would fail the same way.
+	var succeeded, reached, sessionLost bool
 	var failures [len(groups)]error
 	for i, group := range groups {
 		if !group.enabled {
@@ -71,10 +73,14 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			return observations{}, c.interrupted(parent, ctx)
 		}
 		rows, err := session.Query(ctx, group.query)
-		switch {
-		case err != nil && !succeeded && wmiquery.SessionFailed(err) && ctx.Err() == nil:
+		failed := wmiquery.SessionFailed(err)
+		if failed && !reached && ctx.Err() == nil {
 			// WinRM connects and logs in with the first query.
 			return observations{}, safeTransportError("failed to open WMI session", err)
+		}
+		reached = reached || !failed
+		sessionLost = sessionLost || failed
+		switch {
 		case err != nil:
 			failures[i] = safeTransportError(group.name+" WMI query failed", err)
 		case !group.read(rows):
@@ -95,7 +101,7 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			c.Limit("wmi:"+groups[i].name, 1, time.Minute).Warning(err)
 		}
 	}
-	if inventoryDue {
+	if inventoryDue && !sessionLost {
 		c.refreshInventory(ctx, session, fixedDrives, fixedDrivesRead)
 	}
 	// Exhausting the optional inventory budget must not discard successful samples.

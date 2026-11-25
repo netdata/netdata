@@ -77,15 +77,16 @@ modules:
         limits:
           description: |
             - Authentication is NTLMv2 only. Hosts or domains that block NTLM and accept only Kerberos cannot be monitored.
+            - Every collection logs in again. With a wrong or expired password, each collection adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
             - CPU is the total across all processors, without a per-core breakdown. CPU and traffic values are rates Windows calculates at query time over its own short sampling window, not averages over `update_every`.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
           description: |
-            The poller's own cost is small: one connection per job per collection.
+            The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs one authenticated connection and up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`). Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`). DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -233,11 +234,11 @@ modules:
                 | Labels | Meaning |
                 |---|---|
                 | `_os_name`, `_os_version`, `_os_marketing_version`, `_os_edition`, `_kernel_version` | Windows product, edition, version and build |
-                | `_hw_sys_vendor`, `_hw_product_name`, `_virtualization`, `_hw_product_type` | Manufacturer, model, and the platform of a recognized virtual machine |
+                | `_hw_sys_vendor`, `_hw_product_name`, `_virtualization`, `_virt_detection`, `_hw_product_type` | Manufacturer, model, and the platform of a recognized virtual machine |
                 | `_system_cores`, `_architecture`, `_system_cpu_model`, `_system_cpu_freq` | Logical processors, architecture, processor model and clock in Hz |
                 | `_system_ram_total` | Sum of the installed memory modules, in bytes |
                 | `_system_disk_space` | Total partition size of the fixed drives, in bytes; requires the disk group |
-                | `_net_default_iface`, `_net_default_iface_ip` | Interface and IPv4 address of the default route |
+                | `_net_default_iface`, `_net_default_iface_ip`, `_net_default_iface_detection` | Interface and IPv4 address of the default route |
 
                 Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information.
         examples:
@@ -298,7 +299,27 @@ modules:
           - error: 'job output: collector lifecycle failed; resolved configuration details redacted'
             when: The job's password, or another option, is a secret reference such as `${env:WMI_PASSWORD}`.
             cause: The job failed to start. The Agent hides the reason for jobs that use secret references, because error text can contain resolved values.
-            fix: Find the reason on the Windows host or with the other entries below. A rejected login appears in the host's Security event log as event 4625 from the poller's address. To see the plugin's own message, temporarily replace the secret reference with the password, read the log, and restore the reference.
+            fix: |
+              Find the reason on the Windows host or with the other entries below. A rejected login appears in the host's Security event log as event 4625 from the poller's address.
+
+              :::caution
+              To see the plugin's own message, you can temporarily replace the secret reference with the password itself, read the log, and restore the reference. The password is then stored in the configuration file in plain text until you restore it.
+              :::
+          - error: 'auth must be ntlm'
+            cause: The job omits `auth` or sets another value. The option has no default.
+            fix: 'Add `auth: ntlm` to the job.'
+          - error: 'tls_ca requires the winrm transport'
+            cause: 'The job sets `tls_ca` without `transport: winrm`. DCOM does not use TLS.'
+            fix: 'Add `transport: winrm`, or remove `tls_ca` to keep DCOM.'
+          - error: 'host must be a Windows hostname or IP address without a URL or port'
+            cause: '`host` is empty or contains a scheme, path, port or other characters that are not part of a hostname.'
+            fix: Set `host` to the bare name or address, for example `fileserver.example.com` instead of `https://fileserver.example.com:5986`.
+          - error: 'username is required'
+            cause: '`username` is empty, or names a domain with nothing after the backslash.'
+            fix: Set the full account name, such as `EXAMPLE\monitor` or `monitor@example.com`.
+          - error: 'at least one collector group must be enabled'
+            cause: Every group under `collectors` is set to `false`.
+            fix: Enable at least one of `cpu`, `memory`, `network` or `disk`, or remove `collectors` to collect them all.
           - error: 'failed to open WMI session: open DCOM object resolver interface: connection refused'
             when: '`transport: dcom`'
             cause: Nothing accepts connections on TCP 135 at the configured `host`, or a firewall rejects them.
@@ -310,12 +331,12 @@ modules:
           - error: 'failed to open WMI session: read DCOM server version: ERROR_ACCESS_DENIED (0x00000005)'
             when: '`transport: dcom`'
             cause: The host rejected the login. The username or password is wrong, or the host does not accept NTLMv2.
-            fix: Check `username` and `password`, including the domain part of the username. Check that the host's network security policy allows NTLMv2.
-          - error: 'activate WMI: E_ACCESSDENIED (0x80070005)'
+            fix: Check `username` and `password`, including the domain part of the username, and that the host's network security policy allows NTLMv2. Fix it promptly or disable the job, because every collection retries the login and counts toward account lockout.
+          - error: 'failed to open WMI session: activate WMI: E_ACCESSDENIED (0x80070005)'
             when: '`transport: dcom`, with a non-administrator account'
             cause: The account may log in but is not allowed to start WMI remotely over DCOM.
             fix: Add the account to the host's local **Distributed COM Users** group.
-          - error: 'open WMI root/cimv2 namespace: StatusAccessDenied (0x80041003)'
+          - error: 'failed to open WMI session: open WMI root/cimv2 namespace: StatusAccessDenied (0x80041003)'
             when: '`transport: dcom`, with a non-administrator account'
             cause: The account lacks the **Enable Account** or **Remote Enable** permission on the `root\cimv2` WMI namespace.
             fix: Grant both permissions in `wmimgmt.msc`, as described under Prerequisites.
@@ -325,7 +346,7 @@ modules:
           - error: 'failed to open WMI session: WinRM returned HTTP 401'
             when: '`transport: winrm`'
             cause: The listener rejected the login. The username or password is wrong, or the account may not use WinRM.
-            fix: Check `username` and `password`. For a non-administrator account, add it to the host's local **Remote Management Users** group.
+            fix: Check `username` and `password`; every collection retries the login and counts toward account lockout. For a non-administrator account, add it to the host's local **Remote Management Users** group.
           - error: 'failed to open WMI session: WinRM server certificate verification failed'
             when: '`transport: winrm`'
             cause: The poller does not trust the listener certificate, or the certificate does not match the configured `host`.
