@@ -58,6 +58,12 @@ function(bundle_dashboard)
 
   handle_braindead_versioning_insanity("${dashboard_src_prefix}")
 
+  # An archive in an unexpected layout would otherwise install an empty or
+  # partial dashboard and report success.
+  if(NOT EXISTS "${dashboard_src_prefix}/v3/index.html")
+    message(FATAL_ERROR "Dashboard archive has no dist/agent/v3/index.html")
+  endif()
+
   # Archive timestamps can repeat across releases, and install(FILES) skips a
   # changed file whose time matches the installed copy. Copy every bundled file.
   install(CODE [[

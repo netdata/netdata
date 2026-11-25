@@ -148,6 +148,32 @@ bundle_dashboard()
                     self.assertEqual(index.read_bytes(), release)
 
     @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
+    def test_bundle_without_v3_dashboard_fails_configuration(self):
+        (self.root / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.16)
+project(dashboard NONE)
+list(APPEND CMAKE_MODULE_PATH "{MODULES}")
+include(NetdataDashboard)
+set(WEB_DEST "web")
+bundle_dashboard()
+''')
+        archive = self.root / 'bundle.tar.gz'
+        cases = {
+            'no dist/agent': ['other/index.html'],
+            'no v3 tree': ['dist/agent/index.html', 'dist/agent/v1/index.html'],
+        }
+        for name, members in cases.items():
+            with self.subTest(name):
+                with tarfile.open(archive, 'w:gz') as tar:
+                    for member in members:
+                        entry = tarfile.TarInfo(member)
+                        entry.size = 4
+                        tar.addfile(entry, io.BytesIO(b'page'))
+                result = subprocess.run(['cmake', '-S', str(self.root), '-B', str(self.root / name),
+                                         '-DDASHBOARD_URL=' + archive.as_uri()], capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn('Dashboard archive has no dist/agent/v3/index.html', result.stderr)
+
+    @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
     def test_reconfigure_and_install_two_bundles(self):
         self.require_cmake_3_22('install(FILES) accepts archive directory links from CMake 3.22')
         project = self.root / 'CMakeLists.txt'
