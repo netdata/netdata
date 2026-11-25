@@ -16,6 +16,35 @@ PARSER_RC PLUGINSD_PROTOCOL_ERROR(const char *keyword, const char *msg);
 
 ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
+// Child-provided timestamps arrive as unsigned 64-bit strings and are cast to
+// time_t, so values that do not fit time_t wrap to negative. Require positive
+// epoch seconds that are also representable in microseconds: samples are stored
+// as seconds * USEC_PER_SEC in an unsigned 64-bit usec_t, so larger values wrap
+// around and would place samples at arbitrary times in the database.
+static ALWAYS_INLINE bool pluginsd_timestamp_storable(time_t t) {
+    return t > 0 && (uintmax_t)t <= (uintmax_t)UINT64_MAX / USEC_PER_SEC;
+}
+
+// The upper bound is compared with nd_time_t_add_compare() because a plain
+// wall_clock_time + tolerance can overflow when the wall clock is near time_t max.
+static ALWAYS_INLINE bool pluginsd_replay_timestamps_valid(time_t start_time, time_t end_time, time_t wall_clock_time, time_t tolerance) {
+    return pluginsd_timestamp_storable(start_time) && pluginsd_timestamp_storable(end_time) &&
+           nd_time_t_add_compare(wall_clock_time, tolerance, start_time) > 0 &&
+           nd_time_t_add_compare(wall_clock_time, tolerance, end_time) > 0 &&
+           start_time < end_time;
+}
+
+// Validate the sample time of a BEGIN2 sent by a child and sanitize the child
+// wall-clock: non-positive values fall back to end_time, since they can only
+// come from integer wrap-around.
+static ALWAYS_INLINE bool pluginsd_begin_v2_times_valid(time_t end_time, time_t wall_clock_time, time_t *wall_clock_out) {
+    if(!pluginsd_timestamp_storable(end_time))
+        return false;
+
+    *wall_clock_out = (wall_clock_time > 0) ? wall_clock_time : end_time;
+    return true;
+}
+
 static ALWAYS_INLINE RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
     RRDHOST *host = parser->user.host;
 
