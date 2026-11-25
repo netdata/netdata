@@ -1032,6 +1032,210 @@ static void ignore_sigpipe_like_the_daemon(void) {
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
+static volatile sig_atomic_t shutdown_term_received;
+
+static void shutdown_test_sigterm(int signo __maybe_unused) {
+    shutdown_term_received = 1;
+}
+
+static int plugin_shutdown_drain(const char *mode) {
+    struct sigaction action = { .sa_handler = shutdown_test_sigterm };
+    sigemptyset(&action.sa_mask);
+    if(strcmp(mode, "eof") != 0 && sigaction(SIGTERM, &action, NULL) != 0)
+        return 80;
+    if(write(STDOUT_FILENO, "R", 1) != 1)
+        return 81;
+
+    if(strcmp(mode, "eof") == 0) {
+        char byte;
+        if(read(STDIN_FILENO, &byte, 1) != 0)
+            return 82;
+    }
+    else {
+        usec_t deadline = now_monotonic_usec() + 10 * USEC_PER_SEC;
+        while(!shutdown_term_received || strcmp(mode, "ignore") == 0 || strcmp(mode, "server-gone") == 0) {
+            // Bound the orphan fixture even when the cleanup under test fails.
+            if(strcmp(mode, "server-gone") == 0 && now_monotonic_usec() >= deadline)
+                return 82;
+            sleep_usec(10 * USEC_PER_MS);
+        }
+    }
+
+    // Model a child flushing buffered work after EOF or SIGTERM.
+    sleep_usec(200 * USEC_PER_MS);
+    return 23;
+}
+
+static int plugin_shutdown_output(const char *mode) {
+    if(strcmp(mode, "noisy") == 0 && signal(SIGTERM, SIG_IGN) == SIG_ERR)
+        return 80;
+    if(write(STDOUT_FILENO, "R", 1) != 1)
+        return 81;
+    char command[5];
+    size_t used = 0;
+    ssize_t bytes;
+    while(used < sizeof(command) && (bytes = read(STDIN_FILENO, command + used, sizeof(command) - used)) > 0)
+        used += bytes;
+    char byte;
+    if(used != sizeof(command) || memcmp(command, "QUIT\n", sizeof(command)) || read(STDIN_FILENO, &byte, 1) != 0)
+        return 82;
+    if(strcmp(mode, "close-output") == 0) {
+        close(STDOUT_FILENO);
+        sleep_usec(200 * USEC_PER_MS);
+        return 23;
+    }
+    // More than a pipe can hold: keeping stdout open without draining it must fail.
+    char buffer[16384] = { 0 };
+    for(size_t total = 0; total < 2 * 1024 * 1024 || strcmp(mode, "noisy") == 0; ) {
+        bytes = write(STDOUT_FILENO, buffer, sizeof(buffer));
+        if(bytes > 0)
+            total += bytes;
+        else if(bytes < 0 && errno == EINTR)
+            continue;
+        else
+            return 83;
+    }
+    return 23;
+}
+
+typedef struct {
+    SPAWN_SERVER *server;
+    SPAWN_INSTANCE *instance;
+    POPEN_INSTANCE *popen;
+    bool drain_output;
+    int grace_ms;
+    int status;
+    usec_t elapsed;
+    bool normal_wait_cancelled;
+    bool cancellation_preserved;
+} SHUTDOWN_TEST;
+
+static void test_cancelled_shutdown_worker(void *arg) {
+    SHUTDOWN_TEST *test = arg;
+    nd_thread_signal_cancel(nd_thread_self());
+    usec_t start = now_monotonic_usec();
+    if(test->popen)
+        test->status = spawn_popen_shutdown(test->popen, test->grace_ms);
+    else if(test->drain_output)
+        test->status = spawn_server_exec_shutdown(test->server, test->instance, test->grace_ms);
+    else {
+        SPAWN_TIMEDWAIT_RESULT result = spawn_server_exec_timedwait(test->server, test->instance, 5000, &test->status);
+        test->normal_wait_cancelled = result == SPAWN_TIMEDWAIT_RUNNING && now_monotonic_usec() - start < USEC_PER_SEC;
+        if(result != SPAWN_TIMEDWAIT_EXITED)
+            test->status = spawn_server_exec_kill(test->server, test->instance, test->grace_ms);
+    }
+    test->elapsed = now_monotonic_usec() - start;
+    test->cancellation_preserved = nd_thread_signaled_to_cancel();
+}
+
+static void test_cancelled_shutdown(SPAWN_SERVER *server, const char *argv0) {
+    const char *modes[] = { "eof", "term", "ignore" };
+    for(size_t group = 0; group < 2; group++) {
+        for(size_t mode = 0; mode < _countof(modes); mode++) {
+            const char *args[] = { argv0, "plugin-shutdown-drain", modes[mode], NULL };
+            SPAWN_INSTANCE *si = spawn_server_exec(server, STDERR_FILENO, 0, args, NULL, 0,
+                                                  group ? SPAWN_INSTANCE_TYPE_EXEC_GROUP : SPAWN_INSTANCE_TYPE_EXEC);
+            if(!si) exit(1);
+            struct pollfd output = { .fd = spawn_server_instance_read_fd(si), .events = POLLIN };
+            char ready;
+            if(poll(&output, 1, 5000) <= 0 || read(output.fd, &ready, 1) != 1 || ready != 'R') {
+                spawn_server_exec_kill(server, si, 0);
+                exit(1);
+            }
+            SHUTDOWN_TEST test = { .server = server, .instance = si, .grace_ms = mode == 0 ? 2000 : 0, .status = -1 };
+            ND_THREAD *worker = nd_thread_create("SHUTDOWN_TEST", NETDATA_THREAD_OPTIONS_ALL,
+                                                 test_cancelled_shutdown_worker, &test);
+            if(!worker || nd_thread_join(worker) != 0) exit(1);
+            bool status_ok = mode == 2 ? WIFSIGNALED(test.status) && WTERMSIG(test.status) == SIGKILL
+                                       : WIFEXITED(test.status) && WEXITSTATUS(test.status) == 23;
+            if(!test.normal_wait_cancelled || !test.cancellation_preserved || !status_ok || test.elapsed > 6 * USEC_PER_SEC) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "Cancelled shutdown failed: group=%zu mode=%s status=%d elapsed=%llu normal_wait_cancelled=%d cancellation_preserved=%d",
+                       group, modes[mode], test.status, (unsigned long long)test.elapsed,
+                       test.normal_wait_cancelled, test.cancellation_preserved);
+                exit(1);
+            }
+        }
+    }
+}
+
+static void test_shutdown_output(SPAWN_SERVER *server, const char *argv0) {
+    struct {
+        const char *mode;
+        bool group;
+        bool popen;
+    } cases[] = {
+        { "final-output", false, false },
+        { "final-output", true, false },
+        { "final-output", false, true },
+        { "close-output", false, false },
+        { "noisy", false, false },
+    };
+    for(size_t i = 0; i < _countof(cases); i++) {
+        const char *args[] = { argv0, "plugin-shutdown-output", cases[i].mode, NULL };
+        bool noisy = strcmp(cases[i].mode, "noisy") == 0;
+        SHUTDOWN_TEST test = { .server = server, .drain_output = true,
+                               .grace_ms = noisy ? 100 : 2000, .status = -1 };
+        if(cases[i].popen)
+            test.popen = spawn_popen_run_argv(args);
+        else
+            test.instance = spawn_server_exec(server, STDERR_FILENO, 0, args, NULL, 0,
+                                             cases[i].group ? SPAWN_INSTANCE_TYPE_EXEC_GROUP : SPAWN_INSTANCE_TYPE_EXEC);
+        if(!test.popen && !test.instance) exit(1);
+        int output = test.popen ? spawn_popen_read_fd(test.popen) : spawn_server_instance_read_fd(test.instance);
+        int input = test.popen ? spawn_popen_write_fd(test.popen) : spawn_server_instance_write_fd(test.instance);
+        struct pollfd pfd = { .fd = output, .events = POLLIN };
+        char ready;
+        if(poll(&pfd, 1, 5000) <= 0 || read(output, &ready, 1) != 1 || ready != 'R' || write(input, "QUIT\n", 5) != 5)
+            exit(1);
+        ND_THREAD *worker = nd_thread_create("OUTPUT_DRAIN", NETDATA_THREAD_OPTIONS_ALL,
+                                             test_cancelled_shutdown_worker, &test);
+        if(!worker || nd_thread_join(worker) != 0) exit(1);
+        bool exited = cases[i].popen ? test.status == 23 : WIFEXITED(test.status) && WEXITSTATUS(test.status) == 23;
+        bool status_ok = noisy ? WIFSIGNALED(test.status) && WTERMSIG(test.status) == SIGKILL : exited;
+        if(!test.cancellation_preserved || !status_ok || test.elapsed > 6 * USEC_PER_SEC) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Shutdown output failed: case=%zu status=%d elapsed=%llu cancellation_preserved=%d",
+                   i, test.status, (unsigned long long)test.elapsed, test.cancellation_preserved);
+            exit(1);
+        }
+    }
+}
+
+static void test_cancelled_shutdown_without_server(int argc, const char **argv) {
+    for(size_t grace = 0; grace < 2; grace++) {
+        SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "shutdown", NULL, argc, argv);
+        int witness[2];
+        if(!server || pipe(witness) != 0) exit(1);
+        const char *args[] = { argv[0], "plugin-shutdown-drain", "server-gone", NULL };
+        SPAWN_INSTANCE *si = spawn_server_exec(server, witness[1], 0, args, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+        close(witness[1]);
+        if(!si) exit(1);
+        struct pollfd output = { .fd = spawn_server_instance_read_fd(si), .events = POLLIN };
+        char ready;
+        if(poll(&output, 1, 5000) <= 0 || read(output.fd, &ready, 1) != 1 || ready != 'R') exit(1);
+
+        pid_t server_pid = spawn_server_pid(server);
+        if(kill(server_pid, SIGKILL) != 0 || waitpid(server_pid, NULL, 0) != server_pid) exit(1);
+        server->server_pid = 0; // Already reaped; destruction must not signal this PID again.
+        SHUTDOWN_TEST test = { .server = server, .instance = si, .grace_ms = grace ? 100 : 0, .status = -1 };
+        ND_THREAD *worker = nd_thread_create("SHUTDOWN_TEST", NETDATA_THREAD_OPTIONS_ALL,
+                                             test_cancelled_shutdown_worker, &test);
+        if(!worker || nd_thread_join(worker) != 0) exit(1);
+
+        // Only the exact child owns the remaining stderr writer. EOF proves it stopped,
+        // without relying on an orphan's PID still identifying the same process.
+        struct pollfd exited = { .fd = witness[0], .events = POLLIN };
+        bool stopped = poll(&exited, 1, 1000) > 0 && read(witness[0], &ready, 1) == 0;
+        close(witness[0]);
+        spawn_server_destroy(server);
+        if(!stopped || !test.normal_wait_cancelled || !test.cancellation_preserved || test.elapsed > 6 * USEC_PER_SEC) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cancelled shutdown left a child after server exit (grace=%zu)", grace);
+            exit(1);
+        }
+    }
+}
+
 // The descendant deliberately ignores TERM and retains stdout. A readiness pipe ensures
 // the leader-exits-first case cannot pass merely because fork() had not happened yet.
 static int plugin_group_descendant(bool leader_exits) {
@@ -1140,6 +1344,10 @@ static void test_popen_groups(const char *argv0) {
 
 int main(int argc, const char **argv) {
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
+    if(argc == 3 && strcmp(argv[1], "plugin-shutdown-drain") == 0)
+        return plugin_shutdown_drain(argv[2]);
+    if(argc == 3 && strcmp(argv[1], "plugin-shutdown-output") == 0)
+        return plugin_shutdown_output(argv[2]);
     if(argc > 1 && strcmp(argv[1], "plugin-group-hangs") == 0)
         return plugin_group_descendant(false);
     if(argc > 1 && strcmp(argv[1], "plugin-group-leader-exits") == 0)
@@ -1204,7 +1412,19 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "\n\nTESTING fds No %zu (close to stop)\n\n", i + 1);
         test_int_fds_plugin_close_to_stop(server, argv[0]);
     }
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    fprintf(stderr, "\n\nTESTING shutdown from cancelled callers\n\n");
+    test_cancelled_shutdown(server, argv[0]);
+
+    fprintf(stderr, "\n\nTESTING final protocol output during shutdown\n\n");
+    test_shutdown_output(server, argv[0]);
+#endif
     spawn_server_destroy(server);
+
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    fprintf(stderr, "\n\nTESTING cancelled shutdown after spawn server exit\n\n");
+    test_cancelled_shutdown_without_server(argc, argv);
+#endif
 
 #if !defined(OS_WINDOWS)
     fprintf(stderr, "\n\nTESTING callback signal lifecycle\n\n");

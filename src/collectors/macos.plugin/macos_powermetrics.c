@@ -795,11 +795,9 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
 
     freez(buf);
 
-    // The loop also exits when service_running() goes false, which can happen before this thread is
-    // cancelled - and spawn_popen_kill()'s pre-SIGTERM wait only aborts early on cancellation. So
-    // waiting a full interval here would let a wedged child hold up collector shutdown. When we are
-    // stopping, signal it promptly instead; the interval-sized grace is for recycling the loop,
-    // where letting the old child die on its own keeps the restart clean.
+    // Child cleanup honors its grace even after caller cancellation. Keep shutdown's voluntary
+    // wait short; the interval-sized grace is only for recycling the loop, where letting the old
+    // child die on its own keeps the restart clean.
     bool stopping = nd_thread_signaled_to_cancel() || !service_running(SERVICE_COLLECTORS);
     spawn_popen_kill(pi, stopping ? MACOS_POWERMETRICS_STOPPING_KILL_GRACE_MS
                                   : macos_powermetrics_loop_kill_grace_ms());

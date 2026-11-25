@@ -1616,21 +1616,65 @@ static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr
            instance->child_pid, instance->request_id, sr->magic, buf);
 }
 
-SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
+// Terminal cleanup must still give the child its grace period when its caller is cancelled.
+// Use an absolute deadline so repeated signals cannot extend that grace indefinitely.
+static int spawn_server_wait_status(SPAWN_INSTANCE *instance, int timeout_ms, bool cancellable, bool drain_output) {
+    usec_t deadline = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+    struct pollfd pfd[] = {
+        { .fd = instance->sock, .events = POLLIN },
+        { .fd = drain_output ? instance->read_fd : -1, .events = POLLIN },
+    };
+    for(;;) {
+        if(cancellable && nd_thread_signaled_to_cancel()) {
+            errno = ECANCELED;
+            return -1;
+        }
+
+        usec_t now = now_monotonic_usec();
+        if(now >= deadline) {
+            errno = ETIMEDOUT;
+            return 1;
+        }
+
+        int wait_ms = (int)((deadline - now + USEC_PER_MS - 1) / USEC_PER_MS);
+        if(cancellable && wait_ms > ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS)
+            wait_ms = ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS;
+        int rc = poll(pfd, _countof(pfd), wait_ms);
+        if(rc < 0) {
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+            return 2;
+        }
+        // Authoritative status takes priority over output from a noisy child.
+        if(pfd[0].revents)
+            return pfd[0].revents & POLLIN ? 0 : 2;
+        if(pfd[1].revents) {
+            // The parser has detached. Discard final protocol bytes so cleanup writes can finish.
+            char buffer[16384];
+            ssize_t bytes = read(pfd[1].fd, buffer, sizeof(buffer));
+            if(bytes == 0 || (bytes < 0 && errno != EINTR && errno != EAGAIN)) {
+                close(instance->read_fd);
+                instance->read_fd = pfd[1].fd = -1;
+            }
+        }
+    }
+}
+
+static int spawn_server_exec_wait_internal(SPAWN_INSTANCE *instance, bool keep_on_error);
+
+static SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait_internal(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance,
+                                                                 int timeout_ms, int *status, bool cancellable, bool drain_output) {
     if(!instance) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
-    // close the child pipes, to make it exit (same as spawn_server_exec_wait)
+    // EOF requests shutdown; protocol plugins may still need stdout for their final cleanup.
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
-    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+    if(!drain_output && instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
 
-    // a non-positive timeout means "wait forever" to wait_on_socket_or_cancel_with_timeout();
-    // this primitive must always be bounded, so clamp to a minimal positive slice.
+    // A non-positive timeout still performs a bounded, minimal poll.
     if(timeout_ms <= 0) timeout_ms = 1;
 
     // the spawn server sends the final status report on instance->sock when the child exits
-    short revents = 0;
-    NETDATA_SSL ssl = { 0 };
-    int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
+    int rc = spawn_server_wait_status(instance, timeout_ms, cancellable, drain_output);
     if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
         // Nothing was observed - the poll expired, or the wait was cancelled before observing
         // anything at all. Usually the child is still running, but this is not proof of it; see the
@@ -1651,13 +1695,20 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
         return SPAWN_TIMEDWAIT_ERROR;
     }
 
-    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
-    int st = spawn_server_exec_wait(server, instance);
+    // EOF is also readable. Terminal cleanup must retain the child when no valid exit report
+    // exists, so the remaining signal sequence still runs if the spawn server has died.
+    int st = spawn_server_exec_wait_internal(instance, !cancellable);
+    if(st == -1 && !cancellable)
+        return SPAWN_TIMEDWAIT_ERROR;
     if(status) *status = st;
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
-int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
+    return spawn_server_exec_timedwait_internal(server, instance, timeout_ms, status, true, false);
+}
+
+static int spawn_server_exec_wait_internal(SPAWN_INSTANCE *instance, bool keep_on_error) {
     int rc = -1;
 
     // close the child pipes, to make it exit
@@ -1666,7 +1717,9 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     // get the result
     struct status_report sr = { 0 };
-    if(read(instance->sock, &sr, sizeof(sr)) != sizeof(sr))
+    ssize_t bytes = keep_on_error ? recv(instance->sock, &sr, sizeof(sr), MSG_DONTWAIT)
+                                 : read(instance->sock, &sr, sizeof(sr));
+    if(bytes != sizeof(sr))
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN PARENT: failed to read final status report for child %d, request %zu",
             instance->child_pid, instance->request_id);
@@ -1691,32 +1744,40 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         }
     }
 
+    if(rc == -1 && keep_on_error)
+        return rc;
+
     instance->child_pid = 0;
     spawn_server_exec_destroy(instance);
     return rc;
 }
 
+int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
+    return spawn_server_exec_wait_internal(instance, false);
+}
+
 // NOTE on pid safety: the legacy single-process kills below can hit a recycled pid. Our spawn server reaps
 // the child and only then writes the status report, and it writes none at all if the pid is not in
-// its request list - so "no report yet" (SPAWN_TIMEDWAIT_RUNNING) does not mean the pid is still
-// ours. The pre-kill grace makes this worse by discarding its poll result and signalling regardless.
+// its request list - so "no report yet" (SPAWN_TIMEDWAIT_RUNNING) does not mean the pid is still ours.
 // Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
 // process that reaps is the one that signals. Opt-in group requests already use this ownership;
 // the legacy single-process mode retains its existing race.
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
+// A failed status channel skips grace and may lose buffered output. Do not add an unobserved delay
+// before signalling the legacy PID; safe grace after server failure needs stable child identity.
+static int spawn_server_exec_kill_internal(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, bool drain_output) {
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
-    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+    if(!drain_output && instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
 
     if(instance->process_group) {
         int status;
         if(timeout_ms > 0 &&
-           spawn_server_exec_timedwait(server, instance, timeout_ms, &status) == SPAWN_TIMEDWAIT_EXITED)
+           spawn_server_exec_timedwait_internal(server, instance, timeout_ms, &status, false, drain_output) == SPAWN_TIMEDWAIT_EXITED)
             return status;
 
         // No PID crosses this cancellation boundary. Half-close is nonblocking and leaves
         // the status direction open while the server terminates its owned group.
         (void)shutdown(instance->sock, SHUT_WR);
-        if(spawn_server_exec_timedwait(server, instance, 2 * SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+        if(spawn_server_exec_timedwait_internal(server, instance, 2 * SPAWN_KILL_DEFAULT_GRACE_MS, &status, false, drain_output) == SPAWN_TIMEDWAIT_EXITED)
             return status;
 
         // Broken server or uninterruptible child: reclaim locally without unsafe PID signalling.
@@ -1725,9 +1786,9 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
     }
 
     if(timeout_ms > 0) {
-        short revents;
-        NETDATA_SSL ssl = { 0 };
-        wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
+        int status;
+        if(spawn_server_exec_timedwait_internal(server, instance, timeout_ms, &status, false, drain_output) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
     }
 
     // we still have a pid recorded for this child - not a liveness check (see the note above)
@@ -1741,7 +1802,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // EXITED here is authoritative (the server reaps before it reports); RUNNING is not - see
         // the pid-safety note above this function.
         int status;
-        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+        if(spawn_server_exec_timedwait_internal(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status, false, drain_output) == SPAWN_TIMEDWAIT_EXITED)
             return status;
 
         // still not gone: force-kill, then wait another bounded grace. We must NOT fall through to
@@ -1750,7 +1811,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         if(kill(instance->child_pid, SIGKILL) != 0)
             spawn_server_log_kill_failure(instance, SIGKILL);
 
-        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+        if(spawn_server_exec_timedwait_internal(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status, false, drain_output) == SPAWN_TIMEDWAIT_EXITED)
             return status;
 
         // could not confirm the child exited within the bounded waits; reclaim the instance so we
@@ -1766,6 +1827,14 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
     }
 
     return spawn_server_exec_wait(server, instance);
+}
+
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
+    return spawn_server_exec_kill_internal(server, instance, timeout_ms, false);
+}
+
+int spawn_server_exec_shutdown(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
+    return spawn_server_exec_kill_internal(server, instance, timeout_ms, true);
 }
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {

@@ -33,6 +33,9 @@ int spawn_popen_wait(POPEN_INSTANCE *pi);
 SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code);
 
 int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms);
+// For protocol plugins using raw descriptors: drain final stdout during nofork shutdown grace.
+// FILE wrappers retain their close behavior; the parser must already have detached.
+int spawn_popen_shutdown(POPEN_INSTANCE *pi, int timeout_ms);
 
 pid_t spawn_popen_pid(POPEN_INSTANCE *pi);
 int spawn_popen_read_fd(POPEN_INSTANCE *pi);

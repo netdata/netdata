@@ -1710,7 +1710,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
                "PLUGINSD: sending '"PLUGINSD_CALL_QUIT"'  to plugin: %s",
                string2str(cd->filename));
         
-        send_to_plugin(PLUGINSD_CALL_QUIT, parser, STREAM_TRAFFIC_TYPE_METADATA);
+        send_to_plugin(PLUGINSD_CALL_QUIT "\n", parser, STREAM_TRAFFIC_TYPE_METADATA);
     }
 
     cd->unsafe.enabled = parser->user.enabled;
