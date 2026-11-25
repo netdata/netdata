@@ -11,7 +11,7 @@ _Static_assert(sizeof(uid_t) == sizeof(uint32_t) && (uid_t)-1 > 0, "uid_t must b
 _Static_assert(sizeof(gid_t) == sizeof(uint32_t) && (gid_t)-1 > 0, "gid_t must be an unsigned 32-bit integer");
 
 typedef struct {
-    uint32_t version;       // 0 = not from a host file (libc lookup or numeric fallback): never replaced, never deleted
+    uint32_t version;       // version 0 entries survive population and old-version cleanup
     uint32_t id;
     STRING *name;
 } ID_NAME;
