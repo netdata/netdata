@@ -676,6 +676,12 @@ func (m *mockClient) ContainerList(
 		return docker.ContainerListResult{}, errors.New("mockClient.ContainerList() error")
 	}
 
+	if !opts.All {
+		return docker.ContainerListResult{}, errors.New(
+			"mockClient.ContainerList() error (expect 'all' to include stopped containers)",
+		)
+	}
+
 	values := opts.Filters["health"]
 	if len(values) != 1 {
 		return docker.ContainerListResult{}, errors.New("mockClient.ContainerList() error (expect one 'health' filter)")

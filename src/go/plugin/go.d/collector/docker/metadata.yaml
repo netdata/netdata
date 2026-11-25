@@ -35,6 +35,7 @@ modules:
         method_description: |
           It connects to the Docker Engine API over a Unix socket or TCP and only reads; it never creates, starts, stops or removes anything. It makes these requests:
 
+          - [Ping](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemPing) (`HEAD /_ping`, then `GET /_ping` when needed), before the first request, to agree on the API version.
           - [System info](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemInfo) (`GET /info`), on every collection.
           - [List images](https://docs.docker.com/engine/api/v1.43/#tag/Image/operation/ImageList) (`GET /images/json`), at most once every 5 minutes.
           - [List containers](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerList) (`GET /containers/json`), on every collection, once per container health status (four requests).
@@ -44,7 +45,7 @@ modules:
       multi_instance: true
       additional_permissions:
         description: |
-          The `netdata` user needs access to the Docker socket (`/var/run/docker.sock`), which membership in the `docker` group grants. The collector only sends read requests, but the socket gives full control of the daemon. To restrict it, point `address` at a socket proxy that allows the system info, image list and container list requests and nothing else.
+          The `netdata` user needs access to the Docker socket (`/var/run/docker.sock`), which membership in the `docker` group grants. The collector only sends read requests, but the socket gives full control of the daemon. To restrict it, point `address` at a socket proxy that allows the ping, system info, image list and container list requests and nothing else.
       default_behavior:
         auto_detection:
           description: |
@@ -173,13 +174,17 @@ modules:
             when: The Agent reaches Docker through an HAProxy-based socket proxy, such as `tecnativa/docker-socket-proxy`.
             cause: The proxy refuses one of the requests the collector makes. The [socket proxy example](/packaging/docker/README.md#with-docker-socket-proxy) in the Netdata Docker guide allows only container requests, which is enough for container name resolution but not for this collector.
             fix: |
-              Allow the system info, image list and container list requests. With `tecnativa/docker-socket-proxy`, set these environment variables on the proxy:
+              Allow the system info, image list and container list requests. With `tecnativa/docker-socket-proxy`, set these environment variables on the proxy (it allows ping by default):
 
               ```text
               CONTAINERS=1
               IMAGES=1
               INFO=1
               ```
+          - error: "`operation`: Error response from daemon: client version `version` is too new. Maximum supported API version is `version`"
+            when: The Agent reaches Docker through a socket proxy.
+            cause: The proxy refuses the ping request, so the collector cannot agree on an API version with the daemon and uses its newest one, which the daemon does not support.
+            fix: Allow `HEAD` and `GET` requests to `/_ping` on the proxy. `tecnativa/docker-socket-proxy` allows them by default (`PING=1`).
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
