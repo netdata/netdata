@@ -63,7 +63,6 @@
                 <ComponentRef Id="NetdataVarLibNetdata" />
                 <ComponentRef Id="NetdataEtcGo" />
                 <ComponentRef Id="NetdataEtcHealth" />
-                <ComponentRef Id="NetdataEtcPython" />
                 <ComponentRef Id="NetdataEtcStatsd" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <FeatureGroupRef Id="NetdataDriver" />
@@ -88,7 +87,6 @@
                         <Directory Id="ETCDIRNETDATA" Name="netdata">
                             <Directory Id="ETCDIRNETDATAGO" Name="go.d" />
                             <Directory Id="ETCDIRNETDATAHEALTH" Name="health.d" />
-                            <Directory Id="ETCDIRNETDATAPYTHON" Name="python.d" />
                             <Directory Id="ETCDIRNETDATASTATSD" Name="statsd.d" />
                         </Directory>
                     </Directory>
@@ -242,10 +240,6 @@
             </Component>
 
             <Component Id="NetdataEtcHealth" Directory="ETCDIRNETDATAHEALTH" Guid="177b08a0-7bb6-4878-9bcf-c68642c1aa23">
-                <CreateFolder />
-            </Component>
-
-            <Component Id="NetdataEtcPython" Directory="ETCDIRNETDATAPYTHON" Guid="9f4f1e99-47e1-4d88-8836-c02a98d30056">
                 <CreateFolder />
             </Component>
 

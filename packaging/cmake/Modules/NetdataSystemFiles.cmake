@@ -11,6 +11,7 @@
 # It must stay included at the point it was cut from. The get_directory_property
 # calls at the top snapshot the compile and link options accumulated so far, and
 # that snapshot reaches config.h and is shipped as build-info-cmake-cache.gz.
+# RECORD_BUILD_ENVIRONMENT=Off keeps both out of the installed files.
 
 include_guard()
 
@@ -32,16 +33,22 @@ list(APPEND CONFIGURE_OPTIONS
         "-DCMAKE_C_STANDARD=${CMAKE_C_STANDARD}"
         "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
         "-DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
-
-        # Compiler flags (dynamically collected)
-        "-DCMAKE_C_FLAGS='${CMAKE_C_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
-        "-DCMAKE_CXX_FLAGS='${CMAKE_CXX_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
-        "-DCMAKE_COMPILE_DEFINITIONS='${NETDATA_COMPILE_DEFINITIONS}'"
-
-        # Linker flags (dynamically collected)
-        "-DCMAKE_EXE_LINKER_FLAGS='${CMAKE_EXE_LINKER_FLAGS} ${NETDATA_LINK_OPTIONS}'"
-        "-DCMAKE_SHARED_LINKER_FLAGS='${CMAKE_SHARED_LINKER_FLAGS}'"
 )
+
+# The flags carry absolute paths of the build tree and the sysroot, so they are
+# the part a reproducible build leaves out.
+if(RECORD_BUILD_ENVIRONMENT)
+        list(APPEND CONFIGURE_OPTIONS
+                # Compiler flags (dynamically collected)
+                "-DCMAKE_C_FLAGS='${CMAKE_C_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+                "-DCMAKE_CXX_FLAGS='${CMAKE_CXX_FLAGS} ${NETDATA_COMPILE_OPTIONS}'"
+                "-DCMAKE_COMPILE_DEFINITIONS='${NETDATA_COMPILE_DEFINITIONS}'"
+
+                # Linker flags (dynamically collected)
+                "-DCMAKE_EXE_LINKER_FLAGS='${CMAKE_EXE_LINKER_FLAGS} ${NETDATA_LINK_OPTIONS}'"
+                "-DCMAKE_SHARED_LINKER_FLAGS='${CMAKE_SHARED_LINKER_FLAGS}'"
+        )
+endif()
 
 string(JOIN " " CONFIGURE_COMMAND "cmake" ${CONFIGURE_OPTIONS})
 
@@ -591,10 +598,6 @@ if(ENABLE_PLUGIN_PYTHON)
           COMPONENT plugin-pythond
           DESTINATION ${LIBEXEC_DEST}/python.d)
 
-  if(OS_WINDOWS)
-    precompile_python(${LIBEXEC_DEST}/python.d plugin-pythond)
-  endif()
-
   install(FILES src/collectors/python.d.plugin/python.d.conf
           COMPONENT plugin-pythond
           DESTINATION ${LIBCONFIG_DEST})
@@ -798,18 +801,21 @@ endif()
 # Ship CMakeCache.txt as an archive
 #
 
-install(CODE "
-        execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
-                        OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
-                        WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
-                        RESULT_VARIABLE result)
-        if(NOT result EQUAL 0)
-                message(WARNING \"Failed to compress CMakeCache.txt\")
-        endif()
+# CMakeCache.txt is full of absolute paths of the build host.
+if(RECORD_BUILD_ENVIRONMENT)
+        install(CODE "
+                execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                                OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                                WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
+                                RESULT_VARIABLE result)
+                if(NOT result EQUAL 0)
+                        message(WARNING \"Failed to compress CMakeCache.txt\")
+                endif()
 
-        file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
-             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
-")
+                file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                     DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+        ")
+endif()
 
 #
 # vendor msys stuff on Windows

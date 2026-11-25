@@ -48,7 +48,7 @@
 #                                 read CUPS_FOUND false from here and ship a
 #                                 package with no cups.plugin.
 #
-#   PkgConfig, Go, Python3, Git   Tools, not libraries. A missing tool switches a
+#   PkgConfig, Go, Git            Tools, not libraries. A missing tool switches a
 #                                 feature off or fails a build step; it is not a
 #                                 link error, and the resolution is find_program
 #                                 rather than a library search.

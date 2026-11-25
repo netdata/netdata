@@ -623,13 +623,13 @@ static bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max
         return false;
     }
 
-    size_t file_size = st.st_size;
-
-    // Check if the file size exceeds the maximum allowed size
-    if (file_size > max_size) {
+    // Check the size before narrowing it: off_t can be wider than size_t on 32-bit builds
+    if (st.st_size < 0 || (uintmax_t)st.st_size > (uintmax_t)max_size) {
         close(fd);
         return false; // File size too large
     }
+
+    size_t file_size = (size_t)st.st_size;
 
     buffer_need_bytes(wb, file_size + 1);
 

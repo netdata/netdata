@@ -4,47 +4,48 @@
     "title": "Docker collector configuration.",
     "type": "object",
     "properties": {
+      "address": {
+        "title": "Address",
+        "description": "Docker daemon address: a Unix socket (`unix://` and a path) or a TCP endpoint (`tcp://` and a host and port).",
+        "type": "string",
+        "default": "unix:///var/run/docker.sock"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Docker API request timeout, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "container_selector": {
+        "title": "Container selector",
+        "description": "Names of the containers that get their own charts, as a [simple pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). Leave empty to chart every container; the totals always count every container.",
+        "type": "string",
+        "default": "*"
+      },
+      "collect_container_size": {
+        "title": "Collect writable layer size",
+        "description": "Adds a chart of each container's writable layer size. Docker computes the sizes on every collection, which can cost the daemon significant CPU and disk I/O.",
+        "type": "boolean",
+        "default": false
+      },
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, measured in seconds.",
+        "description": "Data collection interval, in seconds.",
         "type": "integer",
         "minimum": 1,
         "default": 10
       },
       "autodetection_retry": {
         "title": "Detection retry",
-        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
-        "default": 60
-      },
-      "address": {
-        "title": "Address",
-        "description": "Docker daemon's Unix or TCP (listening address) socket.",
-        "type": "string",
-        "default": "unix:///var/run/docker.sock"
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
-        "type": "number",
-        "default": 2
-      },
-      "container_selector": {
-        "title": "Container Selector",
-        "description": "[Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor. Leave empty to collect metrics for all containers.",
-        "type": "string",
-        "default": "*"
-      },
-      "collect_container_size": {
-        "title": "Collect container size",
-        "description": "Collect container writable layer size.",
-        "type": "boolean",
-        "default": false
+        "default": 0
       },
       "vnode": {
-        "title": "Vnode",
-        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       }
     },
@@ -53,17 +54,53 @@
     ]
   },
   "uiSchema": {
-    "autodetection_retry": {
-      "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially, with the value of 60 meaning it retries to start data collection jobs every 60 seconds, while setting it to 0 disables this retry mechanism entirely."
-    },
-    "vnode": {
-      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
-    },
     "address": {
-      "ui:help": "Use `unix://{path_to_socket}` for Unix socket or `tcp://{ip}:{port}` for TCP socket."
+      "ui:help": "When the address is left at the default and the Agent's environment sets `DOCKER_HOST`, the collector connects to `DOCKER_HOST` instead. The Netdata container image sets it automatically."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "container_selector": {
+      "ui:help": "Separate patterns with spaces and prefix a pattern with `!` to exclude the names it matches; the first matching pattern decides. For example, `!test-* *` charts every container except those whose names start with `test-`.\n\nA container labeled `netdata.cloud/ignore=true` gets no charts of its own, whatever the selector matches."
+    },
+    "autodetection_retry": {
+      "ui:help": "The job fails to start when the Docker daemon is not running or its socket is not accessible. Set a retry interval if Docker may start after Netdata."
+    },
+    "vnode": {
+      "ui:placeholder": "my-vnode",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Target",
+          "fields": [
+            "address",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Containers",
+          "fields": [
+            "container_selector",
+            "collect_container_size"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
     }
   }
 }

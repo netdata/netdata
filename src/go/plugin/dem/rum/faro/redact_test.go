@@ -151,12 +151,18 @@ func TestRedactURLRemovesControlsJoinedByRemoval(t *testing.T) {
 // form are not undone one round at a time.
 func TestRedactURLJoinedControlsCostOnePass(t *testing.T) {
 	const n = 8000
-	raw := "https://example.org/" + strings.Repeat("%C2", n) + "%00" + strings.Repeat("%85", n) + "/token=hunter2"
+	path := "/" + strings.Repeat("%C2", n) + "%00" + strings.Repeat("%85", n) + "/token=hunter2"
 	var o Options
-	var got string
-	allocs := testing.AllocsPerRun(1, func() { got = o.cleanURL(raw) })
-	assert.Equal(t, "https://example.org//token=[REDACTED]", got)
-	assert.Less(t, allocs, 100.0, "allocations must not grow with the number of joins")
+	assert.Equal(t, "https://example.org//token=[REDACTED]", o.cleanURL("https://example.org"+path))
+
+	plain, err := url.PathUnescape(path)
+	require.NoError(t, err)
+
+	// Measure join removal directly because Go may discard pooled regexp state under -race.
+	var joined string
+	allocs := testing.AllocsPerRun(10, func() { joined, _ = withoutJoins(plain) })
+	assert.Equal(t, "/\x00/token=hunter2", joined)
+	assert.Less(t, allocs, 64.0, "join removal must avoid allocating for each join")
 }
 
 // Whatever escapes, control characters and joins a path holds, the stored URL

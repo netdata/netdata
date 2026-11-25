@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # network-viewer: the socket and container topology collector, and its
-# two test binaries.
+# three test binaries.
 #
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
@@ -10,7 +10,7 @@
 # next to the per-OS list(APPEND) block that assembles them. They sit above
 # the guard, so they are defined unconditionally.
 #
-# The two test targets sit inside the plugin's own guard, so they stay with
+# The three test targets sit inside the plugin's own guard, so they stay with
 # it rather than moving to NetdataTests.cmake.
 #
 # The i386 fat-LTO workaround below reaches out to judy, libnetdata, netipc
@@ -138,6 +138,19 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                         src/collectors/common-cgroups/cgroup-topology-rules.c
                         src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
                 target_link_libraries(network-viewer-topology-containers-test libnetdata)
+
+                add_executable(network-viewer-topology-actors-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_actors.c
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
+                target_compile_options(network-viewer-topology-actors-test PRIVATE
+                                       "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+                target_include_directories(network-viewer-topology-actors-test PRIVATE
+                                           "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+                target_link_libraries(network-viewer-topology-actors-test libnetdata
+                                      "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
         endif()
 
         netdata_add_deb_copyright(plugin-network-viewer netdata-plugin-network-viewer)

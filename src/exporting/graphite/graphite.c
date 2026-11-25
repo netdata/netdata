@@ -26,7 +26,7 @@ int init_graphite_instance(struct instance *instance)
 
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = format_host_labels_graphite_plaintext;
-    instance->start_chart_formatting = NULL;
+    instance->start_chart_formatting = format_chart_graphite_plaintext;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_graphite_plaintext;
@@ -109,53 +109,52 @@ static void buffer_strcat_graphite_metric_path_value(BUFFER *wb, const char *src
     buffer_overflow_check(wb);
 }
 
-static void format_graphite_metric_prefix(
-    struct instance *instance,
-    const char *chart_name,
-    const char *dimension_name) {
-    buffer_fast_strcat(
-        instance->buffer,
-        buffer_tostring(instance->metric_prefix_buffer),
-        buffer_strlen(instance->metric_prefix_buffer));
-    buffer_sprintf(
-        instance->buffer,
-        ".%s.%s%s ",
-        chart_name,
-        dimension_name,
-        instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
+// The part of a record that depends only on the host and the chart: "<prefix>.<hostname>.<chart>.".
+static void format_graphite_chart_prefix(BUFFER *wb, BUFFER *metric_prefix, const char *chart_name) {
+    buffer_memcat(wb, buffer_tostring(metric_prefix), buffer_strlen(metric_prefix));
+    buffer_putc(wb, '.');
+    buffer_strcat(wb, chart_name);
+    buffer_putc(wb, '.');
 }
 
-static void format_graphite_metric_double(
+// Everything of a record up to the value: the chart part, the dimension and the host labels.
+static void format_graphite_record_start(struct instance *instance, const char *dimension_name, size_t dimension_len) {
+    BUFFER *wb = instance->buffer;
+    BUFFER *chart_prefix = instance->chart_prefix_buffer;
+
+    buffer_memcat(wb, buffer_tostring(chart_prefix), buffer_strlen(chart_prefix));
+    buffer_memcat(wb, dimension_name, dimension_len);
+    if(instance->labels_buffer)
+        buffer_memcat(wb, buffer_tostring(instance->labels_buffer), buffer_strlen(instance->labels_buffer));
+    buffer_putc(wb, ' ');
+}
+
+static void format_graphite_record_end(BUFFER *wb, time_t timestamp) {
+    buffer_putc(wb, ' ');
+    buffer_print_uint64(wb, (uint64_t)timestamp);
+    buffer_putc(wb, '\n');
+}
+
+static void format_graphite_record_double(
     struct instance *instance,
-    const char *chart_name,
     const char *dimension_name,
+    size_t dimension_len,
     NETDATA_DOUBLE value,
-    unsigned long long timestamp) {
-    format_graphite_metric_prefix(instance, chart_name, dimension_name);
-    buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT " %llu\n", value, timestamp);
+    time_t timestamp) {
+    format_graphite_record_start(instance, dimension_name, dimension_len);
+    buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, value);
+    format_graphite_record_end(instance->buffer, timestamp);
 }
 
-static void format_graphite_metric_integer(
+static void format_graphite_record_integer(
     struct instance *instance,
-    const char *chart_name,
     const char *dimension_name,
-    collected_number value,
-    unsigned long long timestamp) {
-    format_graphite_metric_prefix(instance, chart_name, dimension_name);
-    buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT " %llu\n", value, timestamp);
-}
-
-static int format_graphite_metric_stored(
-    struct instance *instance,
-    const char *chart_name,
-    const char *dimension_name,
-    NETDATA_DOUBLE value,
-    unsigned long long timestamp) {
-    if(isnan(value))
-        return 0;
-
-    format_graphite_metric_double(instance, chart_name, dimension_name, value, timestamp);
-    return 0;
+    size_t dimension_len,
+    int64_t value,
+    time_t timestamp) {
+    format_graphite_record_start(instance, dimension_name, dimension_len);
+    buffer_print_int64(instance->buffer, value);
+    format_graphite_record_end(instance->buffer, timestamp);
 }
 
 /**
@@ -198,6 +197,49 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
 }
 
 /**
+ * Start a chart for Graphite connector
+ *
+ * The chart part of the records is the same for all dimensions of a chart. It is built once, by the first record
+ * the chart writes, and reused for the rest: a chart whose values are all skipped reads none of its metadata.
+ *
+ * @param instance an instance data structure.
+ * @param st a chart.
+ * @return Always returns 0.
+ */
+int format_chart_graphite_plaintext(struct instance *instance, RRDSET *st __maybe_unused)
+{
+    if (instance->chart_prefix_buffer)
+        buffer_flush(instance->chart_prefix_buffer);
+
+    return 0;
+}
+
+static void graphite_chart_prefix_build(struct instance *instance, RRDSET *st)
+{
+    if (!instance->chart_prefix_buffer)
+        instance->chart_prefix_buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+
+    if (buffer_strlen(instance->chart_prefix_buffer))
+        return;
+
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
+    exporting_name_copy(
+        chart_name,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
+        RRD_ID_LENGTH_MAX);
+
+    format_graphite_chart_prefix(instance->chart_prefix_buffer, instance->metric_prefix_buffer, chart_name);
+}
+
+static size_t graphite_dimension_name_copy(struct instance *instance, RRDDIM *rd, char *dst)
+{
+    return exporting_name_copy(
+        dst,
+        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
+        RRD_ID_LENGTH_MAX);
+}
+
+/**
  * Format dimension using collected data for Graphite connector
  *
  * @param instance an instance data structure.
@@ -206,36 +248,41 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
  */
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
-    char chart_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        RRD_ID_LENGTH_MAX);
+    graphite_chart_prefix_build(instance, rd->rrdset);
 
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-        RRD_ID_LENGTH_MAX);
+    size_t dimension_len = graphite_dimension_name_copy(instance, rd, dimension_name);
 
     if(rrddim_is_float(rd))
-        format_graphite_metric_double(
+        format_graphite_record_double(
             instance,
-            chart_name,
             dimension_name,
+            dimension_len,
             rrddim_last_collected_as_double(rd),
-            (unsigned long long)rd->collector.last_collected_time.tv_sec);
+            rd->collector.last_collected_time.tv_sec);
     else
-        format_graphite_metric_integer(
+        format_graphite_record_integer(
             instance,
-            chart_name,
             dimension_name,
-            (collected_number)rrddim_last_collected_raw_int(rd),
-            (unsigned long long)rd->collector.last_collected_time.tv_sec);
+            dimension_len,
+            rrddim_last_collected_raw_int(rd),
+            rd->collector.last_collected_time.tv_sec);
 
     return 0;
+}
+
+static void format_dimension_stored_graphite_record(
+    struct instance *instance, RRDDIM *rd, NETDATA_DOUBLE value, time_t last_t)
+{
+    if(isnan(value))
+        return;
+
+    graphite_chart_prefix_build(instance, rd->rrdset);
+
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    size_t dimension_len = graphite_dimension_name_copy(instance, rd, dimension_name);
+
+    format_graphite_record_double(instance, dimension_name, dimension_len, value, last_t);
 }
 
 /**
@@ -247,29 +294,10 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
  */
 int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    RRDSET *st = rd->rrdset;
-
-    char chart_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        chart_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        RRD_ID_LENGTH_MAX);
-
-    char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    exporting_name_copy(
-        dimension_name,
-        (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-        RRD_ID_LENGTH_MAX);
-
     time_t last_t = 0;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
-
-    return format_graphite_metric_stored(
-        instance,
-        chart_name,
-        dimension_name,
-        value,
-        (unsigned long long)last_t);
+    format_dimension_stored_graphite_record(instance, rd, value, last_t);
+    return 0;
 }
 
 /**
@@ -303,6 +331,28 @@ typedef enum {
     GRAPHITE_TEST_STORED,
 } GRAPHITE_TEST_BRANCH;
 
+// Compose the record writers the way the callbacks do, for a chart named "chart.name" and a dimension named
+// "dimension.name".
+static void graphite_unittest_record(struct instance *instance, GRAPHITE_TEST_BRANCH branch) {
+    if(!instance->chart_prefix_buffer)
+        instance->chart_prefix_buffer = buffer_create(0, NULL);
+    buffer_flush(instance->chart_prefix_buffer);
+    format_graphite_chart_prefix(instance->chart_prefix_buffer, instance->metric_prefix_buffer, "chart.name");
+
+    const char *dimension = "dimension.name";
+    switch(branch) {
+        case GRAPHITE_TEST_COLLECTED_FLOAT:
+            format_graphite_record_double(instance, dimension, strlen(dimension), 1.5, 42);
+            break;
+        case GRAPHITE_TEST_COLLECTED_INTEGER:
+            format_graphite_record_integer(instance, dimension, strlen(dimension), 15, 42);
+            break;
+        case GRAPHITE_TEST_STORED:
+            format_graphite_record_double(instance, dimension, strlen(dimension), -2.5, 42);
+            break;
+    }
+}
+
 static int graphite_unittest_case(
     const char *description,
     GRAPHITE_TEST_BRANCH branch,
@@ -322,17 +372,7 @@ static int graphite_unittest_case(
     buffer_strcat_graphite_metric_path_value(instance.metric_prefix_buffer, hostname);
     buffer_strcat(instance.labels_buffer, labels);
 
-    switch(branch) {
-        case GRAPHITE_TEST_COLLECTED_FLOAT:
-            format_graphite_metric_double(&instance, "chart.name", "dimension.name", 1.5, 42);
-            break;
-        case GRAPHITE_TEST_COLLECTED_INTEGER:
-            format_graphite_metric_integer(&instance, "chart.name", "dimension.name", 15, 42);
-            break;
-        case GRAPHITE_TEST_STORED:
-            format_graphite_metric_stored(&instance, "chart.name", "dimension.name", -2.5, 42);
-            break;
-    }
+    graphite_unittest_record(&instance, branch);
 
     int errors = 0;
     if(strcmp(buffer_tostring(instance.buffer), expected) != 0) {
@@ -361,6 +401,7 @@ static int graphite_unittest_case(
         errors++;
     }
 
+    buffer_free(instance.chart_prefix_buffer);
     buffer_free(instance.labels_buffer);
     buffer_free(instance.metric_prefix_buffer);
     buffer_free(instance.buffer);
@@ -415,6 +456,132 @@ static int graphite_unicode_whitespace_unittest(void) {
     return errors;
 }
 
+static RRDSET *graphite_unittest_chart(const char *id, const char *name) {
+    RRDSET *st = callocz(1, sizeof(*st));
+    st->id = string_strdupz(id);
+    st->name = string_strdupz(name);
+    return st;
+}
+
+static void graphite_unittest_chart_free(RRDSET *st) {
+    string_freez(st->id);
+    string_freez(st->name);
+    freez(st);
+}
+
+// a NULL name leaves rd->name unset, which makes the connector fall back to the id
+static void graphite_unittest_dimension(
+    struct instance *instance, RRDSET *st, const char *id, const char *name,
+    bool is_float, int64_t int_value, NETDATA_DOUBLE float_value, time_t timestamp) {
+    RRDDIM rd = { 0 };
+    rd.rrdset = st;
+    rd.id = string_strdupz(id);
+    rd.name = name ? string_strdupz(name) : NULL;
+    if(is_float) {
+        rd.collector.options |= RRDDIM_OPTION_VALUE_FLOAT;
+        rd.collector.collected.f.last_collected_value = float_value;
+    }
+    else
+        rd.collector.collected.i.last_collected_value = (collected_number)int_value;
+    rd.collector.last_collected_time.tv_sec = timestamp;
+
+    instance->metric_formatting(instance, &rd);
+
+    string_freez(rd.id);
+    string_freez(rd.name);
+}
+
+static void graphite_unittest_stored(
+    struct instance *instance, RRDSET *st, const char *id, NETDATA_DOUBLE value, time_t last_t) {
+    RRDDIM rd = { 0 };
+    rd.rrdset = st;
+    rd.id = string_strdupz(id);
+    format_dimension_stored_graphite_record(instance, &rd, value, last_t);
+    string_freez(rd.id);
+}
+
+// Drive the real chart and metric callbacks across two hosts and four charts, on the collected and the stored paths,
+// and compare the bytes with the record format the connector has always produced.
+static int graphite_callbacks_unittest(void) {
+    int errors = 0;
+
+    struct instance instance = { 0 };
+    instance.config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+    instance.start_chart_formatting = format_chart_graphite_plaintext;
+    instance.metric_formatting = format_dimension_collected_graphite_plaintext;
+    instance.buffer = buffer_create(0, NULL);
+    instance.metric_prefix_buffer = buffer_create(0, NULL);
+    instance.labels_buffer = buffer_create(0, NULL);
+
+    // first host: labels and names on
+    buffer_strcat(instance.metric_prefix_buffer, "netdata.host1");
+    buffer_strcat(instance.labels_buffer, ";k=v");
+    RRDSET *st1 = graphite_unittest_chart("a.b", "a name");
+    instance.start_chart_formatting(&instance, st1);
+    graphite_unittest_dimension(&instance, st1, "d1", "n 1", false, INT64_MIN, 0.0, 1700000000);
+    // the chart part is built once per chart: a rename during the chart's pass reaches the next pass only
+    string_freez(st1->name);
+    st1->name = string_strdupz("renamed");
+    graphite_unittest_dimension(&instance, st1, "d2", "n2", true, 0, 2.5, 1700000001);
+    graphite_unittest_dimension(&instance, st1, "d3", NULL, false, 42, 0.0, -1);
+
+    // second host: labels and names off
+    instance.config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED;
+    buffer_flush(instance.metric_prefix_buffer);
+    buffer_strcat(instance.metric_prefix_buffer, "netdata.host2");
+    buffer_flush(instance.labels_buffer);
+    RRDSET *st2 = graphite_unittest_chart("c.d", "c name");
+    instance.start_chart_formatting(&instance, st2);
+    graphite_unittest_dimension(&instance, st2, "e1", "m1", false, INT64_MAX, 0.0, 7);
+
+    const char *expected =
+        "netdata.host1.a_name.n_1;k=v -9223372036854775808 1700000000\n"
+        "netdata.host1.a_name.n2;k=v 2.5000000 1700000001\n"
+        "netdata.host1.a_name.d3;k=v 42 18446744073709551615\n"
+        "netdata.host2.c.d.e1 9223372036854775807 7\n";
+    if(strcmp(buffer_tostring(instance.buffer), expected) != 0) {
+        fprintf(stderr, "Graphite callbacks output mismatch\nexpected: %s\nactual:   %s\n",
+                expected, buffer_tostring(instance.buffer));
+        errors++;
+    }
+
+    // stored data source: a skipped (NaN) value writes nothing and does not build the chart part
+    buffer_flush(instance.buffer);
+    instance.config.options = EXPORTING_SOURCE_DATA_AVERAGE;
+    RRDSET *st3 = graphite_unittest_chart("e.f", "e name");
+    instance.start_chart_formatting(&instance, st3);
+    graphite_unittest_stored(&instance, st3, "g1", NAN, 10);
+    if(buffer_strlen(instance.chart_prefix_buffer) || buffer_strlen((BUFFER *)instance.buffer)) {
+        fprintf(stderr, "Graphite stored: a skipped value wrote bytes or built the chart part\n");
+        errors++;
+    }
+    graphite_unittest_stored(&instance, st3, "g2", -1.25, 0);
+    graphite_unittest_stored(&instance, st3, "g3", NAN, 12);
+    graphite_unittest_stored(&instance, st3, "g4", 3.0, -1);
+
+    // a chart whose values are all skipped writes nothing
+    instance.start_chart_formatting(&instance, st2);
+    graphite_unittest_stored(&instance, st2, "e1", NAN, 14);
+
+    expected =
+        "netdata.host2.e.f.g2 -1.2500000 0\n"
+        "netdata.host2.e.f.g4 3.0000000 18446744073709551615\n";
+    if(strcmp(buffer_tostring(instance.buffer), expected) != 0 || buffer_strlen(instance.chart_prefix_buffer)) {
+        fprintf(stderr, "Graphite stored records mismatch\nexpected: %s\nactual:   %s\n",
+                expected, buffer_tostring(instance.buffer));
+        errors++;
+    }
+
+    graphite_unittest_chart_free(st1);
+    graphite_unittest_chart_free(st2);
+    graphite_unittest_chart_free(st3);
+    buffer_free(instance.buffer);
+    buffer_free(instance.metric_prefix_buffer);
+    buffer_free(instance.labels_buffer);
+    buffer_free(instance.chart_prefix_buffer);
+    return errors;
+}
+
 int exporting_graphite_unittest(void) {
     int errors = 0;
 
@@ -442,18 +609,6 @@ int exporting_graphite_unittest(void) {
         "",
         "netdata.localhost.chart.name.dimension.name -2.5000000 42\n");
 
-    struct instance nan_instance = { 0 };
-    BUFFER *nan_wb = buffer_create(0, NULL);
-    nan_instance.buffer = nan_wb;
-    nan_instance.metric_prefix_buffer = buffer_create(0, NULL);
-    buffer_strcat(nan_instance.metric_prefix_buffer, "netdata.localhost");
-    if(format_graphite_metric_stored(&nan_instance, "chart.name", "dimension.name", NAN, 42) != 0 ||
-       buffer_strlen(nan_wb) != 0) {
-        fprintf(stderr, "Graphite stored NaN handling changed\n");
-        errors++;
-    }
-    buffer_free(nan_instance.metric_prefix_buffer);
-    buffer_free(nan_wb);
 
     errors += graphite_unittest_case(
         "accepted punctuation and UTF-8",
@@ -464,6 +619,7 @@ int exporting_graphite_unittest(void) {
         "Netdata-A_9/part.:@[]+()Ε.Host-A_9/path.example:@[]+()λλάδα.chart.name.dimension.name 1.5000000 42\n");
 
     errors += graphite_unicode_whitespace_unittest();
+    errors += graphite_callbacks_unittest();
 
     errors += graphite_unittest_case(
         "hostile metadata",
@@ -530,7 +686,7 @@ int exporting_graphite_unittest(void) {
     buffer_strcat_graphite_metric_path_value(instance.metric_prefix_buffer, long_prefix);
     buffer_putc(instance.metric_prefix_buffer, '.');
     buffer_strcat_graphite_metric_path_value(instance.metric_prefix_buffer, long_hostname);
-    format_graphite_metric_double(&instance, "chart.name", "dimension.name", 1.5, 42);
+    graphite_unittest_record(&instance, GRAPHITE_TEST_COLLECTED_FLOAT);
 
     const size_t expected_length = strlen(long_prefix) + 1 + strlen(long_hostname) +
                                    strlen(".chart.name.dimension.name 1.5000000 42\n");
@@ -541,6 +697,7 @@ int exporting_graphite_unittest(void) {
         fprintf(stderr, "Graphite long metadata was truncated or retained a protocol delimiter\n");
         errors++;
     }
+    buffer_free(instance.chart_prefix_buffer);
     buffer_free(instance.metric_prefix_buffer);
     buffer_free(instance.buffer);
 
@@ -583,7 +740,7 @@ int exporting_graphite_unittest(void) {
     child.hostname = string_strdupz("renamed child");
     string_freez(old_hostname);
 
-    format_graphite_metric_double(&child_instance, "chart.name", "dimension.name", 1.5, 42);
+    graphite_unittest_record(&child_instance, GRAPHITE_TEST_COLLECTED_FLOAT);
     if(strcmp(
            buffer_tostring(child_instance.buffer),
            "netdata.child_host.chart.name.dimension.name 1.5000000 42\n") != 0) {
@@ -591,6 +748,7 @@ int exporting_graphite_unittest(void) {
         errors++;
     }
 
+    buffer_free(child_instance.chart_prefix_buffer);
     buffer_free(child_instance.labels_buffer);
     buffer_free(child_instance.metric_prefix_buffer);
     buffer_free(child_instance.buffer);

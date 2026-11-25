@@ -5,55 +5,74 @@ package docker
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	typesContainer "github.com/moby/moby/api/types/container"
+	typesSystem "github.com/moby/moby/api/types/system"
 	docker "github.com/moby/moby/client"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) error {
+	state, err := c.queryDaemon(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.writeMetrics(state)
+
+	return nil
+}
+
+// daemonState is what one collection reads from the Docker daemon. Images come from the cached snapshot in c.images.
+type daemonState struct {
+	info       typesSystem.Info
+	containers []listedContainer
+}
+
+// listedContainer is a container as returned by the list request filtered by its health status.
+type listedContainer struct {
+	typesContainer.Summary
+	healthStatus typesContainer.HealthStatus
+}
+
+// queryDaemon makes every Docker API call of a collection, so a failed call aborts the collection before any metric
+// is written.
+func (c *Collector) queryDaemon(ctx context.Context) (*daemonState, error) {
 	if c.client == nil {
 		client, err := c.newClient(c.Config)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("creating Docker client: %w", err)
 		}
 		c.client = client
 	}
 
-	mx := make(map[string]int64)
-
-	if err := c.collectInfo(mx); err != nil {
-		return nil, err
-	}
-	// collectContainers adds and removes charts, so every call that can fail the collection runs before it.
-	if err := c.refreshImages(); err != nil {
-		return nil, err
-	}
-	usedImages, err := c.collectContainers(mx)
+	info, err := c.systemInfo(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting system info: %w", err)
 	}
-	c.collectImages(mx, usedImages)
+	if err := c.refreshImages(ctx); err != nil {
+		return nil, fmt.Errorf("listing images: %w", err)
+	}
+	containers, err := c.listContainers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing containers: %w", err)
+	}
 
-	return mx, nil
+	return &daemonState{
+		info:       info,
+		containers: containers,
+	}, nil
 }
 
-func (c *Collector) collectInfo(mx map[string]int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+func (c *Collector) systemInfo(ctx context.Context) (typesSystem.Info, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
 	result, err := c.client.Info(ctx, docker.InfoOptions{})
 	if err != nil {
-		return err
+		return typesSystem.Info{}, err
 	}
-	info := result.Info
-
-	mx["containers_state_running"] = int64(info.ContainersRunning)
-	mx["containers_state_paused"] = int64(info.ContainersPaused)
-	mx["containers_state_exited"] = int64(info.ContainersStopped)
-
-	return nil
+	return result.Info, nil
 }
 
 // On Docker Engine 29+ with the containerd image store, listing images can cost the daemon over a second of CPU time
@@ -65,13 +84,13 @@ type imagesSnapshot struct {
 	size int64
 }
 
-func (c *Collector) refreshImages() error {
+func (c *Collector) refreshImages(ctx context.Context) error {
 	now := c.now()
 	if now.Before(c.imagesNextRefresh) {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
 	result, err := c.client.ImageList(ctx, docker.ImageListOptions{})
@@ -90,143 +109,48 @@ func (c *Collector) refreshImages() error {
 	return nil
 }
 
-// collectImages counts an image as active when a container in usedImages (keyed by image ID) was created from it.
-// The daemon's own per-image container count is not used: it is -1 when the negotiated API is older than 1.51.
-func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]bool) {
-	mx["images_size"] = c.images.size
-	mx["images_dangling"] = 0
-	mx["images_active"] = 0
-
-	for _, id := range c.images.ids {
-		if usedImages[id] {
-			mx["images_active"]++
-		} else {
-			mx["images_dangling"]++
-		}
-	}
+var containerHealthStatuses = []typesContainer.HealthStatus{
+	typesContainer.Healthy,
+	typesContainer.Unhealthy,
+	typesContainer.Starting,
+	typesContainer.NoHealthcheck,
 }
 
-var (
-	containerHealthStatuses = []typesContainer.HealthStatus{
-		typesContainer.Healthy,
-		typesContainer.Unhealthy,
-		typesContainer.Starting,
-		typesContainer.NoHealthcheck,
-	}
-	containerStates = []string{
-		"created",
-		"running",
-		"paused",
-		"restarting",
-		"removing",
-		"exited",
-		"dead",
-	}
-)
-
-func (c *Collector) collectContainers(mx map[string]int64) (map[string]bool, error) {
-	containerSet := make(map[typesContainer.HealthStatus][]typesContainer.Summary)
+// listContainers lists the containers once per health status, in containerHealthStatuses order, so each container
+// comes with its health status.
+func (c *Collector) listContainers(ctx context.Context) ([]listedContainer, error) {
+	var containers []listedContainer
 
 	for _, status := range containerHealthStatuses {
-		if err := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
-			defer cancel()
-
-			result, err := c.client.ContainerList(ctx, docker.ContainerListOptions{
-				All:     true,
-				Filters: make(docker.Filters).Add("health", string(status)),
-				Size:    c.CollectContainerSize,
-			})
-			if err != nil {
-				return err
-			}
-			containerSet[status] = result.Items
-			return nil
-
-		}(); err != nil {
+		items, err := c.listContainersWithHealth(ctx, status)
+		if err != nil {
 			return nil, err
 		}
-	}
-
-	seen := make(map[string]bool)
-	usedImages := make(map[string]bool)
-
-	for _, s := range containerHealthStatuses {
-		mx["containers_health_status_"+string(s)] = 0
-	}
-	mx["containers_health_status_not_running_unhealthy"] = 0
-
-	for status, containers := range containerSet {
-		statusKey := string(status)
-		if status != typesContainer.Unhealthy {
-			mx["containers_health_status_"+statusKey] = int64(len(containers))
-		}
-
-		for _, cntr := range containers {
-			usedImages[cntr.ImageID] = true
-
-			state := string(cntr.State)
-			if status == typesContainer.Unhealthy {
-				if cntr.State == "running" {
-					mx["containers_health_status_"+statusKey] += 1
-				} else {
-					mx["containers_health_status_not_running_unhealthy"] += 1
-				}
-			}
-
-			if hasIgnoreLabel(cntr) {
-				continue
-			}
-
-			if len(cntr.Names) == 0 {
-				continue
-			}
-
-			name := strings.TrimPrefix(cntr.Names[0], "/")
-
-			if c.cntrSr != nil && !c.cntrSr.MatchString(name) {
-				continue
-			}
-
-			seen[name] = true
-
-			if !c.containers[name] {
-				c.containers[name] = true
-				c.addContainerCharts(name, cntr.Image)
-			}
-
-			px := fmt.Sprintf("container_%s_", name)
-
-			for _, s := range containerHealthStatuses {
-				mx[px+"health_status_"+string(s)] = 0
-			}
-			mx[px+"health_status_not_running_unhealthy"] = 0
-			for _, s := range containerStates {
-				mx[px+"state_"+s] = 0
-			}
-
-			if status == typesContainer.Unhealthy && cntr.State != "running" {
-				mx[px+"health_status_not_running_unhealthy"] += 1
-			} else {
-				mx[px+"health_status_"+statusKey] = 1
-			}
-			mx[px+"state_"+state] = 1
-			mx[px+"size_rw"] = cntr.SizeRw
-			mx[px+"size_root_fs"] = cntr.SizeRootFs
+		for _, item := range items {
+			containers = append(containers, listedContainer{
+				Summary:      item,
+				healthStatus: status,
+			})
 		}
 	}
 
-	for name := range c.containers {
-		if !seen[name] {
-			delete(c.containers, name)
-			c.removeContainerCharts(name)
-		}
-	}
-
-	return usedImages, nil
+	return containers, nil
 }
 
-func hasIgnoreLabel(cntr typesContainer.Summary) bool {
-	v := cntr.Labels["netdata.cloud/ignore"]
-	return strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+func (c *Collector) listContainersWithHealth(
+	ctx context.Context,
+	status typesContainer.HealthStatus,
+) ([]typesContainer.Summary, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+	defer cancel()
+
+	result, err := c.client.ContainerList(ctx, docker.ContainerListOptions{
+		All:     true,
+		Filters: make(docker.Filters).Add("health", string(status)),
+		Size:    c.CollectContainerSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
