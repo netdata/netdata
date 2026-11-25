@@ -3,12 +3,17 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-// *out is set only when the value is a REG_DWORD
+// *out is set only when a 4-byte REG_DWORD is read
 long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name)
 {
     DWORD value = 0;
     DWORD length = sizeof(value);
     long ret = RegGetValueA(lKey, NULL, name, RRF_RT_REG_DWORD, NULL, &value, &length);
+
+    // RegGetValue accepts a REG_DWORD stored with fewer than 4 bytes
+    if (ret == ERROR_SUCCESS && length != sizeof(value))
+        ret = ERROR_INVALID_DATA;
+
     if (ret == ERROR_SUCCESS)
         *out = value;
 
@@ -155,6 +160,7 @@ int netdata_registry_unittest(void) {
        !registry_test_set_unterminated(key, L"sz_no_nul_8", L"abcdefgh", 8) ||
        !registry_test_set(key, "multi_sz", REG_MULTI_SZ, "a\0b\0", 5) ||
        !registry_test_set(key, "dword", REG_DWORD, &dword, sizeof(dword)) ||
+       !registry_test_set(key, "dword_2", REG_DWORD, &dword, 2) ||
        !registry_test_set(key, "binary4", REG_BINARY, binary, sizeof(binary)) ||
        !registry_test_set(key, "sz_4", REG_SZ, "123", 4))
         errors++;
@@ -166,6 +172,7 @@ int netdata_registry_unittest(void) {
         errors += registry_test_string(key, "dword", 16, false, NULL);              // wrong type
         errors += registry_test_string(key, "missing", 16, false, NULL);
         errors += registry_test_dword(key, "dword", true, 42);
+        errors += registry_test_dword(key, "dword_2", false, 0);                    // right type, short
         errors += registry_test_dword(key, "binary4", false, 0);                    // wrong type, right size
         errors += registry_test_dword(key, "sz_4", false, 0);                       // wrong type, right size
         errors += registry_test_dword(key, "missing", false, 0);
