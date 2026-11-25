@@ -63,6 +63,7 @@ void register_libuv_worker_job_names(void) {
     worker_register_job_name(UV_EVENT_DBENGINE_QUIESCE, "dbengine quiesce");
     worker_register_job_name(UV_EVENT_DBENGINE_SHUTDOWN, "dbengine shutdown");
     worker_register_job_name(UV_EVENT_DBENGINE_MRG_LOAD, "jv2 mrg load");
+    worker_register_job_name(UV_EVENT_DBENGINE_RETENTION_SUMMARY, "retention summary build");
 
     // metadata
     worker_register_job_name(UV_EVENT_HOST_CONTEXT_LOAD, "metadata load host context");
