@@ -102,7 +102,7 @@ static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemI
                                                     char *key)
 {
     char cpuData[256];
-    long ret = netdata_registry_get_string_from_open_key(cpuData, 255, lKey, key);
+    long ret = netdata_registry_get_string_from_open_key(cpuData, sizeof(cpuData), lKey, key);
     rrdhost_system_info_set_by_name(systemInfo,
                                            variable,
                                            (ret == ERROR_SUCCESS) ? cpuData : NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
@@ -229,7 +229,7 @@ static DWORD netdata_windows_get_current_build()
 {
     char cBuild[64] = { 0 };
     if (!netdata_registry_get_string(
-            cBuild, 63, HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild"))
+            cBuild, sizeof(cBuild), HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild"))
         return 0;
 
     errno_clear();
@@ -517,11 +517,11 @@ static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
     DWORD ubr = 0;
     DWORD build = netdata_windows_get_current_build();
     bool has_ubr = netdata_windows_get_update_revision(&ubr);
-    (void)netdata_registry_get_string(product_name, sizeof(product_name) - 1, HKEY_LOCAL_MACHINE,
+    (void)netdata_registry_get_string(product_name, sizeof(product_name), HKEY_LOCAL_MACHINE,
                                       "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "ProductName");
-    (void)netdata_registry_get_string(display_version, sizeof(display_version) - 1, HKEY_LOCAL_MACHINE,
+    (void)netdata_registry_get_string(display_version, sizeof(display_version), HKEY_LOCAL_MACHINE,
                                       "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "DisplayVersion");
-    (void)netdata_registry_get_string(edition_id, sizeof(edition_id) - 1, HKEY_LOCAL_MACHINE,
+    (void)netdata_registry_get_string(edition_id, sizeof(edition_id), HKEY_LOCAL_MACHINE,
                                       "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "EditionID");
 
     netdata_windows_discover_os_version(info->id, sizeof(info->id), build, product_name, display_version);
