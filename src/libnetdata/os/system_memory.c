@@ -601,7 +601,7 @@ static int sm_cgroup_reader_unittest(void) {
                  "query_total_ram reads the limit again");
 
         ok = sm_fixture_set(usage_file, "3000\n");
-        SM_CHECK(ok && !OS_SYSTEM_MEMORY_OK(os_system_memory_cgroup(&cg, false)), "a failed read returns empty");
+        SM_CHECK(ok && sm_equal(os_system_memory_cgroup(&cg, false), OS_SYSTEM_MEMORY_EMPTY), "a failed read returns empty");
 
         ok = sm_fixture_set(limit_file, "4000\n") && sm_fixture_set(usage_file, "600\n");
         SM_CHECK(ok && sm_equal(os_system_memory_cgroup(&cg, false), (OS_SYSTEM_MEMORY){ 4000, 3400 }),
