@@ -99,11 +99,11 @@ func sanitizeLifecycleError(sanitize func(error) error, err error) (sanitized er
 	return sanitized
 }
 
-func lifecycleLogMessageSanitizer(sanitize func(error) error) func(string) string {
+func lifecycleLogMessageSanitizer(sanitize func(error) error) logger.MessageSanitizer {
 	if sanitize == nil {
 		return nil
 	}
-	return func(message string) string {
+	return func(message string, _ []any) string {
 		return sanitizeLifecycleError(sanitize, errors.New(message)).Error()
 	}
 }

@@ -294,7 +294,7 @@ func (cmf *ConfigModuleFactory) moduleLogger(config confgroup.Config, redact boo
 	if !redact {
 		return log
 	}
-	return log.WithMessageSanitizer(func(message string) string {
+	return log.WithMessageSanitizer(func(message string, _ []any) string {
 		return redactResolvedLifecycleError(errors.New(message)).Error()
 	})
 }
