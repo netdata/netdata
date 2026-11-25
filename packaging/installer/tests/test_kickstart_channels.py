@@ -94,6 +94,8 @@ main
     def test_native_repository_and_version_selection(self):
         for distro, version_id, codename, suffix in [
             ('debian', '12', 'bookworm', '_all.deb'),
+            ('debian', '13', 'trixie', '_all.deb'),
+            ('ubuntu', '24.04', 'noble', '_all.deb'),
             ('fedora', '43', '', '.noarch.rpm'),
             ('opensuse', '15.6', '', '.noarch.rpm'),
         ]:
@@ -122,11 +124,12 @@ printf '%s\\n' "$repoconfig_name" "$REPO_URL_PREFIX" "$NATIVE_VERSION" "$repocon
                     self.assertEqual(lines[0], f'netdata-repo{repo_suffix}')
                     self.assertEqual(lines[1], f'https://repository.netdata.cloud/repos/{repo_path}')
                     native_version = '2.13.0~rc1' if channel == 'preview' else '2.13.0-rc1'
-                    expected_version = f'={native_version}' if distro == 'debian' else f'-{native_version}.x86_64'
+                    is_deb = suffix == '_all.deb'
+                    expected_version = f'={native_version}' if is_deb else f'-{native_version}.x86_64'
                     self.assertEqual(lines[2], expected_version)
-                    self.assertIn(f'netdata-repo{repo_suffix}', lines[3])
-                    self.assertTrue(lines[3].endswith(suffix))
-                    self.assertIn('5-6', lines[3])
+                    artifact_version = f'_5-7+{distro}{version_id}' if is_deb else '-5-6'
+                    self.assertEqual(lines[3].rsplit('/', 1)[-1],
+                                     f'netdata-repo{repo_suffix}{artifact_version}{suffix}')
                     calls = (self.root / 'calls').read_text()
                     self.assertIn(f'netdata{lines[2]}', calls)
                     urls = (self.root / 'urls').read_text()
