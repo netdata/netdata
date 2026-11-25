@@ -137,13 +137,13 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
         bool wall_clock_comes_from_child; (void)wall_clock_comes_from_child;
         if(child_now_str) {
             wall_clock_time = (time_t) str2ull_encoded(child_now_str);
-            tolerance = st->update_every + 1;
+            tolerance = (time_t)st->update_every + 1;
             wall_clock_comes_from_child = true;
         }
 
         if(wall_clock_time <= 0) {
             wall_clock_time = now_realtime_sec();
-            tolerance = st->update_every + 5;
+            tolerance = (time_t)st->update_every + 5;
             wall_clock_comes_from_child = false;
         }
 

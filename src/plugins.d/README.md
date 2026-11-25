@@ -399,7 +399,10 @@ the template is:
 -   `update_every`
 
     overwrite the update frequency set by the server,
-    if empty or missing, the user configured value will be used
+    if empty or missing, the user configured value will be used.
+    It must be at least 1 and small enough that the update frequency of the highest database tier
+    (`update_every` times the tier's grouping) does not exceed 2147483647 seconds. A new chart with an invalid
+    value uses the user configured value instead; an invalid change to an existing chart is ignored.
 
 -   `options`
 

@@ -195,7 +195,7 @@ static time_t test_dbengine_create_metrics(
     time_t time_now = time_start;
     for (size_t c = 0 ; c < CHARTS ; ++c) {
         for (size_t d = 0 ; d < DIMS ; ++d) {
-            storage_engine_store_change_collection_frequency(rd[c][d]->tiers[0].sch, (int)update_every);
+            storage_engine_store_change_collection_frequency(rd[c][d]->tiers[0].sch, (uint32_t)update_every);
 
             // setting these timestamps, to the data collection time, prevents interpolation
             // during data collection, so that our value will be written as-is to the

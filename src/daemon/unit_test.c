@@ -2372,7 +2372,20 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
-    const time_t maximum_update_every = INT32_MAX;
+    // the update every of the last storage tier must fit in INT32_MAX
+    uint32_t grouping = 1;
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        if(st->rrdhost->db[tier].tier_grouping > grouping)
+            grouping = st->rrdhost->db[tier].tier_grouping;
+    const time_t maximum_update_every = INT32_MAX / grouping;
+
+    previous = rrdset_set_update_every_s(st, maximum_update_every + 1);
+    if(previous != original_update_every || st->update_every != original_update_every) {
+        fprintf(stderr, "%s: update every above the tier limit changed chart from %ld to %d\n",
+                __FUNCTION__, (long)previous, st->update_every);
+        rc = 1;
+    }
+
     previous = rrdset_set_update_every_s(st, maximum_update_every);
     if(previous != original_update_every || st->update_every != maximum_update_every) {
         fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
@@ -2382,6 +2395,25 @@ static int test_rrdset_rejects_invalid_update_every(void) {
 
     if(st->update_every != original_update_every)
         rrdset_set_update_every_s(st, original_update_every);
+
+    // a new chart with an invalid update every gets the default one
+    const int invalid_update_every[] = { 0, -1, -1073741824, (int)(maximum_update_every + 1) };
+    size_t invalid_count = sizeof(invalid_update_every) / sizeof(invalid_update_every[0]);
+    if(maximum_update_every == INT32_MAX)
+        invalid_count--; // a single tier: every positive int is valid
+    for(size_t i = 0; i < invalid_count; i++) {
+        char id[64];
+        snprintfz(id, sizeof(id), "unittest-update-every-new-%zu", i);
+        RRDSET *st2 = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1,
+            invalid_update_every[i], RRDSET_TYPE_LINE);
+        if(st2->update_every != original_update_every) {
+            fprintf(stderr, "%s: new chart with update every %d got %d instead of %ld\n",
+                    __FUNCTION__, invalid_update_every[i], st2->update_every, (long)original_update_every);
+            rc = 1;
+        }
+        rrdset_free(st2);
+    }
 
     __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);
     __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);

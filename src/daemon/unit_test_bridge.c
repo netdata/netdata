@@ -16,7 +16,7 @@ NOINLINE void unittest_storage_engine_store_metric(
 }
 
 NOINLINE void unittest_storage_engine_store_change_collection_frequency(
-    STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    STORAGE_COLLECT_HANDLE *sch, uint32_t update_every) {
     storage_engine_store_change_collection_frequency(sch, update_every);
 }
 

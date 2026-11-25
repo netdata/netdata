@@ -41,7 +41,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh);
 
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, uint32_t update_every);
 void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut, NETDATA_DOUBLE n,
                                      NETDATA_DOUBLE min_value,
                                      NETDATA_DOUBLE max_value,

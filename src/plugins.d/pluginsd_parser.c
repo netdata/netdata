@@ -664,8 +664,11 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         priority = str2i(priority_s);
 
     int update_every = parser->user.cd->update_every;
-    if (likely(update_every_s && *update_every_s))
-        update_every = str2i(update_every_s);
+    if (likely(update_every_s && *update_every_s)) {
+        // out of int range is invalid (-1), so it is not narrowed into some other update every
+        long long ue = str2ll(update_every_s, NULL);
+        update_every = (ue >= INT_MIN && ue <= INT_MAX) ? (int)ue : -1;
+    }
     if (unlikely(!update_every))
         update_every = parser->user.cd->update_every;
 

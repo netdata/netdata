@@ -15,7 +15,7 @@ void unittest_storage_engine_store_metric(
     uint16_t anomaly_count,
     SN_FLAGS flags);
 
-void unittest_storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+void unittest_storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, uint32_t update_every);
 void unittest_storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch);
 
 void unittest_storage_engine_query_init(

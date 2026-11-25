@@ -20,8 +20,21 @@ static void rrdset_observe_receiver_update_every(RRDSET *st) {
         ;
 }
 
+// A chart update every is valid when it is positive and the update every of every storage tier of the host
+// (update every x tier grouping) fits in INT32_MAX seconds.
+bool rrdset_update_every_is_valid(RRDHOST *host, time_t update_every_s) {
+    if(update_every_s < 1)
+        return false;
+
+    uint32_t grouping = 1;
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        grouping = MAX(grouping, host->db[tier].tier_grouping);
+
+    return update_every_s <= INT32_MAX / grouping;
+}
+
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
-    if(unlikely(update_every_s <= 0 || update_every_s > INT32_MAX)) {
+    if(unlikely(!rrdset_update_every_is_valid(st->rrdhost, update_every_s))) {
         internal_error(
             true,
             "RRDSET '%s' ignoring invalid update every %lld; keeping %d",
@@ -45,9 +58,7 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (rd->tiers[tier].sch)
-                storage_engine_store_change_collection_frequency(
-                    rd->tiers[tier].sch,
-                    (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+                storage_engine_store_change_collection_frequency(rd->tiers[tier].sch, rrdset_tier_update_every_s(st, tier));
         }
     }
     rrddim_foreach_done(rd);
@@ -188,7 +199,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
             if(!discard_reason) discard_reason = "COLLECTION TIME IN FUTURE";
 #endif
         }
-        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
+        else if(unlikely((usec_t)since_last_usec > (usec_t)st->update_every * 5 * USEC_PER_SEC)) {
 // oops! the database is too far behind
 #ifdef NETDATA_INTERNAL_CHECKS
             netdata_log_info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
