@@ -36,7 +36,7 @@ type Client struct {
 	orpc        dcom.ORPCThis
 	unknown     remoteunknown.RemoteUnknownClient
 	services    services.ServicesClient
-	enumeration dcerpc.Conn
+	enumeration enumerator.EnumClassObjectClient
 	oxid        uint64
 	refs        []*dcom.RemoteInterfaceReference
 }
@@ -83,24 +83,13 @@ func (c *Client) open(host, username, password, auth string) error {
 	cid, _ := rpcuuid.Parse(uuid.NewString())
 	c.orpc.CID = (*dcom.CID)(dtyp.GUIDFromUUID(cid))
 
-	c.resolver, err = c.dial(host, security)
+	c.resolver, err = c.dial(host, security, dcerpc.WithEndpoint("ncacn_ip_tcp:[135]"))
 	if err != nil {
 		return rpcFailure(ctx, "open DCOM resolver", err)
 	}
-	conn, err := c.resolver.Bind(ctx,
-		dcerpc.WithEndpoint("ncacn_ip_tcp:[135]"),
-		dcerpc.WithAbstractSyntax(exporter.ObjectExporterSyntaxV0_0),
-		dcerpc.WithAbstractSyntax(activation.ActivationSyntaxV0_0),
-	)
-	if err != nil {
-		return rpcFailure(ctx, "bind DCOM resolver", err)
-	}
-
-	exporterConn, err := presentation(ctx, conn, exporter.ObjectExporterSyntaxV0_0)
-	if err != nil {
-		return rpcFailure(ctx, "select DCOM object resolver interface", err)
-	}
-	resolver, err := exporter.NewObjectExporterClient(ctx, exporterConn, dcerpc.WithNoBind(exporterConn))
+	// Windows can reject additional interfaces in a combined bind. Each generated
+	// client negotiates its own interface on the existing endpoint transport.
+	resolver, err := exporter.NewObjectExporterClient(ctx, c.resolver)
 	if err != nil {
 		return rpcFailure(ctx, "open DCOM object resolver interface", err)
 	}
@@ -113,11 +102,7 @@ func (c *Client) open(host, username, password, auth string) error {
 	}
 	c.orpc.Version = alive.COMVersion
 
-	activationConn, err := presentation(ctx, conn, activation.ActivationSyntaxV0_0)
-	if err != nil {
-		return rpcFailure(ctx, "select DCOM activation interface", err)
-	}
-	activator, err := activation.NewActivationClient(ctx, activationConn, dcerpc.WithNoBind(activationConn))
+	activator, err := activation.NewActivationClient(ctx, c.resolver)
 	if err != nil {
 		return rpcFailure(ctx, "open DCOM activation interface", err)
 	}
@@ -159,31 +144,17 @@ func (c *Client) open(host, username, password, auth string) error {
 		return diagnostic("DCOM activation returned no WMI TCP endpoint")
 	}
 
-	c.objects, err = c.dial(host, security)
+	c.objects, err = c.dial(host, security, endpoints...)
 	if err != nil {
 		return rpcFailure(ctx, "open WMI object transport", err)
 	}
-	return c.logIn(append(endpoints,
-		dcerpc.WithAbstractSyntax(remoteunknown.RemoteUnknownSyntaxV0_0),
-		dcerpc.WithAbstractSyntax(level1login.Level1LoginSyntaxV0_0),
-		dcerpc.WithAbstractSyntax(services.ServicesSyntaxV0_0),
-		dcerpc.WithAbstractSyntax(enumerator.EnumClassObjectSyntaxV0_0),
-	), act)
+	return c.logIn(act)
 }
 
-func (c *Client) logIn(options []dcerpc.Option, act *activation.RemoteActivationResponse) error {
+func (c *Client) logIn(act *activation.RemoteActivationResponse) error {
 	ctx := c.ctx
-	conn, err := c.objects.Bind(ctx, options...)
-	if err != nil {
-		return rpcFailure(ctx, "bind WMI object transport", err)
-	}
-
-	releaseConn, err := presentation(ctx, conn, remoteunknown.RemoteUnknownSyntaxV0_0)
-	if err != nil {
-		return rpcFailure(ctx, "select WMI release interface", err)
-	}
-	c.unknown, err = remoteunknown.NewRemoteUnknownClient(ctx, releaseConn,
-		dcerpc.WithNoBind(releaseConn), dcom.WithIPID(act.RemoteUnknown))
+	var err error
+	c.unknown, err = remoteunknown.NewRemoteUnknownClient(ctx, c.objects, dcom.WithIPID(act.RemoteUnknown))
 	if err != nil {
 		return rpcFailure(ctx, "open WMI release interface", err)
 	}
@@ -194,12 +165,7 @@ func (c *Client) logIn(options []dcerpc.Option, act *activation.RemoteActivation
 	}
 	c.refs = append(c.refs, loginRef)
 
-	loginConn, err := presentation(ctx, conn, level1login.Level1LoginSyntaxV0_0)
-	if err != nil {
-		return rpcFailure(ctx, "select WMI login interface", err)
-	}
-	login, err := level1login.NewLevel1LoginClient(ctx, loginConn,
-		dcerpc.WithNoBind(loginConn), dcom.WithIPID(loginRef.IPID))
+	login, err := level1login.NewLevel1LoginClient(ctx, c.objects, dcom.WithIPID(loginRef.IPID))
 	if err != nil {
 		return rpcFailure(ctx, "open WMI login interface", err)
 	}
@@ -218,35 +184,25 @@ func (c *Client) logIn(options []dcerpc.Option, act *activation.RemoteActivation
 	}
 	c.refs = append(c.refs, nsRef)
 
-	svcConn, err := presentation(ctx, conn, services.ServicesSyntaxV0_0)
-	if err != nil {
-		return rpcFailure(ctx, "select WMI services interface", err)
-	}
-	c.services, err = services.NewServicesClient(ctx, svcConn,
-		dcerpc.WithNoBind(svcConn), dcom.WithIPID(nsRef.IPID))
+	c.services, err = services.NewServicesClient(ctx, c.objects, dcom.WithIPID(nsRef.IPID))
 	if err != nil {
 		return rpcFailure(ctx, "open WMI services interface", err)
 	}
-	c.enumeration, err = presentation(ctx, conn, enumerator.EnumClassObjectSyntaxV0_0)
+	c.enumeration, err = enumerator.NewEnumClassObjectClient(ctx, c.objects)
 	if err != nil {
-		return rpcFailure(ctx, "select WMI enumeration interface", err)
+		return rpcFailure(ctx, "open WMI enumeration interface", err)
 	}
 	return nil
 }
 
-func (c *Client) dial(host string, security []dcerpc.Option) (dcerpc.Conn, error) {
-	return dcerpc.Dial(c.ctx, host, append([]dcerpc.Option{
+func (c *Client) dial(host string, security []dcerpc.Option, endpoints ...dcerpc.Option) (dcerpc.Conn, error) {
+	options := []dcerpc.Option{
 		dcerpc.WithDialer(&c.dialer),
 		dcerpc.WithDNSResolver(nil),
-	}, security...)...)
-}
-
-func presentation(ctx context.Context, conn dcerpc.Conn, syntax *dcerpc.SyntaxID) (dcerpc.Conn, error) {
-	sub, ok := conn.(dcerpc.SubConn)
-	if !ok {
-		return nil, diagnostic("DCE/RPC presentation context is unavailable")
 	}
-	return sub.SubConn(ctx, syntax)
+	options = append(options, security...)
+	options = append(options, endpoints...)
+	return dcerpc.Dial(c.ctx, host, options...)
 }
 
 // tcpEndpoints uses only the TCP ports advertised by the configured target.

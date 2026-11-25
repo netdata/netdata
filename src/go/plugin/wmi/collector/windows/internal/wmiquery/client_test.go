@@ -3,7 +3,10 @@
 package wmiquery
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net"
 	"testing"
 	"time"
 	"unicode/utf16"
@@ -12,10 +15,55 @@ import (
 	"github.com/oiweiwei/go-msrpc/msrpc/dcetypes"
 	"github.com/oiweiwei/go-msrpc/msrpc/dcom"
 	activation "github.com/oiweiwei/go-msrpc/msrpc/dcom/iactivation/v0"
+	exporter "github.com/oiweiwei/go-msrpc/msrpc/dcom/iobjectexporter/v0"
 	remoteunknown "github.com/oiweiwei/go-msrpc/msrpc/dcom/iremunknown/v0"
+	"github.com/oiweiwei/go-msrpc/ndr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestOpenBindsResolverBeforeActivation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	socket, peer := net.Pipe()
+	defer peer.Close()
+	recorder := &bindRecorder{Conn: socket}
+	c := &Client{
+		ctx:    ctx,
+		cancel: cancel,
+		dialer: rpcDialer{
+			host: "windows.example.test",
+			ctx:  ctx,
+			dial: func(_ context.Context, _, _ string) (net.Conn, error) { return recorder, nil },
+		},
+	}
+	defer c.Close()
+	require.Error(t, c.open(c.dialer.host, "reader", "synthetic", "ntlm"))
+
+	r := ndr.NDR20(recorder.packet)
+	var header dcerpc.Header
+	require.NoError(t, header.ReadFrom(ctx, r))
+	require.Equal(t, dcerpc.PacketTypeBind, header.PacketType)
+	var bind dcerpc.Bind
+	require.NoError(t, bind.ReadFrom(ctx, r))
+	require.NotEmpty(t, bind.ContextList)
+	// Windows rejects activation when it is proposed alongside the resolver.
+	// The RPC bind-time feature context may repeat the resolver's syntax.
+	for _, entry := range bind.ContextList {
+		assert.True(t, entry.AbstractSyntax.Is(exporter.ObjectExporterSyntaxV0_0),
+			"unexpected interface in resolver bind: %v", entry.AbstractSyntax)
+	}
+}
+
+type bindRecorder struct {
+	net.Conn
+	packet []byte
+}
+
+func (c *bindRecorder) Write(b []byte) (int, error) {
+	c.packet = bytes.Clone(b)
+	return 0, io.ErrClosedPipe
+}
 
 func TestTCPBindingsUseOnlyAdvertisedPorts(t *testing.T) {
 	var wire []uint16

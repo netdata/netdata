@@ -44,11 +44,7 @@ func (c *Client) Query(ctx context.Context, wql string) ([]map[string]any, error
 	}
 	defer c.release(ref)
 
-	enum, err := enumerator.NewEnumClassObjectClient(ctx, c.enumeration,
-		dcerpc.WithNoBind(c.enumeration), dcom.WithIPID(ref.IPID))
-	if err != nil {
-		return nil, rpcFailure(ctx, "open WMI query enumeration", err)
-	}
+	enum := c.enumeration.IPID(ctx, ref.IPID)
 	deadline, _ := c.ctx.Deadline()
 	if queryDeadline, ok := ctx.Deadline(); ok && queryDeadline.Before(deadline) {
 		deadline = queryDeadline
