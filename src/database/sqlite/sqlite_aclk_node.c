@@ -445,7 +445,20 @@ void aclk_check_node_info_collectors_and_manifest(void)
         bool manifest_pending = node_manifest_send_time && manifest_topic_available &&
                                 aclk_node_id_snapshot(aclk_host_config, manifest_node_id);
 
-        if (!node_info_send_time && !node_collectors_send && !manifest_pending)
+        // Node info and collectors describe the node itself, and the cloud keeps one copy per node
+        // (last write wins, whichever agent sent it), so only an agent ingesting the node right now
+        // may publish them: localhost, an active local vnode, or a child streaming to this agent now.
+        // An archived child carries what was true when it was last here - labels loaded from SQLite
+        // at startup - and publishing that would overwrite what the parent it has moved to reports.
+        // Like the manifest above, an ineligible request stays armed and is not counted as pending;
+        // it goes out when the child connects again (the receiver also queues an immediate one).
+        //
+        // The manifest is NOT gated: the cloud keeps it per agent, and archiving a host arms an
+        // empty one on purpose, so the cloud learns this agent no longer serves its functions.
+        bool node_publisher = rrdhost_is_online(host);
+        bool node_pending = node_publisher && (node_info_send_time || node_collectors_send);
+
+        if (!node_pending && !manifest_pending)
             continue;
 
         // read once: this gates THIS host below, while replicating_rcv accumulates across
@@ -475,13 +488,13 @@ void aclk_check_node_info_collectors_and_manifest(void)
 
         bool pp_queue_empty = !rrdcontext_queue_entries(&host->rrdctx.pp_queue);
 
-        if (!pp_queue_empty && (node_info_send_time || node_collectors_send || manifest_pending)) {
+        if (!pp_queue_empty && (node_pending || manifest_pending)) {
             context_pp++;
             hostname_snapshot_update(&context_pp_host, host);
         }
 
         node_info_send_time = aclk_send_timestamp_get(&aclk_host_config->node_info_send_time);
-        if (pp_queue_empty && node_info_send_time &&
+        if (node_publisher && pp_queue_empty && node_info_send_time &&
             nd_time_t_add_compare(node_info_send_time, 30, now) < 0 &&
             aclk_send_timestamp_claim(&aclk_host_config->node_info_send_time, node_info_send_time)) {
             build_node_info(host, NULL);
@@ -490,7 +503,7 @@ void aclk_check_node_info_collectors_and_manifest(void)
         }
 
         node_collectors_send = aclk_send_timestamp_get(&aclk_host_config->node_collectors_send);
-        if (pp_queue_empty && node_collectors_send &&
+        if (node_publisher && pp_queue_empty && node_collectors_send &&
             nd_time_t_add_compare(node_collectors_send, 30, now) < 0 &&
             aclk_send_timestamp_claim(&aclk_host_config->node_collectors_send, node_collectors_send)) {
             build_node_collectors(host);
