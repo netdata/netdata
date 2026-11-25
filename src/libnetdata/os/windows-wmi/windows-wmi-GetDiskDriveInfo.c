@@ -5,6 +5,9 @@
 
 #if defined(OS_WINDOWS)
 
+// Total time allowed for enumerating Win32_DiskDrive, across all Next() calls.
+#define WMI_DISKDRIVE_ENUM_TIMEOUT_MS 5000
+
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     HRESULT init_hr = InitializeWMI();
     if (FAILED(init_hr) || !nd_wmi.pSvc) return 0;
@@ -16,12 +19,31 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         return 0;
     }
 
-    IWbemClassObject *pclsObj = NULL;
-    ULONG uReturn = 0;
+    usec_t deadline_ut = now_monotonic_usec() + WMI_DISKDRIVE_ENUM_TIMEOUT_MS * USEC_PER_MS;
     size_t index = 0;
     while (index < array_size) {
-        hr = pEnumerator->lpVtbl->Next(pEnumerator, WBEM_INFINITE, 1, &pclsObj, &uReturn);
-        if (0 == uReturn) break;
+        usec_t now_ut = now_monotonic_usec();
+        if (now_ut >= deadline_ut) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "GetDiskDriveInfo() WMI enumeration timed out after %d ms; using %zu disk(s)",
+                   WMI_DISKDRIVE_ENUM_TIMEOUT_MS, index);
+            break;
+        }
+        long remaining_ms = (long)((deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
+
+        IWbemClassObject *pclsObj = NULL;
+        ULONG uReturn = 0;
+        hr = pEnumerator->lpVtbl->Next(pEnumerator, remaining_ms, 1, &pclsObj, &uReturn);
+        if (FAILED(hr)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "GetDiskDriveInfo() WMI enumeration failed. Error code = 0x%X; using %zu disk(s)", hr, index);
+            break;
+        }
+        if (0 == uReturn || !pclsObj) {
+            if (hr == WBEM_S_TIMEDOUT)
+                continue;
+            break;
+        }
 
         DiskDriveInfoWMI *info = &diskInfoArray[index];
 
