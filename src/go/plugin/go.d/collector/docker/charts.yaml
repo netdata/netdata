@@ -1,0 +1,114 @@
+version: v1
+context_namespace: docker
+groups:
+  - family: containers
+    metrics:
+      - containers_running
+      - containers_paused
+      - containers_exited
+    chart_defaults:
+      priority: 70000
+    charts:
+      - title: Total number of Docker containers in various states
+        context: containers_state
+        units: containers
+        type: stacked
+        dimensions:
+          - selector: containers_running
+            name: running
+          - selector: containers_paused
+            name: paused
+          - selector: containers_exited
+            name: exited
+  - family: containers
+    metrics:
+      - containers_healthy
+      - containers_unhealthy
+      - containers_not_running_unhealthy
+      - containers_starting
+      - containers_no_healthcheck
+    chart_defaults:
+      priority: 70001
+    charts:
+      - title: Total number of Docker containers in various health states
+        context: containers_health_status
+        units: containers
+        dimensions:
+          - selector: containers_healthy
+            name: healthy
+          - selector: containers_unhealthy
+            name: unhealthy
+          - selector: containers_not_running_unhealthy
+            name: not_running_unhealthy
+          - selector: containers_starting
+            name: starting
+          - selector: containers_no_healthcheck
+            name: no_healthcheck
+  - family: containers
+    metrics:
+      - container_state
+    chart_defaults:
+      priority: 70002
+    charts:
+      - title: Docker container state
+        context: container_state
+        units: state
+        instances:
+          by_labels: [container_name]
+        dimensions:
+          - selector: container_state
+  - family: containers
+    metrics:
+      - container_health_status
+    chart_defaults:
+      priority: 70003
+    charts:
+      - title: Docker container health status
+        context: container_health_status
+        units: status
+        instances:
+          by_labels: [container_name]
+        dimensions:
+          - selector: container_health_status
+  - family: containers
+    metrics:
+      - container_writable_layer_size
+    chart_defaults:
+      priority: 70004
+    charts:
+      - title: Docker container writable layer size
+        context: container_writeable_layer_size
+        units: bytes
+        instances:
+          by_labels: [container_name]
+        dimensions:
+          - selector: container_writable_layer_size
+            name: writable_layer
+  - family: images
+    metrics:
+      - images_active
+      - images_dangling
+    chart_defaults:
+      priority: 70005
+    charts:
+      - title: Total number of Docker images in various states
+        context: images
+        units: images
+        type: stacked
+        dimensions:
+          - selector: images_active
+            name: active
+          - selector: images_dangling
+            name: dangling
+  - family: images
+    metrics:
+      - images_size
+    chart_defaults:
+      priority: 70006
+    charts:
+      - title: Total size of all Docker images
+        context: images_size
+        units: bytes
+        dimensions:
+          - selector: images_size
+            name: size
