@@ -150,8 +150,13 @@ use the shared construction paths above. Cookie collection calls `Stat` and cond
 stream before returning. No helper process is retained between operations.
 
 On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
-fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
-reading a file. Do not retain reader state in a job, HTTP client, configuration or context, or cache bearer contents.
+fail closed and never fall back to elevated local reads. The Unix helper is `nd-run` in `buildinfo.NetdataBinDir`
+(`/usr/sbin` unless the build sets it), so a standalone `go build` used for local testing fails every configured file
+read until that directory holds `nd-run`; link with
+`-X github.com/netdata/netdata/go/plugins/pkg/buildinfo.NetdataBinDir=<dir>` to point at one.
+
+Pass the current Init, collection or Function context before reading a file. Do not retain reader state in a job, HTTP
+client, configuration or context, or cache bearer contents.
 
 Bearer tokens are read on every request. CA files, and certificate/key files when both are configured, retain the
 `safefile` contract: validate the opened object as regular, accept symlinks to regular files and read at most 1 MiB.

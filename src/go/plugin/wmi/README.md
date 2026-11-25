@@ -19,9 +19,8 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o wmi.plugin ./cmd/wmiplugin
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o wmi.plugin.exe ./cmd/wmiplugin
 ```
 
-A standalone Linux or macOS build reads `tls_ca` through the installed `nd-run` helper. To test WinRM with a private CA
-outside an installation, build with `-ldflags "-X github.com/netdata/netdata/go/plugins/pkg/buildinfo.NetdataBinDir=<dir>"`
-pointing at a directory that contains `nd-run`.
+A standalone Linux or macOS build cannot read `tls_ca` until it finds the `nd-run` helper; see "Configured credential
+and TLS files" in [helper-packages.md](../go.d/docs/helper-packages.md).
 
 ## Run one job in the foreground
 
