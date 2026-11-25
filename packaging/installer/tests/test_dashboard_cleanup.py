@@ -118,7 +118,7 @@ test ! -e "$3/v3/old.js"
             self.skipTest(reason)
 
     @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
-    def test_cmake_symlink_install_retains_its_targets(self):
+    def test_cmake_symlink_install_resolves_to_current_release(self):
         self.require_cmake_3_22('CMAKE_INSTALL_MODE requires CMake 3.22')
         (self.root / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.16)
 project(dashboard NONE)
@@ -177,7 +177,8 @@ print_deferred_errors() { :; }
 progress() { :; }
 netdata_banner() { :; }
 ''' + installer[installer.rindex('if [ "${DP_ENABLED:-0}" = 1 ]; then'):]
-        build = self.root / 'build'
+        # Glob syntax in the build path must not hide the bundle from the install rules.
+        build = self.root / 'build [1]'
         archive = self.root / 'bundle.tar.gz'
         env = dict(os.environ, NETDATA_PREFIX=str(self.prefix), NETDATA_BUILD_DIR=str(build),
                    NETDATA_SOURCE_DIR=str(ROOT), DESTDIR='', NETDATA_WEB_DIR=str(self.root / 'user-web'))
@@ -258,6 +259,7 @@ netdata_banner() { :; }
         self.assertTrue(installed.is_symlink())
         self.assertEqual(stat.S_IMODE(relocated.stat().st_mode), 0o750)
         self.assertEqual(stat.S_IMODE(asset_dir.stat().st_mode), directory_mode)
+        self.assertEqual((asset_dir / 'chunk.js').read_bytes(), b'chunk')
         if group is not None:
             self.assertEqual((asset_dir / 'chunk.js').stat().st_gid, group)
         self.assertEqual(outside.read_text(), 'untouched')

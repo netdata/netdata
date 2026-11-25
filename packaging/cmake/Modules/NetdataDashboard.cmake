@@ -65,10 +65,15 @@ set(netdata_dashboard_install_always "$ENV{CMAKE_INSTALL_ALWAYS}")
 set(ENV{CMAKE_INSTALL_ALWAYS} 1)
 ]] COMPONENT dashboard)
 
+  # GLOB reads [, * and ? in the build path as patterns. Match them literally so
+  # the install rules cover exactly the tree the cleanup compares against.
+  string(REPLACE "[" "[[]" glob_prefix "${dashboard_src_prefix}")
+  string(REPLACE "*" "[*]" glob_prefix "${glob_prefix}")
+  string(REPLACE "?" "[?]" glob_prefix "${glob_prefix}")
   file(GLOB_RECURSE files
        LIST_DIRECTORIES FALSE
        RELATIVE "${dashboard_src_prefix}"
-       "${dashboard_src_prefix}/*")
+       "${glob_prefix}/*")
 
   foreach(file IN LISTS files)
     get_filename_component(dir "${file}" DIRECTORY)
