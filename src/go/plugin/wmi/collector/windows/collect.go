@@ -18,7 +18,7 @@ const (
 	queryDisk = "SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType = 3"
 )
 
-func (c *Collector) poll(parent context.Context) (observations, error) {
+func (c *Collector) poll(parent context.Context, inventoryDue bool) (observations, error) {
 	ctx, cancel := context.WithTimeout(parent, c.Timeout.Duration())
 	defer cancel()
 	if err := ctx.Err(); err != nil {
@@ -59,7 +59,7 @@ func (c *Collector) poll(parent context.Context) (observations, error) {
 			return observations{}, err
 		}
 		rows, err := client.Query(ctx, group.query)
-		if group.query == queryDisk && err == nil {
+		if inventoryDue && group.query == queryDisk && err == nil {
 			fixedDrives, diskQueryOK = rows, true
 		}
 		switch {
@@ -83,7 +83,7 @@ func (c *Collector) poll(parent context.Context) (observations, error) {
 			c.Limit("wmi:"+groups[i].name, 1, time.Minute).Warning(err)
 		}
 	}
-	if c.Vnode == "" && !time.Now().Before(c.nextInventory) {
+	if inventoryDue {
 		c.refreshInventory(ctx, client, fixedDrives, diskQueryOK)
 	}
 	// Exhausting the optional inventory budget must not discard successful samples.

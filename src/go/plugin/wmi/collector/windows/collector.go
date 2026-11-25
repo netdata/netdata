@@ -72,12 +72,14 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	_, err := c.poll(ctx)
+	// Readiness is determined solely by the enabled metric groups.
+	_, err := c.poll(ctx, false)
 	return err
 }
 
 func (c *Collector) Collect(ctx context.Context) error {
-	snapshot, err := c.poll(ctx)
+	inventoryDue := c.Vnode == "" && !time.Now().Before(c.nextInventory)
+	snapshot, err := c.poll(ctx, inventoryDue)
 	if err != nil {
 		return err
 	}

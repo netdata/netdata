@@ -34,7 +34,7 @@ Omit `collectors` to collect all four groups. Set any of `cpu`, `memory`, `netwo
 
 Each job automatically creates a virtual node. It displays the Windows computer name reported by WMI and records the configured IP address or DNS name in the `address` host label. Until Windows supplies a usable name, the node displays the endpoint. Its GUID comes from the configured endpoint, so a Windows rename keeps the node’s metric history. Changing the endpoint can create a new node. To manage the identity and labels yourself, set `vnode` to an existing named virtual node.
 
-The collector reads inventory after a successful metric poll and refreshes it every five minutes in the same WMI session. A failed inventory query preserves the last values from that provider. When a successful query shows that a value is absent or ambiguous, the collector omits its label.
+The readiness check queries the enabled metric groups. The first successful collection reads inventory after the metrics, then refreshes it every five minutes in the same WMI session. A failed inventory query preserves the last values from that provider. When a successful query shows that a value is absent or ambiguous, the collector omits its label.
 
 | Host information | Source and coverage |
 | --- | --- |

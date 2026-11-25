@@ -46,6 +46,9 @@ func TestInventoryRefresh(t *testing.T) {
 		require.NoError(t, c.Init(t.Context()))
 		initial := c.VirtualNode()
 		require.NoError(t, c.Check(t.Context()))
+		require.Equal(t, []string{cpuProjection, memoryProjection, networkProjection, diskProjection}, session.queries, "readiness must only wait for metrics")
+		_, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
 		node := c.VirtualNode()
 		assert.Equal(t, initial.GUID, node.GUID)
 		assert.Equal(t, "192.0.2.14", initial.Hostname)
@@ -61,19 +64,22 @@ func TestInventoryRefresh(t *testing.T) {
 		time.Sleep(inventoryInterval)
 		session.results[queryOSInfo] = queryResult{err: errors.New("withheld")}
 		session.results[queryInstalledMemory] = fixtureRows(map[string]any{"Capacity": "1"}, map[string]any{})
-		require.NoError(t, c.Check(t.Context()))
+		_, err = collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
 		assert.Equal(t, "FILE01", c.VirtualNode().Hostname, "keep the last name on query failure")
 		assert.NotContains(t, c.VirtualNode().Labels, "_system_ram_total", "a partial DIMM sum is not installed RAM")
 		assert.Equal(t, "12884901888", node.Labels["_system_ram_total"], "previously published snapshots are immutable")
 		time.Sleep(inventoryInterval)
 		session.results[queryOSInfo] = fixtureRows(map[string]any{"CSName": "FILE02"})
-		require.NoError(t, c.Check(t.Context()))
+		_, err = collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
 		assert.Equal(t, "FILE02", c.VirtualNode().Hostname)
 		assert.Equal(t, initial.GUID, c.VirtualNode().GUID)
 		assert.NotContains(t, c.VirtualNode().Labels, "_os_edition")
 		time.Sleep(inventoryInterval)
 		session.results[queryOSInfo] = fixtureRows(map[string]any{"CSName": "unsafe'name"})
-		require.NoError(t, c.Check(t.Context()))
+		_, err = collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
 		assert.Equal(t, initial.Hostname, c.VirtualNode().Hostname)
 	})
 }
@@ -113,7 +119,8 @@ func TestInventoryDisabledQueries(t *testing.T) {
 		session := &fakeSession{results: validQueryResults()}
 		c.open = func(context.Context, string, string, string, string) (queryClient, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
-		require.NoError(t, c.Check(t.Context()))
+		_, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
 		if named {
 			assert.Equal(t, []string{cpuProjection, memoryProjection, networkProjection}, session.queries)
 		} else {
