@@ -95,7 +95,7 @@ The absolute paths shown below are the defaults for standard Linux packages. The
 
 Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `receivers.otlp.protocols.grpc.tls.cert_file` becomes `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_TLS_CERT_FILE`, and `receivers.otlp.protocols.http.enabled` becomes `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_HTTP_ENABLED`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
-Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the removed `logs` options of the previous `otel.yaml` layout prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
+The plugin ignores an option in `otel.yaml` and a `NETDATA_OTEL_CFG_*` variable that it does not know, and logs a warning that names it. This includes a misspelled name and the removed `logs` options of the previous `otel.yaml` layout. An ignored option keeps its default value, so check the Agent journal after you change the configuration. A malformed value or a combination of values that is not valid prevents the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
 
 In a YAML file, an option set to `null` keeps its current value. To turn a listener on or off, set its `enabled` option. The OTLP/gRPC listener is on and the OTLP/HTTP listener is off by default. At least one of the two listeners must stay enabled.
 
@@ -449,11 +449,34 @@ When several Agents share one network namespace and only one needs to receive OT
 ```
 
 
+#### configuration: `/etc/netdata/otel.yaml`: `logs.compresion_enabled` is not a known option, ignoring it
+
+**When**
+
+Logged as a warning in the Agent journal at startup by `otel-plugin`, one time for each such option. The plugin starts and ingests data. For a `NETDATA_OTEL_CFG_*` variable, the message has `environment` in place of the file path and names the variable.
+
+
+**Cause**
+
+The user `otel.yaml` sets an option that the plugin does not know, or the environment of the Agent has a `NETDATA_OTEL_CFG_*` variable that the plugin does not know. The usual sources are a misspelled name, an option at the wrong level of the file, and an option of another plugin version. The plugin ignores the option, so the option that you intended to set keeps its default value.
+
+
+**Fix**
+
+Compare the name and its position with the stock file: run `edit-config otel.yaml`, or see the options above. Correct or remove the option or the variable, then restart the Netdata Agent. For the removed `logs` options of the previous `otel.yaml` layout, the plugin also logs a migration guide that maps each option to its replacement.
+
+:::caution
+
+A misspelled TLS or retention option is ignored like any other. For example, with `client_ca_fle` in place of `client_ca_file` the listener starts without client certificate verification. After each change to `otel.yaml` or to the variables, confirm that the Agent journal has no such warning.
+
+:::
+
+
 ### Other Problems
 
 #### The plugin does not start
 
-Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or a removed `logs` option from the previous `otel.yaml` layout stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
+Check the Agent journal for `otel-plugin` configuration errors. A malformed value in `otel.yaml` or in a `NETDATA_OTEL_CFG_*` variable, or a combination of values that is not valid, stops startup. An option or a variable that the plugin does not know does not stop startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
 
 
 #### The endpoint is reachable but no data appears
@@ -495,4 +518,6 @@ By default, the plugin rejects a span that started more than 24 hours ago or end
 
 #### Logs written by the previous OpenTelemetry plugin are not visible
 
-A removed `logs` option from the previous `otel.yaml` layout stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. If the former file set a custom `logs.journal_dir`, keep it: it is the only former `logs` option still accepted, and the plugin uses it only to locate the former plugin's read-only journals.
+The plugin does not show the logs that the previous OpenTelemetry plugin stored. The journal files of the previous plugin stay on the disk, by default in `/var/log/netdata/otel/v1`. The current plugin does not read them and does not delete them. Delete that directory when you do not need the files. You can also delete `/var/cache/netdata/otel-legacy-logs`, if it is there.
+
+The plugin ignores a removed `logs` option from the previous `otel.yaml` layout and uses its default values for logs storage. It logs a warning with a migration guide in the Agent journal. Replace the removed options with a partial configuration based on the current stock file.
