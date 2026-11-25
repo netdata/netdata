@@ -822,7 +822,7 @@ static const char *netdata_windows_detect_container(void) {
     // in Win32_OperatingSystem.Caption (e.g. "Microsoft Windows Server 2022 Datacenter"), never
     // the word "container", so a caption match cannot detect them. The reliable marker is the
     // ContainerType value under HKLM\SYSTEM\CurrentControlSet\Control, which the host populates
-    // only inside a Windows container; its mere presence identifies the container.
+    // only inside a Windows container, as a REG_DWORD; its presence identifies the container.
     unsigned int container_type;
     if(netdata_registry_get_dword(&container_type, HKEY_LOCAL_MACHINE,
                                   "SYSTEM\\CurrentControlSet\\Control", "ContainerType"))
