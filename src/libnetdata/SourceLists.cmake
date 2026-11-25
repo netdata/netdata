@@ -70,6 +70,7 @@ set(INICFG_FILES
         inicfg/inicfg_migrate.c
         inicfg/inicfg_traversal.c
         inicfg/inicfg_api.c
+        inicfg/inicfg-unittest.c
         inicfg/dyncfg.c
         inicfg/dyncfg.h
 )
