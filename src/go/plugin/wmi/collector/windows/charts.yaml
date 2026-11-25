@@ -1,4 +1,5 @@
 version: v1
+# Not the module name: the native Windows plugin already owns the windows.* contexts.
 context_namespace: wmi
 groups:
   - family: CPU

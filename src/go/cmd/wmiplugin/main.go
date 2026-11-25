@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/user"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
@@ -27,19 +28,18 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
-func main() {
+func init() {
 	executable.Name = "wmi"
-	if strings.HasPrefix(os.Getenv("TZ"), ":") {
+	if v := os.Getenv("TZ"); strings.HasPrefix(v, ":") {
 		_ = os.Unsetenv("TZ")
 	}
+}
+
+func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
-	opts, err := cli.Parse(os.Args)
-	if err != nil {
-		if cli.IsHelp(err) {
-			return
-		}
-		os.Exit(1)
-	}
+
+	opts := parseCLI()
+
 	if opts.Version {
 		fmt.Printf("%s.plugin, version: %s\n", executable.Name, buildinfo.Version)
 		return
@@ -49,6 +49,7 @@ func main() {
 		ConfDir:   opts.ConfDir,
 		WatchPath: opts.WatchPath,
 	})
+
 	if lvl := pluginconfig.EnvLogLevel(); lvl != "" {
 		logger.Level.SetByName(lvl)
 	}
@@ -61,24 +62,35 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
 		os.Exit(1)
 	}
-
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
 		Secrets:                   secrets,
-		ModuleRegistry:            collectorapi.DefaultRegistry,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		RunModePolicy:             policy.Agent(terminal.IsTerminal()),
+		ModuleRegistry:            collectorapi.DefaultRegistry,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
-		DiscoveryProviders:        []discovery.ProviderFactory{discoveryproviders.File()},
-		DisableServiceDiscovery:   true,
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
+		RunModePolicy:             policy.Agent(terminal.IsTerminal()),
+		// Jobs come only from configuration files: without a configured host
+		// there is nothing to monitor, so no default (dummy) job is created.
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+		},
+		RunModule:               opts.Module,
+		RunJob:                  opts.Job,
+		MinUpdateEvery:          opts.UpdateEvery,
+		DisableServiceDiscovery: true,
 	})
+
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())
+	if u, err := user.Current(); err == nil {
+		a.Debugf("current user: name=%s, uid=%s", u.Username, u.Uid)
+	}
+
+	a.Infof("directories → config: %s | collectors: %s | varlib: %s",
+		a.ConfigDir, a.CollectorsConfDir, a.VarLibDir)
+
 	result := agenthost.Run(a)
 	if result.Err != nil {
 		a.Errorf("plugin exiting after Agent failure: %v", result.Err)
@@ -87,4 +99,16 @@ func main() {
 	if result.ExitRequired {
 		os.Exit(0)
 	}
+}
+
+func parseCLI() *cli.Option {
+	opt, err := cli.Parse(os.Args)
+	if err != nil {
+		if cli.IsHelp(err) {
+			os.Exit(0)
+		}
+		os.Exit(1)
+	}
+
+	return opt
 }

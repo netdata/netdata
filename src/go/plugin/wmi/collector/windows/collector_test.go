@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -249,6 +250,45 @@ func TestChartTemplateAndMetadata(t *testing.T) {
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+}
+
+func TestMetadataDocumentsChartLabels(t *testing.T) {
+	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
+	require.NoError(t, err)
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	var doc struct {
+		Modules []struct {
+			Metrics struct {
+				Scopes []struct {
+					Labels []struct {
+						Name string `yaml:"name"`
+					} `yaml:"labels"`
+					Metrics []struct {
+						Name string `yaml:"name"`
+					} `yaml:"metrics"`
+				} `yaml:"scopes"`
+			} `yaml:"metrics"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &doc))
+	require.Len(t, doc.Modules, 1)
+
+	for _, scope := range doc.Modules[0].Metrics.Scopes {
+		var documented []string
+		for _, label := range scope.Labels {
+			documented = append(documented, label.Name)
+		}
+		for _, metric := range scope.Metrics {
+			chart, ok := charts[metric.Name]
+			require.True(t, ok, metric.Name)
+			var attached []string
+			if chart.Instances != nil {
+				attached = chart.Instances.ByLabels
+			}
+			assert.ElementsMatch(t, attached, documented, "labels of %s", metric.Name)
+		}
+	}
 }
 
 func metricQueries(queries []string) []string {
