@@ -43,10 +43,7 @@ struct physical_disk {
 
     STRING *device;
     STRING *mount_point;
-    STRING *manufacturer;
     STRING *model;
-    STRING *media_type;
-    STRING *name;
     STRING *device_id;
 
     ND_DISK_IO disk_io;
@@ -154,14 +151,8 @@ static void physical_disk_cleanup(struct physical_disk *d)
     d->device = NULL;
     string_freez(d->mount_point);
     d->mount_point = NULL;
-    string_freez(d->manufacturer);
-    d->manufacturer = NULL;
     string_freez(d->model);
     d->model = NULL;
-    string_freez(d->media_type);
-    d->media_type = NULL;
-    string_freez(d->name);
-    d->name = NULL;
     string_freez(d->device_id);
     d->device_id = NULL;
 
@@ -3257,17 +3248,8 @@ static void physical_disk_labels(RRDSET *st, void *data)
     if (d->mount_point)
         rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
 
-    //    if (d->manufacturer)
-    //        rrdlabels_add(st->rrdlabels, "manufacturer", string2str(d->manufacturer), RRDLABEL_SRC_AUTO);
-
     if (d->model)
         rrdlabels_add(st->rrdlabels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
-
-    //    if (d->media_type)
-    //        rrdlabels_add(st->rrdlabels, "media_type", string2str(d->media_type), RRDLABEL_SRC_AUTO);
-
-    //    if (d->name)
-    //        rrdlabels_add(st->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
     if (d->device_id)
         rrdlabels_add(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
@@ -3360,10 +3342,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
                     if (infos[k].Index != device_index)
                         continue;
 
-                    d->manufacturer = string_strdupz(infos[k].Manufacturer);
                     d->model = string_strdupz(infos[k].Model);
-                    d->media_type = string_strdupz(infos[k].MediaType);
-                    d->name = string_strdupz(infos[k].Name);
                     d->device_id = string_strdupz(infos[k].DeviceID);
 
                     break;

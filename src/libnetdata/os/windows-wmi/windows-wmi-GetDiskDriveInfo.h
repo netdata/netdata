@@ -8,19 +8,9 @@
 #if defined(OS_WINDOWS)
 
 typedef struct {
-    char DeviceID[256];
-    char Model[256];
-    char Caption[256];
-    char Name[256];
-    int Partitions;
-    unsigned long long Size;
-    char Status[64];
-    int Availability;
     int Index;
-    char Manufacturer[256];
-    char InstallDate[64];
-    char MediaType[128];
-    bool NeedsCleaning;
+    char Model[256];
+    char DeviceID[256];
 } DiskDriveInfoWMI;
 
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size);
