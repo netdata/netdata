@@ -99,10 +99,20 @@ static void lookup_user_in_system(SID_VALUE *sv) {
     }
 
     wchar_t *sid_string = NULL;
-    if (ConvertSidToStringSidW(sv->key.sid, &sid_string))
+    if (ConvertSidToStringSidW(sv->key.sid, &sid_string)) {
         sv->sid_str = string_strdupz(account2utf8(sid_string));
+        LocalFree(sid_string);
+    }
     else
         sv->sid_str = NULL;
+}
+
+static void sid_value_free(SID_VALUE *sv) {
+    string_freez(sv->account);
+    string_freez(sv->domain);
+    string_freez(sv->full);
+    string_freez(sv->sid_str);
+    freez(sv);
 }
 
 static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
@@ -125,15 +135,21 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
         return found;
     }
 
-    // allocate the SID_VALUE
-    found = tmp;
+    // resolve it outside the lock, it may be slow
+    lookup_user_in_system(tmp);
 
-    lookup_user_in_system(found);
-
-    // add it to the cache
+    // add it to the cache, unless another thread added it meanwhile
     spinlock_lock(&sid_globals.spinlock);
-    simple_hashtable_set_SID(&sid_globals.hashtable, &found->key, tmp_key_size, found);
+    found = simple_hashtable_get_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size);
+    if(!found) {
+        simple_hashtable_set_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size, tmp);
+        found = tmp;
+        tmp = NULL;
+    }
     spinlock_unlock(&sid_globals.spinlock);
+
+    if(tmp)
+        sid_value_free(tmp);
 
     return found;
 }
@@ -206,6 +222,131 @@ STRING *cached_sid_fullname_or_sid_str(PSID sid) {
         return string_dup(found->sid_str);
     }
     return NULL;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// unit test: -W sidcachetest
+
+#define SIDCACHE_TEST_SIDS 2000
+#define SIDCACHE_TEST_THREADS 8
+
+static struct {
+    PSID sids[SIDCACHE_TEST_SIDS];
+    SID_VALUE *seen[SIDCACHE_TEST_THREADS][SIDCACHE_TEST_SIDS];
+    int32_t waiting;
+} sidcache_test;
+
+// bytes in use in the default process heap, where LocalAlloc() allocates
+static size_t sidcache_test_process_heap_used(void) {
+    HANDLE heap = GetProcessHeap();
+    PROCESS_HEAP_ENTRY e = { 0 };
+    size_t used = 0;
+
+    if(!HeapLock(heap))
+        return 0;
+
+    while(HeapWalk(heap, &e))
+        if(e.wFlags & PROCESS_HEAP_ENTRY_BUSY)
+            used += e.cbData;
+
+    HeapUnlock(heap);
+    return used;
+}
+
+// SIDs of a random domain, so that none of them is in the cache yet
+static void sidcache_test_make_sids(void) {
+    SID_IDENTIFIER_AUTHORITY nt = SECURITY_NT_AUTHORITY;
+    uint32_t a = os_random32(), b = os_random32(), c = os_random32();
+
+    for(size_t i = 0; i < SIDCACHE_TEST_SIDS; i++) {
+        sidcache_test.sids[i] = NULL;
+        if(!AllocateAndInitializeSid(&nt, 5, SECURITY_NT_NON_UNIQUE, a, b, c, 1000 + (DWORD)i, 0, 0, 0, &sidcache_test.sids[i]))
+            fatal("SIDCACHE TEST: AllocateAndInitializeSid() failed");
+    }
+}
+
+static void sidcache_test_free_sids(void) {
+    for(size_t i = 0; i < SIDCACHE_TEST_SIDS; i++) {
+        FreeSid(sidcache_test.sids[i]);
+        sidcache_test.sids[i] = NULL;
+    }
+}
+
+static void *sidcache_test_thread(void *arg) {
+    size_t t = (size_t)arg;
+
+    // start all threads together, so that they miss the cache for the same SIDs at the same time
+    __atomic_sub_fetch(&sidcache_test.waiting, 1, __ATOMIC_RELEASE);
+    while(__atomic_load_n(&sidcache_test.waiting, __ATOMIC_ACQUIRE) > 0)
+        tinysleep();
+
+    for(size_t i = 0; i < SIDCACHE_TEST_SIDS; i++)
+        sidcache_test.seen[t][i] = lookup_or_convert_user_id_to_name_lookup(sidcache_test.sids[i]);
+
+    return NULL;
+}
+
+int cached_sid_username_unittest(void) {
+    int errors = 0;
+    cached_sid_username_init();
+
+    // 1. a lookup must not leave Windows allocations behind
+    {
+        sidcache_test_make_sids();
+
+        size_t before = sidcache_test_process_heap_used();
+        size_t resolved = 0;
+        for(size_t i = 0; i < SIDCACHE_TEST_SIDS; i++) {
+            SID_VALUE *sv = lookup_or_convert_user_id_to_name_lookup(sidcache_test.sids[i]);
+            if(sv && sv->sid_str)
+                resolved++;
+        }
+        size_t after = sidcache_test_process_heap_used();
+
+        sidcache_test_free_sids();
+
+        // a leaked "S-1-5-21-..." string costs about 100 bytes per lookup;
+        // Windows' own caches add about 10-20 bytes per lookup without it
+        size_t growth = after > before ? after - before : 0;
+        bool ok = resolved == SIDCACHE_TEST_SIDS && growth < SIDCACHE_TEST_SIDS * 48;
+        fprintf(stderr, "SIDCACHE TEST: %zu cold lookups, %zu resolved, process heap grew by %zu bytes (%.1f per lookup): %s\n",
+                (size_t)SIDCACHE_TEST_SIDS, resolved, growth, (double)growth / SIDCACHE_TEST_SIDS, ok ? "OK" : "FAILED");
+        if(!ok) errors++;
+    }
+
+    // 2. threads missing the same SID together must all get the one cached entry
+    {
+        sidcache_test_make_sids();
+
+        pthread_t threads[SIDCACHE_TEST_THREADS];
+        __atomic_store_n(&sidcache_test.waiting, SIDCACHE_TEST_THREADS, __ATOMIC_RELEASE);
+        for(size_t t = 0; t < SIDCACHE_TEST_THREADS; t++)
+            if(pthread_create(&threads[t], NULL, sidcache_test_thread, (void *)t) != 0)
+                fatal("SIDCACHE TEST: pthread_create() failed");
+        for(size_t t = 0; t < SIDCACHE_TEST_THREADS; t++)
+            pthread_join(threads[t], NULL);
+
+        size_t mismatches = 0;
+        for(size_t i = 0; i < SIDCACHE_TEST_SIDS; i++) {
+            SID_VALUE *cached = lookup_or_convert_user_id_to_name_lookup(sidcache_test.sids[i]);
+            for(size_t t = 0; t < SIDCACHE_TEST_THREADS; t++) {
+                if(sidcache_test.seen[t][i] != cached) {
+                    mismatches++;
+                    break;
+                }
+            }
+        }
+
+        sidcache_test_free_sids();
+
+        bool ok = mismatches == 0;
+        fprintf(stderr, "SIDCACHE TEST: %zu SIDs looked up by %d threads together, %zu got an entry that is not the cached one: %s\n",
+                (size_t)SIDCACHE_TEST_SIDS, SIDCACHE_TEST_THREADS, mismatches, ok ? "OK" : "FAILED");
+        if(!ok) errors++;
+    }
+
+    fprintf(stderr, "SIDCACHE TEST: %s\n", errors ? "FAILED" : "PASSED");
+    return errors ? 1 : 0;
 }
 
 #endif
