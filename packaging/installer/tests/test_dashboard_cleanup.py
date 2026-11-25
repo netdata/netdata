@@ -3,6 +3,7 @@ import io
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -132,13 +133,16 @@ bundle_dashboard()
                 tar.addfile(entry, io.BytesIO(release))
             subprocess.run(['cmake', '-S', str(self.root), '-B', str(build),
                             '-DDASHBOARD_URL=' + archive.as_uri()], check=True, capture_output=True)
-            for _ in range(2):
-                subprocess.run(['cmake', '--install', str(build), '--prefix', str(self.prefix)],
-                               env=dict(os.environ, CMAKE_INSTALL_MODE='REL_SYMLINK'),
-                               check=True, capture_output=True)
-                index = self.prefix / 'web/v3/index.html'
-                self.assertTrue(index.is_symlink())
-                self.assertEqual(index.read_bytes(), release)
+            for mode in ('REL_SYMLINK', 'ABS_SYMLINK'):
+                prefix = self.prefix / mode
+                for _ in range(2):
+                    subprocess.run(['cmake', '--install', str(build), '--prefix', str(prefix)],
+                                   env=dict(os.environ, CMAKE_INSTALL_MODE=mode),
+                                   check=True, capture_output=True)
+                    index = prefix / 'web/v3/index.html'
+                    self.assertTrue(index.is_symlink())
+                    self.assertEqual(index.readlink().is_absolute(), mode == 'ABS_SYMLINK')
+                    self.assertEqual(index.read_bytes(), release)
 
     @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
     def test_reconfigure_and_install_two_bundles(self):
@@ -176,21 +180,30 @@ netdata_banner() { :; }
         self.put(self.root / 'user-web/v3/keep.js')
         installed = self.prefix / 'custom web/v3'
         self.put(installed / 'before-first-install.css')
-        for version, asset in [('v2', 'retired/old.gif'), ('v3', 'nested/current.js')]:
+        for version, asset in [('v2', 'old/chunk.js'), ('v3', 'new/chunk.js')]:
             if version == 'v3':
                 agent = self.prefix / 'usr/sbin/netdata'
                 self.put(agent)
                 agent.chmod(0o755)
             with tarfile.open(archive, 'w:gz') as tar:
-                for name in ('index.html', asset, '.well-known/id'):
+                for name, content in [('index.html', b'dashboard'), ('manifest.txt', asset.encode()),
+                                      (asset, b'chunk'), ('.well-known/id', b'id')]:
                     entry = tarfile.TarInfo(f'dist/agent/{version}/{name}')
-                    entry.size = 2
-                    tar.addfile(entry, io.BytesIO(b'ok'))
+                    entry.mtime = 1700000000
+                    entry.size = len(content)
+                    tar.addfile(entry, io.BytesIO(content))
+                entry = tarfile.TarInfo(f'dist/agent/{version}/linked-assets')
+                entry.type = tarfile.SYMTYPE
+                entry.linkname = asset.split('/')[0]
+                tar.addfile(entry)
             subprocess.run(['cmake', '-S', str(self.root), '-B', str(build),
                             '-DCMAKE_INSTALL_PREFIX=' + str(self.prefix),
                             '-DDASHBOARD_URL=' + archive.as_uri()], check=True, capture_output=True)
             subprocess.run(['sh', '-c', script], check=True, env=env, capture_output=True)
-            expected = {'index.html', asset, '.well-known/id'}
+            self.assertEqual((installed / 'manifest.txt').read_text(), asset)
+            self.assertEqual((installed / 'linked-assets/chunk.js').read_bytes(), b'chunk')
+            self.assertEqual(os.readlink(installed / 'linked-assets'), asset.split('/')[0])
+            expected = {'index.html', 'manifest.txt', asset, '.well-known/id'}
             if version == 'v2':
                 expected.add('before-first-install.css')
             self.assertEqual({str(p.relative_to(installed)) for p in installed.rglob('*') if p.is_file()},
@@ -211,6 +224,30 @@ netdata_banner() { :; }
                 self.assertTrue((installed / 'obsolete.js').is_file())
         subprocess.run(['sh', '-c', script], check=True, env=env, capture_output=True)
         self.assertFalse((installed / 'obsolete.js').exists())
+        # A source upgrade still installs packaged files through an administrator's
+        # directory link. The target keeps its permissions and skips stale-file cleanup.
+        relocated = self.root / 'relocated dashboard'
+        installed.rename(relocated)
+        installed.symlink_to(relocated, target_is_directory=True)
+        relocated.chmod(0o750)
+        (relocated / 'new').chmod(0o710)
+        self.put(relocated / 'local.css')
+        subprocess.run(['sh', '-c', script], check=True, env=env, capture_output=True)
+        self.assertTrue(installed.is_symlink())
+        self.assertEqual(stat.S_IMODE(relocated.stat().st_mode), 0o750)
+        self.assertEqual(stat.S_IMODE((relocated / 'new').stat().st_mode), 0o710)
+        self.assertTrue((relocated / 'local.css').is_file())
+        # A payload file cannot replace an existing directory or chmod its target.
+        index = relocated / 'index.html'
+        index.unlink()
+        index.symlink_to(relocated / 'new', target_is_directory=True)
+        result = subprocess.run(['sh', '-c', script], env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Cannot install dashboard file over directory:', result.stderr)
+        self.assertEqual(stat.S_IMODE((relocated / 'new').stat().st_mode), 0o710)
+        self.assertEqual((relocated / 'new/chunk.js').read_bytes(), b'chunk')
+        installed.unlink()
+        relocated.rename(installed)
         subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-DENABLE_DASHBOARD=OFF'],
                        check=True, capture_output=True)
         self.put(installed / 'local.css')

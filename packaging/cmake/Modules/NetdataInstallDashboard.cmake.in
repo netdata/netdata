@@ -28,8 +28,33 @@ else()
 endif()
 set(dashboard_source "${dashboard_stage}/dist/agent")
 set(dashboard_web_dest [==[@WEB_DEST@]==])
-file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/${dashboard_web_dest}"
-     TYPE DIRECTORY FILES "${dashboard_source}/")
+
+set(dashboard_destination "${CMAKE_INSTALL_PREFIX}/${dashboard_web_dest}")
+if(IS_DIRECTORY "$ENV{DESTDIR}${dashboard_destination}")
+  # Materialize the component in an empty tree. CMake can apply its normal file
+  # modes and produce its manifest without chmodding live directories or skipping
+  # changed files that happen to have the same timestamp.
+  string(RANDOM LENGTH 24 overlay_nonce)
+  set(overlay "${dashboard_build}/dashboard-overlay-${overlay_nonce}")
+  if(EXISTS "${overlay}" OR IS_SYMLINK "${overlay}")
+    message(FATAL_ERROR "Dashboard overlay directory already exists")
+  endif()
+  set(saved_destdir "$ENV{DESTDIR}")
+  set(ENV{DESTDIR} "")
+  file(INSTALL DESTINATION "${overlay}" TYPE DIRECTORY FILES "${dashboard_source}/")
+  set(ENV{DESTDIR} "${saved_destdir}")
+  string(REPLACE "${overlay}/" "${dashboard_destination}/" CMAKE_INSTALL_MANIFEST_FILES
+         "${CMAKE_INSTALL_MANIFEST_FILES}")
+  execute_process(COMMAND sh [==[@NETDATA_DASHBOARD_MODULE_DIR@/../../installer/overlay-dashboard.sh]==]
+                  "${overlay}" "${dashboard_source}" "${saved_destdir}${dashboard_destination}"
+                  RESULT_VARIABLE overlay_status)
+  file(REMOVE_RECURSE "${overlay}")
+  if(NOT overlay_status STREQUAL "0")
+    message(FATAL_ERROR "Failed to install dashboard files: ${overlay_status}")
+  endif()
+else()
+  file(INSTALL DESTINATION "${dashboard_destination}" TYPE DIRECTORY FILES "${dashboard_source}/")
+endif()
 
 if("$ENV{NETDATA_INSTALLER_DASHBOARD_UPGRADE}" STREQUAL "1")
   execute_process(COMMAND sh [==[@NETDATA_DASHBOARD_MODULE_DIR@/../../installer/cleanup-dashboard.sh]==]

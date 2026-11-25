@@ -78,6 +78,7 @@ In most cases, you can update Netdata using our one-line kickstart script. This 
 Source and static installers that ship the bundled dashboard remove obsolete regular files from the
 installed `web/v3/` directory, including locally added files. Keep custom dashboards elsewhere in the web root.
 Cleanup skips linked or separately mounted web paths. This includes a separate `/usr` mount when the install prefix is `/`.
+If `web/v3` is a directory symlink, a source upgrade still updates the packaged files through it and preserves the target directory's permissions.
 If cleanup fails, the installer logs a warning and continues the upgrade. Installation and activation failures still return an error.
 
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to this command to make sure it finds Netdata.
