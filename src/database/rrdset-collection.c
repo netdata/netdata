@@ -47,8 +47,14 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     // switch update every to the storage engine
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-            rrddim_tier_update_every_changed(rd, tier);
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+            // a tier whose update every does not fit keeps its handle, flushed, and stores nothing
+            uint32_t tier_update_every = rrdset_tier_update_every_s(st, tier);
+            if (tier_update_every)
+                storage_engine_store_change_collection_frequency(rd->tiers[tier].sch, tier_update_every);
+            else
+                storage_engine_store_flush(rd->tiers[tier].sch);
+        }
     }
     rrddim_foreach_done(rd);
 

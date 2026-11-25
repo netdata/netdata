@@ -20,7 +20,7 @@ bool rrdset_update_every_is_valid(time_t update_every_s);
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s);
 
 // The update every of a storage tier of the chart (chart update every x tier grouping), or 0 when it does not fit
-// in INT32_MAX seconds. A tier with 0 gets no collect handle for the chart, so it never stores with a wrapped step.
+// in INT32_MAX seconds. A tier with 0 stores nothing for the chart, so it never stores with a wrapped step.
 static inline uint32_t rrdset_tier_update_every_s(RRDSET *st, size_t tier) {
     uint64_t update_every_s = (uint64_t)st->rrdhost->db[tier].tier_grouping * (uint64_t)st->update_every;
     return (update_every_s <= INT32_MAX) ? (uint32_t)update_every_s : 0;

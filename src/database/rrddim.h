@@ -312,7 +312,6 @@ NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUB
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
 bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd);
-void rrddim_tier_update_every_changed(RRDDIM *rd, size_t tier);
 
 void rrddim_free(RRDSET *st, RRDDIM *rd);
 

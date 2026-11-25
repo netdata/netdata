@@ -313,7 +313,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = qn->rrdhost->db[tier].eng;
         tier_retention[tier].eng = eng;
-        tier_retention[tier].db_update_every_s = (time_t) (qn->rrdhost->db[tier].tier_grouping * ri->update_every_s);
+        tier_retention[tier].db_update_every_s = (time_t)MIN((int64_t)qn->rrdhost->db[tier].tier_grouping * (int64_t)ri->update_every_s, (int64_t)INT32_MAX);
 
         if(rd && rd->tiers[tier].smh)
             tier_retention[tier].smh = eng->api.metric_dup(rd->tiers[tier].smh);
