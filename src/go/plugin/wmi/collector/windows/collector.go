@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package windows collects host metrics over remote Windows Management Instrumentation.
+// Package windows collects host metrics from a remote Windows host over WMI.
 package windows
 
 import (
@@ -33,7 +33,8 @@ func init() {
 	})
 }
 
-type queryClient interface {
+// querySession is one collection cycle's WMI session, over either transport.
+type querySession interface {
 	Query(ctx context.Context, wql string) ([]map[string]any, error)
 	Close()
 }
@@ -47,8 +48,8 @@ type Collector struct {
 	vnode         *vnodes.VirtualNode
 	nextInventory time.Time
 
-	winrmTLS *tls.Config
-	open     func(context.Context) (queryClient, error)
+	winrmTLS   *tls.Config
+	newSession func(context.Context) (querySession, error)
 }
 
 func New() *Collector {
@@ -58,15 +59,19 @@ func New() *Collector {
 		store:   store,
 		metrics: newCollectorMetrics(store),
 	}
-	c.open = c.openSession
+	c.newSession = c.openSession
 	return c
 }
 
-func (c *Collector) openSession(ctx context.Context) (queryClient, error) {
-	if c.Transport == "winrm" {
+func (c *Collector) openSession(ctx context.Context) (querySession, error) {
+	if c.Transport == transportWinRM {
 		return wmiquery.OpenWinRM(c.Host, c.Username, c.Password, c.winrmTLS), nil
 	}
-	return wmiquery.Open(ctx, c.Host, c.Username, c.Password, c.Auth)
+	session, err := wmiquery.OpenDCOM(ctx, c.Host, c.Username, c.Password)
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
 }
 
 func (c *Collector) Configuration() any { return c.Config }
@@ -75,20 +80,21 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := c.Config.validate(); err != nil {
 		return err
 	}
-	if c.Transport == "winrm" {
-		cfg, err := tlscfg.NewTLSConfig(ctx, tlscfg.TLSConfig{TLSCA: c.TLSCA})
+	if c.Transport == transportWinRM {
+		cfg, err := tlscfg.NewTLSConfig(ctx, tlscfg.TLSConfig{
+			TLSCA: c.TLSCA,
+		})
 		if err != nil {
 			return err
 		}
 		c.winrmTLS = cfg
 	}
 	c.vnode = newVirtualNode(c.Host)
-	c.nextInventory = time.Time{}
 	return nil
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	// Readiness is determined solely by the enabled metric groups.
+	// Readiness depends only on the enabled metric groups.
 	_, err := c.poll(ctx, false)
 	return err
 }
@@ -100,10 +106,10 @@ func (c *Collector) Collect(ctx context.Context) error {
 		return err
 	}
 	c.metrics.write(snapshot)
-	return ctx.Err()
+	return nil
 }
 
-// Each poll closes its own client.
+// Cleanup has nothing to release: every poll closes its own session.
 func (c *Collector) Cleanup(context.Context) {}
 
 func (c *Collector) VirtualNode() *vnodes.VirtualNode { return c.vnode }

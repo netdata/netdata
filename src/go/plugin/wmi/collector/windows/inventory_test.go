@@ -16,37 +16,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func metricQueries(queries []string) []string {
-	var metrics []string
-	for _, query := range queries {
-		switch query {
-		case cpuProjection, memoryProjection, networkProjection, diskProjection:
-			metrics = append(metrics, query)
-		}
-	}
-	return metrics
-}
-
 func TestInventoryRefresh(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		c := configuredCollector()
 		c.Host = "192.0.2.14"
-		session := &fakeSession{results: validQueryResults()}
+		session := &fakeSession{
+			results: validQueryResults(),
+		}
 		session.results[queryOSInfo] = fixtureRows(map[string]any{
-			"CSName": "FILE01", "Caption": "Microsoft Windows Server 2022 Datacenter Evaluation", "ProductType": uint32(3), "Version": "10.0.20348", "BuildNumber": "20348",
+			"CSName":      "FILE01",
+			"Caption":     "Microsoft Windows Server 2022 Datacenter Evaluation",
+			"ProductType": uint32(3),
+			"Version":     "10.0.20348",
+			"BuildNumber": "20348",
 		})
 		session.results[querySystemInfo] = fixtureRows(map[string]any{
-			"Manufacturer": "QEMU", "Model": "Standard PC", "NumberOfLogicalProcessors": uint32(8),
+			"Manufacturer":              "QEMU",
+			"Model":                     "Standard PC",
+			"NumberOfLogicalProcessors": uint32(8),
 		})
 		session.results[queryProcessorInfo] = fixtureRows(map[string]any{
-			"Architecture": uint16(9), "Name": "Test CPU", "CurrentClockSpeed": uint32(2000),
+			"Architecture":      uint16(9),
+			"Name":              "Test CPU",
+			"CurrentClockSpeed": uint32(2000),
 		})
-		session.results[queryInstalledMemory] = fixtureRows(map[string]any{"Capacity": "8589934592"}, map[string]any{"Capacity": uint64(4294967296)})
-		c.open = func(context.Context) (queryClient, error) { return session, nil }
+		session.results[queryInstalledMemory] = fixtureRows(
+			map[string]any{"Capacity": "8589934592"},
+			map[string]any{"Capacity": uint64(4294967296)},
+		)
+		c.newSession = func(context.Context) (querySession, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
 		initial := c.VirtualNode()
 		require.NoError(t, c.Check(t.Context()))
-		require.Equal(t, []string{cpuProjection, memoryProjection, networkProjection, diskProjection}, session.queries, "readiness must only wait for metrics")
+		require.Equal(
+			t,
+			[]string{queryCPU, queryMemory, queryNetwork, queryDisk},
+			session.queries,
+			"readiness must only wait for metrics",
+		)
 		_, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
 		node := c.VirtualNode()
@@ -54,15 +61,34 @@ func TestInventoryRefresh(t *testing.T) {
 		assert.Equal(t, "192.0.2.14", initial.Hostname)
 		assert.Equal(t, "FILE01", node.Hostname)
 		assert.Equal(t, map[string]string{
-			"_vnode_type": "wmi", "address": "192.0.2.14", "_os": "windows", "_os_name": "Windows Server", "_os_version": "Microsoft Windows Server 2022 Datacenter Evaluation", "_os_marketing_version": "2022", "_os_edition": "Datacenter Evaluation", "_kernel_version": "Windows 10.0.20348 Build: 20348", "_hw_product_name": "Standard PC", "_hw_sys_vendor": "QEMU", "_virtualization": "qemu", "_virt_detection": "wmi", "_hw_product_type": "vm", "_system_cores": "8", "_system_cpu_model": "Test CPU", "_architecture": "x86_64", "_system_cpu_freq": "2000000000", "_system_ram_total": "12884901888",
+			"_vnode_type":           "wmi",
+			"address":               "192.0.2.14",
+			"_os":                   "windows",
+			"_os_name":              "Windows Server",
+			"_os_version":           "Microsoft Windows Server 2022 Datacenter Evaluation",
+			"_os_marketing_version": "2022",
+			"_os_edition":           "Datacenter Evaluation",
+			"_kernel_version":       "Windows 10.0.20348 Build: 20348",
+			"_hw_product_name":      "Standard PC",
+			"_hw_sys_vendor":        "QEMU",
+			"_virtualization":       "qemu",
+			"_virt_detection":       "wmi",
+			"_hw_product_type":      "vm",
+			"_system_cores":         "8",
+			"_system_cpu_model":     "Test CPU",
+			"_architecture":         "x86_64",
+			"_system_cpu_freq":      "2000000000",
+			"_system_ram_total":     "12884901888",
 		}, node.Labels)
 		session.queries = nil
 		metrics, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
 		require.NotEmpty(t, metrics)
-		assert.Equal(t, []string{cpuProjection, memoryProjection, networkProjection, diskProjection}, session.queries)
+		assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, session.queries)
 		time.Sleep(inventoryInterval)
-		session.results[queryOSInfo] = queryResult{err: errors.New("withheld")}
+		session.results[queryOSInfo] = queryResult{
+			err: errors.New("withheld"),
+		}
 		session.results[queryInstalledMemory] = fixtureRows(map[string]any{"Capacity": "1"}, map[string]any{})
 		_, err = collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
@@ -97,8 +123,10 @@ func (s *slowInventorySession) Query(ctx context.Context, query string) ([]map[s
 func TestInventoryTimeoutPreservesMetrics(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		c := configuredCollector()
-		session := &slowInventorySession{fakeSession{results: validQueryResults()}}
-		c.open = func(context.Context) (queryClient, error) { return session, nil }
+		session := &slowInventorySession{fakeSession{
+			results: validQueryResults(),
+		}}
+		c.newSession = func(context.Context) (querySession, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
 		start := time.Now()
 		metrics, err := collecttest.CollectScalarSeries(c)
@@ -110,23 +138,28 @@ func TestInventoryTimeoutPreservesMetrics(t *testing.T) {
 }
 
 func TestInventoryDisabledQueries(t *testing.T) {
-	for _, named := range []bool{false, true} {
-		c := configuredCollector()
-		if named {
-			c.Vnode = "manual"
-		}
-		c.Collectors.Disk = new(false)
-		session := &fakeSession{results: validQueryResults()}
-		c.open = func(context.Context) (queryClient, error) { return session, nil }
-		require.NoError(t, c.Init(t.Context()))
-		_, err := collecttest.CollectScalarSeries(c)
-		require.NoError(t, err)
-		if named {
-			assert.Equal(t, []string{cpuProjection, memoryProjection, networkProjection}, session.queries)
-		} else {
+	for name, vnode := range map[string]string{
+		"generated vnode skips the disk capacity query": "",
+		"named vnode skips the inventory":               "manual",
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := configuredCollector()
+			c.Vnode = vnode
+			c.Collectors.Disk = new(false)
+			session := &fakeSession{
+				results: validQueryResults(),
+			}
+			c.newSession = func(context.Context) (querySession, error) { return session, nil }
+			require.NoError(t, c.Init(t.Context()))
+			_, err := collecttest.CollectScalarSeries(c)
+			require.NoError(t, err)
+			if vnode != "" {
+				assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork}, session.queries)
+				return
+			}
 			assert.Contains(t, session.queries, queryOSInfo)
 			assert.NotContains(t, strings.Join(session.queries, " "), "Win32_LogicalDisk")
-		}
+		})
 	}
 }
 

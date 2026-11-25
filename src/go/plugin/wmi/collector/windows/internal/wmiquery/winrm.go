@@ -20,44 +20,71 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-const cimv2Resource = "http://schemas.microsoft.com/wbem/wsman/1/wmi/root/cimv2/*"
+const (
+	winRMHTTPSPort = "5986"
+	cimv2Resource  = "http://schemas.microsoft.com/wbem/wsman/1/wmi/root/cimv2/*"
+	// maxEnvelopeBytes matches the MaxEnvelopeSize that go-wsman advertises in every request.
+	maxEnvelopeBytes = 153600
+)
 
-type winRMClient struct {
-	endpoint  string
-	client    *wsman.HTTPTransport
-	transport *http.Transport
+// WinRMSession is one collection cycle's WMI session over the WinRM HTTPS listener.
+type WinRMSession struct {
+	endpoint string
+	wsman    *wsman.HTTPTransport
+	http     *http.Transport
+	// failed keeps the first transport failure. A refused connection, an
+	// untrusted certificate or a rejected login fails every later request the
+	// same way, and repeating a rejected login counts toward account lockout.
+	failed error
 }
 
-// OpenWinRM creates a poll-scoped client for the remote Windows HTTPS listener.
-func OpenWinRM(host, username, password string, tlsConfig *tls.Config) *winRMClient {
-	endpoint := url.URL{Scheme: "https", Host: net.JoinHostPort(host, "5986"), Path: "/wsman"}
-	return newWinRM(endpoint.String(), username, password, tlsConfig)
+// OpenWinRM creates a session for the WinRM HTTPS listener on host, authenticating
+// with NTLMv2. It does not contact the host; the first Query does.
+func OpenWinRM(host, username, password string, tlsConfig *tls.Config) *WinRMSession {
+	endpoint := url.URL{
+		Scheme: "https",
+		Host:   net.JoinHostPort(host, winRMHTTPSPort),
+		Path:   "/wsman",
+	}
+	return newWinRMSession(endpoint.String(), username, password, tlsConfig)
 }
 
-func newWinRM(endpoint, username, password string, tlsConfig *tls.Config) *winRMClient {
+func newWinRMSession(endpoint, username, password string, tlsConfig *tls.Config) *WinRMSession {
 	// A session owns its HTTP/1.1 transport and NTLM identity. The negotiator may
 	// retain the first 401 response while starting its handshake on another connection.
-	base := &http.Transport{TLSClientConfig: tlsConfig}
-	client := wsman.NewHTTPTransport(endpoint, &http.Client{
-		Transport: winRMTransport{negotiator: ntlmssp.Negotiator{RoundTripper: base}},
+	base := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+	sender := wsman.NewHTTPTransport(endpoint, &http.Client{
+		Transport: authenticatedTransport{
+			negotiator: ntlmssp.Negotiator{
+				RoundTripper: base,
+			},
+		},
 	})
-	// Negotiator consumes these credentials locally with Basic authentication disabled.
-	client.SetCredentials(username, password)
-	return &winRMClient{endpoint: endpoint, client: client, transport: base}
+	// The negotiator consumes these credentials locally; Basic authentication is never sent.
+	sender.SetCredentials(username, password)
+	return &WinRMSession{
+		endpoint: endpoint,
+		wsman:    sender,
+		http:     base,
+	}
 }
 
-type winRMTransport struct {
+// authenticatedTransport authenticates with NTLM and accepts only the statuses
+// that carry a WS-Management envelope.
+type authenticatedTransport struct {
 	negotiator ntlmssp.Negotiator
 }
 
-func (t winRMTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t authenticatedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := t.negotiator.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
 	switch resp.StatusCode {
 	case http.StatusOK, http.StatusInternalServerError: // WinRM returns SOAP faults with status 500.
-		resp.Body = web.LimitResponseBody(resp.Body, 153600) // MaxEnvelopeSize advertised by go-wsman.
+		resp.Body = web.LimitResponseBody(resp.Body, maxEnvelopeBytes)
 		return resp, nil
 	default:
 		// In particular, never follow a redirect to another endpoint with these credentials.
@@ -66,23 +93,24 @@ func (t winRMTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 }
 
-func (c *winRMClient) Close() { c.transport.CloseIdleConnections() }
+func (s *WinRMSession) Close() { s.http.CloseIdleConnections() }
 
-func (c *winRMClient) Query(ctx context.Context, wql string) ([]map[string]any, error) {
+// Query reads the caller's fixed WQL projection from root/cimv2 with WS-Enumeration.
+func (s *WinRMSession) Query(ctx context.Context, wql string) ([]map[string]any, error) {
 	// Windows WinRM rejects numeric XML character references around WQL string
 	// literals. Only the fixed query contributes apostrophes to this envelope.
-	request, err := wsman.BuildEnumerateRequest(cimv2Resource, c.endpoint, wsman.WithWQL(wql))
+	request, err := wsman.BuildEnumerateRequest(cimv2Resource, s.endpoint, wsman.WithWQL(wql))
 	if err != nil {
 		return nil, diagnostic("could not encode WinRM enumeration")
 	}
 	request = bytes.ReplaceAll(request, []byte("&#39;"), []byte("'"))
-	data, err := c.client.Send(ctx, request)
+	data, err := s.send(ctx, request)
 	if err != nil {
-		return nil, winRMError(ctx, err)
+		return nil, err
 	}
 	cursor, err := wsman.ParseEnumerateResponse(data)
 	if err != nil {
-		return nil, winRMError(ctx, err)
+		return nil, responseError(ctx, err)
 	}
 	var rows []map[string]any
 	for {
@@ -97,17 +125,17 @@ func (c *winRMClient) Query(ctx context.Context, wql string) ([]map[string]any, 
 		if err := xml.EscapeText(&escaped, []byte(cursor)); err != nil {
 			return nil, diagnostic("invalid WinRM enumeration context")
 		}
-		request, err = wsman.BuildPullRequest(cimv2Resource, c.endpoint, escaped.String())
+		request, err = wsman.BuildPullRequest(cimv2Resource, s.endpoint, escaped.String())
 		if err != nil {
 			return nil, diagnostic("could not encode WinRM pull")
 		}
-		data, err = c.client.Send(ctx, request)
+		data, err = s.send(ctx, request)
 		if err != nil {
-			return nil, winRMError(ctx, err)
+			return nil, err
 		}
 		page, err := wsman.ParsePullResponse(data)
 		if err != nil {
-			return nil, winRMError(ctx, err)
+			return nil, responseError(ctx, err)
 		}
 		for _, instance := range page.Items {
 			rows = append(rows, winRMRow(instance))
@@ -119,25 +147,51 @@ func (c *winRMClient) Query(ctx context.Context, wql string) ([]map[string]any, 
 	}
 }
 
-func winRMError(ctx context.Context, err error) error {
+// send posts one envelope. go-wsman returns WS-Management faults as data, so
+// every error here is a connection, TLS or HTTP status failure of the session.
+func (s *WinRMSession) send(ctx context.Context, request []byte) ([]byte, error) {
+	if s.failed != nil {
+		return nil, s.failed
+	}
+	data, err := s.wsman.Send(ctx, request)
+	if err == nil {
+		return data, nil
+	}
 	if ctx.Err() != nil {
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
-	if detail := SafeMessage(err); detail != "" {
-		return diagnostic(detail)
-	}
+	s.failed = sessionError{transportError(err)}
+	return nil, s.failed
+}
+
+func transportError(err error) error {
 	var certErr *tls.CertificateVerificationError
-	var fault *wsman.Fault
 	switch {
+	case SafeMessage(err) != "":
+		return diagnostic(SafeMessage(err))
 	case errors.As(err, &certErr):
 		return diagnostic("WinRM server certificate verification failed")
-	case errors.As(err, &fault):
-		return diagnostic("WinRM returned a WS-Management fault")
+	case networkFailure(err) != "":
+		return diagnostic("WinRM request failed: " + networkFailure(err))
 	default:
 		return diagnostic("WinRM request failed")
 	}
 }
 
+func responseError(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var fault *wsman.Fault
+	if errors.As(err, &fault) {
+		return diagnostic("WinRM returned a WS-Management fault")
+	}
+	return diagnostic("WinRM returned an invalid response")
+}
+
+// winRMRow converts WS-Management text values to the value shapes DCOM returns
+// for the collector's projections. The XML carries no CIM types, so array and
+// reference properties are recognized by name.
 func winRMRow(instance *wsman.Instance) map[string]any {
 	properties := instance.PropertiesList()
 	row := make(map[string]any, len(properties))

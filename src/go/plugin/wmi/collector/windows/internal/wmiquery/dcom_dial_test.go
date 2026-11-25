@@ -4,16 +4,12 @@ package wmiquery
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/oiweiwei/go-msrpc/dcerpc"
 	activation "github.com/oiweiwei/go-msrpc/msrpc/dcom/iactivation/v0"
-	"github.com/oiweiwei/go-msrpc/msrpc/erref/hresult"
 	"github.com/oiweiwei/go-msrpc/ssp/ntlm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +31,10 @@ func TestSecurityOptionsUseIndependentNTLMv2Credentials(t *testing.T) {
 		assert.True(t, message.Negotiate.IsSet(ntlm.NegotiateSign|ntlm.NegotiateSeal|ntlm.Negotiate128))
 	}
 
-	challenge := testChallenge(t, ntlm.NegotiateSign|ntlm.NegotiateSeal|ntlm.Negotiate128|ntlm.NegotiateExtendedSessionSecurity|ntlm.NegotiateTargetInfo)
+	challenge := testChallenge(
+		t,
+		ntlm.NegotiateSign|ntlm.NegotiateSeal|ntlm.Negotiate128|ntlm.NegotiateExtendedSessionSecurity|ntlm.NegotiateTargetInfo,
+	)
 	authFirst, err := first.Init(ctx, challenge)
 	require.NoError(t, err)
 	authSecond, err := second.Init(ctx, challenge)
@@ -83,9 +82,10 @@ func TestSecurityDoesNotDowngrade(t *testing.T) {
 
 func testSecurity(t *testing.T, host, username, password string) *dcerpc.Security {
 	t.Helper()
-	opts, err := securityOptions(host, username, password, "ntlm")
-	require.NoError(t, err)
-	parsed, err := dcerpc.ParseOptions(t.Context(), append(opts, dcerpc.WithAbstractSyntax(activation.ActivationSyntaxV0_0))...)
+	opts := securityOptions(host, username, password)
+	parsed, err := dcerpc.ParseOptions(
+		t.Context(),
+		append(opts, dcerpc.WithAbstractSyntax(activation.ActivationSyntaxV0_0))...)
 	require.NoError(t, err)
 	require.Equal(t, dcerpc.AuthTypeWinNT, parsed.Security.Type)
 	require.Equal(t, dcerpc.AuthLevelPktPrivacy, parsed.Security.Level)
@@ -100,59 +100,14 @@ func testChallenge(t *testing.T, flags ntlm.Flag) []byte {
 	}
 	if flags.IsSet(ntlm.NegotiateTargetInfo) {
 		message.TargetInfo = ntlm.AttrValues{
-			ntlm.AttrNetBIOSComputerName: &ntlm.Value{NetBIOSComputerName: "SERVER"},
+			ntlm.AttrNetBIOSComputerName: &ntlm.Value{
+				NetBIOSComputerName: "SERVER",
+			},
 		}
 	}
 	buf, err := message.Marshal(t.Context())
 	require.NoError(t, err)
 	return buf
-}
-
-func TestOpenRejectsMissingSecurityOptions(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
-	defer cancel()
-	for _, config := range []struct {
-		auth     string
-		username string
-		password string
-		want     string
-	}{
-		{"", "reader", "synthetic", "explicitly set to ntlm"},
-		{"kerberos", "reader", "synthetic", "explicitly set to ntlm"},
-		{"ntlm", "", "synthetic", "username and password are required"},
-		{"ntlm", "DOMAIN\\", "synthetic", "username and password are required"},
-		{"ntlm", "reader", "", "username and password are required"},
-	} {
-		c, err := Open(ctx, "server.example.test", config.username, config.password, config.auth)
-		assert.Nil(t, c)
-		assert.Contains(t, SafeMessage(err), config.want)
-	}
-}
-
-func TestScopedIPv6ReachesResolverOnTheSpecifiedInterface(t *testing.T) {
-	const host = "fe80::1%test0"
-	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
-	defer cancel()
-	var addresses []string
-	client := &Client{
-		ctx:    ctx,
-		cancel: cancel,
-		dialer: rpcDialer{
-			host: host,
-			ctx:  ctx,
-			dial: func(_ context.Context, _, address string) (net.Conn, error) {
-				addresses = append(addresses, address)
-				return nil, syscall.ECONNREFUSED
-			},
-		},
-	}
-	defer client.Close()
-	err := client.open(host, "reader", "synthetic", "ntlm")
-	require.Error(t, err)
-	require.NotEmpty(t, addresses)
-	for _, address := range addresses {
-		assert.Equal(t, "[fe80::1%test0]:135", address)
-	}
 }
 
 func TestDialerPinsTheConfiguredHostAndClosesOnCancellation(t *testing.T) {
@@ -168,7 +123,9 @@ func TestDialerPinsTheConfiguredHostAndClosesOnCancellation(t *testing.T) {
 			client, peer := net.Pipe()
 			peers = append(peers, peer)
 			t.Cleanup(func() { _ = peer.Close() })
-			return fixedRemoteAddr{Conn: client}, nil
+			return fixedRemoteAddr{
+				Conn: client,
+			}, nil
 		},
 	}
 	t.Cleanup(dialer.close)
@@ -192,20 +149,8 @@ func TestDialerPinsTheConfiguredHostAndClosesOnCancellation(t *testing.T) {
 type fixedRemoteAddr struct{ net.Conn }
 
 func (fixedRemoteAddr) RemoteAddr() net.Addr {
-	return &net.TCPAddr{IP: net.IPv4(192, 0, 2, 1), Port: 135}
-}
-
-func TestSafeMessageRedactsRawErrors(t *testing.T) {
-	ctx := t.Context()
-	raw := fmt.Errorf("untrusted detail: %w", &net.DNSError{Err: "synthetic secret", Name: "private-name"})
-	assert.Empty(t, SafeMessage(raw))
-	assert.Equal(t, "bind: could not resolve the WMI host", SafeMessage(rpcFailure(ctx, "bind", raw)))
-	assert.Equal(t, "bind: connection refused",
-		SafeMessage(rpcFailure(ctx, "bind", fmt.Errorf("untrusted detail: %w", syscall.ECONNREFUSED))))
-	assert.Equal(t, "open namespace: RPC_E_ACCESS_DENIED (0x8001011b)",
-		SafeMessage(rpcFailure(ctx, "open namespace", fmt.Errorf("untrusted detail: %w", hresult.RpcEAccessDenied))))
-	rejection := &dcerpc.Result{DefResult: dcerpc.ProviderRejection, ProviderReason: dcerpc.AbstractSyntaxNotSupported}
-	assert.Equal(t, "read results: provider_rejection: abstract syntax not supported", SafeMessage(rpcFailure(ctx, "read results", fmt.Errorf("untrusted detail: %w", rejection))))
-	assert.Equal(t, "bind: RPC failed", SafeMessage(rpcFailure(ctx, "bind", errors.New("synthetic secret"))))
-	assert.Equal(t, "WMI collection timed out", SafeMessage(fmt.Errorf("untrusted detail: %w", context.DeadlineExceeded)))
+	return &net.TCPAddr{
+		IP:   net.IPv4(192, 0, 2, 1),
+		Port: 135,
+	}
 }

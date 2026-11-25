@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -15,13 +16,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-)
-
-const (
-	cpuProjection     = "SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor WHERE Name = '_Total'"
-	memoryProjection  = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
-	networkProjection = "SELECT Name, BytesReceivedPerSec, BytesSentPerSec FROM Win32_PerfFormattedData_Tcpip_NetworkInterface"
-	diskProjection    = "SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType = 3"
 )
 
 type queryResult struct {
@@ -63,16 +57,16 @@ func fixtureRows(records ...map[string]any) queryResult {
 
 func validQueryResults() map[string]queryResult {
 	return map[string]queryResult{
-		cpuProjection: fixtureRows(map[string]any{"PercentProcessorTime": uint32(0)}),
-		memoryProjection: fixtureRows(map[string]any{
+		queryCPU: fixtureRows(map[string]any{"PercentProcessorTime": uint32(0)}),
+		queryMemory: fixtureRows(map[string]any{
 			"TotalVisibleMemorySize": "8388608",
 			"FreePhysicalMemory":     uint64(2097152),
 		}),
-		networkProjection: fixtureRows(
+		queryNetwork: fixtureRows(
 			map[string]any{"Name": "Ethernet", "BytesReceivedPerSec": uint32(190), "BytesSentPerSec": uint64(30)},
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPerSec": uint64(0), "BytesSentPerSec": int32(70)},
 		),
-		diskProjection: fixtureRows(
+		queryDisk: fixtureRows(
 			map[string]any{"DeviceID": "C:", "Size": uint64(500000000000), "FreeSpace": uint64(420000000000)},
 			map[string]any{"DeviceID": "D:", "Size": "4294967296", "FreeSpace": "0"},
 		),
@@ -97,22 +91,22 @@ func TestCollector_Collect(t *testing.T) {
 	}
 	// These source readings distinguish absent properties, malformed numbers,
 	// valid zero, and entities missing from a successful table response.
-	sessions[1].results[cpuProjection] = queryResult{
+	sessions[1].results[queryCPU] = queryResult{
 		err: errors.New("fixture-secret"),
 	}
-	sessions[1].results[memoryProjection] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
-	sessions[1].results[networkProjection] = fixtureRows(
+	sessions[1].results[queryMemory] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
+	sessions[1].results[queryNetwork] = fixtureRows(
 		map[string]any{"Name": "Ethernet", "BytesReceivedPerSec": "0", "BytesSentPerSec": "malformed"},
 		map[string]any{"Name": "_Total", "BytesReceivedPerSec": uint32(30)},
 		map[string]any{"BytesSentPerSec": uint64(20)},
 	)
-	sessions[1].results[diskProjection] = fixtureRows(
+	sessions[1].results[queryDisk] = fixtureRows(
 		map[string]any{"DeviceID": "C:", "Size": uint64(300), "FreeSpace": uint64(300)},
 		map[string]any{"DeviceID": "D:", "Size": uint64(500)},
 	)
 
 	next := 0
-	c.open = func(ctx context.Context) (queryClient, error) {
+	c.newSession = func(ctx context.Context) (querySession, error) {
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok)
 		assert.Positive(t, time.Until(deadline))
@@ -155,7 +149,7 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Equal(t, first, recovered)
 
 	for _, session := range sessions {
-		assert.Equal(t, []string{cpuProjection, memoryProjection, networkProjection, diskProjection}, metricQueries(session.queries))
+		assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, metricQueries(session.queries))
 		assert.Equal(t, 1, session.closed)
 	}
 	c.Cleanup(t.Context())
@@ -184,11 +178,11 @@ func TestCollector_CheckFailure(t *testing.T) {
 			c.Collectors.Disk = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
-					cpuProjection:    {err: tc.queryErr},
-					memoryProjection: {err: tc.queryErr},
+					queryCPU:    {err: tc.queryErr},
+					queryMemory: {err: tc.queryErr},
 				},
 			}
-			c.open = func(_ context.Context) (queryClient, error) {
+			c.newSession = func(_ context.Context) (querySession, error) {
 				if tc.openErr != nil {
 					return nil, tc.openErr
 				}
@@ -216,7 +210,7 @@ type cancellableSession struct {
 func (f *cancellableSession) Query(ctx context.Context, wql string) ([]map[string]any, error) {
 	f.queries = append(f.queries, wql)
 	assert.Same(f.t, f.ctx, ctx)
-	if wql == cpuProjection {
+	if wql == queryCPU {
 		return fixtureRows(map[string]any{"PercentProcessorTime": uint32(12)}).rows, nil
 	}
 	f.cancel()
@@ -233,7 +227,7 @@ func TestCollector_CancelDiscardsPartialCycle(t *testing.T) {
 		t:      t,
 		cancel: cancel,
 	}
-	c.open = func(ctx context.Context) (queryClient, error) {
+	c.newSession = func(ctx context.Context) (querySession, error) {
 		session.ctx = ctx
 		return session, nil
 	}
@@ -246,7 +240,7 @@ func TestCollector_CancelDiscardsPartialCycle(t *testing.T) {
 	assert.ErrorIs(t, c.Collect(ctx), context.Canceled)
 	cycle.AbortCycle()
 
-	assert.Equal(t, []string{cpuProjection, memoryProjection}, session.queries)
+	assert.Equal(t, []string{queryCPU, queryMemory}, session.queries)
 	assert.True(t, session.closed)
 }
 
@@ -255,4 +249,59 @@ func TestChartTemplateAndMetadata(t *testing.T) {
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+}
+
+func metricQueries(queries []string) []string {
+	var metrics []string
+	for _, query := range queries {
+		switch query {
+		case queryCPU, queryMemory, queryNetwork, queryDisk:
+			metrics = append(metrics, query)
+		}
+	}
+	return metrics
+}
+
+type sessionFailure struct{ error }
+
+func (sessionFailure) SessionFailed() bool { return true }
+
+func TestCollector_SessionFailureStopsThePoll(t *testing.T) {
+	c := configuredCollector()
+	c.Transport = transportWinRM
+	session := &fakeSession{
+		results: validQueryResults(),
+	}
+	session.results[queryCPU] = queryResult{
+		err: sessionFailure{errors.New("fixture-secret rejected")},
+	}
+	c.newSession = func(context.Context) (querySession, error) { return session, nil }
+	require.NoError(t, c.Init(t.Context()))
+
+	err := c.Check(t.Context())
+	require.EqualError(t, err, "failed to open WMI session")
+	assert.Equal(t, []string{queryCPU}, session.queries)
+	assert.Equal(t, 1, session.closed)
+}
+
+type stalledSession struct{ fakeSession }
+
+func (s *stalledSession) Query(ctx context.Context, wql string) ([]map[string]any, error) {
+	s.queries = append(s.queries, wql)
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestCollector_TimeoutNamesTheLimit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		session := &stalledSession{}
+		c.newSession = func(context.Context) (querySession, error) { return session, nil }
+		require.NoError(t, c.Init(t.Context()))
+
+		err := c.Check(t.Context())
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.EqualError(t, err, "WMI collection did not finish within the 15s timeout: context deadline exceeded")
+		assert.Equal(t, []string{queryCPU}, session.queries)
+	})
 }

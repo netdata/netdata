@@ -1,18 +1,18 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Windows WMI collector configuration",
+    "title": "Windows (WMI) collector configuration.",
     "type": "object",
     "properties": {
       "host": {
         "title": "Host",
-        "description": "Windows hostname or IP address for remote WMI.",
+        "description": "Hostname or IP address of the Windows host.",
         "type": "string",
         "minLength": 1
       },
       "transport": {
         "title": "Transport",
-        "description": "Connection protocol. DCOM uses RPC. WinRM sends WMI queries over HTTPS on port 5986.",
+        "description": "Protocol that carries the WMI queries. DCOM uses TCP 135 and a dynamic RPC port; WinRM uses HTTPS on TCP 5986.",
         "type": "string",
         "enum": [
           "dcom",
@@ -22,7 +22,7 @@
       },
       "auth": {
         "title": "Authentication",
-        "description": "Authentication mechanism for the remote WMI session.",
+        "description": "Authentication protocol for the Windows account. NTLMv2 is the only supported protocol.",
         "type": "string",
         "enum": [
           "ntlm"
@@ -30,13 +30,13 @@
       },
       "username": {
         "title": "Username",
-        "description": "Account with permission to query WMI on the remote host.",
+        "description": "Windows account that reads WMI on the host, as `DOMAIN\\user`, `user@domain` or a local account name.",
         "type": "string",
         "minLength": 1
       },
       "password": {
         "title": "Password",
-        "description": "Password for the remote WMI account.",
+        "description": "Password of the Windows account.",
         "type": "string",
         "minLength": 1
       },
@@ -56,37 +56,37 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for opening the WMI session and querying all enabled groups, in seconds.",
+        "description": "Time limit for one collection, including the connection and every enabled query, in seconds.",
         "type": "number",
         "exclusiveMinimum": 0,
         "default": 15
       },
       "collectors": {
         "title": "Metric groups",
-        "description": "Choose which metric groups to collect. Keep at least one group enabled.",
+        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection. Keep at least one group enabled.",
         "type": "object",
         "properties": {
           "cpu": {
             "title": "CPU",
-            "description": "Collect aggregate processor utilization.",
+            "description": "Collect total processor utilization.",
             "type": "boolean",
             "default": true
           },
           "memory": {
             "title": "Memory",
-            "description": "Collect physical memory usage.",
+            "description": "Collect used and available physical memory.",
             "type": "boolean",
             "default": true
           },
           "network": {
             "title": "Network",
-            "description": "Collect receive and send traffic per network interface.",
+            "description": "Collect received and sent traffic per network interface.",
             "type": "boolean",
             "default": true
           },
           "disk": {
             "title": "Disk",
-            "description": "Collect used and free space per fixed logical drive.",
+            "description": "Collect used and free space per fixed drive.",
             "type": "boolean",
             "default": true
           }
@@ -121,7 +121,7 @@
               },
               "tls_ca": {
                 "title": "TLS CA file",
-                "description": "PEM certificate authority file on the poller for the WinRM HTTPS listener. Omit to use system trust.",
+                "description": "Path on the poller to the PEM file of the CA that issued the WinRM listener certificate. Leave empty to use the system trust store.",
                 "type": "string"
               }
             }
@@ -176,7 +176,22 @@
       ]
     },
     "host": {
-      "ui:placeholder": "windows.example.com"
+      "ui:placeholder": "windows.example.com",
+      "ui:help": "The value identifies the job's virtual node, so changing it later creates a new node. With WinRM, it must match a name in the listener certificate."
+    },
+    "transport": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true,
+        "enumNames": [
+          "DCOM",
+          "WinRM (HTTPS)"
+        ]
+      },
+      "ui:help": "DCOM needs no extra Windows service: enable the built-in Windows Management Instrumentation (WMI) firewall rules. The RPC traffic is encrypted.\n\nWinRM needs an HTTPS listener with a certificate the poller trusts. It uses one fixed port, which is easier to allow through firewalls between networks."
+    },
+    "tls_ca": {
+      "ui:placeholder": "/etc/netdata/ssl/windows-ca.pem"
     },
     "auth": {
       "ui:options": {
@@ -185,21 +200,16 @@
         ]
       }
     },
+    "username": {
+      "ui:placeholder": "EXAMPLE\\monitor"
+    },
     "password": {
-      "ui:widget": "password"
+      "ui:widget": "password",
+      "ui:placeholder": "${env:WMI_PASSWORD}"
     },
     "vnode": {
       "ui:placeholder": "windows-server",
-      "ui:help": "The job creates a Virtual Node for the remote host by default. To use an existing Virtual Node, enter its configured name."
-    },
-    "transport": {
-      "ui:widget": "radio",
-      "ui:options": {
-        "enumNames": [
-          "DCOM",
-          "WinRM (HTTPS)"
-        ]
-      }
+      "ui:help": "Leave empty and the job creates a virtual node for the Windows host, named after its computer name. To use a virtual node you manage instead, define it in `vnodes.conf` first, then enter its name here."
     }
   }
 }

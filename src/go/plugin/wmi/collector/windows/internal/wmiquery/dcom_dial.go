@@ -5,9 +5,6 @@ package wmiquery
 import (
 	"context"
 	"net"
-	"net/netip"
-	"strings"
-	"unicode"
 
 	"github.com/oiweiwei/go-msrpc/dcerpc"
 	"github.com/oiweiwei/go-msrpc/ssp/credential"
@@ -15,36 +12,20 @@ import (
 	"github.com/oiweiwei/go-msrpc/ssp/ntlm"
 )
 
-// ValidHost accepts hostnames and IP literals, including scoped IPv6 addresses.
-func ValidHost(host string) bool {
-	if host == "" || host == "." || strings.ContainsAny(host, " /\\?#@[]") ||
-		strings.IndexFunc(host, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
-		return false
-	}
-	if _, err := netip.ParseAddr(host); err == nil {
-		return true
-	}
-	return !strings.ContainsAny(host, ":%")
-}
-
-func securityOptions(host, username, password, auth string) ([]dcerpc.Option, error) {
-	if auth != "ntlm" {
-		return nil, diagnostic("WMI authentication must be explicitly set to ntlm")
-	}
-	creds := credential.NewFromPassword(username, password)
-	if strings.TrimSpace(creds.UserName()) == "" || password == "" {
-		return nil, diagnostic("WMI username and password are required")
-	}
+// securityOptions authenticates every bind with job-scoped NTLMv2 credentials
+// and seals the traffic (packet privacy).
+func securityOptions(host, username, password string) []dcerpc.Option {
 	config := ntlm.NewConfig()
 	config.NTLMVersion = ntlm.NTLMv2
 	mechanism := ntlm.Mechanism{}
+	creds := credential.NewFromPassword(username, password)
 	return []dcerpc.Option{
 		dcerpc.WithMechanism(mechanism, config),
 		dcerpc.WithCredentials(gssapi.NewCredential("", []gssapi.OID{mechanism.Type()}, gssapi.InitiateOnly, creds)),
 		dcerpc.WithSecurtyProvider(dcerpc.AuthTypeWinNT),
 		dcerpc.WithTargetName("host/" + host),
 		dcerpc.WithSeal(),
-	}, nil
+	}
 }
 
 // rpcDialer owns every TCP socket in a collection cycle. The advertised WMI ports
@@ -84,7 +65,10 @@ func (d *rpcDialer) DialContext(ctx context.Context, network, address string) (n
 	}
 	d.pinned, _, _ = net.SplitHostPort(conn.RemoteAddr().String())
 	stop := context.AfterFunc(d.ctx, func() { _ = conn.Close() })
-	d.sockets = append(d.sockets, rpcSocket{conn: conn, stop: stop})
+	d.sockets = append(d.sockets, rpcSocket{
+		conn: conn,
+		stop: stop,
+	})
 	return conn, nil
 }
 

@@ -34,32 +34,32 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	}
 }
 
+// write records the valid samples. Label sets are built per poll, so an
+// interface or drive that disappears stops being observed.
 func (m collectorMetrics) write(snapshot observations) {
-	if snapshot.cpu.valid {
-		m.cpuBusy.Observe(float64(snapshot.cpu.value))
-	}
-	if snapshot.memoryUsed.valid {
-		m.memoryUsed.Observe(float64(snapshot.memoryUsed.value) * 1024)
-	}
-	if snapshot.memoryAvailable.valid {
-		m.memoryAvailable.Observe(float64(snapshot.memoryAvailable.value) * 1024)
-	}
+	observe(m.cpuBusy, snapshot.cpuBusy)
+	observe(m.memoryUsed, snapshot.memoryUsed)
+	observe(m.memoryAvailable, snapshot.memoryAvailable)
 	for _, nic := range snapshot.interfaces {
-		labels := m.meter.LabelSet(metrix.Label{Key: interfaceLabel, Value: nic.name})
-		if nic.received.valid {
-			m.networkReceived.Observe(float64(nic.received.value), labels)
-		}
-		if nic.sent.valid {
-			m.networkSent.Observe(float64(nic.sent.value), labels)
-		}
+		labels := m.meter.LabelSet(metrix.Label{
+			Key:   interfaceLabel,
+			Value: nic.name,
+		})
+		observe(m.networkReceived, nic.received, labels)
+		observe(m.networkSent, nic.sent, labels)
 	}
 	for _, drive := range snapshot.drives {
-		labels := m.meter.LabelSet(metrix.Label{Key: driveLabel, Value: drive.drive})
-		if drive.used.valid {
-			m.diskUsed.Observe(float64(drive.used.value), labels)
-		}
-		if drive.free.valid {
-			m.diskFree.Observe(float64(drive.free.value), labels)
-		}
+		labels := m.meter.LabelSet(metrix.Label{
+			Key:   driveLabel,
+			Value: drive.drive,
+		})
+		observe(m.diskUsed, drive.used, labels)
+		observe(m.diskFree, drive.free, labels)
+	}
+}
+
+func observe(gauge metrix.SnapshotGauge, s sample, labels ...metrix.LabelSet) {
+	if s.valid {
+		gauge.Observe(float64(s.value), labels...)
 	}
 }

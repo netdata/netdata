@@ -230,8 +230,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
-  --enable-plugin-wmi        Build and install the experimental remote Windows WMI plugin (default: disabled).
-  --disable-plugin-wmi       Disable the remote Windows WMI plugin.
+  --enable-plugin-wmi        Enable the experimental remote Windows WMI plugin. Default: disabled.
+  --disable-plugin-wmi       Explicitly disable the remote Windows WMI plugin.
   --enable-plugin-ipmi       Enable the Go IPMI plugin (Linux). Default: enabled on Linux.
   --disable-plugin-ipmi      Explicitly disable the Go IPMI plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis

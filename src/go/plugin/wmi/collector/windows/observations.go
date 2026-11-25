@@ -3,18 +3,21 @@
 package windows
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
 
+// observations holds one poll's metric values in base units (bytes, bytes/s, percent).
 type observations struct {
-	cpu             sample
+	cpuBusy         sample
 	memoryUsed      sample
 	memoryAvailable sample
 	interfaces      []networkTraffic
 	drives          []diskSpace
 }
 
+// sample distinguishes a reported zero from a missing or malformed value.
 type sample struct {
 	value uint64
 	valid bool
@@ -36,22 +39,23 @@ func (o *observations) readCPU(rows []map[string]any) bool {
 	if len(rows) != 1 {
 		return false
 	}
-	s := readUnsigned(rows[0]["percentprocessortime"])
-	if !s.valid || s.value > 100 {
+	busy := readUnsigned(rows[0]["percentprocessortime"])
+	if !busy.valid || busy.value > 100 {
 		return false
 	}
-	o.cpu = s
+	o.cpuBusy = busy
 	return true
 }
 
+// readMemory converts Win32_OperatingSystem's KiB values to bytes.
 func (o *observations) readMemory(rows []map[string]any) bool {
 	if len(rows) != 1 {
 		return false
 	}
-	total := readUnsigned(rows[0]["totalvisiblememorysize"])
-	free := readUnsigned(rows[0]["freephysicalmemory"])
+	total := kibToBytes(readUnsigned(rows[0]["totalvisiblememorysize"]))
+	free := kibToBytes(readUnsigned(rows[0]["freephysicalmemory"]))
 	o.memoryAvailable = free
-	o.memoryUsed = usedSpace(total, free)
+	o.memoryUsed = used(total, free)
 	return free.valid
 }
 
@@ -85,7 +89,7 @@ func (o *observations) readDisks(rows []map[string]any) bool {
 		if free.valid {
 			o.drives = append(o.drives, diskSpace{
 				drive: drive,
-				used:  usedSpace(size, free),
+				used:  used(size, free),
 				free:  free,
 			})
 		}
@@ -93,7 +97,7 @@ func (o *observations) readDisks(rows []map[string]any) bool {
 	return len(rows) == 0 || len(o.drives) > 0
 }
 
-func usedSpace(total, free sample) sample {
+func used(total, free sample) sample {
 	if total.valid && free.valid && total.value >= free.value {
 		return sample{
 			value: total.value - free.value,
@@ -103,10 +107,30 @@ func usedSpace(total, free sample) sample {
 	return sample{}
 }
 
+func kibToBytes(s sample) sample {
+	if !s.valid || s.value > math.MaxUint64/1024 {
+		return sample{}
+	}
+	return sample{
+		value: s.value * 1024,
+		valid: true,
+	}
+}
+
+// readUnsigned accepts the non-negative integers DCOM decodes and the decimal
+// text WinRM returns.
 func readUnsigned(value any) sample {
 	switch v := value.(type) {
+	case uint8:
+		return sample{
+			value: uint64(v),
+			valid: true,
+		}
 	case uint16:
-		return sample{value: uint64(v), valid: true}
+		return sample{
+			value: uint64(v),
+			valid: true,
+		}
 	case uint32:
 		return sample{
 			value: uint64(v),
@@ -117,23 +141,16 @@ func readUnsigned(value any) sample {
 			value: v,
 			valid: true,
 		}
+	case int8:
+		return signedSample(int64(v))
+	case int16:
+		return signedSample(int64(v))
 	case int32:
-		if v >= 0 {
-			return sample{
-				value: uint64(v),
-				valid: true,
-			}
-		}
+		return signedSample(int64(v))
 	case int64:
-		if v >= 0 {
-			return sample{
-				value: uint64(v),
-				valid: true,
-			}
-		}
+		return signedSample(v)
 	case string:
-		n, err := strconv.ParseUint(v, 10, 64)
-		if err == nil {
+		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
 			return sample{
 				value: n,
 				valid: true,
@@ -141,4 +158,14 @@ func readUnsigned(value any) sample {
 		}
 	}
 	return sample{}
+}
+
+func signedSample(v int64) sample {
+	if v < 0 {
+		return sample{}
+	}
+	return sample{
+		value: uint64(v),
+		valid: true,
+	}
 }

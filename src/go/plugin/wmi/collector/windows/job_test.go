@@ -41,14 +41,22 @@ func TestCollector_JobV2Publication(t *testing.T) {
 				c := configuredCollector()
 				renameAt := time.Now().Add(inventoryInterval)
 				c.Vnode = vnode.Name
-				c.open = func(context.Context) (queryClient, error) {
+				c.newSession = func(context.Context) (querySession, error) {
 					results := validQueryResults()
 					hostname := "WIN-LAB"
 					if !time.Now().Before(renameAt) {
 						hostname = "WIN-RENAMED"
 					}
-					results[queryOSInfo] = fixtureRows(map[string]any{"CSName": hostname, "Caption": "Microsoft Windows Server 2022 Standard", "ProductType": uint32(3)})
-					return &fakeSession{results: results}, nil
+					results[queryOSInfo] = fixtureRows(
+						map[string]any{
+							"CSName":      hostname,
+							"Caption":     "Microsoft Windows Server 2022 Standard",
+							"ProductType": uint32(3),
+						},
+					)
+					return &fakeSession{
+						results: results,
+					}, nil
 				}
 				out := make(wireOutput, 16)
 				job := jobruntime.NewJobV2(jobruntime.JobV2Config{

@@ -26,8 +26,10 @@ import (
 	"github.com/oiweiwei/go-msrpc/ndr"
 )
 
-// Client holds a single collection cycle's WMI session. Calls are serial.
-type Client struct {
+const dcomEndpointMapper = "ncacn_ip_tcp:[135]"
+
+// DCOMSession is one collection cycle's WMI session over DCOM. Calls are serial.
+type DCOMSession struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	dialer      rpcDialer
@@ -41,21 +43,19 @@ type Client struct {
 	refs        []*dcom.RemoteInterfaceReference
 }
 
-// Open activates WMI on the configured host and opens its root/cimv2 namespace.
-// The caller's deadline bounds activation, queries, and release.
-func Open(ctx context.Context, host, username, password, auth string) (*Client, error) {
+// OpenDCOM activates WMI on host and opens its root/cimv2 namespace with NTLMv2
+// and packet privacy. The caller validates host and credentials. The context
+// deadline bounds activation, every query and the release in Close.
+func OpenDCOM(ctx context.Context, host, username, password string) (*DCOMSession, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		return nil, diagnostic("WMI session requires a collection deadline")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if !ValidHost(host) {
-		return nil, diagnostic("WMI host must be a hostname or IP address")
-	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	c := &Client{
+	s := &DCOMSession{
 		ctx:    ctx,
 		cancel: cancel,
 		dialer: rpcDialer{
@@ -64,32 +64,30 @@ func Open(ctx context.Context, host, username, password, auth string) (*Client, 
 			dial: (&net.Dialer{}).DialContext,
 		},
 	}
-	if err := c.open(host, username, password, auth); err != nil {
-		c.Close()
+	if err := s.connect(host, username, password); err != nil {
+		s.Close()
 		return nil, err
 	}
-	return c, nil
+	return s, nil
 }
 
-func (c *Client) open(host, username, password, auth string) error {
-	ctx := c.ctx
+func (s *DCOMSession) connect(host, username, password string) error {
+	ctx := s.ctx
 	// An IPv6 zone selects an interface on the poller. Only the socket dialer
 	// needs it; the DCOM address parser and NTLM target use the remote address.
 	host, _, _ = strings.Cut(host, "%")
-	security, err := securityOptions(host, username, password, auth)
-	if err != nil {
-		return err
-	}
+	security := securityOptions(host, username, password)
 	cid, _ := rpcuuid.Parse(uuid.NewString())
-	c.orpc.CID = (*dcom.CID)(dtyp.GUIDFromUUID(cid))
+	s.orpc.CID = (*dcom.CID)(dtyp.GUIDFromUUID(cid))
 
-	c.resolver, err = c.dial(host, security, dcerpc.WithEndpoint("ncacn_ip_tcp:[135]"))
+	var err error
+	s.resolver, err = s.dial(host, security, dcerpc.WithEndpoint(dcomEndpointMapper))
 	if err != nil {
 		return rpcFailure(ctx, "open DCOM resolver", err)
 	}
 	// Windows can reject additional interfaces in a combined bind. Each generated
 	// client negotiates its own interface on the existing endpoint transport.
-	resolver, err := exporter.NewObjectExporterClient(ctx, c.resolver)
+	resolver, err := exporter.NewObjectExporterClient(ctx, s.resolver)
 	if err != nil {
 		return rpcFailure(ctx, "open DCOM object resolver interface", err)
 	}
@@ -100,14 +98,14 @@ func (c *Client) open(host, username, password, auth string) error {
 	if alive.COMVersion == nil {
 		return diagnostic("DCOM resolver returned no COM version")
 	}
-	c.orpc.Version = alive.COMVersion
+	s.orpc.Version = alive.COMVersion
 
-	activator, err := activation.NewActivationClient(ctx, c.resolver)
+	activator, err := activation.NewActivationClient(ctx, s.resolver)
 	if err != nil {
 		return rpcFailure(ctx, "open DCOM activation interface", err)
 	}
 	act, err := activator.RemoteActivation(ctx, &activation.RemoteActivationRequest{
-		ORPCThis:                   &c.orpc,
+		ORPCThis:                   &s.orpc,
 		ClassID:                    wmi.Level1LoginClassID.GUID(),
 		IIDs:                       []*dcom.IID{level1login.Level1LoginIID},
 		RequestedProtocolSequences: []uint16{uint16(dcetypes.ProtocolTCP)},
@@ -127,7 +125,7 @@ func (c *Client) open(host, username, password, auth string) error {
 	if act.RemoteUnknown.GUID().IsZero() {
 		return diagnostic("DCOM activation returned no remote release interface")
 	}
-	c.oxid = act.OXID
+	s.oxid = act.OXID
 
 	endpoints := tcpEndpoints(act.OXIDBindings)
 	if len(endpoints) == 0 {
@@ -144,61 +142,61 @@ func (c *Client) open(host, username, password, auth string) error {
 		return diagnostic("DCOM activation returned no WMI TCP endpoint")
 	}
 
-	c.objects, err = c.dial(host, security, endpoints...)
+	s.objects, err = s.dial(host, security, endpoints...)
 	if err != nil {
 		return rpcFailure(ctx, "open WMI object transport", err)
 	}
-	return c.logIn(act)
+	return s.login(act)
 }
 
-func (c *Client) logIn(act *activation.RemoteActivationResponse) error {
-	ctx := c.ctx
+func (s *DCOMSession) login(act *activation.RemoteActivationResponse) error {
+	ctx := s.ctx
 	var err error
-	c.unknown, err = remoteunknown.NewRemoteUnknownClient(ctx, c.objects, dcom.WithIPID(act.RemoteUnknown))
+	s.unknown, err = remoteunknown.NewRemoteUnknownClient(ctx, s.objects, dcom.WithIPID(act.RemoteUnknown))
 	if err != nil {
 		return rpcFailure(ctx, "open WMI release interface", err)
 	}
 
-	loginRef, err := c.reference(act.InterfaceData[0])
+	loginRef, err := s.reference(act.InterfaceData[0])
 	if err != nil {
 		return err
 	}
-	c.refs = append(c.refs, loginRef)
+	s.refs = append(s.refs, loginRef)
 
-	login, err := level1login.NewLevel1LoginClient(ctx, c.objects, dcom.WithIPID(loginRef.IPID))
+	login, err := level1login.NewLevel1LoginClient(ctx, s.objects, dcom.WithIPID(loginRef.IPID))
 	if err != nil {
 		return rpcFailure(ctx, "open WMI login interface", err)
 	}
 	// NTLMLogin opens the namespace using the authenticated RPC caller identity.
 	namespace, err := login.NTLMLogin(ctx, &level1login.NTLMLoginRequest{
-		This:            &c.orpc,
+		This:            &s.orpc,
 		NetworkResource: "//./root/cimv2",
 	})
 	if err != nil {
 		return rpcFailure(ctx, "open WMI root/cimv2 namespace", err)
 	}
 
-	nsRef, err := c.reference(namespace.Namespace.InterfacePointer())
+	nsRef, err := s.reference(namespace.Namespace.InterfacePointer())
 	if err != nil {
 		return err
 	}
-	c.refs = append(c.refs, nsRef)
+	s.refs = append(s.refs, nsRef)
 
-	c.services, err = services.NewServicesClient(ctx, c.objects, dcom.WithIPID(nsRef.IPID))
+	s.services, err = services.NewServicesClient(ctx, s.objects, dcom.WithIPID(nsRef.IPID))
 	if err != nil {
 		return rpcFailure(ctx, "open WMI services interface", err)
 	}
 	return nil
 }
 
-func (c *Client) dial(host string, security []dcerpc.Option, endpoints ...dcerpc.Option) (dcerpc.Conn, error) {
+func (s *DCOMSession) dial(host string, security []dcerpc.Option, endpoints ...dcerpc.Option) (dcerpc.Conn, error) {
 	options := []dcerpc.Option{
-		dcerpc.WithDialer(&c.dialer),
+		dcerpc.WithDialer(&s.dialer),
 		dcerpc.WithDNSResolver(nil),
 	}
 	options = append(options, security...)
 	options = append(options, endpoints...)
-	return dcerpc.Dial(c.ctx, host, options...)
+	return dcerpc.Dial(s.ctx, host, options...)
 }
 
 // tcpEndpoints uses only the TCP ports advertised by the configured target.
@@ -223,7 +221,10 @@ func tcpEndpoints(bindings *dcom.DualStringArray) []dcerpc.Option {
 			binding, err := dcerpc.ParseStringBinding("ncacn_ip_tcp:" + string(utf16.Decode(fields[:end])))
 			if err == nil {
 				if port, err := strconv.ParseUint(binding.Endpoint, 10, 16); err == nil && port != 0 {
-					endpoints = append(endpoints, dcerpc.WithEndpoint("ncacn_ip_tcp:["+strconv.FormatUint(port, 10)+"]"))
+					endpoints = append(
+						endpoints,
+						dcerpc.WithEndpoint("ncacn_ip_tcp:["+strconv.FormatUint(port, 10)+"]"),
+					)
 				}
 			}
 		}
@@ -232,7 +233,7 @@ func tcpEndpoints(bindings *dcom.DualStringArray) []dcerpc.Option {
 	return endpoints
 }
 
-func (c *Client) reference(pointer *dcom.InterfacePointer) (*dcom.RemoteInterfaceReference, error) {
+func (s *DCOMSession) reference(pointer *dcom.InterfacePointer) (*dcom.RemoteInterfaceReference, error) {
 	obj, err := decodeReference(pointer)
 	if err != nil {
 		return nil, err
@@ -241,7 +242,7 @@ func (c *Client) reference(pointer *dcom.InterfacePointer) (*dcom.RemoteInterfac
 	if !ok || ref.Std == nil || ref.Std.IPID.GUID().IsZero() {
 		return nil, diagnostic("WMI returned an invalid standard object reference")
 	}
-	if ref.Std.OXID != c.oxid {
+	if ref.Std.OXID != s.oxid {
 		return nil, diagnostic("WMI returned an object reference for a different exporter")
 	}
 	return &dcom.RemoteInterfaceReference{
@@ -261,15 +262,15 @@ func decodeReference(pointer *dcom.InterfacePointer) (*dcom.ObjectReference, err
 	return obj, nil
 }
 
-func (c *Client) release(refs ...*dcom.RemoteInterfaceReference) {
-	if len(refs) == 0 || c.unknown == nil || c.ctx.Err() != nil {
+func (s *DCOMSession) release(refs ...*dcom.RemoteInterfaceReference) {
+	if len(refs) == 0 || s.unknown == nil || s.ctx.Err() != nil {
 		return
 	}
 	// Keep a stalled release from consuming the remaining query budget.
-	ctx, cancel := context.WithTimeout(c.ctx, time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, time.Second)
 	defer cancel()
-	_, _ = c.unknown.RemoteRelease(ctx, &remoteunknown.RemoteReleaseRequest{
-		This:                     &c.orpc,
+	_, _ = s.unknown.RemoteRelease(ctx, &remoteunknown.RemoteReleaseRequest{
+		This:                     &s.orpc,
 		InterfaceReferencesCount: uint16(len(refs)),
 		InterfaceReferences:      refs,
 	})
@@ -277,20 +278,20 @@ func (c *Client) release(refs ...*dcom.RemoteInterfaceReference) {
 
 // Close releases the outstanding references when the exporter remains reachable
 // within the cycle deadline and closes every socket, including failed binds.
-func (c *Client) Close() {
-	c.release(c.refs...)
-	c.refs = nil
-	c.unknown = nil
-	c.services = nil
-	c.enumeration = nil
-	c.cancel()
-	c.dialer.close()
-	if c.objects != nil {
-		_ = c.objects.Close(c.ctx)
-		c.objects = nil
+func (s *DCOMSession) Close() {
+	s.release(s.refs...)
+	s.refs = nil
+	s.unknown = nil
+	s.services = nil
+	s.enumeration = nil
+	s.cancel()
+	s.dialer.close()
+	if s.objects != nil {
+		_ = s.objects.Close(s.ctx)
+		s.objects = nil
 	}
-	if c.resolver != nil {
-		_ = c.resolver.Close(c.ctx)
-		c.resolver = nil
+	if s.resolver != nil {
+		_ = s.resolver.Close(s.ctx)
+		s.resolver = nil
 	}
 }

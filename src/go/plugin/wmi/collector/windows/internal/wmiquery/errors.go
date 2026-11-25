@@ -22,6 +22,21 @@ type diagnostic string
 
 func (d diagnostic) Error() string { return string(d) }
 
+// sessionError marks a failure that makes the whole session unusable: a refused
+// connection, an untrusted certificate or a rejected login.
+type sessionError struct{ error }
+
+func (e sessionError) Unwrap() error { return e.error }
+
+func (sessionError) SessionFailed() bool { return true }
+
+// SessionFailed reports whether err made the session unusable, so every later
+// query in it fails the same way without contacting the host.
+func SessionFailed(err error) bool {
+	var failed interface{ SessionFailed() bool }
+	return errors.As(err, &failed) && failed.SessionFailed()
+}
+
 // SafeMessage returns a diagnostic containing only fixed text and protocol status
 // codes. It returns an empty string for errors outside this package.
 func SafeMessage(err error) string {
@@ -39,20 +54,28 @@ func SafeMessage(err error) string {
 	}
 }
 
+// statusError names a WMI, HRESULT, RPC or Win32 status code, in that order of precedence.
 func statusError(operation string, code uint32) error {
+	if name := statusName(code); name != "" {
+		return diagnostic(fmt.Sprintf("%s: %s (0x%08x)", operation, name, code))
+	}
+	return diagnostic(fmt.Sprintf("%s: status 0x%08x", operation, code))
+}
+
+func statusName(code uint32) string {
 	for _, known := range []error{wmistatus.FromCode(int32(code)), hresult.FromCode(code), rpcerrors.FromCode(code), win32.FromCode(code)} {
 		switch status := known.(type) {
 		case *wmistatus.Error:
-			return diagnostic(fmt.Sprintf("%s: %s (0x%08x)", operation, status.Name, code))
+			return status.Name
 		case *hresult.Error:
-			return diagnostic(fmt.Sprintf("%s: %s (0x%08x)", operation, status.Name, code))
+			return status.Name
 		case *rpcerrors.RPCError:
-			return diagnostic(fmt.Sprintf("%s: %s (0x%08x)", operation, status.Name, code))
+			return status.Name
 		case *win32.Error:
-			return diagnostic(fmt.Sprintf("%s: %s (0x%08x)", operation, status.Name, code))
+			return status.Name
 		}
 	}
-	return diagnostic(fmt.Sprintf("%s: status 0x%08x", operation, code))
+	return ""
 }
 
 // RPC/SSP error chains can contain principal names and server-supplied text.
@@ -70,8 +93,6 @@ func rpcFailure(ctx context.Context, operation string, err error) error {
 		rpcCode      *rpcerrors.RPCError
 		winCode      *win32.Error
 		rawCode      *rpcerrors.Error
-		dnsErr       *net.DNSError
-		netErr       net.Error
 		authErr      *gssapi.Error
 	)
 	switch {
@@ -93,19 +114,34 @@ func rpcFailure(ctx context.Context, operation string, err error) error {
 		case uint32:
 			return statusError(operation, code)
 		}
-	case errors.As(err, &netErr) && netErr.Timeout():
-		return diagnostic(operation + ": network request timed out")
-	case errors.As(err, &dnsErr):
-		return diagnostic(operation + ": could not resolve the WMI host")
-	case errors.Is(err, syscall.ECONNREFUSED), errors.Is(err, syscall.Errno(10061)): // WSAECONNREFUSED
-		return diagnostic(operation + ": connection refused")
-	case errors.Is(err, syscall.EHOSTUNREACH), errors.Is(err, syscall.ENETUNREACH),
-		errors.Is(err, syscall.Errno(10065)), errors.Is(err, syscall.Errno(10051)): // WSAEHOSTUNREACH, WSAENETUNREACH
-		return diagnostic(operation + ": host or network unreachable")
+	case networkFailure(err) != "":
+		return diagnostic(operation + ": " + networkFailure(err))
 	case errors.Is(err, ntlm.ErrConfidentialityNotAvailable), errors.Is(err, ntlm.Err128BitEncryptionNotSupported):
 		return diagnostic(operation + ": server did not negotiate NTLM packet privacy")
 	case errors.Is(err, ntlm.ErrLogonFailure), errors.As(err, &authErr):
 		return diagnostic(operation + ": NTLM authentication failed")
 	}
 	return diagnostic(operation + ": RPC failed")
+}
+
+// networkFailure names a connection failure without the addresses or names
+// that the underlying error text carries. It returns an empty string for other errors.
+func networkFailure(err error) string {
+	var (
+		dnsErr *net.DNSError
+		netErr net.Error
+	)
+	switch {
+	case errors.As(err, &netErr) && netErr.Timeout():
+		return "network request timed out"
+	case errors.As(err, &dnsErr):
+		return "could not resolve the WMI host"
+	case errors.Is(err, syscall.ECONNREFUSED), errors.Is(err, syscall.Errno(10061)): // WSAECONNREFUSED
+		return "connection refused"
+	case errors.Is(err, syscall.EHOSTUNREACH), errors.Is(err, syscall.ENETUNREACH),
+		errors.Is(err, syscall.Errno(10065)), errors.Is(err, syscall.Errno(10051)): // WSAEHOSTUNREACH, WSAENETUNREACH
+		return "host or network unreachable"
+	default:
+		return ""
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"syscall"
 	"testing"
 	"time"
 	"unicode/utf16"
@@ -27,8 +28,10 @@ func TestOpenBindsResolverBeforeActivation(t *testing.T) {
 	defer cancel()
 	socket, peer := net.Pipe()
 	defer peer.Close()
-	recorder := &bindRecorder{Conn: socket}
-	c := &Client{
+	recorder := &bindRecorder{
+		Conn: socket,
+	}
+	c := &DCOMSession{
 		ctx:    ctx,
 		cancel: cancel,
 		dialer: rpcDialer{
@@ -38,7 +41,7 @@ func TestOpenBindsResolverBeforeActivation(t *testing.T) {
 		},
 	}
 	defer c.Close()
-	require.Error(t, c.open(c.dialer.host, "reader", "synthetic", "ntlm"))
+	require.Error(t, c.connect(c.dialer.host, "reader", "synthetic"))
 
 	r := ndr.NDR20(recorder.packet)
 	var header dcerpc.Header
@@ -81,7 +84,10 @@ func TestTCPBindingsUseOnlyAdvertisedPorts(t *testing.T) {
 		wire = append(wire, 0)
 	}
 	wire = append(wire, 0)
-	bindings := &dcom.DualStringArray{StringArray: wire, SecurityOffset: uint16(len(wire))}
+	bindings := &dcom.DualStringArray{
+		StringArray:    wire,
+		SecurityOffset: uint16(len(wire)),
+	}
 	options := append(tcpEndpoints(bindings),
 		dcerpc.WithInsecure(), dcerpc.WithAbstractSyntax(activation.ActivationSyntaxV0_0))
 	parsed, err := dcerpc.ParseOptions(t.Context(), options...)
@@ -95,18 +101,24 @@ func TestTCPBindingsUseOnlyAdvertisedPorts(t *testing.T) {
 func TestCloseReleasesReferencesBeforeCanceling(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
-	releaser := &fakeReleaser{t: t}
-	client := &Client{
+	releaser := &fakeReleaser{
+		t: t,
+	}
+	session := &DCOMSession{
 		ctx:     ctx,
 		cancel:  cancel,
 		unknown: releaser,
 		refs: []*dcom.RemoteInterfaceReference{
-			{IPID: &dcom.IPID{Data1: 1}, PublicReferencesCount: 5},
-			{IPID: &dcom.IPID{Data1: 2}, PublicReferencesCount: 1},
+			{IPID: &dcom.IPID{
+				Data1: 1,
+			}, PublicReferencesCount: 5},
+			{IPID: &dcom.IPID{
+				Data1: 2,
+			}, PublicReferencesCount: 1},
 		},
 	}
-	client.Close()
-	client.Close()
+	session.Close()
+	session.Close()
 	require.Len(t, releaser.requests, 1)
 	req := releaser.requests[0]
 	assert.EqualValues(t, 2, req.InterfaceReferencesCount)
@@ -131,4 +143,30 @@ func (f *fakeReleaser) RemoteRelease(
 	assert.LessOrEqual(f.t, time.Until(deadline), time.Second)
 	f.requests = append(f.requests, req)
 	return &remoteunknown.RemoteReleaseResponse{}, nil
+}
+
+func TestScopedIPv6ReachesResolverOnTheSpecifiedInterface(t *testing.T) {
+	const host = "fe80::1%test0"
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	var addresses []string
+	session := &DCOMSession{
+		ctx:    ctx,
+		cancel: cancel,
+		dialer: rpcDialer{
+			host: host,
+			ctx:  ctx,
+			dial: func(_ context.Context, _, address string) (net.Conn, error) {
+				addresses = append(addresses, address)
+				return nil, syscall.ECONNREFUSED
+			},
+		},
+	}
+	defer session.Close()
+	err := session.connect(host, "reader", "synthetic")
+	require.Error(t, err)
+	require.NotEmpty(t, addresses)
+	for _, address := range addresses {
+		assert.Equal(t, "[fe80::1%test0]:135", address)
+	}
 }

@@ -6,14 +6,17 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/oiweiwei/go-msrpc/ssp/ntlm"
 	"github.com/r4sd/go-wsman/wsman"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,7 +60,9 @@ func TestWinRMQuery(t *testing.T) {
 	defer server.Close()
 	ca := x509.NewCertPool()
 	ca.AddCert(server.Certificate())
-	client := newWinRM(server.URL+"/wsman", "reader", "synthetic", &tls.Config{RootCAs: ca})
+	client := newWinRMSession(server.URL+"/wsman", "reader", "synthetic", &tls.Config{
+		RootCAs: ca,
+	})
 	defer client.Close()
 	rows, err := client.Query(t.Context(), query)
 	require.NoError(t, err)
@@ -93,7 +98,9 @@ func TestWinRMTransportFailures(t *testing.T) {
 			if tc.trust {
 				ca.AddCert(server.Certificate())
 			}
-			client := newWinRM(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{RootCAs: ca})
+			client := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+				RootCAs: ca,
+			})
 			defer client.Close()
 			_, err := client.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
 			require.Error(t, err)
@@ -112,7 +119,15 @@ func TestWinRMDiskAssociation(t *testing.T) {
 	page, err := wsman.ParsePullResponse([]byte(response))
 	require.NoError(t, err)
 	require.Len(t, page.Items, 1)
-	assert.Equal(t, map[string]any{"dependent": `Win32_LogicalDisk.DeviceID="D:"`, "startingaddress": "32768", "endingaddress": "65535"}, winRMRow(page.Items[0]))
+	assert.Equal(
+		t,
+		map[string]any{
+			"dependent":       `Win32_LogicalDisk.DeviceID="D:"`,
+			"startingaddress": "32768",
+			"endingaddress":   "65535",
+		},
+		winRMRow(page.Items[0]),
+	)
 }
 
 func TestWinRMNTLMChallengeWithBody(t *testing.T) {
@@ -128,11 +143,63 @@ func TestWinRMNTLMChallengeWithBody(t *testing.T) {
 	defer server.Close()
 	ca := x509.NewCertPool()
 	ca.AddCert(server.Certificate())
-	client := newWinRM(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{RootCAs: ca})
+	client := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+		RootCAs: ca,
+	})
 	defer client.Close()
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 	_, err := client.Query(ctx, "SELECT Name FROM Win32_ComputerSystem")
 	require.Error(t, err)
 	assert.Contains(t, SafeMessage(err), "HTTP 403")
+}
+
+func TestWinRMSessionStopsAfterRejectedLogin(t *testing.T) {
+	challenge := base64.StdEncoding.EncodeToString(testChallenge(
+		t,
+		ntlm.NegotiateSign|ntlm.NegotiateSeal|ntlm.Negotiate128|ntlm.NegotiateExtendedSessionSecurity|ntlm.NegotiateTargetInfo,
+	))
+	var logins int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, _ := base64.StdEncoding.DecodeString(strings.TrimPrefix(r.Header.Get("Authorization"), "NTLM "))
+		switch {
+		case len(token) > 8 && token[8] == 1: // negotiate
+			w.Header().Set("WWW-Authenticate", "NTLM "+challenge)
+		case len(token) > 8 && token[8] == 3: // authenticate: reject the credentials
+			logins++
+			w.Header().Set("WWW-Authenticate", "NTLM")
+		default:
+			w.Header().Set("WWW-Authenticate", "NTLM")
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	session := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+		RootCAs: ca,
+	})
+	defer session.Close()
+
+	for range 3 {
+		_, err := session.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+		require.Error(t, err)
+		assert.True(t, SessionFailed(err))
+		assert.Contains(t, SafeMessage(err), "HTTP 401")
+	}
+	assert.Equal(t, 1, logins, "a rejected login must not be retried within the session")
+}
+
+func TestWinRMRefusedConnection(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	address := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	session := newWinRMSession("https://"+address+"/wsman", "reader", "fixture-secret", &tls.Config{})
+	defer session.Close()
+	_, err = session.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+	require.Error(t, err)
+	assert.True(t, SessionFailed(err))
+	assert.Equal(t, "WinRM request failed: connection refused", SafeMessage(err))
 }

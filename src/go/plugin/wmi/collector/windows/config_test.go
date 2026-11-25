@@ -24,22 +24,22 @@ func TestCollector_GroupConfig(t *testing.T) {
 		wantQueries []string
 	}{
 		"omitted": {
-			wantQueries: []string{cpuProjection, memoryProjection, networkProjection, diskProjection},
+			wantQueries: []string{queryCPU, queryMemory, queryNetwork, queryDisk},
 		},
 		"empty object": {
 			yamlGroups:  "collectors: {}\n",
 			jsonGroups:  `,"collectors":{}`,
-			wantQueries: []string{cpuProjection, memoryProjection, networkProjection, diskProjection},
+			wantQueries: []string{queryCPU, queryMemory, queryNetwork, queryDisk},
 		},
 		"disable one group": {
 			yamlGroups:  "collectors: {cpu: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false}`,
-			wantQueries: []string{memoryProjection, networkProjection, diskProjection},
+			wantQueries: []string{queryMemory, queryNetwork, queryDisk},
 		},
 		"one group only": {
 			yamlGroups:  "collectors: {cpu: false, memory: true, network: false, disk: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false,"memory":true,"network":false,"disk":false}`,
-			wantQueries: []string{memoryProjection},
+			wantQueries: []string{queryMemory},
 		},
 		"all disabled": {
 			yamlGroups: "collectors: {cpu: false, memory: false, network: false, disk: false}\n",
@@ -72,7 +72,7 @@ func TestCollector_GroupConfig(t *testing.T) {
 						session := &fakeSession{
 							results: validQueryResults(),
 						}
-						c.open = func(context.Context) (queryClient, error) {
+						c.newSession = func(context.Context) (querySession, error) {
 							return session, nil
 						}
 						if len(tc.wantQueries) == 0 {
@@ -99,6 +99,7 @@ func TestCollector_ValidateConfig(t *testing.T) {
 		wantError string
 	}{
 		"winrm":             {change: func(c *Collector) { c.Transport = "winrm" }},
+		"empty transport":   {change: func(c *Collector) { c.Transport = "" }},
 		"unknown transport": {change: func(c *Collector) { c.Transport = "https" }, wantError: "transport must"},
 		"CA with DCOM":      {change: func(c *Collector) { c.TLSCA = "lab-ca.pem" }, wantError: "tls_ca requires"},
 		"host with port":    {change: func(c *Collector) { c.Host = "windows.example.com:135" }, wantError: "host must"},
@@ -108,6 +109,10 @@ func TestCollector_ValidateConfig(t *testing.T) {
 		"missing auth":      {change: func(c *Collector) { c.Auth = "" }, wantError: "auth must"},
 		"unknown auth":      {change: func(c *Collector) { c.Auth = "kerberos" }, wantError: "auth must"},
 		"missing username":  {change: func(c *Collector) { c.Username = "" }, wantError: "username is required"},
+		"domain only":       {change: func(c *Collector) { c.Username = `EXAMPLE\` }, wantError: "username is required"},
+		"UPN without user":  {change: func(c *Collector) { c.Username = "@example.com" }, wantError: "username is required"},
+		"domain account":    {change: func(c *Collector) { c.Username = `EXAMPLE\monitor` }},
+		"UPN account":       {change: func(c *Collector) { c.Username = "monitor@example.com" }},
 		"missing password":  {change: func(c *Collector) { c.Password = "" }, wantError: "password is required"},
 		"zero timeout":      {change: func(c *Collector) { c.Timeout = 0 }, wantError: "timeout must be positive"},
 	} {

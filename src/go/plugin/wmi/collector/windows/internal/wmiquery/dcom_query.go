@@ -20,47 +20,51 @@ import (
 const rowsPerPage = 16
 
 // Query reads the caller's fixed WQL projection from root/cimv2.
-func (c *Client) Query(ctx context.Context, wql string) ([]map[string]any, error) {
-	if err := c.ctx.Err(); err != nil {
+func (s *DCOMSession) Query(ctx context.Context, wql string) ([]map[string]any, error) {
+	if err := s.ctx.Err(); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	stop := context.AfterFunc(c.ctx, cancel)
+	stop := context.AfterFunc(s.ctx, cancel)
 	defer stop()
 	defer cancel()
 
-	result, err := c.services.ExecQuery(ctx, &services.ExecQueryRequest{
-		This:          &c.orpc,
-		QueryLanguage: &oaut.String{Data: "WQL"},
-		Query:         &oaut.String{Data: wql},
-		Flags:         int32(wmi.GenericFlagTypeReturnImmediately | wmi.GenericFlagTypeForwardOnly),
+	result, err := s.services.ExecQuery(ctx, &services.ExecQueryRequest{
+		This: &s.orpc,
+		QueryLanguage: &oaut.String{
+			Data: "WQL",
+		},
+		Query: &oaut.String{
+			Data: wql,
+		},
+		Flags: int32(wmi.GenericFlagTypeReturnImmediately | wmi.GenericFlagTypeForwardOnly),
 	})
 	if err != nil {
 		return nil, rpcFailure(ctx, "execute WMI query", err)
 	}
-	ref, err := c.reference(result.Enum.InterfacePointer())
+	ref, err := s.reference(result.Enum.InterfacePointer())
 	if err != nil {
 		return nil, err
 	}
-	defer c.release(ref)
+	defer s.release(ref)
 
 	// A Windows exporter can reject this interface until ExecQuery has
 	// returned the first enumerator object.
-	enum := c.enumeration
+	enum := s.enumeration
 	if enum == nil {
-		enum, err = enumerator.NewEnumClassObjectClient(ctx, c.objects)
+		enum, err = enumerator.NewEnumClassObjectClient(ctx, s.objects)
 		if err != nil {
 			return nil, rpcFailure(ctx, "open WMI enumeration interface", err)
 		}
 	}
-	deadline, _ := c.ctx.Deadline()
+	deadline, _ := s.ctx.Deadline()
 	if queryDeadline, ok := ctx.Deadline(); ok && queryDeadline.Before(deadline) {
 		deadline = queryDeadline
 	}
-	rows, err := readPages(ctx, &c.orpc, deadline, enum.IPID(ctx, ref.IPID).Next)
+	rows, err := readPages(ctx, &s.orpc, deadline, enum.IPID(ctx, ref.IPID).Next)
 	if err == nil {
 		// go-msrpc may report a rejected presentation only when Next is called.
-		c.enumeration = enum
+		s.enumeration = enum
 	}
 	return rows, err
 }
