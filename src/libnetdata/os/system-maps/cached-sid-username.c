@@ -239,8 +239,9 @@ STRING *cached_sid_fullname_or_sid_str(PSID sid) {
 
 static struct {
     uint32_t salt;
+    int32_t round;
     int32_t arrived;
-    int32_t target;
+    bool timed_out;
     PSID sid;
     SID_VALUE *seen[2];
 } sidcache_test;
@@ -279,12 +280,17 @@ static void sidcache_test_resolve(SID_VALUE *sv) {
     int32_t me = __atomic_add_fetch(&sidcache_test.arrived, 1, __ATOMIC_ACQ_REL);
 
     usec_t until = now_monotonic_usec() + 5 * USEC_PER_SEC;
-    while(__atomic_load_n(&sidcache_test.arrived, __ATOMIC_ACQUIRE) < sidcache_test.target && now_monotonic_usec() < until)
+    while(__atomic_load_n(&sidcache_test.arrived, __ATOMIC_ACQUIRE) < 2) {
+        if(now_monotonic_usec() >= until) {
+            __atomic_store_n(&sidcache_test.timed_out, true, __ATOMIC_RELEASE);
+            break;
+        }
         tinysleep();
+    }
 
     // a unique string per candidate, so that the string entries count how many candidates are alive
     char buf[64];
-    snprintfz(buf, sizeof(buf), "sidcache-test-%u-%d", sidcache_test.salt, me);
+    snprintfz(buf, sizeof(buf), "sidcache-test-%u-%d-%d", sidcache_test.salt, sidcache_test.round, me);
     sv->account = NULL;
     sv->domain = NULL;
     sv->full = NULL;
@@ -337,7 +343,9 @@ int cached_sid_username_unittest(void) {
         size_t failed = 0;
         for(int32_t r = 0; r < SIDCACHE_TEST_RACES; r++) {
             sidcache_test.sid = sidcache_test_make_sid(2000 + r);
-            sidcache_test.target = 2 * (r + 1);
+            sidcache_test.round = r;
+            sidcache_test.arrived = 0;
+            sidcache_test.timed_out = false;
             sidcache_test.seen[0] = sidcache_test.seen[1] = NULL;
 
             pthread_t threads[2];
@@ -348,7 +356,8 @@ int cached_sid_username_unittest(void) {
                 pthread_join(threads[t], NULL);
 
             SID_VALUE *cached = lookup_or_convert_user_id_to_name_lookup(sidcache_test.sid);
-            if(!cached || sidcache_test.seen[0] != cached || sidcache_test.seen[1] != cached)
+            // both threads must have resolved it (so both missed the cache) and got the cached entry
+            if(sidcache_test.timed_out || !cached || sidcache_test.seen[0] != cached || sidcache_test.seen[1] != cached)
                 failed++;
 
             FreeSid(sidcache_test.sid);
@@ -361,7 +370,7 @@ int cached_sid_username_unittest(void) {
         // each race publishes one candidate with one string; a leaked candidate keeps a second string alive
         size_t alive = entries_after - entries_before;
         bool ok = failed == 0 && alive == SIDCACHE_TEST_RACES;
-        fprintf(stderr, "SIDCACHE TEST: %d races of 2 threads, %zu returned an entry that is not the cached one, %zu candidates alive (expected %d): %s\n",
+        fprintf(stderr, "SIDCACHE TEST: %d races of 2 threads, %zu failed (no race, or an entry that is not the cached one), %zu candidates alive (expected %d): %s\n",
                 SIDCACHE_TEST_RACES, failed, alive, SIDCACHE_TEST_RACES, ok ? "OK" : "FAILED");
         if(!ok) errors++;
     }
