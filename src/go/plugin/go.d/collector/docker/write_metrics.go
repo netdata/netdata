@@ -48,15 +48,15 @@ func (c *Collector) writeMetrics(state *daemonState) {
 	healthCounts := make(map[string]int)
 	usedImages := make(map[string]bool)
 	// A container replaced between two of the list requests is listed twice under one name. Its charts are keyed by
-	// name, so only the later listing, the current container, is written.
-	charted := make(map[string]listedContainer)
+	// name, so only the later listing, the current container, decides what they show.
+	latest := make(map[string]listedContainer)
 
 	for _, cntr := range state.containers {
 		usedImages[cntr.ImageID] = true
 		healthCounts[containerHealthState(cntr)]++
 
-		if name, ok := c.chartedName(cntr.Summary); ok {
-			charted[name] = cntr
+		if len(cntr.Names) > 0 {
+			latest[strings.TrimPrefix(cntr.Names[0], "/")] = cntr
 		}
 	}
 
@@ -69,7 +69,10 @@ func (c *Collector) writeMetrics(state *daemonState) {
 		containerWritableLayerSize = containerVec.Gauge("container_writable_layer_size")
 	}
 
-	for name, cntr := range charted {
+	for name, cntr := range latest {
+		if !c.isCharted(name, cntr.Summary) {
+			continue
+		}
 		// A state outside the known set leaves every state dimension at zero.
 		stateSet := containerState.WithLabelValues(name, cntr.Image)
 		if slices.Contains(containerStates, string(cntr.State)) {
@@ -115,14 +118,10 @@ func containerHealthState(cntr listedContainer) string {
 	}
 }
 
-// chartedName returns the name of a container that gets its own charts: not ignored by label and matched by the
-// container selector.
-func (c *Collector) chartedName(cntr typesContainer.Summary) (string, bool) {
-	if hasIgnoreLabel(cntr) || len(cntr.Names) == 0 {
-		return "", false
-	}
-	name := strings.TrimPrefix(cntr.Names[0], "/")
-	return name, c.cntrSr.MatchString(name)
+// isCharted reports whether a container gets its own charts: not ignored by label and matched by the container
+// selector.
+func (c *Collector) isCharted(name string, cntr typesContainer.Summary) bool {
+	return !hasIgnoreLabel(cntr) && c.cntrSr.MatchString(name)
 }
 
 func hasIgnoreLabel(cntr typesContainer.Summary) bool {

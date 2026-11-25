@@ -410,6 +410,37 @@ func TestCollector_Collect(t *testing.T) {
 				true,
 			),
 		},
+		"container replaced by an ignored one between list requests is not charted": {
+			// The replacement carries the netdata.cloud/ignore label, so "foo" gets no per-container series this cycle,
+			// not the values of the container it replaced.
+			prepare: func() *Collector {
+				return prepareCollector(
+					&mockClient{
+						containers: map[typesContainer.HealthStatus][]typesContainer.Summary{
+							typesContainer.Unhealthy: {
+								{
+									Names:   []string{"/foo"},
+									State:   "running",
+									Image:   "example/example:v1",
+									ImageID: "sha256:v1",
+								},
+							},
+							typesContainer.Starting: {
+								{
+									Names:   []string{"/foo"},
+									State:   "running",
+									Image:   "example/example:v5",
+									ImageID: "sha256:v5",
+									Labels:  map[string]string{"netdata.cloud/ignore": "true"},
+								},
+							},
+						},
+					},
+					true,
+				)
+			},
+			wantSeries: summaryWith(map[string]metrix.SampleValue{"containers_unhealthy": 1, "containers_starting": 1}),
+		},
 		"fail on error on Info()": {
 			prepare: func() *Collector {
 				return prepareCollector(&mockClient{
