@@ -27,129 +27,94 @@ static OS_SYSTEM_MEMORY system_memory_read(bool query_total_ram __maybe_unused) 
 // Linux
 #if defined(OS_LINUX)
 
-static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
-    char buf[4096];
-    uint64_t used = 0, inactive = 0;
+// The memory files of a cgroup version, and the reader's state for them.
+typedef struct {
+    const char *limit_path;         // the memory limit, used as total RAM
+    const char *usage_path;         // the memory in use
+    const char *stat_path;          // memory.stat, for the reclaimable page cache
+    const char *inactive_key;       // the memory.stat key of the inactive file pages, with its separator
+    size_t inactive_key_len;
+    OS_SYSTEM_MEMORY sm;            // the last sample: its total is reused until query_total_ram
+} CGROUP_MEMORY_READER;
 
-    if(query_total_ram || sm.ram_total_bytes == 0) {
-        if (read_txt_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", buf, sizeof(buf)) != 0)
+#define CGROUP_INACTIVE_KEY(key) .inactive_key = (key), .inactive_key_len = sizeof(key) - 1
+
+static CGROUP_MEMORY_READER cgroup_v1 = {
+    .limit_path = "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    .usage_path = "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+    .stat_path = "/sys/fs/cgroup/memory/memory.stat",
+    CGROUP_INACTIVE_KEY("total_inactive_file "),
+};
+
+static CGROUP_MEMORY_READER cgroup_v2 = {
+    .limit_path = "/sys/fs/cgroup/memory.max",
+    .usage_path = "/sys/fs/cgroup/memory.current",
+    .stat_path = "/sys/fs/cgroup/memory.stat",
+    CGROUP_INACTIVE_KEY("inactive_file "),
+};
+
+// An unlimited cgroup v2 limit reads "max\n", which parses as 0 and fails the read,
+// so detection falls back to cgroup v1 or /proc/meminfo.
+static OS_SYSTEM_MEMORY os_system_memory_cgroup(CGROUP_MEMORY_READER *cg, bool query_total_ram) {
+    char buf[4096];
+    uint64_t used, inactive = 0;
+
+    if(query_total_ram || cg->sm.ram_total_bytes == 0) {
+        if(read_txt_file(cg->limit_path, buf, sizeof(buf)) != 0)
             goto failed;
 
-        sm.ram_total_bytes = str2ull(buf, NULL);
-        if(!sm.ram_total_bytes)
+        cg->sm.ram_total_bytes = str2ull(buf, NULL);
+        if(!cg->sm.ram_total_bytes)
             goto failed;
     }
 
-    buf[0] = '\0';
-    if (read_txt_file("/sys/fs/cgroup/memory/memory.usage_in_bytes", buf, sizeof(buf)) != 0)
+    if(read_txt_file(cg->usage_path, buf, sizeof(buf)) != 0)
         goto failed;
 
     used = str2ull(buf, NULL);
-    if(!used || used > sm.ram_total_bytes)
+    if(!used || used > cg->sm.ram_total_bytes)
         goto failed;
 
-    if (read_txt_file("/sys/fs/cgroup/memory/memory.stat", buf, sizeof(buf)) != 0)
-        goto done;
-
-    const char *inactive_str = strstr(buf, "total_inactive_file ");
-    if(!inactive_str)
-        goto done;
-
-    inactive_str += 20;
-
-    inactive = str2ull(inactive_str, NULL);
-    if(!inactive || inactive > used) {
-        inactive = 0;
-        goto done;
+    // the page cache is optional: without it, all used memory counts as unavailable
+    if(read_txt_file(cg->stat_path, buf, sizeof(buf)) == 0) {
+        const char *s = strstr(buf, cg->inactive_key);
+        if(s) {
+            inactive = str2ull(s + cg->inactive_key_len, NULL);
+            if(inactive > used)
+                inactive = 0;
+        }
     }
 
-done:
-    sm.ram_available_bytes = sm.ram_total_bytes - (used - inactive);
-    return sm;
+    cg->sm.ram_available_bytes = cg->sm.ram_total_bytes - (used - inactive);
+    return cg->sm;
 
 failed:
-    sm = OS_SYSTEM_MEMORY_EMPTY;
-    return sm;
-}
-
-static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
-    char buf[4096];
-    uint64_t used = 0, inactive = 0;
-
-    if(query_total_ram || sm.ram_total_bytes == 0) {
-        if (read_txt_file("/sys/fs/cgroup/memory.max", buf, sizeof(buf)) != 0)
-            goto failed;
-
-        if(strcmp(buf, "max") == 0)
-            sm.ram_total_bytes = UINT64_MAX;
-        else
-            sm.ram_total_bytes = str2ull(buf, NULL);
-
-        if(!sm.ram_total_bytes)
-            goto failed;
-    }
-
-    buf[0] = '\0';
-    if (read_txt_file("/sys/fs/cgroup/memory.current", buf, sizeof(buf)) != 0)
-        goto failed;
-
-    used = str2ull(buf, NULL);
-    if(!used || used > sm.ram_total_bytes)
-        goto failed;
-
-    if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0)
-        goto done;
-
-    const char *inactive_str = strstr(buf, "inactive_file ");
-    if(!inactive_str)
-        goto done;
-
-    inactive_str += 14;
-
-    inactive = str2ull(inactive_str, NULL);
-    if(!inactive || inactive > used) {
-        inactive = 0;
-        goto done;
-    }
-
-done:
-    sm.ram_available_bytes = sm.ram_total_bytes - (used - inactive);
-    return sm;
-
-failed:
-    sm = OS_SYSTEM_MEMORY_EMPTY;
-    return sm;
+    cg->sm = OS_SYSTEM_MEMORY_EMPTY;
+    return cg->sm;
 }
 
 #define MEMINFO_MEMTOTAL "MemTotal:"
 #define MEMINFO_MEMAVAILABLE "MemAvailable:"
 
-static OS_SYSTEM_MEMORY os_system_memory_meminfo(bool query_total_ram __maybe_unused) {
-    static OS_SYSTEM_MEMORY sm = OS_SYSTEM_MEMORY_EMPTY;
+static OS_SYSTEM_MEMORY os_system_memory_meminfo(void) {
+    OS_SYSTEM_MEMORY sm;
 
     char buf[4096];
     if (read_txt_file("/proc/meminfo", buf, sizeof(buf)) != 0)
-        goto failed;
+        return OS_SYSTEM_MEMORY_EMPTY;
 
     char *s = strstr(buf, MEMINFO_MEMTOTAL);
-    if(!s) goto failed;
+    if(!s) return OS_SYSTEM_MEMORY_EMPTY;
     s += sizeof(MEMINFO_MEMTOTAL) - 1;
     while(isspace((uint8_t)*s)) s++;
     sm.ram_total_bytes = str2ull(s, NULL) * 1024;
 
     s = strstr(buf, MEMINFO_MEMAVAILABLE);
-    if(!s) goto failed;
+    if(!s) return OS_SYSTEM_MEMORY_EMPTY;
     s += sizeof(MEMINFO_MEMAVAILABLE) - 1;
     while(isspace((uint8_t)*s)) s++;
     sm.ram_available_bytes = str2ull(s, NULL) * 1024;
 
-    return sm;
-
-failed:
-    sm.ram_total_bytes = 0;
-    sm.ram_available_bytes = 0;
     return sm;
 }
 
@@ -159,6 +124,12 @@ typedef enum {
     OS_MEM_SRC_CGROUP_V2,
     OS_MEM_SRC_MEMINFO,
 } OS_MEM_SRC;
+
+// a cgroup is used only when it reports less memory than the whole system
+static bool cgroup_is_within_meminfo(OS_SYSTEM_MEMORY cg, OS_SYSTEM_MEMORY mi) {
+    return cg.ram_total_bytes && cg.ram_available_bytes &&
+           cg.ram_total_bytes <= mi.ram_total_bytes && cg.ram_available_bytes < mi.ram_available_bytes;
+}
 
 // query_total_ram also re-detects the source (meminfo, cgroup v1 or v2)
 static OS_SYSTEM_MEMORY system_memory_read(bool query_total_ram) {
@@ -171,43 +142,34 @@ static OS_SYSTEM_MEMORY system_memory_read(bool query_total_ram) {
 
     switch(src) {
         case OS_MEM_SRC_MEMINFO:
-            sm = os_system_memory_meminfo(query_total_ram);
+            sm = os_system_memory_meminfo();
             break;
 
         case OS_MEM_SRC_CGROUP_V2:
-            sm = os_system_memory_cgroup_v2(query_total_ram);
+            sm = os_system_memory_cgroup(&cgroup_v2, query_total_ram);
             break;
 
         case OS_MEM_SRC_CGROUP_V1:
-            sm = os_system_memory_cgroup_v1(query_total_ram);
+            sm = os_system_memory_cgroup(&cgroup_v1, query_total_ram);
             break;
 
         default:
         case OS_MEM_SRC_UNKNOWN: {
-            OS_SYSTEM_MEMORY mi = os_system_memory_meminfo(true);
-            OS_SYSTEM_MEMORY v1 = os_system_memory_cgroup_v1(true);
-            OS_SYSTEM_MEMORY v2 = os_system_memory_cgroup_v2(true);
+            OS_SYSTEM_MEMORY mi = os_system_memory_meminfo();
+            OS_SYSTEM_MEMORY v1 = os_system_memory_cgroup(&cgroup_v1, true);
+            OS_SYSTEM_MEMORY v2 = os_system_memory_cgroup(&cgroup_v2, true);
 
-            if(v2.ram_total_bytes && v2.ram_available_bytes && v2.ram_total_bytes <= mi.ram_total_bytes && v2.ram_available_bytes < mi.ram_available_bytes) {
+            if(cgroup_is_within_meminfo(v2, mi)) {
                 sm = v2;
                 src = OS_MEM_SRC_CGROUP_V2;
             }
+            else if(cgroup_is_within_meminfo(v1, mi)) {
+                sm = v1;
+                src = OS_MEM_SRC_CGROUP_V1;
+            }
             else {
-//                if(v2.ram_total_bytes || v2.ram_available_bytes)
-//                    nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroup v2 reports more memory than meminfo. Ignoring cgroup v2.");
-
-                if (v1.ram_total_bytes && v1.ram_available_bytes && v1.ram_total_bytes <= mi.ram_total_bytes &&
-                    v1.ram_available_bytes < mi.ram_available_bytes) {
-                    sm = v1;
-                    src = OS_MEM_SRC_CGROUP_V1;
-                }
-                else {
-//                    if(v1.ram_total_bytes || v1.ram_available_bytes)
-//                        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroup v1 reports more memory than meminfo. Ignoring cgroup v1.");
-
-                    sm = mi;
-                    src = OS_MEM_SRC_MEMINFO;
-                }
+                sm = mi;
+                src = OS_MEM_SRC_MEMINFO;
             }
         }
     }
@@ -526,9 +488,143 @@ static void sm_unittest_writer(void *ptr __maybe_unused) {
     }
 }
 
+#if defined(OS_LINUX)
+// writes a fixture file, or removes it when content is NULL
+static bool sm_fixture_set(const char *path, const char *content) {
+    if(!content)
+        return unlink(path) == 0 || errno == ENOENT;
+
+    FILE *fp = fopen(path, "w");
+    if(!fp)
+        return false;
+
+    bool ok = fputs(content, fp) >= 0;
+    return fclose(fp) == 0 && ok;
+}
+
+static bool sm_fixture_set_all(const CGROUP_MEMORY_READER *cg, const char *limit, const char *usage, const char *stat) {
+    return sm_fixture_set(cg->limit_path, limit) &&
+           sm_fixture_set(cg->usage_path, usage) &&
+           sm_fixture_set(cg->stat_path, stat);
+}
+
+// the cgroup reader on fixture files: values, failures, and the cached total
+static int sm_cgroup_reader_unittest(void) {
+    int errors = 0;
+
+    char dir[] = "/tmp/netdata-sysmem-XXXXXX";
+    if(!mkdtemp(dir)) {
+        fprintf(stderr, "SYSTEM MEMORY: FAILED: cannot create a fixture directory\n");
+        return 1;
+    }
+
+    char limit_file[FILENAME_MAX + 1], usage_file[FILENAME_MAX + 1], stat_file[FILENAME_MAX + 1];
+    snprintfz(limit_file, sizeof(limit_file), "%s/limit", dir);
+    snprintfz(usage_file, sizeof(usage_file), "%s/usage", dir);
+    snprintfz(stat_file, sizeof(stat_file), "%s/stat", dir);
+
+    const CGROUP_MEMORY_READER v1 = {
+        .limit_path = limit_file, .usage_path = usage_file, .stat_path = stat_file,
+        CGROUP_INACTIVE_KEY("total_inactive_file "),
+    };
+    const CGROUP_MEMORY_READER v2 = {
+        .limit_path = limit_file, .usage_path = usage_file, .stat_path = stat_file,
+        CGROUP_INACTIVE_KEY("inactive_file "),
+    };
+
+    // every case starts from a fresh reader and queries the total
+    const struct {
+        const char *name;
+        const CGROUP_MEMORY_READER *reader;
+        const char *limit, *usage, *stat;      // NULL = the file is missing
+        OS_SYSTEM_MEMORY expected;
+    } cases[] = {
+        { "v2 subtracts the inactive page cache from used",
+          &v2, "1000\n", "600\n", "anon 400\ninactive_file 100\nactive_file 100\n", { 1000, 500 } },
+        { "v2 values above 4 GiB",
+          &v2, "8589934592\n", "4294967296\n", "inactive_file 1073741824\n", { 8589934592ULL, 5368709120ULL } },
+        { "v1 uses total_inactive_file, not inactive_file",
+          &v1, "1000\n", "600\n", "inactive_file 50\ntotal_inactive_file 100\n", { 1000, 500 } },
+        { "v1 without total_inactive_file counts all used memory",
+          &v1, "1000\n", "600\n", "inactive_file 50\n", { 1000, 400 } },
+        { "a missing memory.stat counts all used memory",
+          &v2, "1000\n", "600\n", NULL, { 1000, 400 } },
+        { "inactive above used is ignored",
+          &v2, "1000\n", "600\n", "inactive_file 700\n", { 1000, 400 } },
+        { "inactive 0",
+          &v2, "1000\n", "600\n", "inactive_file 0\n", { 1000, 400 } },
+        { "used equal to the limit leaves nothing available",
+          &v2, "1000\n", "1000\n", "anon 1000\n", { 1000, 0 } },
+        { "an unlimited cgroup v2 fails",
+          &v2, "max\n", "600\n", "inactive_file 100\n", { 0, 0 } },
+        { "a zero limit fails",
+          &v2, "0\n", "600\n", "inactive_file 100\n", { 0, 0 } },
+        { "a missing limit fails",
+          &v2, NULL, "600\n", "inactive_file 100\n", { 0, 0 } },
+        { "a missing usage fails",
+          &v2, "1000\n", NULL, "inactive_file 100\n", { 0, 0 } },
+        { "zero usage fails",
+          &v2, "1000\n", "0\n", "inactive_file 100\n", { 0, 0 } },
+        { "usage above the limit fails",
+          &v2, "1000\n", "1001\n", "inactive_file 100\n", { 0, 0 } },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        CGROUP_MEMORY_READER cg = *cases[i].reader;
+        if(!sm_fixture_set_all(&cg, cases[i].limit, cases[i].usage, cases[i].stat)) {
+            fprintf(stderr, "SYSTEM MEMORY: FAILED: cannot write the fixture of '%s'\n", cases[i].name);
+            errors++;
+            continue;
+        }
+
+        OS_SYSTEM_MEMORY sm = os_system_memory_cgroup(&cg, true);
+        if(!sm_equal(sm, cases[i].expected)) {
+            fprintf(stderr, "SYSTEM MEMORY: FAILED: %s: got total %" PRIu64 " available %" PRIu64
+                            ", expected total %" PRIu64 " available %" PRIu64 "\n",
+                    cases[i].name, sm.ram_total_bytes, sm.ram_available_bytes,
+                    cases[i].expected.ram_total_bytes, cases[i].expected.ram_available_bytes);
+            errors++;
+        }
+    }
+
+    // the total is cached between reads, read again on request, and dropped by a failed read
+    {
+        CGROUP_MEMORY_READER cg = v2;
+        bool ok = sm_fixture_set_all(&cg, "1000\n", "600\n", NULL);
+        SM_CHECK(ok && sm_equal(os_system_memory_cgroup(&cg, true), (OS_SYSTEM_MEMORY){ 1000, 400 }),
+                 "the first read queries the limit");
+
+        ok = sm_fixture_set(limit_file, "2000\n");
+        SM_CHECK(ok && sm_equal(os_system_memory_cgroup(&cg, false), (OS_SYSTEM_MEMORY){ 1000, 400 }),
+                 "later reads reuse the cached limit");
+        SM_CHECK(sm_equal(os_system_memory_cgroup(&cg, true), (OS_SYSTEM_MEMORY){ 2000, 1400 }),
+                 "query_total_ram reads the limit again");
+
+        ok = sm_fixture_set(usage_file, "3000\n");
+        SM_CHECK(ok && !OS_SYSTEM_MEMORY_OK(os_system_memory_cgroup(&cg, false)), "a failed read returns empty");
+
+        ok = sm_fixture_set(limit_file, "4000\n") && sm_fixture_set(usage_file, "600\n");
+        SM_CHECK(ok && sm_equal(os_system_memory_cgroup(&cg, false), (OS_SYSTEM_MEMORY){ 4000, 3400 }),
+                 "a failed read drops the cached limit");
+    }
+
+    (void)unlink(limit_file);
+    (void)unlink(usage_file);
+    (void)unlink(stat_file);
+    (void)rmdir(dir);
+
+    fprintf(stderr, "SYSTEM MEMORY: cgroup reader fixtures: %s\n", errors ? "FAILED" : "OK");
+    return errors;
+}
+#endif
+
 int os_system_memory_unittest(void) {
     int errors = 0;
     fprintf(stderr, "\nTesting system memory sampling...\n");
+
+#if defined(OS_LINUX)
+    errors += sm_cgroup_reader_unittest();
+#endif
 
     // the published sample is process-wide: restore it at the end
     uint64_t saved_total = published.ram_total_bytes, saved_available = published.ram_available_bytes;
