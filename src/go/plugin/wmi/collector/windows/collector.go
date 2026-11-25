@@ -5,10 +5,12 @@ package windows
 
 import (
 	"context"
+	"crypto/tls"
 	_ "embed"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
@@ -45,26 +47,40 @@ type Collector struct {
 	vnode         *vnodes.VirtualNode
 	nextInventory time.Time
 
-	open func(ctx context.Context, host, username, password, auth string) (queryClient, error)
+	winrmTLS *tls.Config
+	open     func(context.Context) (queryClient, error)
 }
 
 func New() *Collector {
 	store := metrix.NewCollectorStore()
-	return &Collector{
+	c := &Collector{
 		Config:  defaultConfig(),
 		store:   store,
 		metrics: newCollectorMetrics(store),
-		open: func(ctx context.Context, host, username, password, auth string) (queryClient, error) {
-			return wmiquery.Open(ctx, host, username, password, auth)
-		},
 	}
+	c.open = c.openSession
+	return c
+}
+
+func (c *Collector) openSession(ctx context.Context) (queryClient, error) {
+	if c.Transport == "winrm" {
+		return wmiquery.OpenWinRM(c.Host, c.Username, c.Password, c.winrmTLS), nil
+	}
+	return wmiquery.Open(ctx, c.Host, c.Username, c.Password, c.Auth)
 }
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.Config.validate(); err != nil {
 		return err
+	}
+	if c.Transport == "winrm" {
+		cfg, err := tlscfg.NewTLSConfig(ctx, tlscfg.TLSConfig{TLSCA: c.TLSCA})
+		if err != nil {
+			return err
+		}
+		c.winrmTLS = cfg
 	}
 	c.vnode = newVirtualNode(c.Host)
 	c.nextInventory = time.Time{}

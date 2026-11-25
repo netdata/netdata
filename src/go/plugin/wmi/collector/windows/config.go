@@ -21,6 +21,8 @@ type Config struct {
 	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
 	Host               string           `yaml:"host"                          json:"host"`
+	Transport          string           `yaml:"transport,omitempty"           json:"transport,omitempty"`
+	TLSCA              string           `yaml:"tls_ca,omitempty"              json:"tls_ca,omitempty"`
 	Auth               string           `yaml:"auth"                          json:"auth"`
 	Username           string           `yaml:"username"                      json:"username"`
 	Password           string           `yaml:"password"                      json:"password"`
@@ -39,6 +41,7 @@ type Collectors struct {
 
 func defaultConfig() Config {
 	return Config{
+		Transport:   "dcom",
 		UpdateEvery: defaultUpdateEvery,
 		Timeout:     confopt.Duration(defaultTimeout),
 	}
@@ -48,6 +51,16 @@ func (c *Config) validate() error {
 	c.Host = strings.TrimSpace(c.Host)
 	if !wmiquery.ValidHost(c.Host) {
 		return errors.New("host must be a Windows hostname or IP address without a URL or port")
+	}
+	switch c.Transport {
+	case "", "dcom":
+		c.Transport = "dcom"
+		if c.TLSCA != "" {
+			return errors.New("tls_ca requires the winrm transport")
+		}
+	case "winrm":
+	default:
+		return errors.New("transport must be dcom or winrm")
 	}
 	if c.Auth != "ntlm" {
 		return errors.New("auth must be ntlm")

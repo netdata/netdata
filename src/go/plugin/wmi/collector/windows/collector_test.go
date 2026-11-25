@@ -112,13 +112,11 @@ func TestCollector_Collect(t *testing.T) {
 	)
 
 	next := 0
-	c.open = func(ctx context.Context, host, username, password, auth string) (queryClient, error) {
+	c.open = func(ctx context.Context) (queryClient, error) {
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok)
 		assert.Positive(t, time.Until(deadline))
 		assert.LessOrEqual(t, time.Until(deadline), 15*time.Second)
-		assert.Equal(t, [4]string{"windows.example.com", "fixture-account", "fixture-secret", "ntlm"},
-			[4]string{host, username, password, auth})
 		require.Less(t, next, len(sessions))
 		session := sessions[next]
 		next++
@@ -190,7 +188,7 @@ func TestCollector_CheckFailure(t *testing.T) {
 					memoryProjection: {err: tc.queryErr},
 				},
 			}
-			c.open = func(_ context.Context, _, _, _, _ string) (queryClient, error) {
+			c.open = func(_ context.Context) (queryClient, error) {
 				if tc.openErr != nil {
 					return nil, tc.openErr
 				}
@@ -235,7 +233,7 @@ func TestCollector_CancelDiscardsPartialCycle(t *testing.T) {
 		t:      t,
 		cancel: cancel,
 	}
-	c.open = func(ctx context.Context, _, _, _, _ string) (queryClient, error) {
+	c.open = func(ctx context.Context) (queryClient, error) {
 		session.ctx = ctx
 		return session, nil
 	}

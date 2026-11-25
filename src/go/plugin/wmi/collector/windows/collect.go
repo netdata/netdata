@@ -25,7 +25,7 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		return observations{}, err
 	}
 
-	client, err := c.open(ctx, c.Host, c.Username, c.Password, c.Auth)
+	client, err := c.open(ctx)
 	if err != nil {
 		if err := ctx.Err(); err != nil {
 			return observations{}, err

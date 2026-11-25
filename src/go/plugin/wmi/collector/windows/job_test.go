@@ -41,7 +41,7 @@ func TestCollector_JobV2Publication(t *testing.T) {
 				c := configuredCollector()
 				renameAt := time.Now().Add(inventoryInterval)
 				c.Vnode = vnode.Name
-				c.open = func(context.Context, string, string, string, string) (queryClient, error) {
+				c.open = func(context.Context) (queryClient, error) {
 					results := validQueryResults()
 					hostname := "WIN-LAB"
 					if !time.Now().Before(renameAt) {

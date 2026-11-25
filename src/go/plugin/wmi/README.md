@@ -1,6 +1,6 @@
 # Remote Windows WMI plugin
 
-Run `wmi.plugin` on a Netdata polling host to monitor remote Windows machines through WMI over DCOM. Each job targets one machine and collects CPU, physical memory, traffic per network interface, and space per fixed logical drive. The plugin reads built-in Windows providers. Install it only on the poller.
+Run `wmi.plugin` on a Netdata polling host to monitor remote Windows machines through WMI over DCOM or WinRM HTTPS. Each job targets one machine and collects CPU, physical memory, traffic per network interface, and space per fixed logical drive. The plugin reads built-in Windows providers. Install it only on the poller.
 
 ## Build from source
 
@@ -30,6 +30,8 @@ jobs:
 
 Omit `collectors` to collect all four groups. Set any of `cpu`, `memory`, `network`, and `disk` to `false` to skip that query. Leave at least one group enabled. The example above collects CPU, memory, and network traffic. Add another job for each additional endpoint.
 
+Set `transport: winrm` on a job to send the same read-only WQL queries to the WinRM HTTPS listener on TCP 5986. The default is `dcom`. Both transports use the same host identity, metrics and inventory. For a private CA, set `tls_ca` to the PEM file on the poller. Otherwise the poller uses its system trust store. The configured hostname or IP must match the listener certificate.
+
 ## Virtual node and system information
 
 Each job automatically creates a virtual node. It displays the Windows computer name reported by WMI and records the configured IP address or DNS name in the `address` host label. Until Windows supplies a usable name, the node displays the endpoint. Its GUID comes from the configured endpoint, so a Windows rename keeps the node’s metric history. Changing the endpoint can create a new node. To manage the identity and labels yourself, set `vnode` to an existing named virtual node.
@@ -46,11 +48,11 @@ The readiness check queries the enabled metric groups. The first successful coll
 
 ## Target requirements
 
-- Allow the polling host to reach the Windows RPC endpoint mapper on TCP 135 and the WMI service on its assigned RPC TCP port. The Windows WMI firewall rules can be scoped to the poller.
-- Grant the account remote DCOM access and permission to read the required providers in `root\cimv2`, including **Remote Enable**. Local accounts may also be subject to remote UAC restrictions.
-- The development build requires explicit `auth: ntlm` and uses NTLMv2. The target and domain policy must permit NTLMv2. Collection uses read-only WQL over DCOM and requires no WinRM HTTPS listener.
+- **DCOM.** Allow the polling host to reach the Windows RPC endpoint mapper on TCP 135 and the WMI service on its assigned RPC TCP port. The Windows WMI firewall rules can be scoped to the poller.
+- **WinRM.** Configure an HTTPS listener with a server certificate on TCP 5986, permit connections from the poller and grant the account access to WinRM. The collector uses WS-Management enumeration. It opens no remote shell.
+- The development build requires explicit `auth: ntlm` and uses NTLMv2. The account needs access to the chosen transport and permission to read the WMI providers in `root\cimv2`, including **Remote Enable**. The target and domain policy must permit NTLMv2. Local accounts can be subject to remote UAC restrictions.
 
-See [Microsoft's remote WMI connection guide](https://learn.microsoft.com/en-us/windows/win32/wmisdk/connecting-to-wmi-on-a-remote-computer) and [remote WMI security settings](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
+See [Microsoft's remote WMI connection guide](https://learn.microsoft.com/en-us/windows/win32/wmisdk/connecting-to-wmi-on-a-remote-computer), [WinRM HTTPS setup](https://learn.microsoft.com/en-us/troubleshoot/windows-client/system-management-components/configure-winrm-for-https) and [remote WMI security settings](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
 
 ## Check collection
 

@@ -10,6 +10,16 @@
         "type": "string",
         "minLength": 1
       },
+      "transport": {
+        "title": "Transport",
+        "description": "Connection protocol. DCOM uses RPC. WinRM sends WMI queries over HTTPS on port 5986.",
+        "type": "string",
+        "enum": [
+          "dcom",
+          "winrm"
+        ],
+        "default": "dcom"
+      },
       "auth": {
         "title": "Authentication",
         "description": "Authentication mechanism for the remote WMI session.",
@@ -93,12 +103,39 @@
       "auth",
       "username",
       "password"
-    ]
+    ],
+    "dependencies": {
+      "transport": {
+        "oneOf": [
+          {
+            "properties": {
+              "transport": {
+                "const": "dcom"
+              }
+            }
+          },
+          {
+            "properties": {
+              "transport": {
+                "const": "winrm"
+              },
+              "tls_ca": {
+                "title": "TLS CA file",
+                "description": "PEM certificate authority file on the poller for the WinRM HTTPS listener. Omit to use system trust.",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
   },
   "uiSchema": {
     "ui:flavour": "tabs",
     "ui:order": [
       "host",
+      "transport",
+      "tls_ca",
       "auth",
       "username",
       "password",
@@ -114,6 +151,8 @@
           "title": "Connection",
           "fields": [
             "host",
+            "transport",
+            "tls_ca",
             "auth",
             "username",
             "password"
@@ -152,6 +191,15 @@
     "vnode": {
       "ui:placeholder": "windows-server",
       "ui:help": "The job creates a Virtual Node for the remote host by default. To use an existing Virtual Node, enter its configured name."
+    },
+    "transport": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "enumNames": [
+          "DCOM",
+          "WinRM (HTTPS)"
+        ]
+      }
     }
   }
 }

@@ -72,7 +72,7 @@ func TestCollector_GroupConfig(t *testing.T) {
 						session := &fakeSession{
 							results: validQueryResults(),
 						}
-						c.open = func(context.Context, string, string, string, string) (queryClient, error) {
+						c.open = func(context.Context) (queryClient, error) {
 							return session, nil
 						}
 						if len(tc.wantQueries) == 0 {
@@ -98,15 +98,18 @@ func TestCollector_ValidateConfig(t *testing.T) {
 		change    func(*Collector)
 		wantError string
 	}{
-		"host with port":   {change: func(c *Collector) { c.Host = "windows.example.com:135" }, wantError: "host must"},
-		"host URL":         {change: func(c *Collector) { c.Host = "https://windows.example.com/" }, wantError: "host must"},
-		"IPv6":             {change: func(c *Collector) { c.Host = "2001:db8::1" }},
-		"scoped IPv6":      {change: func(c *Collector) { c.Host = "fe80::1%test0" }},
-		"missing auth":     {change: func(c *Collector) { c.Auth = "" }, wantError: "auth must"},
-		"unknown auth":     {change: func(c *Collector) { c.Auth = "kerberos" }, wantError: "auth must"},
-		"missing username": {change: func(c *Collector) { c.Username = "" }, wantError: "username is required"},
-		"missing password": {change: func(c *Collector) { c.Password = "" }, wantError: "password is required"},
-		"zero timeout":     {change: func(c *Collector) { c.Timeout = 0 }, wantError: "timeout must be positive"},
+		"winrm":             {change: func(c *Collector) { c.Transport = "winrm" }},
+		"unknown transport": {change: func(c *Collector) { c.Transport = "https" }, wantError: "transport must"},
+		"CA with DCOM":      {change: func(c *Collector) { c.TLSCA = "lab-ca.pem" }, wantError: "tls_ca requires"},
+		"host with port":    {change: func(c *Collector) { c.Host = "windows.example.com:135" }, wantError: "host must"},
+		"host URL":          {change: func(c *Collector) { c.Host = "https://windows.example.com/" }, wantError: "host must"},
+		"IPv6":              {change: func(c *Collector) { c.Host = "2001:db8::1" }},
+		"scoped IPv6":       {change: func(c *Collector) { c.Host = "fe80::1%test0" }},
+		"missing auth":      {change: func(c *Collector) { c.Auth = "" }, wantError: "auth must"},
+		"unknown auth":      {change: func(c *Collector) { c.Auth = "kerberos" }, wantError: "auth must"},
+		"missing username":  {change: func(c *Collector) { c.Username = "" }, wantError: "username is required"},
+		"missing password":  {change: func(c *Collector) { c.Password = "" }, wantError: "password is required"},
+		"zero timeout":      {change: func(c *Collector) { c.Timeout = 0 }, wantError: "timeout must be positive"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := configuredCollector()
@@ -122,9 +125,12 @@ func TestCollector_ValidateConfig(t *testing.T) {
 
 func TestCollector_GeneratedVnodeIdentity(t *testing.T) {
 	var expectedGUID string
-	for _, host := range []string{"windows.example.com", " Windows.Example.com. "} {
+	for i, host := range []string{"windows.example.com", " Windows.Example.com. "} {
 		c := configuredCollector()
 		c.Host = host
+		if i == 1 {
+			c.Transport = "winrm"
+		}
 		require.NoError(t, c.Init(t.Context()))
 		vnode := c.VirtualNode()
 		require.NotNil(t, vnode)

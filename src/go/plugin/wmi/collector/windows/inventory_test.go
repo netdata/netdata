@@ -42,7 +42,7 @@ func TestInventoryRefresh(t *testing.T) {
 			"Architecture": uint16(9), "Name": "Test CPU", "CurrentClockSpeed": uint32(2000),
 		})
 		session.results[queryInstalledMemory] = fixtureRows(map[string]any{"Capacity": "8589934592"}, map[string]any{"Capacity": uint64(4294967296)})
-		c.open = func(context.Context, string, string, string, string) (queryClient, error) { return session, nil }
+		c.open = func(context.Context) (queryClient, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
 		initial := c.VirtualNode()
 		require.NoError(t, c.Check(t.Context()))
@@ -98,7 +98,7 @@ func TestInventoryTimeoutPreservesMetrics(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		c := configuredCollector()
 		session := &slowInventorySession{fakeSession{results: validQueryResults()}}
-		c.open = func(context.Context, string, string, string, string) (queryClient, error) { return session, nil }
+		c.open = func(context.Context) (queryClient, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
 		start := time.Now()
 		metrics, err := collecttest.CollectScalarSeries(c)
@@ -117,7 +117,7 @@ func TestInventoryDisabledQueries(t *testing.T) {
 		}
 		c.Collectors.Disk = new(false)
 		session := &fakeSession{results: validQueryResults()}
-		c.open = func(context.Context, string, string, string, string) (queryClient, error) { return session, nil }
+		c.open = func(context.Context) (queryClient, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
 		_, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
