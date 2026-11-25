@@ -14,8 +14,8 @@ type collectorMetrics struct {
 	cpuBusy         metrix.SnapshotGauge
 	memoryUsed      metrix.SnapshotGauge
 	memoryAvailable metrix.SnapshotGauge
-	networkReceived metrix.SnapshotGauge
-	networkSent     metrix.SnapshotGauge
+	networkReceived metrix.SnapshotCounter
+	networkSent     metrix.SnapshotCounter
 	diskUsed        metrix.SnapshotGauge
 	diskFree        metrix.SnapshotGauge
 }
@@ -24,20 +24,23 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	m := store.Write().SnapshotMeter("")
 	return collectorMetrics{
 		meter:           m,
-		cpuBusy:         m.Gauge("cpu_busy_percent"),
+		cpuBusy:         m.Gauge("cpu_busy_percent", metrix.WithFloat(true)),
 		memoryUsed:      m.Gauge("memory_used_bytes"),
 		memoryAvailable: m.Gauge("memory_available_bytes"),
-		networkReceived: m.Gauge("network_received_bytes_per_second"),
-		networkSent:     m.Gauge("network_sent_bytes_per_second"),
+		networkReceived: m.Counter("network_received_bytes"),
+		networkSent:     m.Counter("network_sent_bytes"),
 		diskUsed:        m.Gauge("disk_used_bytes"),
 		diskFree:        m.Gauge("disk_free_bytes"),
 	}
 }
 
 // write records the valid samples. Label sets are built per poll, so an
-// interface or drive that disappears stops being observed.
+// interface or drive that disappears stops being observed. Byte totals are
+// counters: Netdata computes the traffic rate over each collection interval.
 func (m collectorMetrics) write(snapshot observations) {
-	observe(m.cpuBusy, snapshot.cpuBusy)
+	if snapshot.cpuBusy.valid {
+		m.cpuBusy.Observe(snapshot.cpuBusy.value)
+	}
 	observe(m.memoryUsed, snapshot.memoryUsed)
 	observe(m.memoryAvailable, snapshot.memoryAvailable)
 	for _, nic := range snapshot.interfaces {
@@ -45,8 +48,8 @@ func (m collectorMetrics) write(snapshot observations) {
 			Key:   interfaceLabel,
 			Value: nic.name,
 		})
-		observe(m.networkReceived, nic.received, labels)
-		observe(m.networkSent, nic.sent, labels)
+		observeTotal(m.networkReceived, nic.received, labels)
+		observeTotal(m.networkSent, nic.sent, labels)
 	}
 	for _, drive := range snapshot.drives {
 		labels := m.meter.LabelSet(metrix.Label{
@@ -61,5 +64,11 @@ func (m collectorMetrics) write(snapshot observations) {
 func observe(gauge metrix.SnapshotGauge, s sample, labels ...metrix.LabelSet) {
 	if s.valid {
 		gauge.Observe(float64(s.value), labels...)
+	}
+}
+
+func observeTotal(counter metrix.SnapshotCounter, s sample, labels ...metrix.LabelSet) {
+	if s.valid {
+		counter.ObserveTotal(float64(s.value), labels...)
 	}
 }

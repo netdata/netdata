@@ -58,14 +58,14 @@ func fixtureRows(records ...map[string]any) queryResult {
 
 func validQueryResults() map[string]queryResult {
 	return map[string]queryResult{
-		queryCPU: fixtureRows(map[string]any{"PercentProcessorTime": uint32(0)}),
+		queryCPU: fixtureRows(map[string]any{"PercentProcessorTime": uint64(75_000_000), "Timestamp_Sys100NS": uint64(100_000_000)}),
 		queryMemory: fixtureRows(map[string]any{
 			"TotalVisibleMemorySize": "8388608",
 			"FreePhysicalMemory":     uint64(2097152),
 		}),
 		queryNetwork: fixtureRows(
-			map[string]any{"Name": "Ethernet", "BytesReceivedPerSec": uint32(190), "BytesSentPerSec": uint64(30)},
-			map[string]any{"Name": "Ethernet#1", "BytesReceivedPerSec": uint64(0), "BytesSentPerSec": int32(70)},
+			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
+			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
 		),
 		queryDisk: fixtureRows(
 			map[string]any{"DeviceID": "C:", "Size": uint64(500000000000), "FreeSpace": uint64(420000000000)},
@@ -97,10 +97,15 @@ func TestCollector_Collect(t *testing.T) {
 	}
 	sessions[1].results[queryMemory] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
 	sessions[1].results[queryNetwork] = fixtureRows(
-		map[string]any{"Name": "Ethernet", "BytesReceivedPerSec": "0", "BytesSentPerSec": "malformed"},
-		map[string]any{"Name": "_Total", "BytesReceivedPerSec": uint32(30)},
-		map[string]any{"BytesSentPerSec": uint64(20)},
+		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "0", "BytesSentPersec": "malformed"},
+		map[string]any{"Name": "_Total", "BytesReceivedPersec": uint32(30)},
+		map[string]any{"BytesSentPersec": uint64(20)},
 	)
+	// 20 s of processor time later, idle for 15 s of it: 25% busy since the first sample.
+	sessions[2].results[queryCPU] = fixtureRows(map[string]any{
+		"PercentProcessorTime": uint64(90_000_000),
+		"Timestamp_Sys100NS":   uint64(120_000_000),
+	})
 	sessions[1].results[queryDisk] = fixtureRows(
 		map[string]any{"DeviceID": "C:", "Size": uint64(300), "FreeSpace": uint64(300)},
 		map[string]any{"DeviceID": "D:", "Size": uint64(500)},
@@ -119,34 +124,36 @@ func TestCollector_Collect(t *testing.T) {
 	}
 	require.NoError(t, c.Init(t.Context()))
 
+	// No CPU value yet: an interval needs a previous sample.
 	first, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]metrix.SampleValue{
-		"cpu_busy_percent":       0,
-		"memory_used_bytes":      6 * 1024 * 1024 * 1024,
-		"memory_available_bytes": 2 * 1024 * 1024 * 1024,
-		`network_received_bytes_per_second{interface="Ethernet"}`:   190,
-		`network_received_bytes_per_second{interface="Ethernet#1"}`: 0,
-		`network_sent_bytes_per_second{interface="Ethernet"}`:       30,
-		`network_sent_bytes_per_second{interface="Ethernet#1"}`:     70,
-		`disk_used_bytes{drive="C:"}`:                               80000000000,
-		`disk_free_bytes{drive="C:"}`:                               420000000000,
-		`disk_used_bytes{drive="D:"}`:                               4294967296,
-		`disk_free_bytes{drive="D:"}`:                               0,
+		"memory_used_bytes":                              6 * 1024 * 1024 * 1024,
+		"memory_available_bytes":                         2 * 1024 * 1024 * 1024,
+		`network_received_bytes{interface="Ethernet"}`:   190,
+		`network_received_bytes{interface="Ethernet#1"}`: 0,
+		`network_sent_bytes{interface="Ethernet"}`:       30,
+		`network_sent_bytes{interface="Ethernet#1"}`:     70,
+		`disk_used_bytes{drive="C:"}`:                    80000000000,
+		`disk_free_bytes{drive="C:"}`:                    420000000000,
+		`disk_used_bytes{drive="D:"}`:                    4294967296,
+		`disk_free_bytes{drive="D:"}`:                    0,
 	}, first)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 	second, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]metrix.SampleValue{
-		"memory_available_bytes":                                  0,
-		`network_received_bytes_per_second{interface="Ethernet"}`: 0,
-		`disk_used_bytes{drive="C:"}`:                             0,
-		`disk_free_bytes{drive="C:"}`:                             300,
+		"memory_available_bytes":                       0,
+		`network_received_bytes{interface="Ethernet"}`: 0,
+		`disk_used_bytes{drive="C:"}`:                  0,
+		`disk_free_bytes{drive="C:"}`:                  300,
 	}, second)
 
+	// The failed CPU query keeps the first sample, so the average spans both intervals.
 	recovered, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
+	first["cpu_busy_percent"] = 25
 	assert.Equal(t, first, recovered)
 
 	for _, session := range sessions {
@@ -212,7 +219,7 @@ func (f *cancellableSession) Query(ctx context.Context, wql string) ([]map[strin
 	f.queries = append(f.queries, wql)
 	assert.Same(f.t, f.ctx, ctx)
 	if wql == queryCPU {
-		return fixtureRows(map[string]any{"PercentProcessorTime": uint32(12)}).rows, nil
+		return validQueryResults()[queryCPU].rows, nil
 	}
 	f.cancel()
 	return nil, ctx.Err()
@@ -357,12 +364,15 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 	}{
 		"after a successful group, keep its samples and skip the inventory": {
 			results: map[string]queryResult{
-				queryCPU:     fixtureRows(map[string]any{"PercentProcessorTime": uint32(7)}),
-				queryMemory:  lost,
+				queryCPU:     validQueryResults()[queryCPU],
+				queryMemory:  validQueryResults()[queryMemory],
 				queryNetwork: lost,
 				queryDisk:    lost,
 			},
-			wantMetrics: map[string]metrix.SampleValue{"cpu_busy_percent": 7},
+			wantMetrics: map[string]metrix.SampleValue{
+				"memory_used_bytes":      6 * 1024 * 1024 * 1024,
+				"memory_available_bytes": 2 * 1024 * 1024 * 1024,
+			},
 		},
 		"after a refused query, report the query failures": {
 			results: map[string]queryResult{
@@ -390,6 +400,42 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				assert.Equal(t, tc.wantMetrics, metrics)
 			}
 			assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, session.queries)
+		})
+	}
+}
+
+func TestBusyPercent(t *testing.T) {
+	sample := func(idle, timestamp uint64) cpuTimes {
+		return cpuTimes{
+			idle:      idle,
+			timestamp: timestamp,
+			valid:     true,
+		}
+	}
+	for name, tc := range map[string]struct {
+		prev, cur cpuTimes
+		want      percent
+	}{
+		"no previous sample": {cur: sample(10, 100), want: percent{}},
+		"busy share of interval": {prev: sample(10, 100), cur: sample(70, 180), want: percent{
+			value: 25,
+			valid: true,
+		}},
+		"fully idle": {prev: sample(10, 100), cur: sample(90, 180), want: percent{
+			value: 0,
+			valid: true,
+		}},
+		"idle above elapsed": {prev: sample(10, 100), cur: sample(95, 180), want: percent{
+			value: 0,
+			valid: true,
+		}},
+		"same timestamp":         {prev: sample(10, 100), cur: sample(10, 100), want: percent{}},
+		"timestamp reset":        {prev: sample(10, 100), cur: sample(5, 50), want: percent{}},
+		"idle counter went back": {prev: sample(50, 100), cur: sample(40, 180), want: percent{}},
+		"invalid current sample": {prev: sample(10, 100), cur: cpuTimes{}, want: percent{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, busyPercent(tc.prev, tc.cur))
 		})
 	}
 }

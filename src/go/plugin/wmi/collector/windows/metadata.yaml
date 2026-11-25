@@ -50,9 +50,9 @@ modules:
 
           | Data | WMI classes |
           |---|---|
-          | CPU | `Win32_PerfFormattedData_PerfOS_Processor` |
+          | CPU | `Win32_PerfRawData_PerfOS_Processor` |
           | Memory | `Win32_OperatingSystem` |
-          | Network | `Win32_PerfFormattedData_Tcpip_NetworkInterface` |
+          | Network | `Win32_PerfRawData_Tcpip_NetworkInterface` |
           | Disk | `Win32_LogicalDisk` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
       supported_platforms:
@@ -79,7 +79,8 @@ modules:
             - Authentication is NTLMv2 only. Hosts or domains that block NTLM and accept only Kerberos cannot be monitored.
             - Every collection logs in again. With a wrong or expired password, each collection adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
-            - CPU is the total across all processors, without a per-core breakdown. CPU and traffic values are rates Windows calculates at query time over its own short sampling window, not averages over `update_every`.
+            - CPU is the total across all processors, without a per-core breakdown.
+            - Traffic appears from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
@@ -369,6 +370,7 @@ modules:
         enabled: false
       description: |
         - Charts belong to the Windows host's node, not to the poller.
+        - CPU utilization and traffic are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
       availability: []
       scopes:

@@ -8,9 +8,10 @@ import (
 	"strings"
 )
 
-// observations holds one poll's metric values in base units (bytes, bytes/s, percent).
+// observations holds one poll's values in base units: bytes, byte counters and percent.
 type observations struct {
-	cpuBusy         sample
+	cpuTimes        cpuTimes
+	cpuBusy         percent
 	memoryUsed      sample
 	memoryAvailable sample
 	interfaces      []networkTraffic
@@ -23,6 +24,20 @@ type sample struct {
 	valid bool
 }
 
+// percent is a computed share that may be unavailable.
+type percent struct {
+	value float64
+	valid bool
+}
+
+// cpuTimes is one raw sample of the _Total processor counters, in 100 ns units.
+type cpuTimes struct {
+	idle      uint64 // PercentProcessorTime: idle time (PERF_100NSEC_TIMER_INV)
+	timestamp uint64 // Timestamp_Sys100NS
+	valid     bool
+}
+
+// networkTraffic holds an interface's byte totals since its counters started.
 type networkTraffic struct {
 	name     string
 	received sample
@@ -39,12 +54,32 @@ func (o *observations) readCPU(rows []map[string]any) bool {
 	if len(rows) != 1 {
 		return false
 	}
-	busy := readUnsigned(rows[0]["percentprocessortime"])
-	if !busy.valid || busy.value > 100 {
+	idle := readUnsigned(rows[0]["percentprocessortime"])
+	timestamp := readUnsigned(rows[0]["timestamp_sys100ns"])
+	if !idle.valid || !timestamp.valid {
 		return false
 	}
-	o.cpuBusy = busy
+	o.cpuTimes = cpuTimes{
+		idle:      idle.value,
+		timestamp: timestamp.value,
+		valid:     true,
+	}
 	return true
+}
+
+// busyPercent is the share of the interval between two samples that the
+// processors were busy. It is unavailable without a previous sample and after
+// a counter reset, such as a reboot.
+func busyPercent(prev, cur cpuTimes) percent {
+	if !prev.valid || !cur.valid || cur.timestamp <= prev.timestamp || cur.idle < prev.idle {
+		return percent{}
+	}
+	elapsed := cur.timestamp - prev.timestamp
+	idle := min(cur.idle-prev.idle, elapsed)
+	return percent{
+		value: 100 * float64(elapsed-idle) / float64(elapsed),
+		valid: true,
+	}
 }
 
 // readMemory converts Win32_OperatingSystem's KiB values to bytes.

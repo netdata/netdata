@@ -47,6 +47,9 @@ func TestCollector_JobV2Publication(t *testing.T) {
 					if !time.Now().Before(renameAt) {
 						hostname = "WIN-RENAMED"
 					}
+					// Idle for three quarters of every interval: 25% busy.
+					now := uint64(time.Now().UnixNano() / 100)
+					results[queryCPU] = fixtureRows(map[string]any{"PercentProcessorTime": now / 4 * 3, "Timestamp_Sys100NS": now})
 					results[queryOSInfo] = fixtureRows(
 						map[string]any{
 							"CSName":      hostname,
@@ -101,7 +104,7 @@ func TestCollector_JobV2Publication(t *testing.T) {
 				}
 				output := collect(c.UpdateEvery)
 				assert.Contains(t, output, "CLABEL 'interface' 'Ethernet'")
-				assert.Contains(t, output, "SET 'busy' = 0")
+				assert.NotContains(t, output, "SET 'busy'", "the first interval starts at the readiness check, at the same instant")
 				assert.Contains(t, output, "SET 'used' = 6442450944")
 				if vnode.Name != "" {
 					assert.Contains(t, output, "HOST_DEFINE '"+namedGUID+"' 'configured.example.com'")
@@ -118,6 +121,7 @@ func TestCollector_JobV2Publication(t *testing.T) {
 				time.Sleep(inventoryInterval)
 				renamed := collect(2 * c.UpdateEvery)
 				assert.Contains(t, renamed, "HOST_DEFINE '"+guid+"' 'WIN-RENAMED'")
+				assert.Contains(t, renamed, "SET 'busy' = 25")
 				assert.Contains(t, renamed, "HOST_LABEL 'address' 'windows.example.com'")
 			})
 		})

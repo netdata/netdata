@@ -104,7 +104,7 @@ func testClassObject(t *testing.T, name string, counter uint64) *wmi.ClassObject
 	class := &wmio.Object{
 		Class: &wmio.ObjectClass{
 			CurrentClass: wmio.Class{
-				Name: "Win32_PerfFormattedData_Tcpip_NetworkInterface",
+				Name: "Win32_PerfRawData_Tcpip_NetworkInterface",
 				Properties: []*wmio.Property{
 					{Name: "Name", Order: 0, Value: wmio.Value{
 						Type:  wmio.String,

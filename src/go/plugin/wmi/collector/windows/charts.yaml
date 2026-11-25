@@ -24,7 +24,7 @@ groups:
           - selector: memory_available_bytes
             name: available
   - family: Network
-    metrics: [network_received_bytes_per_second, network_sent_bytes_per_second]
+    metrics: [network_received_bytes, network_sent_bytes]
     charts:
       - context: network_traffic
         title: Network Interface Traffic
@@ -33,9 +33,9 @@ groups:
         instances:
           by_labels: [interface]
         dimensions:
-          - selector: network_received_bytes_per_second
+          - selector: network_received_bytes
             name: received
-          - selector: network_sent_bytes_per_second
+          - selector: network_sent_bytes
             name: sent
             options:
               multiplier: -1

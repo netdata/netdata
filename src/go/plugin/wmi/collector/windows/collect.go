@@ -12,9 +12,11 @@ import (
 )
 
 const (
-	queryCPU     = "SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor WHERE Name = '_Total'"
+	// Raw performance counters: the formatted classes describe only a moment around
+	// each query, not the interval between polls.
+	queryCPU     = "SELECT PercentProcessorTime, Timestamp_Sys100NS FROM Win32_PerfRawData_PerfOS_Processor WHERE Name = '_Total'"
 	queryMemory  = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
-	queryNetwork = "SELECT Name, BytesReceivedPerSec, BytesSentPerSec FROM Win32_PerfFormattedData_Tcpip_NetworkInterface"
+	queryNetwork = "SELECT Name, BytesReceivedPersec, BytesSentPersec FROM Win32_PerfRawData_Tcpip_NetworkInterface"
 	queryDisk    = "SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType = 3"
 )
 
@@ -100,6 +102,11 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		if err != nil {
 			c.Limit("wmi:"+groups[i].name, 1, time.Minute).Warning(err)
 		}
+	}
+	// Check's poll primes the CPU sample, so the first collection already has an interval.
+	snapshot.cpuBusy = busyPercent(c.lastCPU, snapshot.cpuTimes)
+	if snapshot.cpuTimes.valid {
+		c.lastCPU = snapshot.cpuTimes
 	}
 	if inventoryDue && !sessionLost {
 		c.refreshInventory(ctx, session, fixedDrives, fixedDrivesRead)
