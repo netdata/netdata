@@ -30,7 +30,7 @@ modules:
         auto_detection:
           description: Configure each remote endpoint explicitly. The stock configuration contains no jobs.
         limits:
-          description: This experimental source-only plugin uses explicit NTLMv2. It collects total CPU utilization, visible physical memory, rates per Windows network interface performance instance, and fixed logical drives with drive letters.
+          description: This experimental source-only plugin uses explicit NTLMv2. WinRM listeners requiring a TLS channel binding token are unsupported. It collects total CPU utilization, visible physical memory, rates per Windows network interface performance instance, and fixed logical drives with drive letters.
         performance_impact:
           description: Each cycle opens a WMI session and queries each enabled group once. Generated nodes use the same session to refresh host inventory every five minutes after a successful metric poll. Disabling a metric group skips its metric query.
     setup:

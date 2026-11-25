@@ -49,7 +49,7 @@ The readiness check queries the enabled metric groups. The first successful coll
 ## Target requirements
 
 - **DCOM.** Allow the polling host to reach the Windows RPC endpoint mapper on TCP 135 and the WMI service on its assigned RPC TCP port. The Windows WMI firewall rules can be scoped to the poller.
-- **WinRM.** Configure an HTTPS listener with a server certificate on TCP 5986, permit connections from the poller and grant the account access to WinRM. The collector uses WS-Management enumeration. It opens no remote shell.
+- **WinRM.** Configure an HTTPS listener with a server certificate on TCP 5986, permit connections from the poller and grant the account access to WinRM. The collector uses WS-Management enumeration. It opens no remote shell. The current NTLM client does not supply a TLS channel binding token. WinRM listeners with `CbtHardeningLevel=Strict` reject this client.
 - The development build requires explicit `auth: ntlm` and uses NTLMv2. The account needs access to the chosen transport and permission to read the WMI providers in `root\cimv2`, including **Remote Enable**. The target and domain policy must permit NTLMv2. Local accounts can be subject to remote UAC restrictions.
 
 See [Microsoft's remote WMI connection guide](https://learn.microsoft.com/en-us/windows/win32/wmisdk/connecting-to-wmi-on-a-remote-computer), [WinRM HTTPS setup](https://learn.microsoft.com/en-us/troubleshoot/windows-client/system-management-components/configure-winrm-for-https) and [remote WMI security settings](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).

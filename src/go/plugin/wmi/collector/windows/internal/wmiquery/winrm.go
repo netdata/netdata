@@ -35,8 +35,9 @@ func OpenWinRM(host, username, password string, tlsConfig *tls.Config) *winRMCli
 }
 
 func newWinRM(endpoint, username, password string, tlsConfig *tls.Config) *winRMClient {
-	// One HTTP/1.1 connection belongs to one polling session and NTLM identity.
-	base := &http.Transport{TLSClientConfig: tlsConfig, MaxConnsPerHost: 1}
+	// A session owns its HTTP/1.1 transport and NTLM identity. The negotiator may
+	// retain the first 401 response while starting its handshake on another connection.
+	base := &http.Transport{TLSClientConfig: tlsConfig}
 	client := wsman.NewHTTPTransport(endpoint, &http.Client{
 		Transport: winRMTransport{negotiator: ntlmssp.Negotiator{RoundTripper: base}},
 	})

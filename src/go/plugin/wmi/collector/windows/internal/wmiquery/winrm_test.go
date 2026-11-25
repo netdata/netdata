@@ -3,13 +3,16 @@
 package wmiquery
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/r4sd/go-wsman/wsman"
 	"github.com/stretchr/testify/assert"
@@ -110,4 +113,26 @@ func TestWinRMDiskAssociation(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page.Items, 1)
 	assert.Equal(t, map[string]any{"dependent": `Win32_LogicalDisk.DeviceID="D:"`, "startingaddress": "32768", "endingaddress": "65535"}, winRMRow(page.Items[0]))
+}
+
+func TestWinRMNTLMChallengeWithBody(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			w.Header().Set("WWW-Authenticate", "NTLM")
+			http.Error(w, "authenticate", http.StatusUnauthorized)
+			return
+		}
+		assert.True(t, strings.HasPrefix(r.Header.Get("Authorization"), "NTLM "))
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	client := newWinRM(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{RootCAs: ca})
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	_, err := client.Query(ctx, "SELECT Name FROM Win32_ComputerSystem")
+	require.Error(t, err)
+	assert.Contains(t, SafeMessage(err), "HTTP 403")
 }
