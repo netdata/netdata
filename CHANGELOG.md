@@ -45,6 +45,11 @@
 - Ml: replace dlib with an in-tree k-means ([#24767](https://github.com/netdata/netdata/issues/24767))
 - Rrdcontext: queue context SQL writes instead of running SQLite under the context lock ([#24824](https://github.com/netdata/netdata/issues/24824))
 - Otel-plugin: remove legacy OTel logs support; unknown config options are warnings ([#24907](https://github.com/netdata/netdata/issues/24907))
+- Fix(packaging): use the local group for scripts.d and DEM static plugins ([#24917](https://github.com/netdata/netdata/issues/24917))
+- Fix(packaging): stop NetFlow listeners on package removal ([#24903](https://github.com/netdata/netdata/issues/24903))
+- Test(dem): stabilize RUM URL redaction allocation test ([#24888](https://github.com/netdata/netdata/issues/24888))
+- Health: report silencers file read and parse errors ([#24918](https://github.com/netdata/netdata/issues/24918))
+- Network-viewer: fix the extra [unknown] container_name label in container mode ([#24909](https://github.com/netdata/netdata/issues/24909))
 
 ## [2.13.0] - 2026-11-19
 
