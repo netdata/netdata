@@ -94,7 +94,7 @@ modules:
               required: false
               group: Target
             - name: container_selector
-              description: "Names of the containers that get their own charts, as a [simple pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). The totals count every container."
+              description: "Names of the containers that get their own charts, as a [simple pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). Leave empty to chart every container; the totals always count every container."
               detailed_description: |
                 A container labeled `netdata.cloud/ignore=true` (or `yes`) gets no charts of its own, whatever the selector matches; the totals and image usage still count it.
               default_value: "*"

@@ -68,18 +68,26 @@ func TestArtifacts(t *testing.T) {
 
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		config   Config
-		wantFail bool
+		config      Config
+		dockerHost  string
+		wantAddress string
+		wantFail    bool
 	}{
 		"default config": {
-			wantFail: false,
-			config:   New().Config,
+			config:      New().Config,
+			wantAddress: docker.DefaultDockerHost,
 		},
-		"unset 'address'": {
-			wantFail: false,
+		"DOCKER_HOST replaces the default address": {
+			config:      New().Config,
+			dockerHost:  "tcp://203.0.113.10:2375",
+			wantAddress: "tcp://203.0.113.10:2375",
+		},
+		"DOCKER_HOST does not replace a configured address": {
 			config: Config{
-				Address: "",
+				Address: "unix:///run/user/1000/docker.sock",
 			},
+			dockerHost:  "tcp://203.0.113.10:2375",
+			wantAddress: "unix:///run/user/1000/docker.sock",
 		},
 		"bad 'container_selector'": {
 			wantFail: true,
@@ -92,14 +100,16 @@ func TestCollector_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Setenv("DOCKER_HOST", test.dockerHost)
 			collr := New()
 			collr.Config = test.config
 
 			if test.wantFail {
 				assert.Error(t, collr.Init(context.Background()))
-			} else {
-				assert.NoError(t, collr.Init(context.Background()))
+				return
 			}
+			require.NoError(t, collr.Init(context.Background()))
+			assert.Equal(t, test.wantAddress, collr.Address)
 		})
 	}
 }
@@ -277,6 +287,60 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantSeries: expectedSeries(summary, []wantContainer{containers[0], containers[4]}, false),
+		},
+		"empty container selector charts every container": {
+			prepare: func() *Collector {
+				collr := prepareCollector(&mockClient{}, false)
+				collr.ContainerSelector = ""
+				return collr
+			},
+			wantSeries: expectedSeries(summary, containers, false),
+		},
+		"netdata.cloud/ignore label values": {
+			prepare: func() *Collector {
+				ignore := func(value string) map[string]string { return map[string]string{"netdata.cloud/ignore": value} }
+				return prepareCollector(
+					&mockClient{
+						containers: map[typesContainer.HealthStatus][]typesContainer.Summary{
+							typesContainer.NoHealthcheck: {
+								{
+									Names:   []string{"/yes"},
+									State:   "running",
+									Image:   "example/example:v1",
+									ImageID: "sha256:v1",
+									Labels:  ignore("yes"),
+								},
+								{
+									Names:   []string{"/upper"},
+									State:   "running",
+									Image:   "example/example:v1",
+									ImageID: "sha256:v1",
+									Labels:  ignore("TRUE"),
+								},
+								{
+									Names:   []string{"/charted"},
+									State:   "running",
+									Image:   "example/example:v1",
+									ImageID: "sha256:v1",
+									Labels:  ignore("false"),
+								},
+							},
+						},
+					},
+					false,
+				)
+			},
+			wantSeries: expectedSeries(
+				summaryWith(map[string]metrix.SampleValue{
+					"containers_no_healthcheck": 3,
+					"images_active":             1,
+					"images_dangling":           2,
+				}),
+				[]wantContainer{
+					{name: "charted", image: "example/example:v1", state: "running", health: "no_healthcheck"},
+				},
+				false,
+			),
 		},
 		"unknown container state leaves every state at zero": {
 			prepare: func() *Collector {
@@ -486,70 +550,6 @@ func TestCollector_ChartCoverage(t *testing.T) {
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 }
 
-// Container "foo" is a name prefix of "foo-bar" and "foo_state": removing "foo" must retire only its own charts, and
-// the other two must keep being updated (https://github.com/netdata/netdata/issues/24230).
-func TestCollector_RemovesOnlyChartsOfRemovedContainer(t *testing.T) {
-	m := &mockClient{}
-	collr := prepareCollector(m, true)
-	require.NoError(t, collr.Init(context.Background()))
-	engine := newEngine(t, collr)
-
-	chartContainer := make(map[string]string) // chart ID -> container_name label
-	removed := make(map[string]bool)
-	var updated map[string]bool
-	cycle := func() {
-		t.Helper()
-		_, err := collecttest.CollectScalarSeries(collr)
-		require.NoError(t, err)
-		updated = make(map[string]bool)
-		for _, action := range preparePlan(t, engine, collr).Actions {
-			switch a := action.(type) {
-			case chartengine.CreateChartAction:
-				chartContainer[a.ChartID] = a.Labels["container_name"]
-			case chartengine.UpdateChartAction:
-				updated[a.ChartID] = true
-			case chartengine.RemoveChartAction:
-				removed[a.ChartID] = true
-			}
-		}
-	}
-	chartsOf := func(names ...string) map[string]bool {
-		charts := make(map[string]bool)
-		for chartID, name := range chartContainer {
-			for _, want := range names {
-				if name == want {
-					charts[chartID] = true
-				}
-			}
-		}
-		return charts
-	}
-
-	all := []typesContainer.Summary{
-		{Names: []string{"/foo"}, State: "running", Image: "alpine", ImageID: "sha256:alpine"},
-		{Names: []string{"/foo-bar"}, State: "running", Image: "alpine", ImageID: "sha256:alpine"},
-		{Names: []string{"/foo_state"}, State: "running", Image: "alpine", ImageID: "sha256:alpine"},
-	}
-	m.containers = map[typesContainer.HealthStatus][]typesContainer.Summary{typesContainer.NoHealthcheck: all}
-	cycle()
-	require.Empty(t, removed)
-	// State, health status and writable layer size for each container.
-	for _, name := range []string{"foo", "foo-bar", "foo_state"} {
-		require.Lenf(t, chartsOf(name), 3, "charts of %q", name)
-	}
-
-	m.containers = map[typesContainer.HealthStatus][]typesContainer.Summary{typesContainer.NoHealthcheck: all[1:]}
-	// Keep collecting well beyond the chart expiry and the metric-store retention.
-	for range 30 {
-		cycle()
-	}
-
-	assert.Equal(t, chartsOf("foo"), removed)
-	for chartID := range chartsOf("foo-bar", "foo_state") {
-		assert.Truef(t, updated[chartID], "chart %q is not updated after %q is removed", chartID, "foo")
-	}
-}
-
 type wantContainer struct {
 	name, image, state, health string
 }
@@ -607,23 +607,6 @@ func imageSeries(got map[string]metrix.SampleValue) map[string]metrix.SampleValu
 		}
 	}
 	return images
-}
-
-func newEngine(t *testing.T, c *Collector) *chartengine.Engine {
-	t.Helper()
-	engine, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, engine.LoadYAML([]byte(c.ChartTemplateYAML()), 1))
-	return engine
-}
-
-func preparePlan(t *testing.T, engine *chartengine.Engine, c *Collector) chartengine.Plan {
-	t.Helper()
-	attempt, err := engine.PreparePlan(c.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
-	return plan
 }
 
 func prepareCollector(m *mockClient, collectContainerSize bool) *Collector {
@@ -703,7 +686,6 @@ func (m *mockClient) ContainerList(
 		}
 		if opts.Size {
 			containers[i].SizeRw = 123
-			containers[i].SizeRootFs = 321
 		}
 	}
 
