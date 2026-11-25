@@ -45,17 +45,21 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
             break;
         }
 
-        DiskDriveInfoWMI *info = &diskInfoArray[index];
-
+        // Fill a fresh row: the caller's array is reused across calls, and a property missing now must not
+        // keep the value of an earlier call.
+        DiskDriveInfoWMI info = { 0 };
         uint64_t disk_index;
-        if (nd_wmi_get_uint64_property(pclsObj, L"Index", &disk_index) && disk_index <= INT_MAX)
-            info->Index = (int)disk_index;
-
-        nd_wmi_get_string_property(pclsObj, L"Model", info->Model, sizeof(info->Model));
-        nd_wmi_get_string_property(pclsObj, L"DeviceID", info->DeviceID, sizeof(info->DeviceID));
-
+        bool has_index = nd_wmi_get_uint64_property(pclsObj, L"Index", &disk_index) && disk_index <= INT_MAX;
+        if (has_index) {
+            info.Index = (int)disk_index;
+            nd_wmi_get_string_property(pclsObj, L"Model", info.Model, sizeof(info.Model));
+            nd_wmi_get_string_property(pclsObj, L"DeviceID", info.DeviceID, sizeof(info.DeviceID));
+        }
         pclsObj->lpVtbl->Release(pclsObj);
-        index++;
+
+        // The caller matches rows by Index; a row without one would match the wrong disk.
+        if (has_index)
+            diskInfoArray[index++] = info;
     }
 
     pEnumerator->lpVtbl->Release(pEnumerator);
