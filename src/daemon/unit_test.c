@@ -2399,7 +2399,7 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         rrdset_free(st2);
     }
 
-    // a tier update every that does not fit in INT32_MAX is 0 (the tier gets no collect handle), never a wrapped value
+    // a tier update every that does not fit in INT32_MAX is 0 (the tier stores nothing), never a wrapped value
     {
         RRDHOST *h = callocz(1, sizeof(*h));
         RRDSET *s = callocz(1, sizeof(*s));
