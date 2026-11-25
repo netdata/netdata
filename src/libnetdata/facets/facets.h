@@ -153,4 +153,6 @@ void *facets_row_bin_data_get(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 void facets_use_hashes_for_ids(FACETS *facets, bool set);
 
+int facets_unittest(void);
+
 #endif
