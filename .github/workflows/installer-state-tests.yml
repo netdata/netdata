@@ -6,10 +6,8 @@ on:
       - '.github/workflows/installer-state-tests.yml'
       - 'netdata-installer.sh'
       - 'packaging/cmake/Modules/NetdataDashboard.cmake'
-      - 'packaging/cmake/Modules/NetdataInstallDashboard.cmake.in'
       - 'packaging/cmake/Modules/NetdataSystemFiles.cmake'
       - 'packaging/installer/cleanup-dashboard.sh'
-      - 'packaging/installer/overlay-dashboard.sh'
       - 'packaging/installer/tests/test_dashboard_cleanup.py'
       - 'packaging/makeself/post-installer.sh'
       - 'packaging/installer/functions.sh'
@@ -33,10 +31,8 @@ on:
       - '.github/workflows/installer-state-tests.yml'
       - 'netdata-installer.sh'
       - 'packaging/cmake/Modules/NetdataDashboard.cmake'
-      - 'packaging/cmake/Modules/NetdataInstallDashboard.cmake.in'
       - 'packaging/cmake/Modules/NetdataSystemFiles.cmake'
       - 'packaging/installer/cleanup-dashboard.sh'
-      - 'packaging/installer/overlay-dashboard.sh'
       - 'packaging/installer/tests/test_dashboard_cleanup.py'
       - 'packaging/makeself/post-installer.sh'
       - 'packaging/installer/functions.sh'
@@ -72,7 +68,7 @@ jobs:
           bash -n packaging/makeself/jobs/00-prepare-destination.install.sh
           bash -n packaging/makeself/jobs/90-prepare-archive-source.sh
           bash -n packaging/makeself/jobs/97-create-package-manifest.sh
-          shellcheck packaging/installer/cleanup-dashboard.sh packaging/installer/overlay-dashboard.sh
+          shellcheck packaging/installer/cleanup-dashboard.sh
           sh -n packaging/installer/functions.sh
           shellcheck packaging/makeself/create-package-manifest.sh packaging/makeself/install-or-update.sh packaging/installer/functions.sh
           shellcheck -x packaging/makeself/jobs/00-prepare-destination.install.sh packaging/makeself/jobs/90-prepare-archive-source.sh packaging/makeself/jobs/97-create-package-manifest.sh

@@ -5,7 +5,10 @@
 
 include_guard()
 
-set(NETDATA_DASHBOARD_MODULE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+include(NetdataUtil)
+
+get_filename_component(NETDATA_DASHBOARD_CLEANUP_SCRIPT
+                       "${CMAKE_CURRENT_LIST_DIR}/../../installer/cleanup-dashboard.sh" ABSOLUTE)
 
 # Work around upstream release hiccups that ship the v3 tree under a v2 name.
 function(handle_braindead_versioning_insanity prefix)
@@ -21,13 +24,17 @@ function(handle_braindead_versioning_insanity prefix)
   endif()
 endfunction()
 
+# Bundle the dashboard code for inclusion during install.
 function(bundle_dashboard)
+  set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
+  set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
+  set(cleanup_script "${NETDATA_DASHBOARD_CLEANUP_SCRIPT}")
   message(STATUS "Preparing local agent dashboard code")
 
   message(STATUS "  Fetching ${DASHBOARD_URL}")
   file(DOWNLOAD
        "${DASHBOARD_URL}"
-       "${CMAKE_BINARY_DIR}/dashboard.tar.gz.part"
+       "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
        TIMEOUT 180
        STATUS fetch_status)
 
@@ -39,15 +46,53 @@ function(bundle_dashboard)
     message(STATUS "  Fetching ${DASHBOARD_URL} -- Done")
   endif()
 
-  # Catch damaged downloads at configure time, before the installer writes live files.
-  execute_process(COMMAND "${CMAKE_COMMAND}" -E tar tf "${CMAKE_BINARY_DIR}/dashboard.tar.gz.part"
-                  OUTPUT_QUIET RESULT_VARIABLE result)
-  if(NOT result EQUAL 0)
-    message(FATAL_ERROR "Invalid dashboard archive")
+  message(STATUS "  Extracting dashboard code")
+  # The extracted tree is both the install source and the reference for the
+  # stale-file cleanup, so a reused build directory must not keep an older release.
+  file(REMOVE_RECURSE "${dashboard_src_dir}")
+  extract_gzipped_tarball(
+    "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
+    "${dashboard_src_dir}"
+  )
+  message(STATUS "  Extracting dashboard code -- Done")
+
+  handle_braindead_versioning_insanity("${dashboard_src_prefix}")
+
+  # Archive timestamps can repeat across releases, and install(FILES) skips a
+  # changed file whose time matches the installed copy. Copy every bundled file.
+  install(CODE [[
+set(netdata_dashboard_install_always "$ENV{CMAKE_INSTALL_ALWAYS}")
+set(ENV{CMAKE_INSTALL_ALWAYS} 1)
+]] COMPONENT dashboard)
+
+  file(GLOB_RECURSE files
+       LIST_DIRECTORIES FALSE
+       RELATIVE "${dashboard_src_prefix}"
+       "${dashboard_src_prefix}/*")
+
+  foreach(file IN LISTS files)
+    get_filename_component(dir "${file}" DIRECTORY)
+    set(destination "${WEB_DEST}")
+    if(NOT dir STREQUAL "")
+      string(APPEND destination "/${dir}")
+    endif()
+    install(FILES "${dashboard_src_prefix}/${file}" COMPONENT dashboard DESTINATION "${destination}")
+  endforeach()
+
+  # Restore the caller's setting for later components. On upgrades driven by
+  # netdata-installer.sh, remove installed v3 files that this release no longer ships.
+  string(CONFIGURE [==[
+set(ENV{CMAKE_INSTALL_ALWAYS} "${netdata_dashboard_install_always}")
+if("$ENV{NETDATA_INSTALLER_DASHBOARD_UPGRADE}" STREQUAL "1")
+  execute_process(COMMAND sh [=[@cleanup_script@]=] [=[@dashboard_src_prefix@/v3]=]
+                          "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/" [=[@WEB_DEST@]=]
+                  RESULT_VARIABLE netdata_dashboard_cleanup_status)
+  if(NOT netdata_dashboard_cleanup_status STREQUAL "0")
+    message(WARNING "Dashboard cleanup failed: ${netdata_dashboard_cleanup_status}. Continuing installation.")
   endif()
-  file(RENAME "${CMAKE_BINARY_DIR}/dashboard.tar.gz.part" "${CMAKE_BINARY_DIR}/dashboard.tar.gz")
-  configure_file("${NETDATA_DASHBOARD_MODULE_DIR}/NetdataInstallDashboard.cmake.in"
-                 "${CMAKE_BINARY_DIR}/install-dashboard.cmake" @ONLY)
-  install(SCRIPT "${CMAKE_BINARY_DIR}/install-dashboard.cmake" COMPONENT dashboard)
+endif()
+]==] cleanup_code @ONLY)
+  install(CODE "${cleanup_code}" COMPONENT dashboard)
+
   message(STATUS "Preparing local agent dashboard code -- Done")
 endfunction()

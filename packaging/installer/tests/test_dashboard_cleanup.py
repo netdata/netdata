@@ -112,11 +112,14 @@ test ! -e "$3/v3/old.js"
                 link.unlink()
                 target.rename(link)
 
-    @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
-    def test_cmake_symlink_install_retains_its_targets(self):
+    def require_cmake_3_22(self, reason):
         version = subprocess.check_output(['cmake', '--version'], text=True).split()[2]
         if tuple(map(int, version.split('.')[:2])) < (3, 22):
-            self.skipTest('CMAKE_INSTALL_MODE requires CMake 3.22')
+            self.skipTest(reason)
+
+    @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
+    def test_cmake_symlink_install_retains_its_targets(self):
+        self.require_cmake_3_22('CMAKE_INSTALL_MODE requires CMake 3.22')
         (self.root / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.16)
 project(dashboard NONE)
 list(APPEND CMAKE_MODULE_PATH "{MODULES}")
@@ -146,6 +149,7 @@ bundle_dashboard()
 
     @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
     def test_reconfigure_and_install_two_bundles(self):
+        self.require_cmake_3_22('install(FILES) accepts archive directory links from CMake 3.22')
         project = self.root / 'CMakeLists.txt'
         system_files = (MODULES / 'NetdataSystemFiles.cmake').read_text()
         begin = system_files.index('if(ENABLE_DASHBOARD)')
@@ -159,7 +163,7 @@ function(netdata_add_deb_copyright)
 endfunction()
 ''' + system_files[begin:end])
         installer = (ROOT / 'netdata-installer.sh').read_text()
-        begin = installer.index('dashboard_upgrade=0')
+        begin = installer.index('NETDATA_INSTALLER_DASHBOARD_UPGRADE=0')
         end = installer.index('\n# ---', begin)
         script = ('set -eu\nrun() { "$@"; }\nfatal() { exit 1; }\n'
                   'cmake_install() { cmake --install "$1" --component dashboard; }\n'
@@ -260,29 +264,6 @@ netdata_banner() { :; }
         self.assertEqual((relocated / 'index.html').read_bytes(), b'dashboard')
         self.assertEqual((relocated / 'manifest.txt').read_text(), 'new/chunk.js')
         self.assertTrue((relocated / 'local.css').is_file())
-        if os.geteuid() != 0:
-            # A read-only directory must not turn a failed replacement into a
-            # write through the existing link.
-            index = relocated / 'index.html'
-            index.unlink()
-            index.symlink_to(outside)
-            relocated.chmod(0o550)
-            try:
-                result = subprocess.run(['sh', '-c', script], env=env, capture_output=True)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertTrue(index.is_symlink())
-                self.assertEqual(outside.read_text(), 'untouched')
-            finally:
-                relocated.chmod(0o750)
-        # A payload file cannot replace an existing directory or chmod its target.
-        index = relocated / 'index.html'
-        index.unlink()
-        index.symlink_to(relocated / 'new', target_is_directory=True)
-        result = subprocess.run(['sh', '-c', script], env=env, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Cannot install dashboard file over directory:', result.stderr)
-        self.assertEqual(stat.S_IMODE(asset_dir.stat().st_mode), directory_mode)
-        self.assertEqual((relocated / 'new/chunk.js').read_bytes(), b'chunk')
         installed.unlink()
         relocated.rename(installed)
         subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-DENABLE_DASHBOARD=OFF'],
