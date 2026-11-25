@@ -46,7 +46,7 @@ if(IS_DIRECTORY "$ENV{DESTDIR}${dashboard_destination}")
   string(REPLACE "${overlay}/" "${dashboard_destination}/" CMAKE_INSTALL_MANIFEST_FILES
          "${CMAKE_INSTALL_MANIFEST_FILES}")
   execute_process(COMMAND sh [==[@NETDATA_DASHBOARD_MODULE_DIR@/../../installer/overlay-dashboard.sh]==]
-                  "${overlay}" "${dashboard_source}" "${saved_destdir}${dashboard_destination}"
+                  "${overlay}" "${dashboard_source}" "${saved_destdir}${dashboard_destination}" "${CMAKE_COMMAND}"
                   RESULT_VARIABLE overlay_status)
   file(REMOVE_RECURSE "${overlay}")
   if(NOT overlay_status STREQUAL "0")

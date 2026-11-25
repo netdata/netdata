@@ -230,12 +230,35 @@ netdata_banner() { :; }
         installed.rename(relocated)
         installed.symlink_to(relocated, target_is_directory=True)
         relocated.chmod(0o750)
-        (relocated / 'new').chmod(0o710)
+        asset_dir = relocated / 'new'
+        directory_mode = 0o710
+        group = None
+        if os.uname().sysname == 'Linux':
+            # A setgid web directory assigns its group to newly installed assets.
+            group = next((g for g in os.getgroups() if g != build.stat().st_gid), None)
+            if group is None and os.geteuid() == 0:
+                group = build.stat().st_gid + 1
+            if group is not None:
+                os.chown(asset_dir, -1, group)
+                directory_mode |= stat.S_ISGID
+        asset_dir.chmod(directory_mode)
+        (asset_dir / 'chunk.js').unlink()
+        outside = self.root / 'operator file'
+        self.put(outside, 'untouched')
+        (relocated / 'index.html').unlink()
+        (relocated / 'index.html').symlink_to(outside)
+        (relocated / 'manifest.txt').unlink()
+        os.link(outside, relocated / 'manifest.txt')
         self.put(relocated / 'local.css')
         subprocess.run(['sh', '-c', script], check=True, env=env, capture_output=True)
         self.assertTrue(installed.is_symlink())
         self.assertEqual(stat.S_IMODE(relocated.stat().st_mode), 0o750)
-        self.assertEqual(stat.S_IMODE((relocated / 'new').stat().st_mode), 0o710)
+        self.assertEqual(stat.S_IMODE(asset_dir.stat().st_mode), directory_mode)
+        if group is not None:
+            self.assertEqual((asset_dir / 'chunk.js').stat().st_gid, group)
+        self.assertEqual(outside.read_text(), 'untouched')
+        self.assertEqual((relocated / 'index.html').read_bytes(), b'dashboard')
+        self.assertEqual((relocated / 'manifest.txt').read_text(), 'new/chunk.js')
         self.assertTrue((relocated / 'local.css').is_file())
         # A payload file cannot replace an existing directory or chmod its target.
         index = relocated / 'index.html'
@@ -244,7 +267,7 @@ netdata_banner() { :; }
         result = subprocess.run(['sh', '-c', script], env=env, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Cannot install dashboard file over directory:', result.stderr)
-        self.assertEqual(stat.S_IMODE((relocated / 'new').stat().st_mode), 0o710)
+        self.assertEqual(stat.S_IMODE(asset_dir.stat().st_mode), directory_mode)
         self.assertEqual((relocated / 'new/chunk.js').read_bytes(), b'chunk')
         installed.unlink()
         relocated.rename(installed)

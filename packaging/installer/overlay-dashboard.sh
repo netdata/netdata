@@ -4,6 +4,15 @@
 # missing directories: existing directories and their link targets keep their modes.
 set -eu
 unset CDPATH
+cmake=$4
+
+copy_files() {
+    # Create files at their destination so they inherit its group, ACLs and label.
+    "$cmake" -E copy "$@" "$destination"
+    for copied do
+        touch -r "$copied" "$destination/${copied#./}"
+    done
+}
 
 merge_directory() (
     staged=$1
@@ -24,10 +33,16 @@ merge_directory() (
             echo >&2 "Cannot install dashboard file over directory: $destination/$name"
             exit 1
         fi
-        # CMake's relative links point back to the persistent release tree.
-        # Recompute them from the physical install directory after relocation.
-        if [ -L "$file" ] && [ ! -L "$release/$name" ]; then
-            case "$(readlink "$file")" in
+        if [ -L "$file" ]; then
+            # The suffix preserves trailing newlines in archive-supplied link targets.
+            link=$(readlink "$file" && printf .)
+            target=${link%??}
+            if [ -L "$release/$name" ]; then
+                ln -sfn -- "$target" "$destination/$name"
+                continue
+            fi
+            # Recompute CMake's links from the physical destination directory.
+            case "$target" in
                 /* | ?:/*) target="$release/$name" ;;
                 *)
                     parent=$destination
@@ -41,7 +56,7 @@ merge_directory() (
                     target="$up${path#"${parent%/}/"}"
                     ;;
             esac
-            if ln -sf "$target" "$destination/$name"; then continue; fi
+            if ln -sfn -- "$target" "$destination/$name"; then continue; fi
             case ${CMAKE_INSTALL_MODE:-} in
                 *_OR_COPY)
                     rm -f "$file"
@@ -53,11 +68,11 @@ merge_directory() (
         fi
         set -- "$@" "$file"
         if [ "$#" -eq 128 ]; then
-            mv -f "$@" "$destination"
+            copy_files "$@"
             set --
         fi
     done
-    if [ "$#" -gt 0 ]; then mv -f "$@" "$destination"; fi
+    if [ "$#" -gt 0 ]; then copy_files "$@"; fi
 )
 
 cd -P "$2"
