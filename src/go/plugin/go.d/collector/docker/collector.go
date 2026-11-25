@@ -60,18 +60,20 @@ func New() *Collector {
 		now:    time.Now,
 		store:  metrix.NewCollectorStore(),
 	}
-	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
+	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{
+		collector: c,
+	})
 	return c
 }
 
 type Config struct {
-	Vnode                string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery          int              `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode                string           `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery          int              `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry   int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	Address              string           `yaml:"address" json:"address"`
-	Timeout              confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	ContainerSelector    string           `yaml:"container_selector,omitempty" json:"container_selector"`
-	CollectContainerSize bool             `yaml:"collect_container_size" json:"collect_container_size"`
+	Address              string           `yaml:"address"                       json:"address"`
+	Timeout              confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
+	ContainerSelector    string           `yaml:"container_selector,omitempty"  json:"container_selector"`
+	CollectContainerSize bool             `yaml:"collect_container_size"        json:"collect_container_size"`
 }
 
 type (
@@ -117,14 +119,18 @@ func (c *Collector) Init(context.Context) error {
 		c.cntrSr = sr
 	}
 	if c.funcRouter == nil {
-		c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
+		c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{
+			collector: c,
+		})
 	}
 
 	return nil
 }
 
+// Check makes the Docker API calls of a collection, so a daemon or socket proxy that refuses any of them fails
+// detection. The image list it fetches is cached for the following collections.
 func (c *Collector) Check(ctx context.Context) error {
-	_, err := c.info(ctx)
+	_, err := c.queryDaemon(ctx)
 	return err
 }
 

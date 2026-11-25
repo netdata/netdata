@@ -4,45 +4,67 @@ package docker
 
 import (
 	"context"
-	"slices"
-	"strings"
+	"fmt"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 	typesContainer "github.com/moby/moby/api/types/container"
 	typesSystem "github.com/moby/moby/api/types/system"
 	docker "github.com/moby/moby/client"
 )
 
-// Every Docker API call of a cycle runs before any metric is written, so a failed call aborts the cycle as a whole.
 func (c *Collector) collect(ctx context.Context) error {
-	info, err := c.info(ctx)
-	if err != nil {
-		return err
-	}
-	if err := c.refreshImages(ctx); err != nil {
-		return err
-	}
-	containers, err := c.listContainers(ctx)
+	state, err := c.queryDaemon(ctx)
 	if err != nil {
 		return err
 	}
 
-	c.writeMetrics(info, containers)
+	c.writeMetrics(state)
 
 	return nil
 }
 
-func (c *Collector) info(ctx context.Context) (typesSystem.Info, error) {
+// daemonState is what one collection reads from the Docker daemon. Images come from the cached snapshot in c.images.
+type daemonState struct {
+	info       typesSystem.Info
+	containers []listedContainer
+}
+
+// listedContainer is a container as returned by the list request filtered by its health status.
+type listedContainer struct {
+	typesContainer.Summary
+	healthStatus typesContainer.HealthStatus
+}
+
+// queryDaemon makes every Docker API call of a collection, so a failed call aborts the collection before any metric
+// is written.
+func (c *Collector) queryDaemon(ctx context.Context) (*daemonState, error) {
 	if c.client == nil {
 		client, err := c.newClient(c.Config)
 		if err != nil {
-			return typesSystem.Info{}, err
+			return nil, fmt.Errorf("creating Docker client: %w", err)
 		}
 		c.client = client
 	}
 
+	info, err := c.systemInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting system info: %w", err)
+	}
+	if err := c.refreshImages(ctx); err != nil {
+		return nil, fmt.Errorf("listing images: %w", err)
+	}
+	containers, err := c.listContainers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing containers: %w", err)
+	}
+
+	return &daemonState{
+		info:       info,
+		containers: containers,
+	}, nil
+}
+
+func (c *Collector) systemInfo(ctx context.Context) (typesSystem.Info, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
@@ -94,138 +116,41 @@ var containerHealthStatuses = []typesContainer.HealthStatus{
 	typesContainer.NoHealthcheck,
 }
 
-// containersByHealth holds the containers listed with each health status filter.
-type containersByHealth map[typesContainer.HealthStatus][]typesContainer.Summary
-
-// listContainers lists the containers once per health status, so each container comes with its health status.
-func (c *Collector) listContainers(ctx context.Context) (containersByHealth, error) {
-	containers := make(containersByHealth)
+// listContainers lists the containers once per health status, in containerHealthStatuses order, so each container
+// comes with its health status.
+func (c *Collector) listContainers(ctx context.Context) ([]listedContainer, error) {
+	var containers []listedContainer
 
 	for _, status := range containerHealthStatuses {
-		if err := func() error {
-			ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-			defer cancel()
-
-			result, err := c.client.ContainerList(ctx, docker.ContainerListOptions{
-				All:     true,
-				Filters: make(docker.Filters).Add("health", string(status)),
-				Size:    c.CollectContainerSize,
-			})
-			if err != nil {
-				return err
-			}
-			containers[status] = result.Items
-			return nil
-		}(); err != nil {
+		items, err := c.listContainersWithHealth(ctx, status)
+		if err != nil {
 			return nil, err
+		}
+		for _, item := range items {
+			containers = append(containers, listedContainer{
+				Summary:      item,
+				healthStatus: status,
+			})
 		}
 	}
 
 	return containers, nil
 }
 
-const (
-	healthStatusNotRunningUnhealthy = "not_running_unhealthy"
-	healthStatusNoHealthcheck       = "no_healthcheck"
-)
+func (c *Collector) listContainersWithHealth(
+	ctx context.Context,
+	status typesContainer.HealthStatus,
+) ([]typesContainer.Summary, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+	defer cancel()
 
-var (
-	// containerStates are the states of the Docker container state machine.
-	containerStates = []string{
-		string(typesContainer.StateRunning),
-		string(typesContainer.StatePaused),
-		string(typesContainer.StateExited),
-		string(typesContainer.StateCreated),
-		string(typesContainer.StateRestarting),
-		string(typesContainer.StateRemoving),
-		string(typesContainer.StateDead),
+	result, err := c.client.ContainerList(ctx, docker.ContainerListOptions{
+		All:     true,
+		Filters: make(docker.Filters).Add("health", string(status)),
+		Size:    c.CollectContainerSize,
+	})
+	if err != nil {
+		return nil, err
 	}
-	containerHealthStates = []string{
-		string(typesContainer.Healthy),
-		string(typesContainer.Unhealthy),
-		healthStatusNotRunningUnhealthy,
-		string(typesContainer.Starting),
-		healthStatusNoHealthcheck,
-	}
-)
-
-// writeMetrics builds the instruments every cycle: containers come and go, so a long-lived Vec would keep a handle for
-// every container ever seen.
-func (c *Collector) writeMetrics(info typesSystem.Info, containers containersByHealth) {
-	meter := c.store.Write().SnapshotMeter("")
-
-	meter.Gauge("containers_running").Observe(float64(info.ContainersRunning))
-	meter.Gauge("containers_paused").Observe(float64(info.ContainersPaused))
-	meter.Gauge("containers_exited").Observe(float64(info.ContainersStopped))
-
-	containerVec := meter.Vec("container_name", "image")
-	containerState := containerVec.StateSet("container_state", metrix.WithStateSetStates(containerStates...))
-	containerHealthStatus := containerVec.StateSet("container_health_status",
-		metrix.WithStateSetStates(containerHealthStates...), metrix.WithStateSetMode(metrix.ModeEnum))
-	var containerWritableLayerSize metrix.SnapshotGaugeVec
-	if c.CollectContainerSize {
-		containerWritableLayerSize = containerVec.Gauge("container_writable_layer_size")
-	}
-
-	healthCounts := make(map[string]int)
-	usedImages := make(map[string]bool)
-
-	for status, cntrs := range containers {
-		for _, cntr := range cntrs {
-			usedImages[cntr.ImageID] = true
-
-			// "unhealthy" counts only running containers; the others count as "not_running_unhealthy".
-			health := string(status)
-			switch {
-			case status == typesContainer.Unhealthy && cntr.State != typesContainer.StateRunning:
-				health = healthStatusNotRunningUnhealthy
-			case status == typesContainer.NoHealthcheck:
-				health = healthStatusNoHealthcheck
-			}
-			healthCounts[health]++
-
-			if hasIgnoreLabel(cntr) || len(cntr.Names) == 0 {
-				continue
-			}
-			name := strings.TrimPrefix(cntr.Names[0], "/")
-			if c.cntrSr != nil && !c.cntrSr.MatchString(name) {
-				continue
-			}
-
-			// A state outside the known set leaves every state dimension at zero.
-			state := containerState.WithLabelValues(name, cntr.Image)
-			if slices.Contains(containerStates, string(cntr.State)) {
-				state.Enable(string(cntr.State))
-			} else {
-				state.ObserveStateSet(metrix.StateSetPoint{})
-			}
-			containerHealthStatus.WithLabelValues(name, cntr.Image).Enable(health)
-			if containerWritableLayerSize != nil {
-				containerWritableLayerSize.WithLabelValues(name, cntr.Image).Observe(float64(cntr.SizeRw))
-			}
-		}
-	}
-
-	for _, status := range containerHealthStates {
-		meter.Gauge("containers_" + status).Observe(float64(healthCounts[status]))
-	}
-
-	// An image is active when a container was created from it. The daemon's own per-image container count is not
-	// used: it is -1 when the negotiated API is older than 1.51.
-	var active, dangling int
-	for _, id := range c.images.ids {
-		if usedImages[id] {
-			active++
-		} else {
-			dangling++
-		}
-	}
-	meter.Gauge("images_active").Observe(float64(active))
-	meter.Gauge("images_dangling").Observe(float64(dangling))
-	meter.Gauge("images_size").Observe(float64(c.images.size))
-}
-
-func hasIgnoreLabel(cntr typesContainer.Summary) bool {
-	v := cntr.Labels["netdata.cloud/ignore"]
-	return strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+	return result.Items, nil
 }
