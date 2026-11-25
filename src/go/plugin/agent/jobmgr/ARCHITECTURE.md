@@ -1076,9 +1076,11 @@ Once a configuration containing secret references has been applied to a collecto
   logged request error cannot bypass the runtime boundary. Both layers use one policy (`redactResolvedLifecycleError`);
   the logger reaches it through `jobruntime.LifecycleLogMessageSanitizer`.
 
-What survives redaction: cancellation, the collector's lifecycle error class, panic classification,
-retained-ownership state, and the first `dyncfg.PublicError` message the collector attached (to an error, or to a log
-line as an argument or attribute value). The collector guarantees that message is secret-free.
+What survives redaction: the classifications `redactResolvedLifecycleError` re-applies (process control,
+cancellation and deadline, panic, activation dependency, resolver failure kind, lifecycle error class, retry deadline,
+construction and preparation failures, runtime startup failure, retained ownership), and the first `dyncfg.PublicError`
+message the collector attached to an error. A log line keeps the public message of its first argument that carries
+one, and each `With` attribute value keeps its own. The collector guarantees those messages are secret-free.
 What does not: the raw collector cause, and any text wrapped around a public message.
 
 ### Changing a store restarts its jobs
@@ -1384,9 +1386,9 @@ it does not establish runtime health. Rejected preflight preserves the exact inc
   as validation-only; the sentinel does not turn real failures into success.
 - Resource-authored parsing, construction, and operational failures retain their causes internally but cross one
   sanitized response/diagnostic boundary. Unmarked failures render only their generic phase. A `dyncfg.PublicError`
-  may add code-authored detail under that type's contract; its public message must never derive from submitted/resolved
-  values, endpoints, credentials, backend errors, or response bodies. Resource callbacks return failures rather than
-  logging raw configuration or endpoint material.
+  may add static, code-authored detail; its public message must never derive from submitted/resolved values, endpoints,
+  credentials, backend errors, or response bodies. Resource callbacks return failures rather than logging raw
+  configuration or endpoint material.
 - A discoverer without the capability produces an explicit validation-only success. Configuration/construction
   failures return 400, operational failures return 422, and busy/contained attempts return 503.
 - Operational guarantees are discoverer-specific. Docker performs a one-item container-list query. `net_listeners`

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/assert"
@@ -79,6 +81,30 @@ func TestRedactResolvedLifecycleErrorPublicMessages(t *testing.T) {
 				DeadlineExceeded: true,
 			},
 		},
+		"task panic survives": {
+			err: errors.Join(public(secretCause), lifecycle.ErrTaskPanic),
+			want: redactionSummary{
+				Text:      publicText + "\n" + lifecycle.ErrTaskPanic.Error(),
+				Public:    publicText,
+				TaskPanic: true,
+			},
+		},
+		"retained ownership survives": {
+			err:  lifecycle.RetainOwnership(public(secretCause)),
+			want: redactionSummary{Text: publicText, Public: publicText, OwnershipRetained: true},
+		},
+		"invalid configuration survives": {
+			err:  invalidJobConfiguration(public(secretCause)),
+			want: redactionSummary{Text: publicText, Public: publicText, InvalidConfiguration: true},
+		},
+		"transient construction survives": {
+			err:  transientJobConstruction(public(secretCause)),
+			want: redactionSummary{Text: publicText, Public: publicText, TransientConstruction: true},
+		},
+		"pure process control keeps its generic text": {
+			err:  public(jobmgr.ErrProcessAttemptStopped),
+			want: redactionSummary{Text: generic, ProcessStopped: true},
+		},
 		"activation dependency survives": {
 			err: &collectorapi.ActivationDependencyUnavailableError{Kind: "vnode", Name: "edge", Cause: public(secretCause)},
 			want: redactionSummary{
@@ -93,7 +119,10 @@ func TestRedactResolvedLifecycleErrorPublicMessages(t *testing.T) {
 			redacted := redactResolvedLifecycleError(test.err)
 
 			assert.Equal(t, test.want, summarizeRedaction(redacted))
-			assert.ErrorIs(t, redacted, errResolvedLifecycleRedacted)
+			if !test.want.ProcessStopped {
+				// A pure process-control result unwraps only to its control sentinel.
+				assert.ErrorIs(t, redacted, errResolvedLifecycleRedacted)
+			}
 			assert.NotErrorIs(t, redacted, secretCause)
 			for _, text := range errorTreeTexts(redacted) {
 				assert.NotContains(t, text, syntheticResolvedSecret)
@@ -103,25 +132,37 @@ func TestRedactResolvedLifecycleErrorPublicMessages(t *testing.T) {
 }
 
 type redactionSummary struct {
-	Text             string
-	Public           string
-	Class            collectorapi.LifecycleErrorClass
-	RetryNotBefore   time.Time
-	Canceled         bool
-	DeadlineExceeded bool
-	Dependency       string
+	Text                  string
+	Public                string
+	Class                 collectorapi.LifecycleErrorClass
+	RetryNotBefore        time.Time
+	Canceled              bool
+	DeadlineExceeded      bool
+	TaskPanic             bool
+	OwnershipRetained     bool
+	InvalidConfiguration  bool
+	TransientConstruction bool
+	ProcessStopped        bool
+	Dependency            string
 }
 
 func summarizeRedaction(err error) redactionSummary {
 	public, _ := dyncfg.PublicMessage(err)
 	summary := redactionSummary{
-		Text:             err.Error(),
-		Public:           public,
-		Class:            collectorapi.ClassifyLifecycleError(err),
-		RetryNotBefore:   collectorapi.RetryNotBefore(err),
-		Canceled:         errors.Is(err, context.Canceled),
-		DeadlineExceeded: errors.Is(err, context.DeadlineExceeded),
+		Text:              err.Error(),
+		Public:            public,
+		Class:             collectorapi.ClassifyLifecycleError(err),
+		RetryNotBefore:    collectorapi.RetryNotBefore(err),
+		Canceled:          errors.Is(err, context.Canceled),
+		DeadlineExceeded:  errors.Is(err, context.DeadlineExceeded),
+		TaskPanic:         errors.Is(err, lifecycle.ErrTaskPanic),
+		OwnershipRetained: lifecycle.OwnershipRetained(err),
+		ProcessStopped:    errors.Is(err, jobmgr.ErrProcessAttemptStopped),
 	}
+	var invalid *invalidJobConfigurationError
+	summary.InvalidConfiguration = errors.As(err, &invalid)
+	var transient *transientJobConstructionError
+	summary.TransientConstruction = errors.As(err, &transient)
 	var dependency *collectorapi.ActivationDependencyUnavailableError
 	if errors.As(err, &dependency) {
 		summary.Dependency = dependency.Kind + "/" + dependency.Name

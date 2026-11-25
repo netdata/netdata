@@ -223,8 +223,9 @@ collector guarantees to be secret-free in `dyncfg.NewPublicError(message, cause)
   `PublicError` type in `src/go/plugin/framework/dyncfg/public_error.go` owns this contract.
 - Errors keep only the first public message in the returned error tree; wrapping text and the private cause are
   dropped. Classification (`PermanentError`, `TemporaryError`, `WithRetryNotBefore`, context errors) is preserved.
-- A log line keeps only the public message of the first argument or attribute value that carries one, as in
-  `c.Limit(key, n, d).Warning(err)`; format text and other arguments are dropped. Lines without one stay redacted.
+- A log message keeps only the public message of its first argument that carries one, as in
+  `c.Limit(key, n, d).Warning(err)`; format text and other arguments are dropped. Each attribute value added with
+  `With` keeps only its own public message. Messages and values without one stay redacted.
 - `PublicError.Error()` returns only the message for every job, so the private cause is not shown even without
   secret references. Panics are never public.
 
