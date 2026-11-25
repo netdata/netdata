@@ -49,6 +49,7 @@ FILE *registry_fopen_regular(const char *filename, const char *mode) {
         return NULL;
     }
 
+#if !defined(OS_WINDOWS)
     int status_flags = fcntl(fd, F_GETFL);
     if(status_flags == -1 || fcntl(fd, F_SETFL, status_flags & ~O_NONBLOCK) != 0) {
         int saved_errno = errno;
@@ -56,6 +57,7 @@ FILE *registry_fopen_regular(const char *filename, const char *mode) {
         errno = saved_errno;
         return NULL;
     }
+#endif
 
     FILE *fp = fdopen(fd, mode);
     if(!fp) {

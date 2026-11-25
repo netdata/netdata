@@ -23,6 +23,24 @@
 #else
 #ifdef __FreeBSD__
     #include <sys/endian.h>
+#elif defined(_WIN32)
+    // Windows/UCRT64 has no <endian.h>; x86_64 is always little-endian.
+    #ifndef htobe16
+    #define htobe16(x) __builtin_bswap16(x)
+    #define htole16(x) (x)
+    #define be16toh(x) __builtin_bswap16(x)
+    #define le16toh(x) (x)
+    #define htobe32(x) __builtin_bswap32(x)
+    #define htobe64(x) __builtin_bswap64(x)
+    #define be32toh(x) __builtin_bswap32(x)
+    #define be64toh(x) __builtin_bswap64(x)
+    #endif
+    #ifndef htole32
+    #define htole32(x) (x)
+    #define le32toh(x) (x)
+    #define htole64(x) (x)
+    #define le64toh(x) (x)
+    #endif
 #else
     #include <endian.h>
 #endif

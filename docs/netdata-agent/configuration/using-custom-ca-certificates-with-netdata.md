@@ -111,41 +111,32 @@ the certificate must be in PEM or DER format with a `.crt` extension.
 
 ## Using custom certificates on Windows
 
-Currently, Netdata does not provide integration for most components with the system certificate store on
-Windows. Instead, certificates must be installed into the bundled MSYS2 environment shipped as part of Netdata
-using the following instructions:
+Netdata's Windows TLS clients that use native Windows trust load certificates from the Windows certificate
+stores. To make a custom CA available to the Windows service, import it into **Local Computer → Trusted Root
+Certification Authorities**. For an interactive agent running as the current user, import it into **Current User
+→ Trusted Root Certification Authorities**. Use the Certificates MMC snap-in (`certlm.msc` for the local
+computer store or `certmgr.msc` for the current user store), or import the certificate with the Windows
+certificate-management tools.
 
-1. Ensure the certificate file to be installed is in PEM or DER format, with a `.crt` extension.
-2. From an elevated (administrator) shell, create the directory
-`C:\Program Files\Netdata\etc\pki\ca-trust\source\anchors` if it does not exist, and
-copy the certificate file into it.
-3. Refresh the certificate store by running `update-ca-trust` inside the bundled MSYS2 environment: start
-`C:\Program Files\Netdata\msys2.exe` as administrator and run `update-ca-trust`. From an elevated PowerShell
-session the same can be done with one line:
-`& "C:\Program Files\Netdata\usr\bin\bash.exe" -lc /usr/bin/update-ca-trust`
-The script has no `.exe` extension - it is a shell script provided by the MSYS2 `ca-certificates` package,
-and it cannot be run from `cmd.exe` or PowerShell directly.
-4. Restart the agent: `Restart-Service Netdata`
-5. Check that the store was refreshed: the files under
-`C:\Program Files\Netdata\etc\pki\ca-trust\extracted\` and `C:\Program Files\Netdata\usr\ssl\cert.pem`
-should have fresh timestamps.
+Streaming connections to a parent use OpenSSL's CA file and directory settings instead of the Windows stores.
+Configure `[stream]` `CAfile` or `CApath` in `stream.conf` to trust a private CA for streaming. For example:
 
-Five things to keep in mind:
+```ini
+[stream]
+CAfile = C:\path\to\custom-ca.pem
+```
 
-- After upgrading the agent, run `update-ca-trust` again. The installer resets the trust-store
-files it owns under `C:\Program Files\Netdata\etc\pki`; certificates you copied into
-`ca-trust\source\anchors` are left in place, but the derived bundles are rebuilt.
-- `go.d.plugin` is a native Go binary and uses the Windows certificate store, not the MSYS2
-bundle, unless the collector job sets `tls_ca`. If a job sets `tls_ca`, the file it names must
-contain the corporate CA; otherwise remove `tls_ca` so the collector uses the Windows store.
-Behind a TLS-intercepting proxy, install the corporate CA in the MSYS2 anchors directory and,
-for jobs without `tls_ca`, in `Local Computer` > `Trusted Root Certification Authorities`.
-- The agent's C components (Netdata Cloud connection, claiming, streaming, exporting) verify
-peers against the OpenSSL bundle maintained by `update-ca-trust`, not the Windows store.
-- `ssl skip certificate verification = yes` in the `[stream]` section of `stream.conf` disables
-certificate verification on the child-to-parent sender, including unknown issuing CAs. To trust
-a private CA, use `CAfile` or `CApath` in the same section instead.
-- `INSECURE=1` is a Windows installer property for the Netdata Cloud connection - claiming and
-ACLK - not a `stream.conf` option. It relaxes certificate checks for Cloud only, not for
-streaming or the collectors, and is not a substitute for installing the certificate.
+Certificates previously installed only in Netdata's bundled MSYS2 CA directory are no longer used. Import
+those certificates into the appropriate Windows Trusted Root store when upgrading.
 
+Keep in mind:
+
+- `go.d.plugin` uses the Windows certificate store unless the collector job sets `tls_ca`. If a job sets
+  `tls_ca`, the file it names must contain the custom CA; otherwise remove `tls_ca` so the collector uses the
+  Windows store.
+- `ssl skip certificate verification = yes` in the `[stream]` section of `stream.conf` disables certificate
+  verification on the child-to-parent sender, including unknown issuing CAs. To trust a private CA, use `CAfile`
+  or `CApath` in the same section instead.
+- `INSECURE=1` is a Windows installer property for the Netdata Cloud connection - claiming and ACLK - not a
+  `stream.conf` option. It relaxes certificate checks for Cloud only, not for streaming or the collectors, and is
+  not a substitute for installing the certificate.

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -62,7 +63,7 @@ func TestDynamicChecksReplaceOnlyChangedFamily(t *testing.T) {
 	require.NotEmpty(t, renamedID)
 	out.Reset()
 	replaceResponse(t, path, checksFrame(betaCheck))
-	tickUntil(t, job, func() bool { return obsoleteChart(out.String(), renamedID) })
+	tickUntilWithin(t, job, 10*time.Second, func() bool { return obsoleteChart(out.String(), renamedID) })
 	assert.False(t, obsoleteChart(out.String(), betaID))
 	assert.Contains(t, out.String(), "BEGIN '"+betaID+"'")
 }

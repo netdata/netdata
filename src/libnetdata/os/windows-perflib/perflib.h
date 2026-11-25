@@ -7,10 +7,11 @@
 
 #if defined(OS_WINDOWS)
 
-typedef uint32_t DWORD;
-typedef long long  LONGLONG;
-typedef unsigned long long ULONGLONG;
-typedef int BOOL;
+// On Windows (UCRT64), windows.h is already pulled in transitively through uv.h
+// and provides DWORD, LONGLONG, ULONGLONG, and BOOL with the correct platform types.
+// Including it directly here is a no-op when already included, and ensures these
+// types are available when the header is used in isolation.
+#include <windows.h>
 
 struct _PERF_DATA_BLOCK;
 typedef struct _PERF_DATA_BLOCK PERF_DATA_BLOCK;

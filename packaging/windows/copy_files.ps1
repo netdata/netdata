@@ -14,7 +14,7 @@ Function NetdataCopyConfig {
 }
 
 Function NetdataDownloadNetdataConfig {
-    param ($path)
+    param ($path, $stockPath)
 
     Write-Host "Creating netdata.conf if it does not exist!"
 
@@ -28,7 +28,11 @@ Function NetdataDownloadNetdataConfig {
         Invoke-WebRequest $netdataConfURL -OutFile $netdataConfPATH
     }
     catch {
-        New-Item -Path "$netdataConfPATH" -ItemType File
+        if (Test-Path -LiteralPath $stockPath -PathType Leaf) {
+            Copy-Item -LiteralPath $stockPath -Destination $netdataConfPATH
+        } else {
+            New-Item -Path "$netdataConfPATH" -ItemType File
+        }
     }
 }
 
@@ -37,6 +41,6 @@ $stockStreamPath = "C:\Program Files\Netdata\usr\lib\netdata\conf.d";
 
 NetdataCopyConfig $confPath $stockStreamPath "stream.conf"
 
-NetdataDownloadNetdataConfig $confPath
+NetdataDownloadNetdataConfig $confPath "$stockStreamPath\netdata.conf"
 
 exit 0;

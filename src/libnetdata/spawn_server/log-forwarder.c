@@ -88,8 +88,13 @@ LOG_FORWARDER *log_forwarder_start(void) {
     }
 
     // make sure read() will not block on this pipe
+    // On Windows, pipes do not support non-blocking mode via ioctlsocket (WSAENOTSOCK).
+    // The Windows poll path (WaitForMultipleObjects + PeekNamedPipe) guarantees data
+    // is present before read() is called, so non-blocking mode is not needed there.
+#ifndef OS_WINDOWS
     if(sock_setnonblock(lf->pipe_fds[PIPE_READ], true) != 1)
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to set non-blocking mode");
+#endif
 
     lf->running = true;
     lf->next_token = LOG_FORWARDER_TOKEN_NONE + 1;
@@ -349,7 +354,74 @@ static void log_forwarder_thread_func(void *arg) {
         spinlock_unlock(&lf->spinlock);
 
         int timeout = 200; // 200ms
-        int ret = poll(pfds, nfds, timeout);
+        int ret;
+
+#ifdef OS_WINDOWS
+        // On Windows, WSAPoll() (which poll() maps to) only accepts sockets — pipe handles
+        // return WSAENOTSOCK (10038). Use WaitForMultipleObjects with the underlying HANDLEs.
+        {
+            size_t i;
+            for(i = 0; i < nfds; i++)
+                pfds[i].revents = 0;
+
+            if(nfds <= MAXIMUM_WAIT_OBJECTS) {
+                HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+                bool ok = true;
+                for(i = 0; i < nfds && ok; i++) {
+                    handles[i] = (HANDLE)_get_osfhandle(pfds[i].fd);
+                    if(handles[i] == INVALID_HANDLE_VALUE) ok = false;
+                }
+
+                if(ok) {
+                    DWORD wr = WaitForMultipleObjects((DWORD)nfds, handles, FALSE, (DWORD)timeout);
+                    // Anonymous pipe handles do not reliably signal readability
+                    // through WaitForMultipleObjects. Always probe every pipe,
+                    // including WAIT_FAILED/WAIT_ABANDONED, so queued stderr is
+                    // drained even when the wait result is unusable.
+                    ret = 0;
+                    for(i = 0; i < nfds; i++) {
+                        DWORD avail = 0;
+                        if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
+                            pfds[i].revents = POLLHUP;
+                        else if(avail > 0)
+                            pfds[i].revents = POLLIN;
+                        if(pfds[i].revents) ret++;
+                    }
+
+                    if(wr == WAIT_FAILED || wr == WAIT_ABANDONED_0) {
+                        Sleep((DWORD)timeout);
+                    }
+                    else if(ret == 0 && wr != WAIT_TIMEOUT) {
+                        // A signalled anonymous pipe can still have no bytes
+                        // available to PeekNamedPipe(); avoid a tight retry loop.
+                        Sleep(10);
+                    }
+                }
+                else {
+                    ret = poll(pfds, (nfds_t)nfds, timeout); // invalid handle — fall through
+                }
+            }
+            else {
+                // WaitForMultipleObjects is limited to MAXIMUM_WAIT_OBJECTS;
+                // anonymous pipes are not sockets, so WSAPoll cannot be used
+                // as a fallback for larger sets. Probe each pipe directly.
+                ret = 0;
+                for(i = 0; i < nfds; i++) {
+                    HANDLE handle = (HANDLE)_get_osfhandle(pfds[i].fd);
+                    DWORD avail = 0;
+                    if(handle == INVALID_HANDLE_VALUE || !PeekNamedPipe(handle, NULL, 0, NULL, &avail, NULL))
+                        pfds[i].revents = POLLHUP;
+                    else if(avail > 0)
+                        pfds[i].revents = POLLIN;
+                    if(pfds[i].revents) ret++;
+                }
+                if(ret == 0)
+                    Sleep((DWORD)timeout);
+            }
+        }
+#else
+        ret = poll(pfds, (nfds_t)nfds, timeout);
+#endif
 
         if (ret > 0) {
             // Check the notification pipe

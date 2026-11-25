@@ -359,7 +359,8 @@ static void bearer_tokens_load_from_disk(void) {
         char filename[FILENAME_MAX];
         filename_from_path_entry(filename, path, de->d_name, NULL);
 
-        if(de->d_type == DT_REG || (de->d_type == DT_LNK && filename_is_file(filename)))
+        unsigned char type = nd_dirent_type(path, de);
+        if(type == DT_REG || (type == DT_LNK && filename_is_file(filename)))
             bearer_token_load_token(uuid.uuid);
     }
 

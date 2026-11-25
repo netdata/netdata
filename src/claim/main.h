@@ -4,6 +4,12 @@
 # define NETDATA_CLAIM_H_ 1
 
 #include <wchar.h>
+
+// wcscasecmp is a POSIX/GNU extension absent in UCRT64; _wcsicmp is the Windows equivalent.
+#ifndef wcscasecmp
+#define wcscasecmp _wcsicmp
+#endif
+
 #include "ui.h"
 
 extern LPWSTR token;

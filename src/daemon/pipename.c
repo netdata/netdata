@@ -20,13 +20,16 @@ const char *daemon_pipename(void) {
         if (env_pipename)
             cached_pipename = strdupz(env_pipename);
         else {
-            //#if defined(OS_WINDOWS)
-            // cached_pipename = strdupz("\\\\?\\pipe\\netdata-cli");
-            //#else
+#if defined(OS_WINDOWS)
+            // Keep the well-known endpoint so the CLI and service can
+            // communicate across their different user identities. Authorization
+            // must be enforced by the pipe security descriptor, not by naming.
+            cached_pipename = strdupz("\\\\.\\pipe\\netdata-daemon");
+#else
             char filename[FILENAME_MAX + 1];
             snprintfz(filename, FILENAME_MAX, "%s/netdata.pipe", os_run_dir(false));
             cached_pipename = strdupz(filename);
-            //#endif
+#endif
         }
 
         pipename = cached_pipename;
