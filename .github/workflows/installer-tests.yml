@@ -166,6 +166,7 @@ jobs:
             fi
           }
           trap stop_fixture EXIT
+          # shellcheck disable=SC2016 # Expanded by the inner shell.
           "$fixture_root_bin" -c 'python3 "$1" "$2" & child=$!; echo "$child" > "$3"; wait' \
             fixture-root "$fixture_child_script" "$fixture_port_file" "$fixture_child_pid_file" &
           fixture_root_pid=$!
