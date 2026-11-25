@@ -252,12 +252,12 @@ static inline bool readRegistryKeys_unsafe(BOOL helps, PERFLIB_NAMES_LOAD *load)
     else
         valueName = "CounterDefinition";
 
-    bool english = perflib_thread_ui_language_set_english(&saved_languages, &saved_languages_count);
+    bool override_applied = perflib_thread_ui_language_set_english(&saved_languages, &saved_languages_count);
 
     // Open the key for the English counters
     lStatus = RegOpenKeyExA(HKEY_LOCAL_MACHINE, REGISTRY_KEY, 0, KEY_READ, &hKey);
     if (lStatus != ERROR_SUCCESS) {
-        if(english)
+        if(override_applied)
             perflib_thread_ui_language_restore(saved_languages, saved_languages_count);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to open registry key HKEY_LOCAL_MACHINE, subkey '%s', error %ld\n", REGISTRY_KEY, (long)lStatus);
@@ -274,7 +274,7 @@ static inline bool readRegistryKeys_unsafe(BOOL helps, PERFLIB_NAMES_LOAD *load)
         lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
     }
 
-    if(english)
+    if(override_applied)
         perflib_thread_ui_language_restore(saved_languages, saved_languages_count);
 
     if (!pData) {
@@ -409,12 +409,22 @@ static void PerflibNamesLogNotEnglish(const PERFLIB_NAMES_LOAD *load) {
     if(!load->loaded || load->english_found == PERFLIB_ENGLISH_CHECK_ALL)
         return;
 
+    char missing[64] = "";
+    size_t len = 0;
+    for(size_t i = 0; i < _countof(perflib_english_check_names); i++) {
+        if(load->english_found & (1U << i))
+            continue;
+
+        if(len)
+            len = strcatz(missing, len, ", ", sizeof(missing));
+        len = strcatz(missing, len, perflib_english_check_names[i], sizeof(missing));
+    }
+
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
-           "PERFLIB: the performance counter names read from HKEY_LOCAL_MACHINE\\%s do not include "
-           "the English names 'System', 'Memory' and 'Process' (object %u is named '%s'). "
-           "The table may be localized or incomplete; Windows performance counter collectors "
-           "will not find their objects and their charts will be missing.",
-           REGISTRY_KEY, PERFLIB_SYSTEM_OBJECT_ID, load->system_name[0] ? load->system_name : "(none)");
+           "PERFLIB: the performance counter names read from HKEY_LOCAL_MACHINE\\%s are missing "
+           "the English object names: %s (object %u is named '%s'). The table may be localized or incomplete; "
+           "Windows performance counter collectors that look up these objects by name will not collect them.",
+           REGISTRY_KEY, missing, PERFLIB_SYSTEM_OBJECT_ID, load->system_name[0] ? load->system_name : "(none)");
 }
 
 void PerflibNamesRegistryInitialize(void) {
