@@ -129,7 +129,8 @@ printf 'INSTALL_VERSION=%s\\n' "$INSTALL_VERSION"
             'latest check fails': ({major: (1, None), latest: (2, None)}, [f'check {major}', f'check {latest}']),
             'major download fails': ({major: (0, None)}, [f'check {major}', f'download {major} force']),
             'latest download fails': (
-                {major: (1, None), latest: (0, None)}, [f'check {major}', f'check {latest}', f'download {latest} force']),
+                {major: (1, None), latest: (0, None)},
+                [f'check {major}', f'check {latest}', f'download {latest} force']),
         }
         for name, (table, expected_urls) in cases.items():
             with self.subTest(name):
