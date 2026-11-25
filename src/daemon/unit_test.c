@@ -2372,20 +2372,7 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
-    // the update every of the last storage tier must fit in INT32_MAX
-    uint32_t grouping = 1;
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-        if(st->rrdhost->db[tier].tier_grouping > grouping)
-            grouping = st->rrdhost->db[tier].tier_grouping;
-    const time_t maximum_update_every = INT32_MAX / grouping;
-
-    previous = rrdset_set_update_every_s(st, maximum_update_every + 1);
-    if(previous != original_update_every || st->update_every != original_update_every) {
-        fprintf(stderr, "%s: update every above the tier limit changed chart from %ld to %d\n",
-                __FUNCTION__, (long)previous, st->update_every);
-        rc = 1;
-    }
-
+    const time_t maximum_update_every = INT32_MAX;
     previous = rrdset_set_update_every_s(st, maximum_update_every);
     if(previous != original_update_every || st->update_every != maximum_update_every) {
         fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
@@ -2397,11 +2384,8 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         rrdset_set_update_every_s(st, original_update_every);
 
     // a new chart with an invalid update every gets the default one
-    const int invalid_update_every[] = { 0, -1, -1073741824, (int)(maximum_update_every + 1) };
-    size_t invalid_count = sizeof(invalid_update_every) / sizeof(invalid_update_every[0]);
-    if(maximum_update_every == INT32_MAX)
-        invalid_count--; // a single tier: every positive int is valid
-    for(size_t i = 0; i < invalid_count; i++) {
+    const int invalid_update_every[] = { 0, -1, -1073741824 };
+    for(size_t i = 0; i < sizeof(invalid_update_every) / sizeof(invalid_update_every[0]); i++) {
         char id[64];
         snprintfz(id, sizeof(id), "unittest-update-every-new-%zu", i);
         RRDSET *st2 = rrdset_create_localhost(
@@ -2413,6 +2397,37 @@ static int test_rrdset_rejects_invalid_update_every(void) {
             rc = 1;
         }
         rrdset_free(st2);
+    }
+
+    // a tier update every that does not fit in INT32_MAX is 0 (the tier gets no collect handle), never a wrapped value
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        RRDSET *s = callocz(1, sizeof(*s));
+        s->rrdhost = h;
+        h->db[0].tier_grouping = 1;
+        h->db[1].tier_grouping = 60;
+
+        const struct { int update_every; size_t tier; uint32_t expected; } cases[] = {
+            { 1, 0, 1 },
+            { 1, 1, 60 },
+            { INT32_MAX, 0, INT32_MAX },
+            { INT32_MAX / 60, 1, (INT32_MAX / 60) * 60 },
+            { INT32_MAX / 60 + 1, 1, 0 },
+            { 1073741824, 1, 0 },       // 2^30 x 60 wraps to 0 in 32 bits
+            { -1073741824, 1, 0 },
+        };
+        for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+            s->update_every = cases[i].update_every;
+            uint32_t got = rrdset_tier_update_every_s(s, cases[i].tier);
+            if(got != cases[i].expected) {
+                fprintf(stderr, "%s: tier %zu update every of chart update every %d is %u, expected %u\n",
+                        __FUNCTION__, cases[i].tier, cases[i].update_every, got, cases[i].expected);
+                rc = 1;
+            }
+        }
+
+        freez(s);
+        freez(h);
     }
 
     __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);

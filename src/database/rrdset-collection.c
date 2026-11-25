@@ -20,21 +20,12 @@ static void rrdset_observe_receiver_update_every(RRDSET *st) {
         ;
 }
 
-// A chart update every is valid when it is positive and the update every of every storage tier of the host
-// (update every x tier grouping) fits in INT32_MAX seconds.
-bool rrdset_update_every_is_valid(RRDHOST *host, time_t update_every_s) {
-    if(update_every_s < 1)
-        return false;
-
-    uint32_t grouping = 1;
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-        grouping = MAX(grouping, host->db[tier].tier_grouping);
-
-    return update_every_s <= INT32_MAX / grouping;
+bool rrdset_update_every_is_valid(time_t update_every_s) {
+    return update_every_s >= 1 && update_every_s <= INT32_MAX;
 }
 
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
-    if(unlikely(!rrdset_update_every_is_valid(st->rrdhost, update_every_s))) {
+    if(unlikely(!rrdset_update_every_is_valid(update_every_s))) {
         internal_error(
             true,
             "RRDSET '%s' ignoring invalid update every %lld; keeping %d",
@@ -56,10 +47,8 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     // switch update every to the storage engine
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-            if (rd->tiers[tier].sch)
-                storage_engine_store_change_collection_frequency(rd->tiers[tier].sch, rrdset_tier_update_every_s(st, tier));
-        }
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+            rrddim_tier_update_every_changed(rd, tier);
     }
     rrddim_foreach_done(rd);
 

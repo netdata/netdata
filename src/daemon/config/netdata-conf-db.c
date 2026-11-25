@@ -225,9 +225,9 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     storage_tiers_grouping_iterations[0] = nd_profile.update_every;
 
-    // A chart collected at the default update every must have a last-tier update every that fits in INT32_MAX
-    // seconds (see rrdset_update_every_is_valid()), so the grouping of the last tier is capped. Every tier after the
-    // current one keeps room for its minimum of 2 iterations.
+    // The update every of the last tier of a chart collected at the default update every must fit in INT32_MAX
+    // seconds (see rrdset_tier_update_every_s(): a tier that does not fit gets no data), so the grouping of the
+    // last tier is capped. Every tier after the current one keeps room for its minimum of 2 iterations.
     long long grouping_max = INT32_MAX / nd_profile.update_every;
     long long grouping = 1;
 

@@ -46,10 +46,11 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         // published under the same lock that finalizes it (rrddim_free), so a reader holding the tier
         // spinlock (storage_engine_store_page_time_to_close_s() callers) sees either NULL or a live handle
+        uint32_t tier_update_every = rrdset_tier_update_every_s(st, tier);
         spinlock_lock(&rd->tiers[tier].spinlock);
-        if (!rd->tiers[tier].sch)
+        if (!rd->tiers[tier].sch && tier_update_every)
             rd->tiers[tier].sch =
-                storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, rrdset_tier_update_every_s(st, tier), rd->rrdset->smg[tier]);
+                storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 }
@@ -140,8 +141,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
                 rd->tiers[tier].last_completed_point_flush_modulo = rrddim_collection_modulo(st, tier_update_every);
 
-                rd->tiers[tier].sch =
-                        storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
+                if(tier_update_every)
+                    rd->tiers[tier].sch =
+                            storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
 
                 initialized++;
             }
@@ -167,6 +169,32 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     internal_error(false, "RRDDIM: inserted dimension '%s' of chart '%s' of host '%s'",
                    rrddim_name(rd), rrdset_name(st), rrdhost_hostname(st->rrdhost));
 
+}
+
+// The chart update every changed: move the collect handle of the tier to the new tier update every. A tier whose
+// update every no longer fits loses its handle; one that fits again gets a new handle, but only while the dimension
+// is collected (its tier 0 handle exists: tier 0 always fits), so a finalized dimension is not revived here.
+void rrddim_tier_update_every_changed(RRDDIM *rd, size_t tier) {
+    struct rrddim_tier *t = &rd->tiers[tier];
+    uint32_t tier_update_every = rrdset_tier_update_every_s(rd->rrdset, tier);
+
+    spinlock_lock(&t->spinlock);
+
+    if(t->sch && tier_update_every)
+        storage_engine_store_change_collection_frequency(t->sch, tier_update_every);
+
+    else if(t->sch) {
+        if(tier > 0)
+            store_metric_at_tier_flush_last_completed(rd, tier, t);
+
+        storage_engine_store_finalize(t->sch);
+        t->sch = NULL;
+    }
+
+    else if(tier_update_every && t->smh && rd->tiers[0].sch)
+        t->sch = storage_metric_store_init(t->seb, t->smh, tier_update_every, rd->rrdset->smg[tier]);
+
+    spinlock_unlock(&t->spinlock);
 }
 
 bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
