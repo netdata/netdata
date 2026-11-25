@@ -34,6 +34,55 @@ static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) 
     return true;
 }
 
+// A normal protocol line is bounded by PLUGINSD_LINE_MAX. Deferred payloads are
+// different: the sender writes the body verbatim between the begin/end keywords
+// (FUNCTION_RESULT and the JSON stream path), and a minified JSON body can
+// legitimately be a single line much larger than PLUGINSD_LINE_MAX. The parser
+// already bounds the whole deferred response with PLUGINSD_MAX_DEFERRED_SIZE,
+// so use the same bound while a deferred response is being received.
+static inline size_t stream_receiver_line_max(bool deferred) {
+    return deferred ? PLUGINSD_MAX_DEFERRED_SIZE : PLUGINSD_LINE_MAX;
+}
+
+// The receiver accumulates input into line_buffer across reads until a newline
+// shows up. Reject a line as soon as its accumulated size exceeds the limit,
+// regardless of whether the current input completed the line.
+static inline bool stream_receiver_line_buffer_overflow(const BUFFER *line_buffer, size_t line_max) {
+    return line_buffer->len > line_max;
+}
+
+// Length of the next line (including its newline) still available in the
+// reader. This mirrors the newline search in buffered_reader_next_line() so
+// the receiver can reject an overlong line before it is appended.
+static inline size_t stream_receiver_next_line_length(const struct buffered_reader *reader) {
+    if(reader->read_len <= reader->pos)
+        return 0;
+
+    const char *start = &reader->read_buffer[reader->pos];
+    size_t remaining = (size_t)(reader->read_len - reader->pos);
+    const char *newline = memchr(start, '\n', remaining);
+
+    return newline ? (size_t)(newline - start) + 1 : remaining;
+}
+
+static inline bool stream_receiver_next_line_checked(
+    struct buffered_reader *reader, BUFFER *line_buffer, size_t line_max, bool *overflow) {
+
+    size_t next_line_len = stream_receiver_next_line_length(reader);
+
+    // Reject before appending, so an overlong line cannot grow the buffer by
+    // a whole read chunk before the post-append check notices it.
+    if(line_buffer->len + next_line_len > line_max) {
+        *overflow = true;
+        return false;
+    }
+
+    bool complete = buffered_reader_next_line(reader, line_buffer);
+    *overflow = stream_receiver_line_buffer_overflow(line_buffer, line_max);
+
+    return complete;
+}
+
 struct parser;
 
 struct receiver_state {

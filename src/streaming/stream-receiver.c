@@ -795,6 +795,64 @@ static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct re
     return true;
 }
 
+static void stream_receiver_overlong_line(
+    struct stream_thread *sth, struct receiver_state *rpt, size_t line_max, bool *removed) {
+
+    nd_log_limit_static_global_var(erl, 1, 0);
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+           "STREAM RCV[%zu] '%s' [from [%s]:%s]: line is %zu bytes (max %zu). "
+           "Disconnecting the sender.",
+           sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+           (size_t)rpt->thread.line_buffer->len, line_max);
+
+    *removed = true;
+    // An overlong line is a protocol violation, not a send-buffer issue.
+    stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+}
+
+static bool stream_receiver_process_lines(
+    struct stream_thread *sth, struct receiver_state *rpt,
+    PARSER *parser, bool *removed) {
+
+    for(;;) {
+        // Deferred payloads are opaque data and can be a single line larger than
+        // PLUGINSD_LINE_MAX (for example a minified function result or stream
+        // path JSON). The parser bounds the whole deferred response by
+        // PLUGINSD_MAX_DEFERRED_SIZE, so use that as the line limit here.
+        // Require a real deferred response: a bogus FUNCTION_RESULT_BEGIN with
+        // an unknown transaction leaves defer.response NULL and must not
+        // unlock the larger limit.
+        bool deferred_payload =
+            (parser->flags & PARSER_DEFER_UNTIL_KEYWORD) && parser->defer.response;
+        size_t line_max = stream_receiver_line_max(deferred_payload);
+        bool overflow = false;
+        bool complete = stream_receiver_next_line_checked(
+            &rpt->thread.uncompressed,
+            rpt->thread.line_buffer,
+            line_max,
+            &overflow);
+
+        if(unlikely(overflow)) {
+            stream_receiver_overlong_line(sth, rpt, line_max, removed);
+            return false;
+        }
+
+        if(!complete)
+            return true;
+
+        if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
+            stream_receiver_remove(
+                sth,
+                rpt,
+                STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+            *removed = true;
+            return false;
+        }
+
+        buffer_flush(rpt->thread.line_buffer);
+    }
+}
+
 static ssize_t
 stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, usec_t now_ut __maybe_unused, bool *removed) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
@@ -819,17 +877,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
                     if (likely(decompress_rc == DECOMPRESS_OK)) {
                         // loop through all the complete lines found in the uncompressed buffer
-
-                        while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
-                                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
-                                *removed = true;
-                                return -1;
-                            }
-
-                            rpt->thread.line_buffer->len = 0;
-                            rpt->thread.line_buffer->buffer[0] = '\0';
-                        }
+                        if(unlikely(!stream_receiver_process_lines(sth, rpt, parser, removed)))
+                            return -1;
                     }
                     else if (decompress_rc == DECOMPRESS_NEED_MORE_DATA)
                         break;
@@ -861,16 +910,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
         if(rc <= 0)
             return rc;
 
-        while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
-                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
-                *removed = true;
-                return -1;
-            }
-
-            rpt->thread.line_buffer->len = 0;
-            rpt->thread.line_buffer->buffer[0] = '\0';
-        }
+        if(unlikely(!stream_receiver_process_lines(sth, rpt, parser, removed)))
+            return -1;
     }
 
     return rc;
