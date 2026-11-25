@@ -58,7 +58,7 @@ jobs:
       - name: Verify public kickstart SHA-256
         if: ${{ !cancelled() && steps.upload-r2.outcome == 'success' }}
         run: |
-          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 60 https://repository.netdata.cloud/kickstart.sh -o "$RUNNER_TEMP/kickstart-public.sh"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 60 https://repository.netdata.cloud/kickstart.sh -o "$RUNNER_TEMP/kickstart-public.sh"
           local_sha="$(sha256sum packaging/installer/kickstart.sh | awk '{print $1}')"
           public_sha="$(sha256sum "$RUNNER_TEMP/kickstart-public.sh" | awk '{print $1}')"
           test "$local_sha" = "$public_sha"
