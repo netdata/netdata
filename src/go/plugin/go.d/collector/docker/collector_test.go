@@ -60,6 +60,10 @@ func TestArtifacts(t *testing.T) {
 
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, templateYAML, nil)
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, templateYAML)
+	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml",
+		collecttest.ConfigSchemaCheck{
+			Defaults: true,
+		})
 }
 
 func TestCollector_Init(t *testing.T) {
