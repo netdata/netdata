@@ -257,8 +257,12 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         const char *type = procfile_lineword(ff, l, 5);
 
         struct pageline *pgl = pageline_find(&hint, node, zone, type);
-        if (unlikely(pgl && pgl->seen))
-            continue; // the same line twice in one read
+        if (unlikely(pgl && pgl->seen)) {
+            // The same line twice in one read: the kernel resumed the file at a shifted
+            // node position (NUMA node hotplug mid-read), so other lines may be missing.
+            global_complete = false;
+            continue;
+        }
 
         bool added = false;
         if (unlikely(!pgl)) {
