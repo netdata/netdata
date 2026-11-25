@@ -1,0 +1,54 @@
+version: v1
+context_namespace: wmi
+groups:
+  - family: CPU
+    metrics: [cpu_busy_percent]
+    charts:
+      - context: cpu_utilization
+        title: CPU Utilization
+        units: "%"
+        dimensions:
+          - selector: cpu_busy_percent
+            name: busy
+  - family: Memory
+    metrics: [memory_used_bytes, memory_available_bytes]
+    charts:
+      - context: memory_usage
+        title: Physical Memory Usage
+        units: bytes
+        type: stacked
+        dimensions:
+          - selector: memory_used_bytes
+            name: used
+          - selector: memory_available_bytes
+            name: available
+  - family: Network
+    metrics: [network_received_bytes_per_second, network_sent_bytes_per_second]
+    charts:
+      - context: network_traffic
+        title: Network Interface Traffic
+        units: bytes/s
+        type: area
+        instances:
+          by_labels: [interface]
+        dimensions:
+          - selector: network_received_bytes_per_second
+            name: received
+          - selector: network_sent_bytes_per_second
+            name: sent
+            options:
+              multiplier: -1
+  - family: Disk
+    metrics: [disk_used_bytes, disk_free_bytes]
+    charts:
+      - context: disk_space
+        title: Fixed Disk Space
+        units: bytes
+        type: stacked
+        instances:
+          by_labels: [drive]
+        dimensions:
+          - selector: disk_used_bytes
+            name: used
+          - selector: disk_free_bytes
+            name: free

@@ -1,0 +1,157 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Windows WMI collector configuration",
+    "type": "object",
+    "properties": {
+      "host": {
+        "title": "Host",
+        "description": "Windows hostname or IP address for remote WMI.",
+        "type": "string",
+        "minLength": 1
+      },
+      "auth": {
+        "title": "Authentication",
+        "description": "Authentication mechanism for the remote WMI session.",
+        "type": "string",
+        "enum": [
+          "ntlm"
+        ]
+      },
+      "username": {
+        "title": "Username",
+        "description": "Account with permission to query WMI on the remote host.",
+        "type": "string",
+        "minLength": 1
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password for the remote WMI account.",
+        "type": "string",
+        "minLength": 1
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 30
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for opening the WMI session and querying all enabled groups, in seconds.",
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 15
+      },
+      "collectors": {
+        "title": "Metric groups",
+        "description": "Choose which metric groups to collect. Keep at least one group enabled.",
+        "type": "object",
+        "properties": {
+          "cpu": {
+            "title": "CPU",
+            "description": "Collect aggregate processor utilization.",
+            "type": "boolean",
+            "default": true
+          },
+          "memory": {
+            "title": "Memory",
+            "description": "Collect physical memory usage.",
+            "type": "boolean",
+            "default": true
+          },
+          "network": {
+            "title": "Network",
+            "description": "Collect receive and send traffic per network interface.",
+            "type": "boolean",
+            "default": true
+          },
+          "disk": {
+            "title": "Disk",
+            "description": "Collect used and free space per fixed logical drive.",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "host",
+      "auth",
+      "username",
+      "password"
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:order": [
+      "host",
+      "auth",
+      "username",
+      "password",
+      "update_every",
+      "autodetection_retry",
+      "timeout",
+      "collectors",
+      "vnode"
+    ],
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Connection",
+          "fields": [
+            "host",
+            "auth",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "timeout",
+            "collectors"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
+    },
+    "host": {
+      "ui:placeholder": "windows.example.com"
+    },
+    "auth": {
+      "ui:options": {
+        "enumNames": [
+          "NTLMv2"
+        ]
+      }
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "vnode": {
+      "ui:placeholder": "windows-server",
+      "ui:help": "The job creates a Virtual Node for the remote host by default. To use an existing Virtual Node, enter its configured name."
+    }
+  }
+}

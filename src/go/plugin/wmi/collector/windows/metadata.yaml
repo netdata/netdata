@@ -1,0 +1,192 @@
+plugin_name: wmi.plugin
+modules:
+  - meta:
+      id: collector-wmi.plugin-windows
+      plugin_name: wmi.plugin
+      module_name: windows
+      monitored_instance:
+        name: Remote Windows host (WMI)
+        link: https://learn.microsoft.com/en-us/windows/win32/wmisdk/wmi-start-page
+        icon_filename: windows.svg
+        categories:
+          - data-collection.operating-systems
+      keywords: [windows, wmi, wql, dcom]
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: Monitor CPU, physical memory, network interface traffic, and fixed-drive space on a remote Windows host.
+        method_description: One job connects to one configured host over DCOM and reads the enabled groups in the root/cimv2 WMI namespace. The monitored machine uses its built-in Windows providers.
+      supported_platforms:
+        include: [Linux, Windows]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: Allow the account remote DCOM access and Remote Enable and read permissions on the target WMI namespace and providers.
+      default_behavior:
+        auto_detection:
+          description: Configure each remote endpoint explicitly. The stock configuration contains no jobs.
+        limits:
+          description: This experimental source-only plugin uses explicit NTLMv2. It collects total CPU utilization, visible physical memory, rates per Windows network interface performance instance, and fixed logical drives with drive letters.
+        performance_impact:
+          description: Each cycle opens a WMI session and queries each enabled group once. Disabling a group skips its remote query.
+    setup:
+      prerequisites:
+        list:
+          - title: Build the plugin on the polling host
+            description: Pass `--enable-plugin-wmi` to the Netdata source installer, or configure CMake with `-DENABLE_PLUGIN_WMI=ON`. The development plugin is omitted from nightly packages.
+          - title: Allow remote WMI access
+            description: Allow TCP 135 and the assigned WMI RPC port from the poller. Use an account permitted to read the Windows performance, operating system, and logical drive providers. The site's authentication policy must allow NTLMv2.
+      configuration:
+        file:
+          name: wmi/windows.conf
+          description: Define one job per remote Windows endpoint. Each job creates a virtual node for its host unless an existing named vnode is specified.
+        options:
+          description: All four metric groups are enabled by default. Set an individual group to false to skip its query.
+          folding:
+            title: Options
+            enabled: false
+          list:
+            - name: host
+              description: "Windows hostname or IP address for remote WMI."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: auth
+              description: "Authentication mechanism for the remote WMI session."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: username
+              description: "Account with permission to query WMI on the remote host."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: password
+              description: "Password for the remote WMI account."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: update_every
+              description: "Data collection interval, in seconds."
+              default_value: 30
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
+              default_value: 0
+              required: false
+              group: Collection
+            - name: timeout
+              description: "Timeout for opening the WMI session and querying all enabled groups, in seconds."
+              default_value: 15
+              required: false
+              group: Collection
+            - name: collectors
+              description: "Choose which metric groups to collect. Keep at least one group enabled."
+              default_value: ''
+              required: false
+              group: Collection
+            - name: collectors.cpu
+              description: "Collect aggregate processor utilization."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.memory
+              description: "Collect physical memory usage."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.network
+              description: "Collect receive and send traffic per network interface."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.disk
+              description: "Collect used and free space per fixed logical drive."
+              default_value: true
+              required: false
+              group: Collection
+            - name: vnode
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
+              default_value: ''
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Configuration example
+            enabled: false
+          list:
+            - name: Windows file server
+              description: Collect CPU, memory and network traffic. The password is supplied by the poller's environment.
+              config: |
+                jobs:
+                  - name: fileserver
+                    host: fileserver.example.org
+                    auth: ntlm
+                    username: 'EXAMPLE\monitor'
+                    password: '${env:WMI_PASSWORD}'
+                    collectors:
+                      disk: false
+    troubleshooting:
+      errors:
+        list:
+          - error: RPC endpoint unavailable
+            cause: The polling service cannot resolve or reach the RPC endpoint.
+            fix: Verify the configured host resolves from the poller and the firewall permits both the endpoint mapper and the WMI RPC endpoint.
+          - error: Access denied
+            cause: The target rejected the credentials or denied access to the WMI namespace or provider.
+            fix: Check the account's NTLMv2 policy, remote DCOM permissions and permissions on root/cimv2 and the queried WMI providers.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: CPU and RAM describe the remote host. Windows supplies precomputed network rates. Disk space is reported per local fixed logical drive.
+      availability: []
+      scopes:
+        - name: host
+          description: The configured Windows host.
+          labels: []
+          metrics:
+            - name: wmi.cpu_utilization
+              description: CPU Utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: wmi.memory_usage
+              description: Physical Memory Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+        - name: interface
+          description: A Windows network interface performance instance.
+          labels:
+            - name: interface
+              description: Windows performance counter instance name.
+          metrics:
+            - name: wmi.network_traffic
+              description: Network Interface Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: drive
+          description: A fixed local logical drive.
+          labels:
+            - name: drive
+              description: Windows logical drive identifier.
+          metrics:
+            - name: wmi.disk_space
+              description: Fixed Disk Space
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
