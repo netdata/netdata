@@ -85,6 +85,24 @@ static bool registry_test_set(HKEY key, const char *name, DWORD type, const void
     return false;
 }
 
+// a REG_SZ stored without a terminating NUL: the byte after the data is not zero, and the stored size proves it
+static bool registry_test_set_unterminated(HKEY key, const wchar_t *name, const wchar_t *chars, DWORD nchars) {
+    wchar_t buf[16];
+    for(size_t i = 0; i < _countof(buf); i++)
+        buf[i] = L'Z';
+    memcpy(buf, chars, nchars * sizeof(wchar_t));
+
+    DWORD size = 0;
+    if(RegSetValueExW(key, name, 0, REG_SZ, (const BYTE *)buf, nchars * sizeof(wchar_t)) != ERROR_SUCCESS ||
+       RegQueryValueExW(key, name, NULL, NULL, NULL, &size) != ERROR_SUCCESS ||
+       size != nchars * sizeof(wchar_t)) {
+        fprintf(stderr, "REGISTRY TEST: cannot store an unterminated value\n");
+        return false;
+    }
+
+    return true;
+}
+
 static int registry_test_string(HKEY key, const char *name, unsigned int length, bool expect_ok, const char *expect) {
     char buf[16];
     memset(buf, 'X', sizeof(buf));
@@ -103,7 +121,9 @@ static int registry_test_string(HKEY key, const char *name, unsigned int length,
 static int registry_test_dword(HKEY key, const char *name, bool expect_ok, unsigned int expect) {
     unsigned int value = 0xDEADBEEF;
     bool ok = netdata_registry_get_dword_from_open_key(&value, key, (char *)name) == ERROR_SUCCESS;
-    bool passed = ok == expect_ok && (!ok || value == expect);
+
+    // on failure the output must be left alone
+    bool passed = ok == expect_ok && value == (ok ? expect : 0xDEADBEEF);
 
     fprintf(stderr, "REGISTRY TEST: dword '%s': %s (%u): %s\n", name, ok ? "read" : "not read", value, passed ? "OK" : "FAILED");
     return passed ? 0 : 1;
@@ -115,8 +135,14 @@ int netdata_registry_unittest(void) {
 
     // volatile: the key does not survive a reboot, even if the test crashes
     HKEY key;
-    if(RegCreateKeyExA(HKEY_CURRENT_USER, path, 0, NULL, REG_OPTION_VOLATILE, KEY_ALL_ACCESS, NULL, &key, NULL) != ERROR_SUCCESS) {
+    DWORD disposition = 0;
+    if(RegCreateKeyExA(HKEY_CURRENT_USER, path, 0, NULL, REG_OPTION_VOLATILE, KEY_ALL_ACCESS, NULL, &key, &disposition) != ERROR_SUCCESS) {
         fprintf(stderr, "REGISTRY TEST: cannot create HKCU\\%s\n", path);
+        return 1;
+    }
+    if(disposition != REG_CREATED_NEW_KEY) {
+        fprintf(stderr, "REGISTRY TEST: HKCU\\%s already exists\n", path);
+        RegCloseKey(key);
         return 1;
     }
 
@@ -125,8 +151,8 @@ int netdata_registry_unittest(void) {
     int errors = 0;
 
     if(!registry_test_set(key, "sz", REG_SZ, "hello", 6) ||
-       !registry_test_set(key, "sz_no_nul", REG_SZ, "abcd", 4) ||
-       !registry_test_set(key, "sz_no_nul_8", REG_SZ, "abcdefgh", 8) ||
+       !registry_test_set_unterminated(key, L"sz_no_nul", L"abcd", 4) ||
+       !registry_test_set_unterminated(key, L"sz_no_nul_8", L"abcdefgh", 8) ||
        !registry_test_set(key, "multi_sz", REG_MULTI_SZ, "a\0b\0", 5) ||
        !registry_test_set(key, "dword", REG_DWORD, &dword, sizeof(dword)) ||
        !registry_test_set(key, "binary4", REG_BINARY, binary, sizeof(binary)) ||
@@ -159,7 +185,10 @@ int netdata_registry_unittest(void) {
     }
 
     RegCloseKey(key);
-    RegDeleteKeyA(HKEY_CURRENT_USER, path);
+    if(RegDeleteKeyA(HKEY_CURRENT_USER, path) != ERROR_SUCCESS) {
+        fprintf(stderr, "REGISTRY TEST: cannot delete HKCU\\%s\n", path);
+        errors++;
+    }
 
     fprintf(stderr, "REGISTRY TEST: %s\n", errors ? "FAILED" : "PASSED");
     return errors ? 1 : 0;
