@@ -26,7 +26,7 @@ which data type it produces, or how the closest existing collectors in its domai
 | `statsd.plugin` (Go) | Go (no CGO) | All | `src/go/plugin/statsd/` | **Experimental**, opt-in (`ENABLE_PLUGIN_STATSD`): StatsD UDP/TCP ingestion (`listen` module) |
 | `netflow-plugin` | Rust | Linux | `src/crates/netflow-plugin/` | NetFlow v5/v9, IPFIX, sFlow |
 | `otel-plugin` | Rust | Linux | `src/crates/otel-plugin/` | OpenTelemetry metrics + logs ingestion (logs queryable via the `otel-logs` Function) |
-| `charts.d.plugin` / `python.d.plugin` | Bash / Python | All | `src/collectors/{charts,python}.d.plugin/` | **Legacy** — do not add new modules |
+| `charts.d.plugin` / `python.d.plugin` | Bash / Python | All but Windows | `src/collectors/{charts,python}.d.plugin/` | **Legacy** — do not add new modules |
 
 Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orchestrators →
 `src/go/plugin/{go.d,ibm.d,scripts.d,statsd}/` with entry points in `src/go/cmd/` (`godplugin`, `ibmdplugin`,

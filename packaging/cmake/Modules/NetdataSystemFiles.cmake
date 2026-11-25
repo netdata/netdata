@@ -591,10 +591,6 @@ if(ENABLE_PLUGIN_PYTHON)
           COMPONENT plugin-pythond
           DESTINATION ${LIBEXEC_DEST}/python.d)
 
-  if(OS_WINDOWS)
-    precompile_python(${LIBEXEC_DEST}/python.d plugin-pythond)
-  endif()
-
   install(FILES src/collectors/python.d.plugin/python.d.conf
           COMPONENT plugin-pythond
           DESTINATION ${LIBCONFIG_DEST})
