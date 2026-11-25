@@ -508,6 +508,17 @@ static bool sm_fixture_set_all(const CGROUP_MEMORY_READER *cg, const char *limit
            sm_fixture_set(cg->stat_path, stat);
 }
 
+// a production reader pointed at fixture files, so its memory.stat key is the one under test
+static CGROUP_MEMORY_READER sm_fixture_reader(const CGROUP_MEMORY_READER *production,
+                                              const char *limit, const char *usage, const char *stat) {
+    CGROUP_MEMORY_READER cg = *production;
+    cg.limit_path = limit;
+    cg.usage_path = usage;
+    cg.stat_path = stat;
+    cg.sm = OS_SYSTEM_MEMORY_EMPTY;
+    return cg;
+}
+
 // the cgroup reader on fixture files: values, failures, and the cached total
 static int sm_cgroup_reader_unittest(void) {
     int errors = 0;
@@ -523,14 +534,8 @@ static int sm_cgroup_reader_unittest(void) {
     snprintfz(usage_file, sizeof(usage_file), "%s/usage", dir);
     snprintfz(stat_file, sizeof(stat_file), "%s/stat", dir);
 
-    const CGROUP_MEMORY_READER v1 = {
-        .limit_path = limit_file, .usage_path = usage_file, .stat_path = stat_file,
-        CGROUP_INACTIVE_KEY("total_inactive_file "),
-    };
-    const CGROUP_MEMORY_READER v2 = {
-        .limit_path = limit_file, .usage_path = usage_file, .stat_path = stat_file,
-        CGROUP_INACTIVE_KEY("inactive_file "),
-    };
+    const CGROUP_MEMORY_READER v1 = sm_fixture_reader(&cgroup_v1, limit_file, usage_file, stat_file);
+    const CGROUP_MEMORY_READER v2 = sm_fixture_reader(&cgroup_v2, limit_file, usage_file, stat_file);
 
     // every case starts from a fresh reader and queries the total
     const struct {
