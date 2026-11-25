@@ -171,6 +171,81 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
 //    }
 //}
 
+// Each child runs in a job of its own. An MSYS exec() starts a new Windows process, so a plugin is
+// usually a chain of processes (sh -> bash -> ...), and only the job reaches all of them. The job is
+// killed when its last handle closes, which also takes the children down when the agent dies.
+static HANDLE spawn_server_job_create(void) {
+    HANDLE job = CreateJobObject(NULL, NULL);
+    if(!job)
+        return NULL;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { 0 };
+    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if(!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
+        DWORD err = GetLastError();
+        CloseHandle(job);
+        SetLastError(err);
+        return NULL;
+    }
+
+    return job;
+}
+
+// Closing the job kills whatever still runs in it, unless keep_descendants: a child that exited by itself
+// leaves its background processes running, as on the other platforms.
+static void spawn_server_job_close(SPAWN_INSTANCE *si, bool keep_descendants) {
+    if(!si->job_handle)
+        return;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = { 0 };
+    if(keep_descendants &&
+       !SetInformationJobObject(si->job_handle, JobObjectExtendedLimitInformation, &info, sizeof(info)))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "SPAWN PARENT: cannot release the job of request No %zu (err %lu), its remaining processes will be killed",
+               si->request_id, (unsigned long)GetLastError());
+
+    CloseHandle(si->job_handle);
+    si->job_handle = NULL;
+}
+
+#ifndef PROC_THREAD_ATTRIBUTE_JOB_LIST
+#define PROC_THREAD_ATTRIBUTE_JOB_LIST 0x0002000D
+#endif
+
+// CreateProcess() puts the process in the job before it runs (Windows 10 / Server 2016 and later), so
+// there is no moment when it, or anything it starts, is outside the job.
+static LPPROC_THREAD_ATTRIBUTE_LIST spawn_server_job_attributes(HANDLE *job) {
+    SIZE_T size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &size);
+
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = mallocz(size);
+    if(!InitializeProcThreadAttributeList(attrs, 1, 0, &size)) {
+        DWORD err = GetLastError();
+        freez(attrs);
+        SetLastError(err);
+        return NULL;
+    }
+
+    if(!UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST, job, sizeof(*job), NULL, NULL)) {
+        DWORD err = GetLastError();
+        DeleteProcThreadAttributeList(attrs);
+        freez(attrs);
+        SetLastError(err);
+        return NULL;
+    }
+
+    return attrs;
+}
+
+static void spawn_server_job_attributes_free(LPPROC_THREAD_ATTRIBUTE_LIST *attrs) {
+    if(!*attrs)
+        return;
+
+    DeleteProcThreadAttributeList(*attrs);
+    freez(*attrs);
+    *attrs = NULL;
+}
+
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
@@ -183,6 +258,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         return NULL;
 
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 }, pipe_stderr[2] = { -1, -1 };
+    HANDLE job = NULL;
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = NULL;
 
     errno_clear();
 
@@ -230,6 +307,22 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         goto cleanup;
     }
 
+    job = spawn_server_job_create();
+    if(!job) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot create a job object (err %lu) for request No %zu, command: %s",
+               (unsigned long)GetLastError(), instance->request_id, command);
+        goto cleanup;
+    }
+
+    attrs = spawn_server_job_attributes(&job);
+    if(!attrs) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot set the job of the process (err %lu) for request No %zu, command: %s",
+               (unsigned long)GetLastError(), instance->request_id, command);
+        goto cleanup;
+    }
+
     // do not run multiple times this section
     // to prevent handles leaking
     spinlock_lock(&spinlock);
@@ -259,14 +352,15 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     }
 
     // Set up the STARTUPINFO structure
-    STARTUPINFO si;
+    STARTUPINFOEX si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = stdin_read_handle;
-    si.hStdOutput = stdout_write_handle;
-    si.hStdError = stderr_write_handle;
+    si.StartupInfo.cb = sizeof(si);
+    si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    si.StartupInfo.hStdInput = stdin_read_handle;
+    si.StartupInfo.hStdOutput = stdout_write_handle;
+    si.StartupInfo.hStdError = stderr_write_handle;
+    si.lpAttributeList = attrs;
 
     // Retrieve the current environment block
     char* env_block = GetEnvironmentStrings();
@@ -281,11 +375,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // Spawn the process
     errno_clear();
-    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, env_block, NULL, &si, &pi)) {
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT, env_block, NULL, &si.StartupInfo, &pi)) {
+        DWORD err = GetLastError();
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
-               instance->request_id, command);
+               "SPAWN PARENT: cannot CreateProcess() (err %lu) for request No %zu, command: %s",
+               (unsigned long)err, instance->request_id, command);
         if(env_block)
             FreeEnvironmentStrings(env_block);
         goto cleanup;
@@ -302,6 +397,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     // end of the critical section
     spinlock_unlock(&spinlock);
 
+    spawn_server_job_attributes_free(&attrs);
+
     // Close unused pipe ends
     close(pipe_stdin[PIPE_READ]); pipe_stdin[PIPE_READ] = -1;
     close(pipe_stdout[PIPE_WRITE]); pipe_stdout[PIPE_WRITE] = -1;
@@ -311,6 +408,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     instance->dwProcessId = pi.dwProcessId;
     instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
     instance->process_handle = pi.hProcess;
+    instance->job_handle = job;
 
     // Convert handles to POSIX file descriptors
     instance->write_fd = pipe_stdin[PIPE_WRITE];
@@ -330,6 +428,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     return instance;
 
     cleanup:
+    spawn_server_job_attributes_free(&attrs);
+    if (job) CloseHandle(job);
     if (pipe_stdin[PIPE_READ] >= 0) close(pipe_stdin[PIPE_READ]);
     if (pipe_stdin[PIPE_WRITE] >= 0) close(pipe_stdin[PIPE_WRITE]);
     if (pipe_stdout[PIPE_READ] >= 0) close(pipe_stdout[PIPE_READ]);
@@ -366,33 +466,6 @@ static char* GetErrorString(DWORD errorCode) {
     }
 
     return NULL;
-}
-
-static void TerminateChildProcesses(SPAWN_INSTANCE *si) {
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE)
-        return;
-
-    PROCESSENTRY32 pe;
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(hSnapshot, &pe)) {
-        do {
-            if (pe.th32ParentProcessID == si->dwProcessId) {
-                HANDLE hChildProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
-                if (hChildProcess) {
-                    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                           "SPAWN PARENT: killing subprocess %u of request No %zu, pid %d (winpid %u)",
-                           pe.th32ProcessID, si->request_id, (int)si->child_pid, si->dwProcessId);
-
-                    TerminateProcess(hChildProcess, STATUS_CONTROL_C_EXIT);
-                    CloseHandle(hChildProcess);
-                }
-            }
-        } while (Process32Next(hSnapshot, &pe));
-    }
-
-    CloseHandle(hSnapshot);
 }
 
 int map_status_code_to_signal(DWORD status_code) {
@@ -435,6 +508,8 @@ int map_status_code_to_signal(DWORD status_code) {
     }
 }
 
+static int spawn_server_exec_reap(SPAWN_SERVER *server, SPAWN_INSTANCE *si, bool killed);
+
 int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
     // this gives some warnings at the spawn-tester, but it is generally better
     // to have them, to avoid abnormal shutdown of the plugins
@@ -450,18 +525,16 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
                si->request_id, (int)si->child_pid, si->dwProcessId);
 
+    // terminate the child and everything it started; if this fails, closing the job in reap does it
     errno_clear();
-    if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
+    if(TerminateJobObject(si->job_handle, STATUS_CONTROL_C_EXIT) == 0)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated",
-               si->request_id, (int)si->child_pid, si->dwProcessId);
-
-    errno_clear();
-    TerminateChildProcesses(si);
+               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated (err %lu)",
+               si->request_id, (int)si->child_pid, si->dwProcessId, (unsigned long)GetLastError());
 
     spawn_server_release_stderr_fd(server, si);
 
-    return spawn_server_exec_wait(server, si);
+    return spawn_server_exec_reap(server, si, true);
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
@@ -495,16 +568,24 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
-int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
+// After a kill, the job is closed before the wait: closing it kills whatever the kill missed, so the wait
+// cannot block on it and nothing in the job survives.
+static int spawn_server_exec_reap(SPAWN_SERVER *server, SPAWN_INSTANCE *si, bool killed) {
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
+    if(killed)
+        spawn_server_job_close(si, false);
+
     // wait for the process to end
-    WaitForSingleObject(si->process_handle, INFINITE);
+    DWORD wait_rc = WaitForSingleObject(si->process_handle, INFINITE);
 
     DWORD exit_code = -1;
     GetExitCodeProcess(si->process_handle, &exit_code);
     CloseHandle(si->process_handle);
+
+    // keep its background processes only when we know the child exited by itself
+    spawn_server_job_close(si, wait_rc == WAIT_OBJECT_0);
 
     char *err = GetErrorString(exit_code);
 
@@ -520,6 +601,10 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     freez(si);
     return map_status_code_to_signal(exit_code);
+}
+
+int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
+    return spawn_server_exec_reap(server, si, false);
 }
 
 #endif
