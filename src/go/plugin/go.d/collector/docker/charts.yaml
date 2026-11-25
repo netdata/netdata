@@ -56,20 +56,7 @@ groups:
         instances:
           by_labels: [container_name]
         dimensions:
-          - selector: container_state{container_state="running"}
-            name: running
-          - selector: container_state{container_state="paused"}
-            name: paused
-          - selector: container_state{container_state="exited"}
-            name: exited
-          - selector: container_state{container_state="created"}
-            name: created
-          - selector: container_state{container_state="restarting"}
-            name: restarting
-          - selector: container_state{container_state="removing"}
-            name: removing
-          - selector: container_state{container_state="dead"}
-            name: dead
+          - selector: container_state
   - family: containers
     metrics:
       - container_health_status
@@ -82,16 +69,7 @@ groups:
         instances:
           by_labels: [container_name]
         dimensions:
-          - selector: container_health_status{container_health_status="healthy"}
-            name: healthy
-          - selector: container_health_status{container_health_status="unhealthy"}
-            name: unhealthy
-          - selector: container_health_status{container_health_status="not_running_unhealthy"}
-            name: not_running_unhealthy
-          - selector: container_health_status{container_health_status="starting"}
-            name: starting
-          - selector: container_health_status{container_health_status="no_healthcheck"}
-            name: no_healthcheck
+          - selector: container_health_status
   - family: containers
     metrics:
       - container_writable_layer_size

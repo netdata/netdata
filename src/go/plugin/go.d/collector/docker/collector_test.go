@@ -58,7 +58,11 @@ func TestArtifacts(t *testing.T) {
 	health, err := os.ReadFile("../../../../../health/health.d/docker.conf")
 	require.NoError(t, err)
 
-	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, templateYAML, nil)
+	// The state charts infer their dimensions from the states the collector declares.
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, templateYAML, map[string][]string{
+		"container_state":         containerStates,
+		"container_health_status": containerHealthStates,
+	})
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, templateYAML)
 	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml",
 		collecttest.ConfigSchemaCheck{
