@@ -1309,32 +1309,40 @@ static size_t dictionary_gc_view_lookup_unittest(void) {
     // start the lookup thread outside any dictionary lock, and wait until it runs, so the callback's
     // timer covers only the lookup
     ND_THREAD *thread = nd_thread_create("dictviewlkp", NETDATA_THREAD_OPTION_DONT_LOG, dict_gc_view_lookup_thread, &t);
-    while(!__atomic_load_n(&t.ready, __ATOMIC_ACQUIRE))
-        sleep_usec(1000);
+    if(!thread) {
+        fprintf(stderr, "GC VIEW LOOKUP: cannot create the lookup thread\n");
+        errors++;
+    }
+    else {
+        while(!__atomic_load_n(&t.ready, __ATOMIC_ACQUIRE))
+            sleep_usec(1000);
+    }
 
     // the view collection drops the last link and runs the callback, which releases the lookup
-    t.armed = true;
+    t.armed = (thread != NULL);
     dictionary_garbage_collect(view);
     t.armed = false;
 
-    // a lookup blocked on the view's index lock finishes once the collection releases it; release the
-    // thread anyway in case the callback never ran, so the join cannot hang
-    __atomic_store_n(&t.go, true, __ATOMIC_RELEASE);
-    nd_thread_join(thread);
+    if(thread) {
+        // a lookup blocked on the view's index lock finishes once the collection releases it; release the
+        // thread anyway in case the callback never ran, so the join cannot hang
+        __atomic_store_n(&t.go, true, __ATOMIC_RELEASE);
+        nd_thread_join(thread);
+
+        if(!t.lookup_done_in_callback) {
+            fprintf(stderr, "GC VIEW LOOKUP: a lookup on the view waited for the delete callback to finish - "
+                            "the view's index lock is held during delivery\n");
+            errors++;
+        }
+
+        if(!__atomic_load_n(&t.lookup_found_live, __ATOMIC_RELAXED)) {
+            fprintf(stderr, "GC VIEW LOOKUP: the lookup did not return the live item\n");
+            errors++;
+        }
+    }
 
     if(t.deletes != 1) {
         fprintf(stderr, "GC VIEW LOOKUP: expected exactly 1 delete callback from the view collection, got %zu\n", t.deletes);
-        errors++;
-    }
-
-    if(!t.lookup_done_in_callback) {
-        fprintf(stderr, "GC VIEW LOOKUP: a lookup on the view waited for the delete callback to finish - "
-                        "the view's index lock is held during delivery\n");
-        errors++;
-    }
-
-    if(!__atomic_load_n(&t.lookup_found_live, __ATOMIC_RELAXED)) {
-        fprintf(stderr, "GC VIEW LOOKUP: the lookup did not return the live item\n");
         errors++;
     }
 
