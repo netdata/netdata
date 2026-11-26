@@ -20,7 +20,8 @@ type ProbeConfig struct {
 	Privileged bool             `yaml:"privileged" json:"privileged"`
 	Packets    int              `yaml:"packets,omitempty" json:"packets"`
 	Interval   confopt.Duration `yaml:"interval,omitempty" json:"interval"`
-	Timeout    time.Duration    `yaml:"-,omitempty" json:",omitempty"`
+	// Timeout bounds the whole probe, host name resolution included.
+	Timeout time.Duration `yaml:"-,omitempty" json:",omitempty"`
 }
 
 type AnalysisConfig struct {

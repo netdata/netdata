@@ -176,12 +176,13 @@ modules:
         list:
           - name: Frequent ping timeouts
             description: |
-              The ping collector has no dedicated timeout setting. The per-host ping timeout is derived from `update_every` (approximately 90% of it when `update_every` is `1`, otherwise ~95%), and every host must complete all of its `packets` within that window.
+              The ping collector has no dedicated timeout setting. The per-host ping timeout is derived from `update_every` (approximately 90% of it when `update_every` is `1`, otherwise ~95%), and every host must complete all of its `packets` within that window. Resolving a host name counts toward the window, so a slow or unreachable DNS server shortens it or fails the probe with a lookup `i/o timeout`.
 
               If you see frequent ping timeouts, try one or more of the following:
                 - Raise `update_every` (for example from `1` to `2` or `5`). This widens the window each host has to reply and helps with slow or temporarily unreachable hosts.
                 - Reduce `packets`. Each host must fit all of its packets within the window, so fewer packets means it finishes sooner and is less likely to exceed the timeout.
                 - Reduce the number of `hosts` per job, or split them across multiple jobs, so fewer hosts are probed concurrently. This lowers local network and CPU pressure when a large host list is saturating the probe cycle.
+                - When host name lookups are slow, list IP addresses in `hosts`, or fix the DNS resolver the Agent host uses.
     metrics:
       folding:
         title: Metrics
