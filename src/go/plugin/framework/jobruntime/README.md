@@ -109,15 +109,18 @@ their collection time whatever happened in between: failed runs, charts a run di
 scrapes slower than the update interval, chart redefinitions.
 
 - Times MUST strictly increase per chart: the Agent reads a time behind the chart's clock as a forward gap and runs the
-  chart into the future. All jobs of a plugin process and its runtime charts take their times from one
+  chart into the future. Known exception: two engine charts whose IDs sanitize to one wire chart both send the run's
+  time (the Agent adds a zero-interval sample). All jobs of a plugin process and its runtime charts take their times from one
   `netdataapi.SampleClock`, created by the agent and passed through `JobConfig.SampleClock`/`JobV2Config.SampleClock`,
   which never issues a time at or before an earlier one (microsecond resolution), across job restarts and wall-clock
   steps back. A job without one gets its own clock.
 - The time is the run start, taken after the tick: a whole second plus scheduling delay, never truncated to whole
   seconds (a time exactly on the update grid makes the Agent turn one missed sample into a gap). Each run renders its
   `END` line once (`netdataapi.SampleTime`); `chartemit` rejects a plan with chart updates and no time.
-- Health: a chart's `$last_collected_t` is the run start of its last sample; per-dimension `_last_collected_t` stays
-  the Agent's receipt time. Streaming v1 parents still place samples by their own receipt time.
+- Health: a chart's `$last_collected_t` is the run start of its last sample (on a chart's first sample, and after an
+  Agent reset, the `update_every` boundary it aligns to); per-dimension `_last_collected_t` stays the Agent's receipt
+  time. Streaming v1 children forward intervals (now derived from collection times), so a v1 parent still re-anchors to
+  its own receipt time on a chart's first sample, after redefinitions and after gaps over five update intervals.
 
 Regression coverage: `job_sample_time_test.go` (V2 failed cycle, unobserved chart, rejected scope, slow scrape with a
 dropped tick; V1 failed run, empty sample, `SkipGaps`, dropped vnode frame, rejected write; one clock across jobs) and

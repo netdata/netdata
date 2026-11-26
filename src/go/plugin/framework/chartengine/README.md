@@ -164,12 +164,15 @@ attempt, err := engine.PreparePlan(store.Read(metrix.ReadRaw(), metrix.ReadFlatt
 plan := attempt.Plan()
 defer attempt.Abort()
 
+// Every chart update ends with its collection time; take it from one
+// netdataapi.SampleClock per plugin process (see jobruntime "Chart Sample Times").
 err = chartemit.ApplyPlan(api, plan, chartemit.EmitEnv{
 	TypeID:      "plugin.job",
 	UpdateEvery: 1,
 	Plugin:      "example",
 	Module:      "example",
 	JobName:     "example",
+	CollectedAt: clock.Next(time.Now()),
 })
 // handle err
 err = attempt.Commit()
