@@ -6,12 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
@@ -29,8 +30,6 @@ type normalizedTagFilter struct {
 }
 
 type profileResourceMatcher struct {
-	profileName    string
-	resourceType   string
 	resourceGroups map[string]struct{}
 	regions        map[string]struct{}
 	tagFilters     []normalizedTagFilter
@@ -52,30 +51,41 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourc
 		c.Warningf("ignoring unsupported discovered resource types: %v", fetched.UnsupportedTypes)
 	}
 
-	state := buildDiscoveryState(fetched.Resources, c.runtime, now, c.Discovery.RefreshEvery, c.discovery.FetchCounter+1, fetched)
-	if !equalResourceSlices(state.Resources, c.discovery.Resources) {
-		c.Infof("discovered %d resources: %v", len(state.Resources), state.Resources)
-	}
-
-	c.discovery = state
-	c.warnDiscoveryScopeFallbacks(state, c.runtime)
-	return state.Resources, nil
+	c.applyDiscovery(fetched, now)
+	return c.discovery.Resources, nil
 }
 
-func buildDiscoveryState(resources []resourceInfo, runtime *collectorRuntime, now time.Time, refreshEvery int, fetchCounter uint64, fetched discoveryFetchResult) discoveryState {
-	filteredResources, _ := filterDiscoveryResourcesByTypes(resources, runtimeResourceTypes(runtime))
-	scopeReport := applyWorkloadHostScopes(filteredResources, runtime)
-	return discoveryState{
-		Resources:              filteredResources,
-		ByType:                 indexResourcesByType(filteredResources),
-		ByProfile:              filterDiscoveryResourcesByProfiles(filteredResources, runtime),
+func (c *Collector) applyDiscovery(fetched discoveryFetchResult, now time.Time) {
+	resources := filterDiscoveryResourcesByTypes(fetched.Resources, runtimeResourceTypes(c.runtime))
+	scopeReport := applyWorkloadHostScopes(resources, c.runtime)
+	state := discoveryState{
+		Resources:              resources,
+		ByType:                 indexResourcesByType(resources),
+		ByProfile:              make(map[string][]resourceInfo, len(c.runtime.Profiles)),
 		FetchedAt:              now,
-		ExpiresAt:              discoveryExpiresAt(now, refreshEvery),
-		FetchCounter:           fetchCounter,
+		ExpiresAt:              discoveryExpiresAt(now, c.Discovery.RefreshEvery),
+		FetchCounter:           c.discovery.FetchCounter + 1,
 		QueryTagsColumnMissing: fetched.QueryTagsColumnMissing,
 		QueryTagsWrongShape:    fetched.QueryTagsWrongShape,
 		UnsafeWorkloadValues:   scopeReport.unsafeValues,
 	}
+	for _, profile := range c.runtime.Profiles {
+		typeKey := stringsLowerTrim(profile.ResourceType)
+		candidates := state.ByType[typeKey]
+		matched := c.matchProfileResources(profile, candidates)
+		if len(matched) > 0 {
+			state.ByProfile[profile.Name] = matched
+		}
+		logSummary := c.Debugf
+		if c.discovery.FetchCounter == 0 || len(candidates) != len(c.discovery.ByType[typeKey]) ||
+			len(matched) != len(c.discovery.ByProfile[profile.Name]) {
+			logSummary = c.Infof
+		}
+		logSummary("resource discovery: mode=%s profile_mode=%s profile=%s candidates=%d matched=%d",
+			c.Discovery.Mode, c.Profiles.Mode, profile.Name, len(candidates), len(matched))
+	}
+	c.discovery = state
+	c.warnDiscoveryScopeFallbacks(state, c.runtime)
 }
 
 func discoveryExpiresAt(now time.Time, refreshEvery int) time.Time {
@@ -662,9 +672,9 @@ func strictQueryStringColumn(row map[string]any, column string) (string, error) 
 	}
 }
 
-func filterDiscoveryResourcesByTypes(resources []resourceInfo, allowedTypes []string) ([]resourceInfo, map[string][]resourceInfo) {
+func filterDiscoveryResourcesByTypes(resources []resourceInfo, allowedTypes []string) []resourceInfo {
 	if len(resources) == 0 || len(allowedTypes) == 0 {
-		return nil, map[string][]resourceInfo{}
+		return nil
 	}
 
 	allowed := make(map[string]struct{}, len(allowedTypes))
@@ -681,32 +691,33 @@ func filterDiscoveryResourcesByTypes(resources []resourceInfo, allowedTypes []st
 		filtered = append(filtered, resource)
 	}
 
-	return filtered, indexResourcesByType(filtered)
+	return filtered
 }
 
-func filterDiscoveryResourcesByProfiles(resources []resourceInfo, runtime *collectorRuntime) map[string][]resourceInfo {
-	if runtime == nil || len(runtime.Profiles) == 0 {
-		return map[string][]resourceInfo{}
-	}
-
-	result := make(map[string][]resourceInfo, len(runtime.Profiles))
-	for _, profile := range runtime.Profiles {
-		matcher := newProfileResourceMatcher(profile)
-		for _, resource := range resources {
-			if !matcher.matches(resource) {
-				continue
+func (c *Collector) matchProfileResources(profile *profileRuntime, candidates []resourceInfo) []resourceInfo {
+	matcher := newProfileResourceMatcher(profile)
+	debug := logger.Level.Enabled(slog.LevelDebug)
+	var matched []resourceInfo
+	var included, excluded []string
+	for _, resource := range candidates {
+		reason := matcher.exclusionReason(resource)
+		if reason == "" {
+			matched = append(matched, resource)
+			if debug && len(included) < diagnosticExampleLimit {
+				included = append(included, resource.diagnosticName())
 			}
-			result[profile.Name] = append(result[profile.Name], resource)
+		} else if debug && len(excluded) < diagnosticExampleLimit {
+			excluded = append(excluded, resource.diagnosticName()+" reason="+reason)
 		}
 	}
-	return result
+	if debug {
+		c.Debugf("discovery examples: profile=%s matched=%v excluded=%v", profile.Name, included, excluded)
+	}
+	return matched
 }
 
 func newProfileResourceMatcher(profile *profileRuntime) profileResourceMatcher {
-	matcher := profileResourceMatcher{
-		resourceType: stringsLowerTrim(profile.ResourceType),
-		profileName:  profile.Name,
-	}
+	var matcher profileResourceMatcher
 	if profile.Filters == nil {
 		return matcher
 	}
@@ -717,26 +728,23 @@ func newProfileResourceMatcher(profile *profileRuntime) profileResourceMatcher {
 	return matcher
 }
 
-func (m profileResourceMatcher) matches(resource resourceInfo) bool {
-	if stringsLowerTrim(resource.Type) != m.resourceType {
-		return false
-	}
+func (m profileResourceMatcher) exclusionReason(resource resourceInfo) string {
 	if len(m.resourceGroups) > 0 {
 		if _, ok := m.resourceGroups[stringsLowerTrim(resource.ResourceGroup)]; !ok {
-			return false
+			return "resource_group"
 		}
 	}
 	if len(m.regions) > 0 {
 		if _, ok := m.regions[normalizeRegion(resource.Region)]; !ok {
-			return false
+			return "region"
 		}
 	}
 	for _, tagFilter := range m.tagFilters {
 		if !resourceMatchesTag(resource, tagFilter) {
-			return false
+			return "tag"
 		}
 	}
-	return true
+	return ""
 }
 
 func resourceMatchesTag(resource resourceInfo, filter normalizedTagFilter) bool {
@@ -863,41 +871,4 @@ func sortResourceInfos(resources []resourceInfo) {
 			return 0
 		}
 	})
-}
-
-func equalResourceSlices(a, b []resourceInfo) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if !equalResourceInfo(a[i], b[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func equalResourceInfo(a, b resourceInfo) bool {
-	return a.SubscriptionID == b.SubscriptionID &&
-		a.ID == b.ID &&
-		a.UID == b.UID &&
-		a.Name == b.Name &&
-		a.Type == b.Type &&
-		a.ResourceGroup == b.ResourceGroup &&
-		a.Region == b.Region &&
-		a.HostScope.ScopeKey == b.HostScope.ScopeKey &&
-		equalResourceTags(a.Tags, b.Tags) &&
-		maps.Equal(a.Properties, b.Properties)
-}
-
-func equalResourceTags(a, b []resourceTag) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

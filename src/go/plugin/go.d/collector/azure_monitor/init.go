@@ -97,9 +97,8 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 
 	c.runtime = runtime
 	c.observations = newObservationState(runtime, c.store.Write().SnapshotMeter(""))
-	c.discovery = buildDiscoveryState(fetched.Resources, runtime, now, c.Discovery.RefreshEvery, 1, fetched)
+	c.applyDiscovery(fetched, now)
 	c.observations.reconcileResources(c.discovery.ByProfile)
-	c.warnDiscoveryScopeFallbacks(c.discovery, runtime)
 
 	return nil
 }

@@ -218,7 +218,10 @@ func TestDiscoveryState_WorkloadScopes(t *testing.T) {
 		},
 	}
 
-	state := buildDiscoveryState(resources, runtime, time.Unix(0, 0), 300, 7, discoveryFetchResult{})
+	c := New()
+	c.runtime = runtime
+	c.applyDiscovery(discoveryFetchResult{Resources: resources}, time.Unix(0, 0))
+	state := c.discovery
 	require.Len(t, state.Resources, 1)
 	scope := state.Resources[0].HostScope
 	require.False(t, scope.IsDefault())
@@ -226,9 +229,6 @@ func TestDiscoveryState_WorkloadScopes(t *testing.T) {
 	assert.Equal(t, scope.GUID, scope.ScopeKey)
 	assert.Equal(t, state.Resources, state.ByProfile["sql_database"])
 
-	changed := state.Resources[0]
-	changed.HostScope = metrix.HostScope{}
-	assert.False(t, equalResourceInfo(state.Resources[0], changed))
 }
 
 func TestParseStrictQueryDiscoveryRow_OptionalTags(t *testing.T) {
@@ -1774,14 +1774,16 @@ func TestCollector_WorkloadMode_UnsafeValueReportResetsPerRefresh(t *testing.T) 
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.runtime = runtime
 			for i, refresh := range tc.refreshes {
 				resource := base
 				resource.Tags = refresh.tags
 				fetchCounter := uint64(i + 1)
 
-				state := buildDiscoveryState([]resourceInfo{resource}, runtime, time.Unix(int64(fetchCounter), 0), 300, fetchCounter, discoveryFetchResult{})
+				c.applyDiscovery(discoveryFetchResult{Resources: []resourceInfo{resource}}, time.Unix(int64(fetchCounter), 0))
 
-				assert.Equal(t, refresh.wantUnsafe, state.UnsafeWorkloadValues)
+				assert.Equal(t, refresh.wantUnsafe, c.discovery.UnsafeWorkloadValues)
 			}
 		})
 	}

@@ -3,6 +3,7 @@
 package azure_monitor
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -79,8 +80,11 @@ type resourceInfo struct {
 	HostScope      metrix.HostScope
 }
 
-func (r resourceInfo) String() string {
-	return r.Name + " (" + r.Type + ")"
+// Limit examples in each diagnostic category independently of inventory size.
+const diagnosticExampleLimit = 3
+
+func (r resourceInfo) diagnosticName() string {
+	return fmt.Sprintf("%.80q[%s]", r.Name, r.UID)
 }
 
 type queryBatch struct {
@@ -102,6 +106,7 @@ type metricSample struct {
 }
 
 type queryBatchResult struct {
-	Samples []metricSample
-	Err     error
+	Diagnostics *batchDiagnostics
+	Samples     []metricSample
+	Err         error
 }
