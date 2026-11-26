@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Fail if any AArch64 executable or shared object under a directory still contains a Cortex-A53 erratum 843419
-# instruction sequence: either it was linked without --fix-cortex-a53-843419, or the linker missed the sequence.
+# instruction sequence. The usual causes are a link without --fix-cortex-a53-843419 and a sequence the linker missed
+# (see below); check_elf() lists the rarer ones.
 #
 # Static aarch64 builds run on Cortex-A53 boards (Raspberry Pi 3, ODROID-C2, ...). There an ADRP at page offset
 # 0xff8/0xffc followed by a load or store can use an address one page off, so a function pointer is loaded from the
@@ -275,8 +276,8 @@ def report(rel, is_go, hits):
     if is_go:
         print(f'NOTICE: {rel}: {len(hits)} sequence(s) in a Go binary (no Go linker workaround): {addrs}')
         return False
-    print(f'ERROR: {rel}: {len(hits)} sequence(s) left unpatched (linked without --fix-cortex-a53-843419, '
-          f'or missed by ld.bfd: binutils bug 34200): {addrs}')
+    print(f'ERROR: {rel}: {len(hits)} sequence(s) (linked without --fix-cortex-a53-843419, missed by ld.bfd as in '
+          f'binutils bug 34200, or inline data; see the script header): {addrs}')
     return True
 
 
