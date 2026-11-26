@@ -23,7 +23,7 @@ type client struct {
 }
 
 func New(cfg Config, log *logger.Logger) (Client, error) {
-	return newClient(cfg, log, &defaultRunner{log: ensureLogger(log)})
+	return newClient(cfg, log, newDefaultRunner(ensureLogger(log)))
 }
 
 func newClient(cfg Config, log *logger.Logger, runner probeRunner) (*client, error) {
