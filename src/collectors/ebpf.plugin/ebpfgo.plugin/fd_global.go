@@ -126,7 +126,7 @@ func emitFDGlobalChart(api *netdataapi.API, chart fdGlobalChart, updateEvery int
 // writeFDGlobal emits the cumulative counters.  No delta is computed here: the
 // dimensions are `incremental`, so the agent derives the rate itself and a
 // restart of this plugin cannot produce a spike.
-func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, usecSince int, reportErrors bool) {
+func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, sinceLast time.Duration, reportErrors bool) {
 	if api == nil {
 		return
 	}
@@ -134,7 +134,7 @@ func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, usecSi
 	pluginOutputMu.Lock()
 	defer pluginOutputMu.Unlock()
 
-	api.BEGIN(fdGlobalGroup, "file_descriptor", usecSince)
+	api.BEGIN(fdGlobalGroup, "file_descriptor", sinceLast)
 	api.SET("open", int64(snapshot.OpenCall))
 	api.SET("close", int64(snapshot.CloseCall))
 	api.END()
@@ -143,7 +143,7 @@ func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, usecSi
 		return
 	}
 
-	api.BEGIN(fdGlobalGroup, "file_error", usecSince)
+	api.BEGIN(fdGlobalGroup, "file_error", sinceLast)
 	api.SET("open", int64(snapshot.OpenErr))
 	api.SET("close", int64(snapshot.CloseErr))
 	api.END()
@@ -178,16 +178,16 @@ func runFDGlobalCollector(
 	}
 
 	lastCollection := time.Now()
-	collectAndPublish := func(usecSince int) {
+	collectAndPublish := func(sinceLast time.Duration) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, fdGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+			publishArenaDrops(api, fdGlobalModule, handle.Runtime.ArenaDropped(), sinceLast)
 		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("fd.snapshot", "fd", "snapshot", err)
 		} else {
-			writeFDGlobal(api, snapshot, usecSince, handle.ReportErrors)
+			writeFDGlobal(api, snapshot, sinceLast, handle.ReportErrors)
 		}
 
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
@@ -283,8 +283,8 @@ func runFDGlobalCollector(
 		}
 
 		now := time.Now()
-		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
+		sinceLast := now.Sub(lastCollection)
 		lastCollection = now
-		collectAndPublish(usecSince)
+		collectAndPublish(sinceLast)
 	}
 }

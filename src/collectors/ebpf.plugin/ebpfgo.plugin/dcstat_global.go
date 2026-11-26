@@ -162,7 +162,7 @@ func emitDCStatGlobalChart(api *netdataapi.API, chart dcstatGlobalChart, updateE
 	}
 }
 
-func (p dcstatGlobalPublish) write(api *netdataapi.API, usecSince int) {
+func (p dcstatGlobalPublish) write(api *netdataapi.API, sinceLast time.Duration) {
 	if api == nil {
 		return
 	}
@@ -170,11 +170,11 @@ func (p dcstatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 	pluginOutputMu.Lock()
 	defer pluginOutputMu.Unlock()
 
-	api.BEGIN(dcstatGlobalGroup, "dc_hit_ratio", usecSince)
+	api.BEGIN(dcstatGlobalGroup, "dc_hit_ratio", sinceLast)
 	api.SET("ratio", p.Ratio)
 	api.END()
 
-	api.BEGIN(dcstatGlobalGroup, "dc_reference", usecSince)
+	api.BEGIN(dcstatGlobalGroup, "dc_reference", sinceLast)
 	api.SET("reference", p.Reference)
 	api.SET("slow", p.Slow)
 	api.SET("miss", p.Miss)
@@ -211,9 +211,9 @@ func runDCStatGlobalCollector(
 
 	state := &dcstatGlobalState{}
 	lastCollection := time.Now()
-	collectAndPublish := func(usecSince int) {
+	collectAndPublish := func(sinceLast time.Duration) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, dcstatGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+			publishArenaDrops(api, dcstatGlobalModule, handle.Runtime.ArenaDropped(), sinceLast)
 		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
@@ -226,7 +226,7 @@ func runDCStatGlobalCollector(
 				Miss:      snapshot.Miss,
 			})
 			if ok {
-				publish.write(api, usecSince)
+				publish.write(api, sinceLast)
 			}
 		}
 
@@ -324,8 +324,8 @@ func runDCStatGlobalCollector(
 		}
 
 		now := time.Now()
-		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
+		sinceLast := now.Sub(lastCollection)
 		lastCollection = now
-		collectAndPublish(usecSince)
+		collectAndPublish(sinceLast)
 	}
 }

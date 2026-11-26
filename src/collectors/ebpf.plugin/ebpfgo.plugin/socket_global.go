@@ -150,9 +150,9 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 	}
 
-	collectAndPublish := func(usecSince int) {
+	collectAndPublish := func(sinceLast time.Duration) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, "socket", handle.Runtime.ArenaDropped(), usecSince)
+			publishArenaDrops(api, "socket", handle.Runtime.ArenaDropped(), sinceLast)
 		}
 		if shmPublisher == nil && shouldPublish && store != nil {
 			p, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
@@ -211,8 +211,8 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 
 		now := time.Now()
-		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
+		sinceLast := now.Sub(lastCollection)
 		lastCollection = now
-		collectAndPublish(usecSince)
+		collectAndPublish(sinceLast)
 	}
 }

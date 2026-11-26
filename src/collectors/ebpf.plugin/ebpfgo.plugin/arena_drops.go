@@ -1,6 +1,10 @@
 package main
 
-import "github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+import (
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+)
 
 // Arena drops are cumulative in BPF; the incremental dimension reports events/s.
 func createArenaDropsChart(api *netdataapi.API, module string, updateEvery int) {
@@ -33,14 +37,14 @@ func createArenaDropsChart(api *netdataapi.API, module string, updateEvery int) 
 	})
 }
 
-func publishArenaDrops(api *netdataapi.API, module string, dropped uint64, usecSince int) {
+func publishArenaDrops(api *netdataapi.API, module string, dropped uint64, sinceLast time.Duration) {
 	if api == nil {
 		return
 	}
 	pluginOutputMu.Lock()
 	defer pluginOutputMu.Unlock()
 
-	api.BEGIN("ebpf", module+"_arena_drops", usecSince)
+	api.BEGIN("ebpf", module+"_arena_drops", sinceLast)
 	api.SET("dropped", int64(dropped))
 	api.END()
 }

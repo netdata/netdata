@@ -316,6 +316,14 @@ Examples:
     `sim_test.go`, `dyncfg_collector_test.go`, and `dyncfg_vnode_test.go`.
 - Function/topology payloads:
   - schema validation tests in the affected collector or package.
+- Exported API changes:
+  - Go modules outside `src/go` import these packages through a
+    `replace github.com/netdata/netdata/go/plugins => ...` directive (today
+    `src/collectors/ebpf.plugin/ebpfgo.plugin`, which CMake builds on 64-bit
+    Linux). Find them with
+    `grep -rl 'netdata/netdata/go/plugins =>' --include=go.mod .` from the
+    repository root, search their callers, and build each one
+    (`GOOS=linux go build ./...` in its directory).
 
 Record exactly what ran. Full validation MUST NOT be claimed from a narrow
 command.

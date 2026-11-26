@@ -181,7 +181,7 @@ func emitCachestatGlobalChart(api *netdataapi.API, chart cachestatGlobalChart, u
 	})
 }
 
-func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
+func (p cachestatGlobalPublish) write(api *netdataapi.API, sinceLast time.Duration) {
 	if api == nil {
 		return
 	}
@@ -199,7 +199,7 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 		{chart: "cachestat_hits", dim: "hit", value: p.Hit},
 		{chart: "cachestat_misses", dim: "miss", value: p.Miss},
 	} {
-		api.BEGIN(cachestatGlobalGroup, item.chart, usecSince)
+		api.BEGIN(cachestatGlobalGroup, item.chart, sinceLast)
 		api.SET(item.dim, item.value)
 		api.END()
 	}
@@ -225,9 +225,9 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 
 	state := &cachestatGlobalState{}
 	lastCollection := time.Now()
-	collectAndPublish := func(usecSince int) {
+	collectAndPublish := func(sinceLast time.Duration) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, cachestatGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+			publishArenaDrops(api, cachestatGlobalModule, handle.Runtime.ArenaDropped(), sinceLast)
 		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
@@ -241,7 +241,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 				AccountPageDirtied: snapshot.AccountPageDirtied,
 			})
 			if ok {
-				publish.write(api, usecSince)
+				publish.write(api, sinceLast)
 			}
 		}
 
@@ -315,8 +315,8 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		}
 
 		now := time.Now()
-		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
+		sinceLast := now.Sub(lastCollection)
 		lastCollection = now
-		collectAndPublish(usecSince)
+		collectAndPublish(sinceLast)
 	}
 }

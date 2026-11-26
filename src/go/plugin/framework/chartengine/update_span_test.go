@@ -3,6 +3,7 @@
 package chartengine
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 const updateSpanYAML = `
@@ -82,6 +84,14 @@ func TestUpdateChartActionSinceLast(t *testing.T) {
 			{at: sec(95), write: []string{"a", "b"}, reset: true, want: spans("a", 0, "b", 0)},
 			{at: sec(105), write: []string{"a", "b"}, want: spans("a", 10, "b", 10)},
 		},
+		// Rejected plans keep c past its expiry; it returns with an unchanged
+		// definition, so it is kept and its span covers every undelivered cycle.
+		"chart kept past expiry by rejected plans": {
+			{at: sec(10), write: []string{"a", "c"}, want: spans("a", 0, "c", 0)},
+			{at: sec(20), write: []string{"a"}, abort: true, want: spans("a", 10), remove: []string{"c"}},
+			{at: sec(30), write: []string{"a"}, abort: true, want: spans("a", 20), remove: []string{"c"}},
+			{at: sec(40), write: []string{"a", "c"}, want: spans("a", 30, "c", 30)},
+		},
 		"revived chart starts without a span": {
 			{at: sec(10), write: []string{"a", "c"}, want: spans("a", 0, "c", 0)},
 			{at: sec(20), write: []string{"a", "c"}, want: spans("a", 10, "c", 10)},
@@ -119,6 +129,66 @@ func TestUpdateChartActionSinceLast(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A template transition keeps the charts of unchanged entries, with their
+// stamps, and re-creates the charts of changed entries without a span.
+func TestUpdateChartActionSinceLastTemplateTransition(t *testing.T) {
+	entry := func(id, title string) TemplateEntry {
+		spec, err := charttpl.DecodeYAML([]byte(fmt.Sprintf(`
+version: v1
+groups:
+  - family: Span
+    metrics: [%[1]s]
+    charts:
+      - id: %[1]s
+        title: %[2]s
+        context: %[1]s
+        units: v
+        dimensions:
+          - selector: %[1]s
+            name: %[1]s
+`, id, title)))
+		require.NoError(t, err)
+		return TemplateEntry{ID: id, ContextNamespace: "span", Groups: spec.Groups}
+	}
+	newSet := func(titleB string) *TemplateSet {
+		set, err := NewTemplateSet(TemplateSetSpec{
+			Entries:                  []TemplateEntry{entry("a", "A"), entry("b", titleB)},
+			FallbackContextNamespace: "span",
+		})
+		require.NoError(t, err)
+		return set
+	}
+	first, second := newSet("B"), newSet("B2")
+	engine, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	meter := store.Write().SnapshotMeter("")
+
+	var got []map[string]time.Duration
+	for i, set := range []*TemplateSet{first, first, second, second} {
+		cc.BeginCycle()
+		meter.Gauge("a").Observe(1)
+		meter.Gauge("b").Observe(1)
+		require.NoError(t, cc.CommitCycleSuccess())
+		attempt, err := engine.PreparePlanWithOptions(
+			store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
+			PlanOptions{TemplateSet: set, CollectedAt: time.Unix(int64(10*(i+1)), 0)},
+		)
+		require.NoError(t, err)
+		spans, _ := planSpans(attempt.Plan())
+		got = append(got, spans)
+		require.NoError(t, attempt.Commit())
+	}
+	want := []map[string]time.Duration{
+		{"a": 0, "b": 0},
+		{"a": 10 * time.Second, "b": 10 * time.Second},
+		{"a": 10 * time.Second, "b": 0},
+		{"a": 10 * time.Second, "b": 10 * time.Second},
+	}
+	assert.Equal(t, want, got)
 }
 
 // A runtime planner emits updates on every plan while the source sequence

@@ -263,14 +263,15 @@ output is rejected.
 - Each chart keeps the `CollectedAt` of its last emitted update, committed and rolled back with its attempt, so only
   accepted output counts. `SinceLast` is `CollectedAt` minus that stamp.
 - `SinceLast` is zero, so `BEGIN` carries no interval and the Agent measures the gap itself, for the first update of a
-  new chart, including revival, template transition, ownership change and `ResetMaterialized`, and when either time is
-  unknown.
+  new chart, including revival, a chart re-created by a template transition or ownership change, and
+  `ResetMaterialized`, and when either time is unknown. Charts a transition retains keep their stamps.
 - A plan with zero `CollectedAt` clears the stamps of the charts it updates, so their next span never covers a sample
   delivered without a time. A `CollectedAt` at or before the stamp (a wall-clock step back) gives zero and restamps.
 - Runtime planner mode stamps every emitted update, including updates of a repeated source sequence.
-- If an attempt commit fails after its output was written, those samples are delivered but unstamped; the next span
-  is too long, and the Agent ignores an interval beyond five update intervals. Only a stale attempt can fail to
-  commit, and the job and runtime emitters plan and commit one attempt at a time.
+- If an attempt commit fails after its output was written, those samples are delivered but unstamped, so the next
+  span is too long. The Agent checks only its own measured gap, so it trusts that span while the gap stays within five
+  update intervals and places the chart's later samples late. Only a stale attempt can fail to commit, and the job and
+  runtime emitters plan and commit one attempt at a time.
 - Gaps of single dimensions inside an updated chart are outside this contract: the protocol has one interval per chart.
 
 ## Routing and Collision Rules
