@@ -1221,14 +1221,17 @@ static size_t dictionary_gc_view_orphans_unittest(void) {
 //
 // The setup follows rrdset_free(): the name is deleted while referenced, the id item is then freed on
 // the master (which drops only its own link), and a later view collection runs the callback. Inside it,
-// another thread looks up a live name on the view and must finish while the callback is still running.
+// a lookup thread started before the collection looks up a live name on the view, and must finish while
+// the callback is still running.
 
 struct dict_gc_view_lookup_test {
     DICTIONARY *view;
-    ND_THREAD *thread;              // the lookup thread, joined after the collection returns
     const char *victim_value;
     const char *live_value;
     size_t deletes;
+    bool armed;                     // the callback releases the lookup only during the explicit collection
+    bool ready;                     // the lookup thread is running
+    bool go;                        // released: do the lookup
     bool lookup_done;               // written by the lookup thread
     bool lookup_found_live;         // written by the lookup thread
     bool lookup_done_in_callback;   // the lookup finished while the delete callback was running
@@ -1236,6 +1239,10 @@ struct dict_gc_view_lookup_test {
 
 static void dict_gc_view_lookup_thread(void *arg) {
     struct dict_gc_view_lookup_test *t = arg;
+
+    __atomic_store_n(&t->ready, true, __ATOMIC_RELEASE);
+    while(!__atomic_load_n(&t->go, __ATOMIC_ACQUIRE))
+        sleep_usec(1000);
 
     const char *value = dictionary_get(t->view, "NAME-B");
     __atomic_store_n(&t->lookup_found_live, value == t->live_value, __ATOMIC_RELAXED);
@@ -1250,17 +1257,16 @@ static void dict_gc_view_lookup_delete_callback(const DICTIONARY_ITEM *item __ma
 
     t->deletes++;
 
-    ND_THREAD *thread = nd_thread_create("dictviewlkp", NETDATA_THREAD_OPTION_DONT_LOG, dict_gc_view_lookup_thread, t);
+    if(!t->armed || __atomic_load_n(&t->go, __ATOMIC_RELAXED))
+        return;
+
+    __atomic_store_n(&t->go, true, __ATOMIC_RELEASE);
 
     usec_t deadline = now_monotonic_usec() + 2 * USEC_PER_SEC;
     while(!__atomic_load_n(&t->lookup_done, __ATOMIC_ACQUIRE) && now_monotonic_usec() < deadline)
         sleep_usec(1000);
 
     t->lookup_done_in_callback = __atomic_load_n(&t->lookup_done, __ATOMIC_ACQUIRE);
-
-    // a lookup blocked on the view's index lock finishes only once the collection releases it, so it
-    // cannot be joined here: the collection's caller joins it after the collection returns
-    __atomic_store_n(&t->thread, thread, __ATOMIC_RELEASE);
 }
 
 static size_t dictionary_gc_view_lookup_unittest(void) {
@@ -1300,12 +1306,21 @@ static size_t dictionary_gc_view_lookup_unittest(void) {
         errors++;
     }
 
-    // the view collection drops the last link and runs the callback
-    dictionary_garbage_collect(view);
+    // start the lookup thread outside any dictionary lock, and wait until it runs, so the callback's
+    // timer covers only the lookup
+    ND_THREAD *thread = nd_thread_create("dictviewlkp", NETDATA_THREAD_OPTION_DONT_LOG, dict_gc_view_lookup_thread, &t);
+    while(!__atomic_load_n(&t.ready, __ATOMIC_ACQUIRE))
+        sleep_usec(1000);
 
-    ND_THREAD *thread = __atomic_load_n(&t.thread, __ATOMIC_ACQUIRE);
-    if(thread)
-        nd_thread_join(thread);
+    // the view collection drops the last link and runs the callback, which releases the lookup
+    t.armed = true;
+    dictionary_garbage_collect(view);
+    t.armed = false;
+
+    // a lookup blocked on the view's index lock finishes once the collection releases it; release the
+    // thread anyway in case the callback never ran, so the join cannot hang
+    __atomic_store_n(&t.go, true, __ATOMIC_RELEASE);
+    nd_thread_join(thread);
 
     if(t.deletes != 1) {
         fprintf(stderr, "GC VIEW LOOKUP: expected exactly 1 delete callback from the view collection, got %zu\n", t.deletes);
