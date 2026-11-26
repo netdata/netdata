@@ -926,7 +926,6 @@ int main(int argc, char **argv) {
     program_name = PLUGIN_XENSTAT_NAME;
 
     nd_log_initialize_for_external_plugins(PLUGIN_XENSTAT_NAME);
-    netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------
     // parse command line parameters

@@ -1666,7 +1666,6 @@ static void plugin_send_and_exit(const char *keyword) {
 
 int main (int argc, char **argv) {
     nd_log_initialize_for_external_plugins("freeipmi.plugin");
-    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
 
