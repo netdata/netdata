@@ -19,13 +19,20 @@ static ULONG wmi_getsysteminfo_timeout_ms(void) {
     return (ULONG)v;
 }
 
-static IWbemClassObject *wmi_exec_single_row_query(const wchar_t *query_text, const char *caller) {
-    HRESULT init_hr = InitializeWMI();
-    if(FAILED(init_hr) || !nd_wmi.pSvc)
+// The returned row belongs to the connection in *wmi: release it before disconnecting.
+static IWbemClassObject *wmi_exec_single_row_query(ND_WMI *wmi, const wchar_t *query_text, const char *caller) {
+    // These probes run synchronously on the daemon startup path (before rrd_init()). The connect is bounded by
+    // nd_wmi_connect(), the row fetch below by the startup timeout.
+    const char *failed_step = NULL;
+    HRESULT hr = nd_wmi_connect(wmi, L"ROOT\\CIMV2", &failed_step);
+    if(FAILED(hr)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "%s %s. Error code = 0x%X",
+               caller, failed_step ? failed_step : "WMI connect failed", hr);
         return NULL;
+    }
 
     IEnumWbemClassObject *pEnumerator = NULL;
-    HRESULT hr = nd_wmi_exec_query(nd_wmi.pSvc, query_text, &pEnumerator);
+    hr = nd_wmi_exec_query(wmi->pSvc, query_text, &pEnumerator);
     if(FAILED(hr)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "%s WMI query failed. Error code = 0x%X", caller, hr);
@@ -58,17 +65,20 @@ bool GetWin32ComputerSystemInfo(Win32ComputerSystemInfo *out) {
     if(!out) return false;
     memset(out, 0, sizeof(*out));
 
+    // One-shot probe: connect, read and disconnect on this thread, so no COM reference outlives the call.
+    ND_WMI wmi = { 0 };
     IWbemClassObject *pclsObj = wmi_exec_single_row_query(
+        &wmi,
         L"SELECT Model, Manufacturer FROM Win32_ComputerSystem",
         "GetWin32ComputerSystemInfo()");
-    if(!pclsObj)
-        return false;
-
-    nd_wmi_get_string_property(pclsObj, L"Model", out->Model, sizeof(out->Model));
-    nd_wmi_get_string_property(pclsObj, L"Manufacturer", out->Manufacturer, sizeof(out->Manufacturer));
-    out->Populated = true;
-    pclsObj->lpVtbl->Release(pclsObj);
-    return true;
+    if(pclsObj) {
+        nd_wmi_get_string_property(pclsObj, L"Model", out->Model, sizeof(out->Model));
+        nd_wmi_get_string_property(pclsObj, L"Manufacturer", out->Manufacturer, sizeof(out->Manufacturer));
+        out->Populated = true;
+        pclsObj->lpVtbl->Release(pclsObj);
+    }
+    nd_wmi_disconnect(&wmi);
+    return out->Populated;
 }
 
 #endif

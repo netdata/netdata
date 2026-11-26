@@ -9,13 +9,23 @@
 #define WMI_DISKDRIVE_ENUM_TIMEOUT_MS 5000
 
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
-    HRESULT init_hr = InitializeWMI();
-    if (FAILED(init_hr) || !nd_wmi.pSvc) return 0;
+    // The connection lives only for this call: it is rare (first sight of a disk), and the COM reference it takes
+    // must be released on this thread.
+    ND_WMI wmi = { 0 };
+    const char *failed_step = NULL;
+
+    HRESULT hr = nd_wmi_connect(&wmi, L"ROOT\\CIMV2", &failed_step);
+    if (FAILED(hr)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetDiskDriveInfo() %s. Error code = 0x%X",
+               failed_step ? failed_step : "WMI connect failed", hr);
+        return 0;
+    }
 
     IEnumWbemClassObject *pEnumerator = NULL;
-    HRESULT hr = nd_wmi_exec_query(nd_wmi.pSvc, L"SELECT Index, Model, DeviceID FROM Win32_DiskDrive", &pEnumerator);
+    hr = nd_wmi_exec_query(wmi.pSvc, L"SELECT Index, Model, DeviceID FROM Win32_DiskDrive", &pEnumerator);
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetDiskDriveInfo() WMI query failed. Error code = 0x%X", hr);
+        nd_wmi_disconnect(&wmi);
         return 0;
     }
 
@@ -63,7 +73,7 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     }
 
     pEnumerator->lpVtbl->Release(pEnumerator);
-
+    nd_wmi_disconnect(&wmi);
     return index;
 }
 

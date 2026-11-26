@@ -4,8 +4,6 @@
 
 #if defined(OS_WINDOWS)
 
-__thread ND_WMI nd_wmi = { 0 };
-
 void wmi_bstr_to_multibyte(char *dst, size_t dst_size, BSTR src)
 {
     if (!dst_size)
@@ -194,21 +192,6 @@ void nd_wmi_cancel(ND_WMI *wmi, usec_t max_wait_ut) {
 
     if (SUCCEEDED(com_hr))
         CoUninitialize();
-}
-
-HRESULT InitializeWMI(void) {
-    // These probes run synchronously on the daemon startup path (before rrd_init()). The query iteration is
-    // time-bounded (Next() in the GetSystemInfo helper); the connect is bounded by nd_wmi_connect().
-    const char *failed_step = NULL;
-    HRESULT hr = nd_wmi_connect(&nd_wmi, L"ROOT\\CIMV2", &failed_step);
-    if (FAILED(hr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "%s. Error code = 0x%X", failed_step ? failed_step : "WMI connect failed", hr);
-
-    return hr;
-}
-
-void CleanupWMI(void) {
-    nd_wmi_disconnect(&nd_wmi);
 }
 
 HRESULT nd_wmi_exec_query(IWbemServices *svc, const wchar_t *query_text, IEnumWbemClassObject **enumerator) {
