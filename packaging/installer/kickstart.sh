@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0533
+# Next unused error code: F0534
 
 # ======================================================================
 # Constants
@@ -52,7 +52,6 @@ FORUM_URL="https://community.netdata.cloud/"
 INSTALL_DOC_URL="https://learn.netdata.cloud/docs/install-the-netdata-agent/one-line-installer-for-all-linux-systems"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
-RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
 STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
 PREVIEW_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/preview"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
@@ -738,7 +737,9 @@ handle_http_status() {
   warn_msg="Server returned ${status} when ${action} ${url}"
   case "${status}" in
     404)
-      warning "File not found when ${action} ${url}"
+      if [ "${NETDATA_QUIET_NOT_FOUND}" != 1 ]; then
+        warning "File not found when ${action} ${url}"
+      fi
       return 1
       ;;
     4*)
@@ -912,25 +913,91 @@ download() {
   fatal "${ERROR_F0003}" F0003
 }
 
+# Prints the newest published version (without the leading 'v') of the given
+# major version in the given channel, 'NONE' if no version metadata for that
+# major version is published in the channel, or an empty string if the lookup
+# itself failed.
+#
+# Per-major version files are only published for non-nightly channels, so a
+# missing per-major file falls back to the channel-wide latest version, which
+# is accepted only if it matches. The per-major file is missing when the check
+# reports it absent, or its download returns not found after the check was
+# skipped with NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT non-empty.
+#
+# Everything else is a lookup failure: any other check or download failure, a
+# version file that is not exactly one version line, and a per-major file that
+# names another major version (inconsistent published metadata).
 get_actual_version() {
-    major="${1}"
-    channel="${2}"
-    url="${RELEASE_INFO_URL}/${channel}/${major}"
-    old_pwd="${PWD}"
-    set_tmpdir
-    cd "${old_pwd}" || true
-    tmp_file="${tmpdir}/version-info"
+  major="${1}"
+  channel="${2}"
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || true
+  tmp_file="${tmpdir}/version-info"
+  major_url="${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/${major}/Version"
+  latest_url="${RELEASE_ARTIFACT_URL_PREFIX}/${channel}/latest/Version"
 
-    if check_for_remote_file "${RELEASE_INFO_URL}"; then
-        if check_for_remote_file "${url}"; then
-            download "${url}" "${tmp_file}"
-            cat "${tmp_file}"
-        else
-            echo "NONE"
-        fi
+  # The latest iteration always returns; ending without output reads as a failed lookup.
+  for version_url in "${major_url}" "${latest_url}"; do
+    if [ "${version_url}" = "${major_url}" ]; then
+      # A per-major 404 is expected; keep other diagnostics on stderr.
+      NETDATA_QUIET_NOT_FOUND=1
+      check_for_remote_file "${version_url}"
+      check_ret="${?}"
+      unset NETDATA_QUIET_NOT_FOUND
     else
-        echo ""
+      check_for_remote_file "${version_url}"
+      check_ret="${?}"
     fi
+
+    if [ "${check_ret}" -eq 1 ] && [ "${version_url}" = "${major_url}" ]; then
+      continue
+    elif [ "${check_ret}" -ne 0 ]; then
+      echo ""
+      return
+    fi
+
+    # Reading the version file is read-only, so it is also done for dry runs.
+    if [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ] && [ "${version_url}" = "${major_url}" ]; then
+      # With the check skipped, a missing per-major file is still expected.
+      NETDATA_QUIET_NOT_FOUND=1
+    fi
+    download "${version_url}" "${tmp_file}" force
+    download_ret="${?}"
+    unset NETDATA_QUIET_NOT_FOUND
+    if [ "${download_ret}" -ne 0 ]; then
+      if [ "${download_ret}" -eq 1 ] &&
+        [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ] &&
+        [ "${version_url}" = "${major_url}" ]; then
+        continue
+      fi
+
+      echo ""
+      return
+    fi
+
+    # Command substitution would hide trailing blank lines.
+    if [ "$(awk 'END { print NR }' "${tmp_file}")" -ne 1 ]; then
+      echo ""
+      return
+    fi
+
+    found_version="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "${tmp_file}")"
+    found_version="${found_version#v}"
+    if ! printf '%s\n' "${found_version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+      echo ""
+      return
+    fi
+
+    if [ "${found_version%%.*}" = "${major}" ]; then
+      echo "${found_version}"
+    elif [ "${version_url}" = "${major_url}" ]; then
+      echo ""
+    else
+      echo "NONE"
+    fi
+    return
+  done
 }
 
 get_redirect() {
@@ -2112,7 +2179,7 @@ common_rpm_opts() {
   pkg_suffix=".noarch"
   pkg_vsep="-"
   INSTALL_TYPE="binpkg-rpm"
-  NATIVE_VERSION="${native_install_version:+"-${native_install_version}.${SYSARCH}"}"
+  NATIVE_VERSION="${native_install_version:+"-${native_install_version}"}"
 }
 
 common_dnf_opts() {
@@ -2137,6 +2204,9 @@ configure_native_package_manager() {
   native_install_version="${INSTALL_VERSION}"
   if [ "${SELECTED_RELEASE_CHANNEL}" = preview ]; then
     native_install_version="$(printf '%s' "${INSTALL_VERSION}" | sed 's/-/~/')"
+  else
+    # Artifact metadata spells nightly versions X.Y.Z-N-nightly, but the native repositories publish X.Y.Z.N.nightly.
+    native_install_version="$(printf '%s' "${INSTALL_VERSION}" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-nightly$/\1.\2.nightly/')"
   fi
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
@@ -3070,23 +3140,33 @@ handle_major_version() {
     return
   fi
 
-  actual_version="$(get_actual_version "v${INSTALL_MAJOR_VERSION}" "${RELEASE_CHANNEL}")"
+  # Accept both '2' and 'v2'.
+  major_version="${INSTALL_MAJOR_VERSION#v}"
+
+  case "${major_version}" in
+    ""|*[!0-9]*)
+      fatal "Invalid major version '${INSTALL_MAJOR_VERSION}'. It must be a number, for example '2' or 'v2'." F0533
+      ;;
+  esac
+
+  actual_version="$(get_actual_version "${major_version}" "${SELECTED_RELEASE_CHANNEL}")"
 
   if [ -z "${actual_version}" ]; then
     if [ "${INTERACTIVE}" -eq 0 ]; then
-      fatal "Could not determine the lastest releaase in channel '${RELEASE_CHANNEL}' with major version '${INSTALL_MAJOR_VERSION}'" F0517
+      fatal "Could not determine the latest release in channel '${SELECTED_RELEASE_CHANNEL}' with major version '${major_version}'" F0517
     else
-      if confirm "Unable to determine the correct version to install for major version '${INSTALL_MAJOR_VERSION}'. ${CONTINUE_INSTALL_PROMPT}"; then
+      if confirm "Unable to determine the correct version to install for major version '${major_version}'. ${CONTINUE_INSTALL_PROMPT}"; then
         progress "User requested continuing the install with the latest version."
       else
         fatal "Cancelling installation at user request." F0518
       fi
     fi
   elif [ "${actual_version}" = 'NONE' ]; then
+    no_metadata_msg="No version metadata for major version '${major_version}' is published in the '${SELECTED_RELEASE_CHANNEL}' channel."
     if [ "${INTERACTIVE}" -eq 0 ]; then
-      warning "No releases with major version '${INSTALL_MAJOR_VERSION}' have been published. Continuing the install with the latest version instead."
+      warning "${no_metadata_msg} Continuing the install with the latest version instead."
     else
-      if confirm "No releases with major version '${INSTALL_MAJOR_VERSION}' have been published. ${CONTINUE_INSTALL_PROMPT}"; then
+      if confirm "${no_metadata_msg} ${CONTINUE_INSTALL_PROMPT}"; then
         progress "User requested continuing the install with the latest version."
       else
         fatal "Cancelling installation at user request." F0519

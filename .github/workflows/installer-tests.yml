@@ -55,6 +55,8 @@ jobs:
             .github/ISSUE_TEMPLATE/BUG_REPORT.yml
             packaging/installer/netdata-support-bundle*
             packaging/installer/functions.sh
+            packaging/installer/kickstart.sh
+            packaging/installer/tests/test_kickstart_*.py
             packaging/installer/tests/test_support_bundle.py
             packaging/installer/tests/test_snmp_diagnostics.py
             packaging/installer/tests/test_install_state.py
@@ -164,6 +166,7 @@ jobs:
             fi
           }
           trap stop_fixture EXIT
+          # shellcheck disable=SC2016 # Expanded by the inner shell.
           "$fixture_root_bin" -c 'python3 "$1" "$2" & child=$!; echo "$child" > "$3"; wait' \
             fixture-root "$fixture_child_script" "$fixture_port_file" "$fixture_child_pid_file" &
           fixture_root_pid=$!
@@ -467,6 +470,8 @@ jobs:
       - name: Run install state tests
         run:
           python3 -m unittest discover packaging/installer/tests test_install_state.py -v
+      - name: Run kickstart fixtures
+        run: python3 -B -m unittest discover -s packaging/installer/tests -p 'test_kickstart_*.py' -v
 
   ipmi-delivery:
     needs: changes

@@ -91,6 +91,30 @@ deferred_warnings() { :; }
 main
 ''')
 
+    def native_install(self, distro, version_id, codename, channel, install_version):
+        """Run try_package_install; returns its summary lines, the package manager calls and the checked URLs."""
+        result = self.shell(f'''
+DISTRO_COMPAT_NAME={distro}
+SYSVERSION={version_id}
+SYSCODENAME={codename}
+SELECTED_RELEASE_CHANNEL={channel}
+INSTALL_VERSION={install_version}
+check_for_remote_file() {{ echo "$1" >> urls; return 0; }}
+download() {{ echo "$1" >> urls; return 0; }}
+cleanup_apt_state() {{ :; }}
+cleanup_dnf_state() {{ :; }}
+cleanup_zypper_state() {{ :; }}
+check_special_native_deps() {{ return 0; }}
+netdata_avail_check() {{ return 0; }}
+try_package_install >/dev/null
+printf '%s\\n' "$repoconfig_name" "$REPO_URL_PREFIX" "$NATIVE_VERSION" "$repoconfig_url" "$INSTALL_VERSION"
+''')
+        calls = (self.root / 'calls').read_text()
+        urls = (self.root / 'urls').read_text()
+        (self.root / 'calls').unlink()
+        (self.root / 'urls').unlink()
+        return result.stdout.splitlines(), calls, urls
+
     def test_native_repository_and_version_selection(self):
         for distro, version_id, codename, suffix in [
             ('debian', '12', 'bookworm', '_all.deb'),
@@ -102,38 +126,38 @@ main
                 ('stable', '', 'stable'), ('nightly', '-edge', 'edge'),
             ]:
                 with self.subTest(distro=distro, channel=channel):
-                    result = self.shell(f'''
-DISTRO_COMPAT_NAME={distro}
-SYSVERSION={version_id}
-SYSCODENAME={codename}
-SELECTED_RELEASE_CHANNEL={channel}
-INSTALL_VERSION=2.13.0-rc1
-check_for_remote_file() {{ echo "$1" >> urls; return 0; }}
-download() {{ echo "$1" >> urls; return 0; }}
-cleanup_apt_state() {{ :; }}
-cleanup_dnf_state() {{ :; }}
-cleanup_zypper_state() {{ :; }}
-check_special_native_deps() {{ return 0; }}
-netdata_avail_check() {{ return 0; }}
-try_package_install >/dev/null
-printf '%s\\n' "$repoconfig_name" "$REPO_URL_PREFIX" "$NATIVE_VERSION" "$repoconfig_url"
-''')
-                    lines = result.stdout.splitlines()
+                    lines, calls, urls = self.native_install(distro, version_id, codename, channel, '2.13.0-rc1')
                     self.assertEqual(lines[0], f'netdata-repo{repo_suffix}')
                     self.assertEqual(lines[1], f'https://repository.netdata.cloud/repos/{repo_path}')
                     native_version = '2.13.0~rc1' if channel == 'preview' else '2.13.0-rc1'
-                    expected_version = f'={native_version}' if distro == 'debian' else f'-{native_version}.x86_64'
+                    expected_version = f'={native_version}' if distro == 'debian' else f'-{native_version}'
                     self.assertEqual(lines[2], expected_version)
                     self.assertIn(f'netdata-repo{repo_suffix}', lines[3])
                     self.assertTrue(lines[3].endswith(suffix))
                     self.assertIn('5-6', lines[3])
-                    calls = (self.root / 'calls').read_text()
                     self.assertIn(f'netdata{lines[2]}', calls)
-                    urls = (self.root / 'urls').read_text()
                     self.assertIn(f'/repos/{repo_path}/', urls)
                     self.assertIn('.currently.published', urls)
-                    (self.root / 'calls').unlink()
-                    (self.root / 'urls').unlink()
+
+    # Artifact metadata spells nightly versions X.Y.Z-N-nightly, the native repositories X.Y.Z.N.nightly.
+    def test_native_package_pin_uses_repository_version_spelling(self):
+        cases = {
+            'nightly artifact version': ('nightly', '2.13.0-54-nightly', '2.13.0.54.nightly'),
+            'native nightly version': ('nightly', '2.13.0.54.nightly', '2.13.0.54.nightly'),
+            'stable version': ('stable', '2.13.0', '2.13.0'),
+        }
+        for distro, version_id, codename in [('debian', '12', 'bookworm'), ('fedora', '43', ''),
+                                             ('opensuse', '15.6', '')]:
+            separator = '=' if distro == 'debian' else '-'
+            for name, (channel, install_version, native_version) in cases.items():
+                with self.subTest(distro=distro, case=name):
+                    lines, calls, _ = self.native_install(distro, version_id, codename, channel, install_version)
+                    self.assertEqual(lines[2], f'{separator}{native_version}')
+                    # Static and source installs still need the artifact spelling.
+                    self.assertEqual(lines[4], install_version)
+                    packages = [call.split()[-1] for call in calls.splitlines()
+                                if call.split()[-1].startswith('netdata')]
+                    self.assertEqual(packages, [f'netdata{separator}{native_version}'])
 
     def test_repository_cleanup(self):
         for function in ('cleanup_apt_state', 'cleanup_dnf_state', 'cleanup_zypper_state'):
