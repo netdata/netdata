@@ -1,5 +1,5 @@
 ---
-# Upload the kickstart script to the repo server
+# Upload the kickstart script to the repo servers and R2
 name: Upload Kickstart Script
 on:
   push:
@@ -9,19 +9,24 @@ on:
       - .github/workflows/kickstart-upload.yml
       - packaging/installer/kickstart.sh
   workflow_dispatch: null
-concurrency:
-  group: kickstart-upload
-  cancel-in-progress: true
 jobs:
   upload:
     name: Upload Kickstart Script
     runs-on: ubuntu-latest
-    if: github.repository == 'netdata/netdata'
+    if: github.repository == 'netdata/netdata' && github.ref == 'refs/heads/master'
+    # Job-level so a skipped non-master dispatch cannot cancel a publishing run.
+    concurrency:
+      group: kickstart-upload
+      cancel-in-progress: true
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # A rerun keeps the original GITHUB_SHA; always publish the current master tip so a
+          # rerun of an older run cannot roll the public script back. All writes and the
+          # verify step below use this checkout.
+          ref: refs/heads/master
           fetch-depth: 1
       - name: SSH setup
         id: ssh-setup
@@ -37,6 +42,32 @@ jobs:
       - name: Upload to packages2.netdata.cloud
         id: upload-packages2
         run: rsync -vp packaging/installer/kickstart.sh netdatabot@packages2.netdata.cloud:/home/netdatabot/incoming/kickstart.sh
+      - name: Install Rclone
+        id: install-rclone
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        # Pinned, checksum-verified rclone; the APT build fails its post-upload HEAD on versioned PUTs.
+        run: bash .github/scripts/install-rclone.sh
+      - name: Upload to R2
+        id: upload-r2
+        if: ${{ !cancelled() && steps.install-rclone.outcome == 'success' }}
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        run: |
+          rclone copyto --verbose --s3-no-check-bucket --checksum \
+            --header-upload "Cache-Control: no-transform" \
+            packaging/installer/kickstart.sh s3:netdata-agent-repository/kickstart.sh
+      - name: Verify public kickstart SHA-256
+        if: ${{ !cancelled() && steps.upload-r2.outcome == 'success' }}
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 60 https://repository.netdata.cloud/kickstart.sh -o "$RUNNER_TEMP/kickstart-public.sh"
+          local_sha="$(sha256sum packaging/installer/kickstart.sh | awk '{print $1}')"
+          public_sha="$(sha256sum "$RUNNER_TEMP/kickstart-public.sh" | awk '{print $1}')"
+          test "$local_sha" = "$public_sha"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -45,11 +76,13 @@ jobs:
           SLACK_TITLE: 'Kickstart upload failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Failed to upload updated kickstart script to repo server.
+              ${{ github.repository }}: Failed to upload updated kickstart script to repo servers and R2.
               Checkout: ${{ steps.checkout.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Upload to packages.netdata.cloud: ${{ steps.upload-primary.outcome }}
               Upload to packages2.netdata.cloud: ${{ steps.upload-packages2.outcome }}
+              Install Rclone: ${{ steps.install-rclone.outcome }}
+              Upload to R2: ${{ steps.upload-r2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
