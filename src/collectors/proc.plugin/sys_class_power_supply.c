@@ -54,7 +54,7 @@ void power_supply_free(struct power_supply *ps) {
                 freez(pd->name);
                 freez(pd->filename);
                 if(likely(pd->fd != -1)) close(pd->fd);
-                files_num--;
+                if(likely(!pd->always_zero)) files_num--;
                 struct ps_property_dim *d = pd;
                 pd = pd->next;
                 freez(d);
@@ -246,6 +246,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             struct ps_property_dim *pd;
                             pd= callocz(sizeof(struct ps_property_dim), 1);
                             pd->name = strdupz(ps_property_dim_names[pr_idx * 5 + 1]);
+                            pd->fd = -1;
                             pd->always_zero = 1;
                             pd->next = pr->property_dim_root;
                             pr->property_dim_root = pd;
