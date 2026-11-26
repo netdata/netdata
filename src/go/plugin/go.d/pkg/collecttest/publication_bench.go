@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -50,6 +51,7 @@ type publicationBench struct {
 	aggregator *chartengine.RuntimeAggregator
 	buf        bytes.Buffer
 	api        *netdataapi.API
+	clock      netdataapi.SampleClock
 }
 
 func newPublicationBench(b *testing.B, collector interface {
@@ -113,6 +115,7 @@ func (p *publicationBench) cycle(b *testing.B, collect func(context.Context) err
 		b.Fatalf("collecttest: commit: %v", err)
 	}
 	updates := 0
+	sample := p.clock.Next(time.Now())
 	reader := p.store.Read(metrix.ReadFlatten()).(metrix.FreshVisibleHostScopesReader)
 	for _, scope := range reader.FreshVisibleHostScopes() {
 		engine := p.engines[scope.ScopeKey]
@@ -138,6 +141,7 @@ func (p *publicationBench) cycle(b *testing.B, collect func(context.Context) err
 		env := chartemit.EmitEnv{
 			TypeID:      "bench.job",
 			UpdateEvery: 1,
+			CollectedAt: sample,
 		}
 		if !scope.IsDefault() {
 			env.HostScope = &chartemit.HostScope{

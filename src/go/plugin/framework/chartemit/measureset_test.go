@@ -250,6 +250,7 @@ func emitMeasureSetAvailability(
 	defer attempt.Abort()
 	var wire bytes.Buffer
 	require.NoError(t, ApplyPlan(netdataapi.New(&wire), attempt.Plan(), EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		HostScope:   host,
@@ -276,7 +277,7 @@ func measureSetWireSamples(t *testing.T, wire string) map[string]map[string]stri
 			_, exists := samples[chart][parts[1]]
 			require.False(t, exists, "duplicate SET: %s", wire)
 			samples[chart][parts[1]] = strings.TrimSpace(strings.TrimPrefix(parts[2], " ="))
-		case line == "END":
+		case line == "END" || strings.HasPrefix(line, "END "):
 			chart = ""
 		}
 	}

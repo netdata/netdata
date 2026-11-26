@@ -33,14 +33,14 @@ func createArenaDropsChart(api *netdataapi.API, module string, updateEvery int) 
 	})
 }
 
-func publishArenaDrops(api *netdataapi.API, module string, dropped uint64, usecSince int) {
+func publishArenaDrops(api *netdataapi.API, module string, dropped uint64, sample netdataapi.SampleTime) {
 	if api == nil {
 		return
 	}
 	pluginOutputMu.Lock()
 	defer pluginOutputMu.Unlock()
 
-	api.BEGIN("ebpf", module+"_arena_drops", usecSince)
+	api.BEGIN("ebpf", module+"_arena_drops")
 	api.SET("dropped", int64(dropped))
-	api.END()
+	api.ENDTimed(sample)
 }

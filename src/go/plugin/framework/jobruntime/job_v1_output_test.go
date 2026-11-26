@@ -8,7 +8,6 @@ import (
 	"maps"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -84,14 +83,12 @@ func TestV1WriteFailurePreservesCommittedEmission(t *testing.T) {
 				job.runOnce()
 			}
 			type committed struct {
-				guid                 string
-				owner                *hostoutput.Owner
-				info                 netdataapi.HostInfo
-				charts               jobV1ChartInventory
-				published            bool
-				statusAt, durationAt time.Time
-				prev                 time.Time
-				priority             int
+				guid      string
+				owner     *hostoutput.Owner
+				info      netdataapi.HostInfo
+				charts    jobV1ChartInventory
+				published bool
+				priority  int
 			}
 			snapshot := func() committed {
 				return committed{
@@ -100,9 +97,6 @@ func TestV1WriteFailurePreservesCommittedEmission(t *testing.T) {
 					job.hostDefinition.Info(),
 					maps.Clone(job.hostCharts),
 					job.selfMetrics.published,
-					job.selfMetrics.statusAt,
-					job.selfMetrics.durationAt,
-					job.prevRun,
 					job.priority,
 				}
 			}

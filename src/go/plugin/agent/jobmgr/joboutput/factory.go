@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -70,6 +71,7 @@ type FactoryConfig struct {
 	ConfigModules   *ConfigModuleFactory                          // resolved config application and short-lived probes
 	Runtime         runtimecomp.Service                           // V2 runtime service dependency
 	Publication     *hostoutput.Publisher                         // shared host metadata publisher for V1 and V2 jobs
+	SampleClock     *netdataapi.SampleClock                       // process sample clock for V1 and V2 jobs
 	Vnode           func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
 	HandlerStager   JobHandlerStager                              // run-detached Function-handler staging
 	HandlerAttacher JobHandlerAttacher                            // run-owned Function publication attachment
@@ -522,6 +524,7 @@ func (f *Factory) buildV1(
 	}
 	jobConfig := jobruntime.JobConfig{
 		Publication:     f.config.Publication,
+		SampleClock:     f.config.SampleClock,
 		PluginName:      f.config.PluginName,
 		Name:            config.Name(),
 		ModuleName:      config.Module(),
@@ -619,6 +622,7 @@ func (f *Factory) buildV2(
 		StoreFirst:      creator.StoreFirst,
 		RuntimeService:  runtimeStage,
 		Publication:     f.config.Publication,
+		SampleClock:     f.config.SampleClock,
 	}
 	if redactLifecycle {
 		jobConfig.LifecycleErrorSanitizer = redactResolvedLifecycleError

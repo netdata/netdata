@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) bool {
+func (tx *jobV1Emission) processMetrics(mx collectedMetrics) bool {
 	j := tx.job
 	createCharts := j.hostGUID != tx.guid
 	// pluginsd_validate_machine_guid in src/plugins.d/pluginsd_parser.c canonicalizes
@@ -40,7 +40,7 @@ func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) b
 		if chart.IsRemoved() {
 			tx.pruneCharts = true
 		} else if len(mx.intMetrics)+len(mx.floatMetrics) > 0 && !chart.Obsolete {
-			if tx.updateChart(&change, mx, sinceLastRun) {
+			if tx.updateChart(&change, mx) {
 				updated++
 			}
 		}
@@ -50,7 +50,7 @@ func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) b
 		j.buf.Reset()
 	}
 	tx.hostBytes = j.buf.Len()
-	tx.self = j.selfMetrics.prepare(j.api, tx.started, elapsed, updated > 0, createCharts)
+	tx.self = j.selfMetrics.prepare(j.api, tx.sample, elapsed, updated > 0, createCharts)
 	return updated > 0
 }
 
@@ -133,7 +133,9 @@ func (tx *jobV1Emission) createChart(change *jobV1ChartChange) {
 	_ = j.api.EMPTYLINE()
 }
 
-func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetrics, sinceLastRun int) bool {
+// updateChart writes the chart's sample, timed at the run's start; a SkipGaps
+// chart without values sends none.
+func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetrics) bool {
 	j := tx.job
 	chart := change.chart
 	if change.ignored {
@@ -146,7 +148,6 @@ func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetri
 		return false
 	}
 
-	// Handle SkipGaps: check if any dimension has data
 	if chart.SkipGaps {
 		hasData := false
 		for _, dim := range chart.Dims {
@@ -158,16 +159,11 @@ func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetri
 			}
 		}
 		if !hasData {
-			// No dimensions have data - skip this chart entirely
 			return false
 		}
-		// At least one dimension has data - proceed with deltaTime=0
-		sinceLastRun = 0
-	} else if !chart.IsUpdated() {
-		sinceLastRun = 0
 	}
 
-	j.api.BEGIN(change.typeID, change.id, sinceLastRun)
+	j.api.BEGIN(change.typeID, change.id)
 
 	var updated int
 	for _, dim := range chart.Dims {
@@ -197,13 +193,12 @@ func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetri
 		}
 	}
 
-	j.api.END()
+	j.api.ENDTimed(tx.sample)
 
-	change.updated = updated > 0
-	if change.updated {
+	if updated > 0 {
 		change.retries = 0
 	} else {
 		change.retries++
 	}
-	return change.updated
+	return updated > 0
 }

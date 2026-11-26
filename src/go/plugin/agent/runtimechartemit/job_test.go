@@ -88,7 +88,7 @@ func TestRuntimeMetricsJobStartStopLifecycle(t *testing.T) {
 			})
 
 			out := &safeBuffer{}
-			job := newRuntimeMetricsJob(out, reg, nil)
+			job := newRuntimeMetricsJob(out, reg, nil, nil)
 
 			done := make(chan struct{})
 			go func() {
@@ -128,7 +128,7 @@ func TestRuntimeMetricsJobTickSkipWhenBusy(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil)
+			job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil, nil)
 
 			// Fill single-slot queue to force skip path.
 			job.tick <- 1
@@ -166,7 +166,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 					},
 				})
 
-				job := newRuntimeMetricsJob(failingWriter{}, reg, nil)
+				job := newRuntimeMetricsJob(failingWriter{}, reg, nil, nil)
 				job.runOnce(1)
 
 				state := job.components["component"]
@@ -178,7 +178,6 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 
 				state = job.components["component"]
 				require.NotNil(t, state)
-				require.False(t, state.prev.IsZero())
 				require.NotEmpty(t, state.knownCharts)
 				requireInOrder(
 					t,
@@ -242,7 +241,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 					},
 				})
 
-				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil)
+				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil, nil)
 				current := &runtimeComponentState{
 					spec: componentSpec{
 						Name:       "component",
@@ -255,7 +254,6 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 							JobName:     "component",
 						},
 					},
-					prev: time.Unix(1, 0),
 					knownCharts: map[string]chartengine.ChartMeta{
 						"component_load": {
 							Title:   "Component Load",
@@ -274,7 +272,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 		},
 		"removal keeps old state when obsolete emit fails": {
 			run: func(t *testing.T) {
-				job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil)
+				job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil, nil)
 				current := &runtimeComponentState{
 					spec: componentSpec{
 						Name:       "component",
@@ -287,7 +285,6 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 							JobName:     "component",
 						},
 					},
-					prev: time.Unix(1, 0),
 					knownCharts: map[string]chartengine.ChartMeta{
 						"component_load": {
 							Title:   "Component Load",

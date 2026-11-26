@@ -5,6 +5,7 @@ package netdataapi
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,38 +92,9 @@ func TestCLABELCOMMIT(t *testing.T) {
 }
 
 func TestBEGIN(t *testing.T) {
-
-	tests := map[string]struct {
-		name     string
-		typeID   string
-		ID       string
-		msSince  int
-		expected string
-	}{
-		"without msSince": {
-			typeID:   "system",
-			ID:       "cpu",
-			msSince:  0,
-			expected: "BEGIN 'system.cpu'\n",
-		},
-		"with msSince": {
-			typeID:   "system",
-			ID:       "cpu",
-			msSince:  1000,
-			expected: "BEGIN 'system.cpu' 1000\n",
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			w := &bytes.Buffer{}
-			api := New(w)
-
-			api.BEGIN(test.typeID, test.ID, test.msSince)
-
-			require.Equal(t, test.expected, w.String())
-		})
-	}
+	w := &bytes.Buffer{}
+	New(w).BEGIN("system", "cpu")
+	assert.Equal(t, "BEGIN 'system.cpu'\n", w.String())
 }
 
 func TestSET(t *testing.T) {
@@ -427,6 +399,8 @@ func (w *plainWriter) Write(p []byte) (int, error) {
 }
 
 func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
+	var clock SampleClock
+	sample := clock.Next(time.Unix(1700000000, 250000000))
 	emit := func(api *API) {
 		api.CHART(ChartOpts{
 			TypeID:      "type",
@@ -444,12 +418,13 @@ func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
 		})
 		api.CLABEL("key", "value", 1)
 		api.HOST("guid")
-		api.BEGIN("type", "id", 1000)
+		api.BEGIN("type", "id")
 		api.SET("int", -1234567890)
 		api.SETFLOAT("float", 0.25)
 		api.SETEMPTY("empty")
 		api.VARIABLE("var", 1.5)
 		api.END()
+		api.ENDTimed(sample)
 	}
 
 	buffered := &bytes.Buffer{}

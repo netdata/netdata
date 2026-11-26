@@ -329,25 +329,15 @@ func TestJobSelfMetricsVersionSemantics(t *testing.T) {
 	}
 }
 
-// The Agent places a sample by the interval its BEGIN carries and trusts it up
-// to five update intervals, so each self chart's interval must span every run
-// since that chart's previous delivered sample. Otherwise its samples, and the
-// health variable $last_collected_t, fall behind after a failed or rejected run.
-func TestJobSelfMetricsSampleIntervals(t *testing.T) {
+// Each self chart sample ends with its run's start time, so the Agent places it
+// at that time whatever happened to earlier samples (failed or rejected runs).
+func TestJobSelfMetricsSampleTimes(t *testing.T) {
 	type run struct {
 		failed, rejected bool
 	}
 	// Runs are ten seconds apart. A failed run delivers status but no duration;
 	// a rejected run delivers nothing.
 	runs := []run{{}, {failed: true}, {failed: true}, {}, {rejected: true}, {}}
-	want := []map[string]string{
-		{"status": "", "duration": ""},
-		{"status": "10000000"},
-		{"status": "10000000"},
-		{"status": "10000000", "duration": "30000000"},
-		{},
-		{"status": "20000000", "duration": "20000000"},
-	}
 	for name, version := range map[string]int{"v1": 1, "v2": 2} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -409,6 +399,16 @@ func TestJobSelfMetricsSampleIntervals(t *testing.T) {
 					runOnce = job.runOnce
 				}
 
+				start := time.Now()
+				at := func(s int) string { return endAt(start.Add(time.Duration(s) * time.Second)) }
+				want := []map[string]string{
+					{"status": at(0), "duration": at(0)},
+					{"status": at(10)},
+					{"status": at(20)},
+					{"status": at(30), "duration": at(30)},
+					{},
+					{"status": at(50), "duration": at(50)},
+				}
 				var got []map[string]string
 				for i, r := range runs {
 					if i > 0 {
@@ -417,7 +417,7 @@ func TestJobSelfMetricsSampleIntervals(t *testing.T) {
 					current = r
 					out.Reset()
 					runOnce()
-					got = append(got, selfChartIntervals(out.String()))
+					got = append(got, selfChartTimes(out.String()))
 				}
 				assert.Equal(t, want, got)
 			})
@@ -425,21 +425,16 @@ func TestJobSelfMetricsSampleIntervals(t *testing.T) {
 	}
 }
 
-// selfChartIntervals maps each self chart's BEGIN in the output to its
-// interval in microseconds, "" when the BEGIN carries none.
-func selfChartIntervals(wire string) map[string]string {
-	intervals := make(map[string]string)
-	for line := range strings.SplitSeq(wire, "\n") {
-		rest, ok := strings.CutPrefix(line, "BEGIN 'netdata.")
-		if !ok || !strings.Contains(rest, "_data_collection_") {
-			continue
+// selfChartTimes maps each self chart sample ("status", "duration") to the time
+// its END carries.
+func selfChartTimes(wire string) map[string]string {
+	out := make(map[string]string)
+	for key, end := range sampleTimes(wire) {
+		if _, chart, ok := strings.Cut(key, "/netdata."); ok && strings.Contains(chart, "_data_collection_") {
+			out[chart[strings.LastIndex(chart, "_")+1:]] = end
 		}
-		chart, interval, _ := strings.Cut(rest, "' ")
-		chart = strings.TrimSuffix(chart, "'")
-		chart = chart[strings.LastIndex(chart, "_")+1:]
-		intervals[chart] = interval
 	}
-	return intervals
+	return out
 }
 
 func TestPrometheusJobCollectionSelfMetrics(t *testing.T) {

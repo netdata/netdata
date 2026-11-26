@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
@@ -87,7 +88,8 @@ func TestWriteFDGlobalPublishesRawCounters(t *testing.T) {
 	snapshot := libbpfloader.FDSnapshot{OpenCall: 1000, OpenErr: 7, CloseCall: 900, CloseErr: 3}
 
 	var buf bytes.Buffer
-	writeFDGlobal(netdataapi.New(&buf), snapshot, 0, true)
+	var clock netdataapi.SampleClock
+	writeFDGlobal(netdataapi.New(&buf), snapshot, clock.Next(time.Unix(1700000000, 250000000)), true)
 	got := buf.String()
 
 	for _, want := range []string{
@@ -97,6 +99,7 @@ func TestWriteFDGlobalPublishesRawCounters(t *testing.T) {
 		"BEGIN 'filesystem.file_error'",
 		"SET 'open' = 7",
 		"SET 'close' = 3",
+		"END 1700000000 250000 1",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
@@ -111,7 +114,7 @@ func TestWriteFDGlobalSkipsErrorChartInEntryMode(t *testing.T) {
 	snapshot := libbpfloader.FDSnapshot{OpenCall: 10, OpenErr: 2, CloseCall: 9, CloseErr: 1}
 
 	var buf bytes.Buffer
-	writeFDGlobal(netdataapi.New(&buf), snapshot, 0, false)
+	writeFDGlobal(netdataapi.New(&buf), snapshot, netdataapi.SampleTime{}, false)
 	got := buf.String()
 
 	if !strings.Contains(got, "filesystem.file_descriptor") {
@@ -130,7 +133,7 @@ func TestWriteFDGlobalNilAPIIsNoOp(t *testing.T) {
 			t.Fatalf("nil api panicked: %v", r)
 		}
 	}()
-	writeFDGlobal(nil, libbpfloader.FDSnapshot{}, 0, true)
+	writeFDGlobal(nil, libbpfloader.FDSnapshot{}, netdataapi.SampleTime{}, true)
 }
 
 func TestRunFDGlobalCollectorNilHandleIsNoOp(t *testing.T) {

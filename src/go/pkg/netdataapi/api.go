@@ -133,18 +133,14 @@ func (a *API) CLABELCOMMIT() {
 	_, _ = a.Write(clabelCommit)
 }
 
-// BEGIN initializes data collection for a chart.
-func (a *API) BEGIN(typeID string, id string, msSince int) {
+// BEGIN initializes data collection for a chart. It carries no interval: the
+// sample's time comes from ENDTimed (or, with a plain END, the Agent's clock).
+func (a *API) BEGIN(typeID string, id string) {
 	b := append(a.line(), "BEGIN '"...)
 	b = append(b, typeID...)
 	b = append(b, '.')
 	b = append(b, id...)
-	b = append(b, '\'')
-	if msSince > 0 {
-		b = append(b, ' ')
-		b = strconv.AppendInt(b, int64(msSince), 10)
-	}
-	b = append(b, '\n')
+	b = append(b, "'\n"...)
 	a.send(b)
 }
 

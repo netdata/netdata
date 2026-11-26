@@ -26,14 +26,6 @@ func (c *Chart) SetCreated(v bool) {
 	c.created = v
 }
 
-func (c *Chart) IsUpdated() bool {
-	return c.updated
-}
-
-func (c *Chart) SetUpdated(v bool) {
-	c.updated = v
-}
-
 func (c *Chart) IsIgnored() bool {
 	return c.ignore
 }

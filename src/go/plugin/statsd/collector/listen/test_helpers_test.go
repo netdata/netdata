@@ -125,6 +125,7 @@ func (f *coreFixture) finish(t testing.TB, metricAbort, outputAbort bool) string
 				TypeID:      "statsd.test",
 				UpdateEvery: 1,
 				StoreFirst:  true,
+				CollectedAt: (&netdataapi.SampleClock{}).Next(time.Now()),
 			},
 		),
 	)
