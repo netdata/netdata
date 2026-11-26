@@ -38,6 +38,8 @@ netdata.dbengine_global_errors,,"io_errors, fs_errors",errors/s,Netdata DB engin
 netdata.dbengine_global_file_descriptors,,"current, max",descriptors,Netdata DB engine File Descriptors,line,,netdata,stats
 netdata.dbengine_io_operations,,"reads, writes",operations/s,Netdata DB engine I/O operations,line,,netdata,stats
 netdata.dbengine_io_throughput,,"reads, writes",MiB/s,Netdata DB engine I/O throughput,line,,netdata,stats
+netdata.dbengine_journal_lookups,,"searched, not in journal, outside metric range, filter skipped",lookups/s,Netdata Database Journal Lookups of Query Planning,stacked,,netdata,stats
+netdata.dbengine_journal_time_filter,,"skipped, passed, bypassed",lookups/s,Netdata Database Journal Time Filter Verdicts,stacked,,netdata,stats
 netdata.dbengine_main_cache_events,,"evictions aggressive, evictions critical, flushes critical",events/s,Netdata main Cache Events,area,,netdata,stats
 netdata.dbengine_main_cache_hit_ratio,,"closest, exact",%,Netdata main Cache Hit Ratio,line,,netdata,stats
 netdata.dbengine_main_cache_memory,,"free, hot, dirty, clean, index, evicting, flushing",bytes,Netdata main Cache Memory,stacked,,netdata,stats

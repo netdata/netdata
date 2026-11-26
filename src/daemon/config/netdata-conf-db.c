@@ -181,6 +181,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     dbengine_use_direct_io = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use direct io", dbengine_use_direct_io);
     dbengine_journal_v2_unmount_time = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "dbengine journal v2 unmount time", nd_profile.dbengine_journal_v2_unmount_time);
+    dbengine_journal_time_filters = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine journal time filters", dbengine_journal_time_filters);
 
     unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)

@@ -1279,6 +1279,7 @@ int rrdeng_init(
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
+    __atomic_store_n(&ctx->loading.files_loaded, false, __ATOMIC_RELEASE);
 
     ctx->atomic.first_time_s = LONG_MAX;
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
@@ -1286,6 +1287,7 @@ int rrdeng_init(
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
+        __atomic_store_n(&ctx->loading.files_loaded, true, __ATOMIC_RELEASE);
         rrdeng_populate_mrg(ctx);
         return 0;
     }
@@ -1550,7 +1552,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void) {
     // the writers update these fields atomically, so copy each field atomically;
     // every field takes one 64-byte slot: a new field changes the size and fails this check until it is copied below
-    BUILD_BUG_ON(sizeof(struct rrdeng_cache_efficiency_stats) != 54 * 64);
+    BUILD_BUG_ON(sizeof(struct rrdeng_cache_efficiency_stats) != 60 * 64);
 
     struct rrdeng_cache_efficiency_stats stats = { 0 };
 
@@ -1622,6 +1624,12 @@ struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void) {
     STAT_COPY(datafile_deletion_spin);
     STAT_COPY(journal_v2_indexing_started);
     STAT_COPY(metrics_retention_started);
+    STAT_COPY(journal_v2_lookups_searched);
+    STAT_COPY(journal_v2_lookups_not_found);
+    STAT_COPY(journal_v2_lookups_range_skipped);
+    STAT_COPY(journal_v2_lookups_filter_skipped);
+    STAT_COPY(journal_v2_lookups_filter_passed);
+    STAT_COPY(journal_v2_lookups_filter_bypassed);
 #undef STAT_COPY
 
     return stats;

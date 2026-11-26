@@ -751,6 +751,7 @@ Database engine configuration, retention, and storage tiers
 | `dbengine disk space MB` | number | Maximum disk space for database storage (legacy setting, superseded by tier-specific settings) |
 | `dbengine enable journal integrity check` | boolean | Enable integrity checks on database engine journal files at startup. Helps detect corruption but increases startup time. Default is "no". |
 | `dbengine extent cache size` | size | Size of extent cache in MB for the database engine. Extents are compressed data blocks. Set to 0 to disable extent caching. Default is calculated based on system memory. |
+| `dbengine journal time filters` | boolean | Keep a small filter file next to every tier-0 journal so that queries skip the journals that hold no data of a metric in the queried hours. The filters take ~2% of the size of the tier-0 journals and count towards the tier's disk space. Set to "no" to stop building and using them. Default is "yes". |
 | `dbengine journal v2 unmount time` | duration | Time after which inactive database journal files are unmounted to free file descriptors. Default is based on system configuration. |
 | `dbengine multihost disk space MB` | number | Legacy multihost disk space setting, superseded by tier-specific retention settings |
 | `dbengine out of memory protection` | size | Amount of system memory to keep free to prevent out-of-memory conditions. Database engine will limit its memory usage to leave this much RAM available. Default is 10% of total RAM (max 5GB). |

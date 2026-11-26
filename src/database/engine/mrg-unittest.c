@@ -1773,7 +1773,7 @@ static bool jv2_tmpdir_is_usable(const char *dir, size_t dst_size) {
 // /tmp. Returns false only if neither can be used, in which case the caller skips
 // rather than fails - an unusable /tmp is an environment problem, not a defect in the
 // code under test.
-static bool jv2_make_tmpdir(char *dst, size_t dst_size) {
+bool jv2_make_tmpdir(char *dst, size_t dst_size) {
     const char *base = getenv("TMPDIR");
 
     if(!jv2_tmpdir_is_usable(base, dst_size)) {
