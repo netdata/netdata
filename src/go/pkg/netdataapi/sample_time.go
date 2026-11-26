@@ -12,12 +12,11 @@ import (
 //
 // With `END <seconds> <microseconds> 1` (ENDTimed) the Agent places a sample at
 // its time and derives the interval since the chart's previous sample from the
-// two times, as an absolute difference: a time behind the chart's clock would read
-// as a forward gap and push the chart into the future. The clock never issues a
-// time at or before one it issued, at microsecond resolution, so a single clock per
-// plugin process keeps the times of every chart increasing across jobs, job
-// restarts and wall-clock steps back. The zero value is ready to use; it is safe
-// for concurrent use.
+// two times; it ignores a sample whose time is not after the chart's last
+// collection time. The clock never issues a time at or before one it issued, at
+// microsecond resolution, so a single clock per plugin process keeps the times of
+// every chart increasing across jobs, job restarts and wall-clock steps back. The
+// zero value is ready to use; it is safe for concurrent use.
 type SampleClock struct {
 	last atomic.Int64 // unix microseconds of the latest issued time
 }
