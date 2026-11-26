@@ -39,6 +39,7 @@ struct sample_times_case {
     size_t points_count;
     const struct sample_times_point *late_points;   // 'late', when the case adds it
     size_t late_points_count;
+    bool late_float;            // 'late' is a `type=float` dimension
 };
 
 struct sample_times_plugin {
@@ -88,7 +89,8 @@ static RRDSET *sample_times_define(struct sample_times_plugin *p, const char *id
     if(!sample_times_command(p, "CHART sample_times.%s '' 'Sample times' events/s sample_times sample_times.events "
                                 "line 1000 %d '%s'", id, tc->update_every, tc->store_first ? "store_first" : "") ||
        !sample_times_command(p, "DIMENSION events '' incremental 1 1") ||
-       (with_late && !sample_times_command(p, "DIMENSION late '' incremental 1 1")))
+       (with_late && !sample_times_command(p, "DIMENSION late '' incremental 1 1 '%s'",
+                                           tc->late_float ? "type=float" : "")))
         return NULL;
 
     char full_id[RRD_ID_LENGTH_MAX + 1];
@@ -230,8 +232,16 @@ static int sample_times_check_points(const char *id, RRDSET *st, const char *dim
 
 static int sample_times_check_chart(const struct sample_times_case *tc, const char *id, RRDSET *st) {
     int errors = sample_times_check_points(id, st, "events", tc->points, tc->points_count);
-    if(tc->late_points_count)
+    if(tc->late_points_count) {
         errors += sample_times_check_points(id, st, "late", tc->late_points, tc->late_points_count);
+
+        RRDDIM *late = rrddim_find(st, "late", false);
+        if(late && (rrddim_is_float(late) ? true : false) != tc->late_float) {
+            fprintf(stderr, "SAMPLE TIMES unittest '%s': 'late' is %s, expected %s\n",
+                    id, rrddim_is_float(late) ? "float" : "int", tc->late_float ? "float" : "int");
+            errors++;
+        }
+    }
     return errors;
 }
 
@@ -409,6 +419,11 @@ int pluginsd_sample_times_unittest(void) {
     late_dimension_case.late_points = late_dimension_late_points;
     late_dimension_case.late_points_count = _countof(late_dimension_late_points);
 
+    // the same with a `type=float` dimension, which takes the float SET path
+    struct sample_times_case late_float_dimension_case = late_dimension_case;
+    late_float_dimension_case.name = "late_float_dimension";
+    late_float_dimension_case.late_float = true;
+
     const struct sample_times_case cases[] = {
         SAMPLE_TIMES_CASE("aligned", 1, false, aligned, aligned_points),
         SAMPLE_TIMES_CASE("aligned_store_first", 1, true, aligned_store_first, aligned_store_first_points),
@@ -416,6 +431,7 @@ int pluginsd_sample_times_unittest(void) {
         SAMPLE_TIMES_CASE("out_of_order", 1, false, out_of_order, out_of_order_points),
         SAMPLE_TIMES_CASE("slow_scrape", 10, false, slow_scrape, slow_scrape_points),
         late_dimension_case,
+        late_float_dimension_case,
     };
 
     int errors = 0;
