@@ -27,7 +27,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor CPU, memory, network traffic and disk space on Windows hosts remotely over WMI, without installing anything on them.
+          Monitor CPU, memory, network traffic and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
@@ -35,11 +35,14 @@ modules:
           - free and used physical memory;
           - received and sent traffic per network interface;
           - available and used space per fixed drive;
+          - round-trip time and packet loss of ICMP ping from the poller;
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address.
 
-          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent.
+          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
         method_description: |
           `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group, and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+
+          While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
           It authenticates as the configured Windows account with NTLMv2 and uses one of two transports:
 
@@ -73,6 +76,8 @@ modules:
           | Membership in the local **Performance Monitor Users** group | The CPU or network group is enabled |
 
           The plugin only reads: do not grant **Execute Methods**, write or full-control permissions. See [Securing a remote WMI connection](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
+
+          On a Linux poller, `wmi.plugin` needs the `CAP_NET_RAW` capability to send ICMP echo requests. The installer grants it that capability and no other privilege.
       default_behavior:
         auto_detection:
           description: The plugin does not discover Windows hosts. The stock configuration has no jobs, so it contacts no host until you add one.
@@ -84,12 +89,14 @@ modules:
             - Traffic appears from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
             - Network interface speed is not collected, so the stock alerts that compare traffic with it have no value.
+            - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
+            - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`). DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     excluded_alerts:
       - interface_speed
       - 1m_received_traffic_overflow
@@ -106,6 +113,8 @@ modules:
               ```
 
               CMake builds use `-DENABLE_PLUGIN_WMI=ON`. Check that `wmi.plugin` is in the Netdata plugins directory, usually `/usr/libexec/netdata/plugins.d/`.
+
+              The installer also gives `wmi.plugin` the `CAP_NET_RAW` capability, which ping needs. Without the `setcap` tool, or inside a container, it cannot, and prints a warning; the plugin then collects without ping charts.
           - title: Allow the poller through the Windows firewall
             description: |
               On each Windows host, allow inbound connections from the poller for the transport you use. In PowerShell as Administrator, replace `192.0.2.10` with the poller's address.
@@ -123,7 +132,15 @@ modules:
               New-NetFirewallRule -DisplayName "WinRM HTTPS from Netdata" -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress 192.0.2.10 -Action Allow
               ```
 
-              Network firewalls between the poller and the host need the same ports. DCOM's WMI port is dynamic, by default in the TCP range 49152-65535.
+              For the ping charts, allow ICMP echo requests from the poller:
+
+              ```powershell
+              New-NetFirewallRule -DisplayName "ICMP echo from Netdata" -Direction Inbound -Protocol ICMPv4 -IcmpType 8 -RemoteAddress 192.0.2.10 -Action Allow
+              ```
+
+              For a host monitored over IPv6, use `-Protocol ICMPv6 -IcmpType 128`.
+
+              Network firewalls between the poller and the host need the same ports and ICMP echo. DCOM's WMI port is dynamic, by default in the TCP range 49152-65535.
           - title: Create a WinRM HTTPS listener
             description: |
               WinRM only. The host needs a server authentication certificate whose subject or subject alternative name matches the `host` you configure, in the computer's Personal certificate store. Then create the listener in PowerShell as Administrator:
@@ -380,6 +397,30 @@ modules:
             when: '`transport: winrm`'
             cause: The poller cannot resolve the configured `host` name.
             fix: Use a name the poller resolves and that matches the listener certificate, such as the host's fully qualified domain name.
+          - error: 'ICMP ping disabled: the plugin may not open raw ICMP sockets, which on Linux requires the CAP_NET_RAW capability'
+            cause: '`wmi.plugin` lacks the `CAP_NET_RAW` capability on the poller, for example because the installer ran without the `setcap` tool or the Agent runs in a container. The job logs this once and keeps collecting WMI metrics without ping charts.'
+            fix: |
+              Grant the capability, then restart the Netdata service:
+
+              ```bash
+              sudo setcap cap_net_raw+ep /usr/libexec/netdata/plugins.d/wmi.plugin
+              ```
+
+              In a container, add the `NET_RAW` capability to the container instead.
+          - error: 'ICMP ping failed: could not resolve the host'
+            cause: The poller could not resolve the configured `host` name when it pinged the host, while the WMI queries of that collection succeeded. The usual cause is an intermittent DNS failure.
+            fix: Use a name the poller resolves reliably, such as the host's fully qualified domain name, or its IP address.
+          - error: 'ICMP ping failed: `reason`'
+            cause: The poller could not send the echo requests, for example because a firewall on the poller rejects outgoing ICMP (`operation not permitted`) or has no route to the host (`no route to host`).
+            fix: Allow outgoing ICMP echo requests from the poller to the host, and check the poller's routing to the host's address.
+          - error: 'Ping packet loss stays at 100% while the other charts update'
+            cause: The host, or a firewall between it and the poller, drops ICMP echo requests or their replies. Windows Firewall blocks inbound echo requests unless a rule allows them.
+            fix: |
+              Allow ICMP echo requests from the poller, as described under Prerequisites. If ICMP must stay blocked, exclude the host from the `ping_host_reachable` alert with a [`chart labels`](/src/health/REFERENCE.md#alert-line-chart-labels) line in your copy of `health.d/ping.conf`, for example:
+
+              ```text
+              chart labels: host=!fileserver.example.com *
+              ```
           - error: '`group` WMI query failed: WinRM returned a WS-Management fault'
             when: '`transport: winrm`'
             cause: The listener accepted the login but refused the query, most often because the account lacks permissions on the `root\cimv2` WMI namespace.
@@ -392,6 +433,7 @@ modules:
         - Charts belong to the Windows host's node, not to the poller.
         - CPU utilization and traffic are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
+        - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
       availability: []
       scopes:
         - name: global
@@ -467,3 +509,29 @@ modules:
               dimensions:
                 - name: avail
                 - name: used
+        - name: ping target
+          description: The Windows host as the poller pings it.
+          labels:
+            - name: host
+              description: The job's `host` option, the name or address the poller pings.
+          metrics:
+            - name: ping.host_rtt
+              description: Ping round-trip time
+              unit: milliseconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: max
+                - name: avg
+            - name: ping.host_std_dev_rtt
+              description: Ping round-trip time standard deviation
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: std_dev
+            - name: ping.host_packet_loss
+              description: Ping packet loss
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: loss

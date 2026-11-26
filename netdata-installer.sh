@@ -1156,6 +1156,15 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/wmi.plugin" ]; then
+    # Pinging the monitored hosts needs raw ICMP sockets. There is deliberately
+    # no setuid-root fallback: without the capability the plugin skips ping.
+    if iscontainer || ! command -v setcap 1> /dev/null 2>&1 ||
+      ! run setcap cap_net_raw+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/wmi.plugin"; then
+      warning "wmi.plugin did not get the CAP_NET_RAW capability, so it cannot ping the Windows hosts it monitors. Grant it with: setcap cap_net_raw+ep ${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/wmi.plugin"
+    fi
+  fi
+
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"

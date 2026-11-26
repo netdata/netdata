@@ -266,16 +266,17 @@ func publishedCharts(t *testing.T) []wireChart {
 	return charts
 }
 
-// TestCollector_PublishesNativeWindowsCharts compares the published charts with
-// the native Windows Agent's definitions of the same contexts, the oracle:
-// src/collectors/windows.plugin/perflib-processor.c (system.cpu, cpu.cpu),
-// src/collectors/common-contexts/system-ram.h (system.ram),
-// src/collectors/windows.plugin/perflib-network.c (net.net) and
-// src/collectors/windows.plugin/perflib-storage.c (disk.space). Native CPU
-// dimensions use the percent-of-total-delta algorithm, which this collector
-// computes itself, so they arrive as absolute percentages. Families are
-// display metadata and not compared.
-func TestCollector_PublishesNativeWindowsCharts(t *testing.T) {
+// TestCollector_PublishesSharedContexts compares the published charts with the
+// other producers' definitions of the same contexts, the oracles: the native
+// Windows Agent's src/collectors/windows.plugin/perflib-processor.c
+// (system.cpu, cpu.cpu), src/collectors/common-contexts/system-ram.h
+// (system.ram), src/collectors/windows.plugin/perflib-network.c (net.net) and
+// src/collectors/windows.plugin/perflib-storage.c (disk.space), and the go.d
+// ping collector's src/go/plugin/go.d/collector/ping/charts.yaml (ping.*).
+// Native CPU dimensions use the percent-of-total-delta algorithm, which this
+// collector computes itself, so they arrive as absolute percentages. Families
+// are display metadata and not compared.
+func TestCollector_PublishesSharedContexts(t *testing.T) {
 	modes := []wireDimension{
 		{name: "irq", algorithm: "absolute", multiplier: 1, divisor: 1},
 		{name: "user", algorithm: "absolute", multiplier: 1, divisor: 1},
@@ -323,6 +324,32 @@ func TestCollector_PublishesNativeWindowsCharts(t *testing.T) {
 				{name: "used", algorithm: "absolute", multiplier: 1, divisor: 1073741824},
 			},
 		},
+		"ping.host_rtt": {
+			title:     "Ping round-trip time",
+			units:     "milliseconds",
+			chartType: "area",
+			dimensions: []wireDimension{
+				{name: "min", algorithm: "absolute", multiplier: 1, divisor: 1000},
+				{name: "max", algorithm: "absolute", multiplier: 1, divisor: 1000},
+				{name: "avg", algorithm: "absolute", multiplier: 1, divisor: 1000},
+			},
+		},
+		"ping.host_std_dev_rtt": {
+			title:     "Ping round-trip time standard deviation",
+			units:     "milliseconds",
+			chartType: "line",
+			dimensions: []wireDimension{
+				{name: "std_dev", algorithm: "absolute", multiplier: 1, divisor: 1000},
+			},
+		},
+		"ping.host_packet_loss": {
+			title:     "Ping packet loss",
+			units:     "percentage",
+			chartType: "line",
+			dimensions: []wireDimension{
+				{name: "loss", algorithm: "absolute", multiplier: 1, divisor: 1000},
+			},
+		},
 	}
 	instance := func(context string, labels map[string]string) wireChart {
 		chart := native[context]
@@ -353,6 +380,9 @@ func TestCollector_PublishesNativeWindowsCharts(t *testing.T) {
 			"rw_mode":       "rw",
 			"serial_number": "0xABCD",
 		}),
+		instance("ping.host_rtt", map[string]string{"host": "windows.example.com"}),
+		instance("ping.host_std_dev_rtt", map[string]string{"host": "windows.example.com"}),
+		instance("ping.host_packet_loss", map[string]string{"host": "windows.example.com"}),
 	}, publishedCharts(t))
 }
 
