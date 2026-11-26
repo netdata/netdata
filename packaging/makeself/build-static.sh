@@ -52,7 +52,11 @@ case "${BUILDARCH}" in
         # Work around Cortex-A53 errata 835769 and 843419 (Raspberry Pi 3, ODROID-C2, ...). The builder's GCC enables
         # neither by default, and neither QEMU nor the CI runners' ARM cores exhibit them. The 843419 fix happens at
         # link time, so the jobs also pass $(errata_ldflags) to every final link.
-        TUNING_FLAGS="-march=armv8-a -mfix-cortex-a53-835769 -mfix-cortex-a53-843419"
+        # ld.bfd scans for 843419 once, then adds 8-byte aligned stub sections; the 4-byte pad before a stub shifts
+        # every following 4-byte aligned input section and can create sequences it never scanned (binutils bug 34200).
+        # An 8-byte aligned section absorbs the pad, so every C/C++ function we compile, cold and size-optimized ones
+        # included, is kept 8-byte aligned (GCC >= 14). Rust does the same in NetdataRust.cmake.
+        TUNING_FLAGS="-march=armv8-a -mfix-cortex-a53-835769 -mfix-cortex-a53-843419 -fmin-function-alignment=8"
         GOARM64="v8.0"
         GOARCH="arm64"
         ;;

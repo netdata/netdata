@@ -8,7 +8,8 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building OpenSSL" || true
 
-export CFLAGS="${TUNING_FLAGS} -fno-lto -pipe"
+# CFLAGS replaces the Configure target's default flags, so it has to carry the optimization level (-O3) itself.
+export CFLAGS="${TUNING_FLAGS} -O3 -fno-lto -pipe"
 export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
