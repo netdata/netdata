@@ -78,12 +78,12 @@ above), so a child-originated update flows all the way to the apex.
 
 ## 5. The cycle terminator
 
-The `if(!from_parent)` guard at `stream-path.c:423` is **load-bearing**.
+The `if(!from_parent)` guard at `stream-path.c:503` is **load-bearing**.
 Without it, every parent-to-child echo would generate a child-to-parent
 re-send, generating another echo, forever.
 
 Combined with the volatile self-overlay (see §3), even the hash check at
-`stream-path.c:422` cannot stop oscillation: the live timing fields change
+`stream-path.c:502` cannot stop oscillation: the live timing fields change
 between emits, so the hash would differ on every round-trip even when the
 structural content is identical.
 
@@ -116,9 +116,12 @@ write:
   which calls `stream_path_parent_disconnected(s->host)`
   (`stream-sender.c:497`) whether the sender will reconnect or is being
   removed. This truncates the host's stored chain after the localhost
-  entry and sends the truncated chain to the child, so a reconnection
+  entry and, for a relayed host, sends the truncated chain to its child
+  (`localhost` has no child to update), so a reconnection
   to another parent starts from `[..., self]` and the old parent is not
-  carried over. `stream_sender_on_disconnect` (`stream-sender.c:207`)
+  carried over. If the stored chain has no localhost entry (e.g. the
+  parent sent its own chain before it received ours), nothing is
+  truncated. `stream_sender_on_disconnect` (`stream-sender.c:207`)
   truncates again when a sender waiting in the connector queue is
   cancelled or removed.
 
@@ -143,10 +146,10 @@ Known consumers of `host->stream.path.array` in this tree:
   synthesis from PR #22432). Reads stored data, falls back to the
   rrdhost-derived live data via `rrdhost_status()` for the localhost
   classification (Bug A in PR #22432).
-- `src/database/contexts/api_v2_contexts.c:425, :510` — emits
+- `src/database/contexts/api_v2_contexts.c:463, :554` — emits
   `streaming_path` per host via `rrdhost_stream_path_to_json` (so the
   emit-time self-append fires). No direct array access.
-- `src/streaming/stream-path.c:145-158` — `rrdhost_stream_path_total_reboot_time_ms`
+- `src/streaming/stream-path.c:147-160` — `rrdhost_stream_path_total_reboot_time_ms`
   walks the stored array looking for localhost's own entry. **This shares
   Bug A's blind assumption**: on the apex parent, the localhost entry is
   not in storage, so this function returns 0 silently. This is the same
