@@ -774,8 +774,10 @@ void GetAllProcessesInfo(void) {
 
         if(!p->sid_name) {
             PSID pSid = NULL;
-            if (GetProcessUserSID(hProcess, &pSid))
-                p->sid_name = cached_sid_fullname_or_sid_str(pSid);
+            if (GetProcessUserSID(hProcess, &pSid)) {
+                p->sid_name = cached_sid_fullname_or_sid_str(pSid); // the cache keeps its own copy of the SID
+                LocalFree(pSid);
+            }
             else
                 p->sid_name = string_strdupz("Unknown");
         }
