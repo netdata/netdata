@@ -50,7 +50,7 @@ func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) b
 		j.buf.Reset()
 	}
 	tx.hostBytes = j.buf.Len()
-	tx.self = j.selfMetrics.prepare(j.api, sinceLastRun, elapsed, updated > 0, createCharts)
+	tx.self = j.selfMetrics.prepare(j.api, tx.started, elapsed, updated > 0, createCharts)
 	return updated > 0
 }
 

@@ -84,13 +84,14 @@ func TestV1WriteFailurePreservesCommittedEmission(t *testing.T) {
 				job.runOnce()
 			}
 			type committed struct {
-				guid                       string
-				owner                      *hostoutput.Owner
-				info                       netdataapi.HostInfo
-				charts                     jobV1ChartInventory
-				published, durationUpdated bool
-				prev                       time.Time
-				priority                   int
+				guid                 string
+				owner                *hostoutput.Owner
+				info                 netdataapi.HostInfo
+				charts               jobV1ChartInventory
+				published            bool
+				statusAt, durationAt time.Time
+				prev                 time.Time
+				priority             int
 			}
 			snapshot := func() committed {
 				return committed{
@@ -99,7 +100,8 @@ func TestV1WriteFailurePreservesCommittedEmission(t *testing.T) {
 					job.hostDefinition.Info(),
 					maps.Clone(job.hostCharts),
 					job.selfMetrics.published,
-					job.selfMetrics.durationUpdated,
+					job.selfMetrics.statusAt,
+					job.selfMetrics.durationAt,
 					job.prevRun,
 					job.priority,
 				}

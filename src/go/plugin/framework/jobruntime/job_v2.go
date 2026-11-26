@@ -571,7 +571,7 @@ func (j *JobV2) runOnce() {
 	}
 	j.buf.Reset()
 	if !j.panicked.Load() {
-		self := j.selfMetrics.prepare(j.api, sinceLastRun, elapsed, ok, false)
+		self := j.selfMetrics.prepare(j.api, curTime, elapsed, ok, false)
 		if _, err := commitHostOutput(j.out, hostoutput.Request{
 			Payload: j.buf.Bytes(),
 		}, self); err != nil {

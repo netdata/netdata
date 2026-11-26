@@ -132,6 +132,9 @@ plugin/module identity, configured job labels, `_collect_job`, and the job's col
   scope fails the cycle.
 - Status reports complementary `success`/`failed` values on ordinary cycles. Duration is sampled only on success and
   measured before output I/O, so output backpressure is excluded. A panic does not publish self samples.
+- Each sample's `BEGIN` interval is the time since that chart's previous delivered sample, so it spans failed,
+  panicked and rejected runs. The Agent places a sample by that interval (it trusts up to five update intervals), so
+  a shorter one would leave the chart's samples and the health variable `$last_collected_t` behind.
 - Autodetection and function-only jobs do not publish these charts.
 
 `jobSelfMetrics` shares definitions, rendering and committed publication state between versions. V1 includes self
