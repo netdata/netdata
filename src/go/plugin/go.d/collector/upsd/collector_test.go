@@ -494,3 +494,72 @@ func (m *mockUpsdConn) upsUnits() ([]upsUnit, error) {
 
 	return upsUnits, nil
 }
+
+func TestCollector_Collect_upsStatusWhitespace(t *testing.T) {
+	tests := map[string]struct {
+		status  string
+		wantOn  []string
+		wantOff []string
+	}{
+		"single flag": {
+			status:  "OL",
+			wantOn:  []string{"OL"},
+			wantOff: []string{"OB", "LB", "other"},
+		},
+		"leading space": {
+			status:  " LB",
+			wantOn:  []string{"LB"},
+			wantOff: []string{"OL", "other"},
+		},
+		"repeated separator": {
+			status:  "OL  CHRG",
+			wantOn:  []string{"OL", "CHRG"},
+			wantOff: []string{"OB", "other"},
+		},
+		"trailing space": {
+			status:  "OL ",
+			wantOn:  []string{"OL"},
+			wantOff: []string{"OB", "other"},
+		},
+		"unknown flag still counts as other": {
+			status:  "OL ALARM",
+			wantOn:  []string{"OL", "other"},
+			wantOff: []string{"OB", "LB"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.newUpsdConn = func(Config) upsdConn {
+				return &mockUpsdConnStatus{status: test.status}
+			}
+
+			require.NoError(t, collr.Init(context.Background()))
+
+			mx := collr.Collect(context.Background())
+			require.NotEmpty(t, mx)
+
+			for _, st := range test.wantOn {
+				assert.Equal(t, int64(1), mx["ups_ups1_ups.status."+st], "status %s", st)
+			}
+			for _, st := range test.wantOff {
+				assert.Equal(t, int64(0), mx["ups_ups1_ups.status."+st], "status %s", st)
+			}
+		})
+	}
+}
+
+type mockUpsdConnStatus struct {
+	mockUpsdConn
+	status string
+}
+
+func (m *mockUpsdConnStatus) upsUnits() ([]upsUnit, error) {
+	return []upsUnit{
+		{
+			name: "ups1",
+			vars: map[string]string{"ups.status": m.status},
+		},
+	}, nil
+}
