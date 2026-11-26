@@ -75,6 +75,16 @@ static char *domain2utf8(const wchar_t *domain) {
     return buffer;
 }
 
+static STRING *sid_to_sid_str(PSID sid) {
+    wchar_t *sid_string = NULL;
+    if (!ConvertSidToStringSidW(sid, &sid_string))
+        return NULL;
+
+    STRING *s = string_strdupz(account2utf8(sid_string));
+    LocalFree(sid_string);
+    return s;
+}
+
 static void lookup_user_in_system(SID_VALUE *sv) {
     static __thread wchar_t account_unicode[256];
     static __thread wchar_t domain_unicode[256];
@@ -98,11 +108,18 @@ static void lookup_user_in_system(SID_VALUE *sv) {
         sv->full = NULL;
     }
 
-    wchar_t *sid_string = NULL;
-    if (ConvertSidToStringSidW(sv->key.sid, &sid_string))
-        sv->sid_str = string_strdupz(account2utf8(sid_string));
-    else
-        sv->sid_str = NULL;
+    sv->sid_str = sid_to_sid_str(sv->key.sid);
+}
+
+// the unit test replaces it, to make two threads resolve the same SID together
+static void (*sid_resolve)(SID_VALUE *sv) = lookup_user_in_system;
+
+static void sid_value_free(SID_VALUE *sv) {
+    string_freez(sv->account);
+    string_freez(sv->domain);
+    string_freez(sv->full);
+    string_freez(sv->sid_str);
+    freez(sv);
 }
 
 static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
@@ -125,15 +142,21 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
         return found;
     }
 
-    // allocate the SID_VALUE
-    found = tmp;
+    // resolve it outside the lock, it may be slow
+    sid_resolve(tmp);
 
-    lookup_user_in_system(found);
-
-    // add it to the cache
+    // add it to the cache, unless another thread added it meanwhile
     spinlock_lock(&sid_globals.spinlock);
-    simple_hashtable_set_SID(&sid_globals.hashtable, &found->key, tmp_key_size, found);
+    found = simple_hashtable_get_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size);
+    if(!found) {
+        simple_hashtable_set_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size, tmp);
+        found = tmp;
+        tmp = NULL;
+    }
     spinlock_unlock(&sid_globals.spinlock);
+
+    if(tmp)
+        sid_value_free(tmp);
 
     return found;
 }
@@ -206,6 +229,154 @@ STRING *cached_sid_fullname_or_sid_str(PSID sid) {
         return string_dup(found->sid_str);
     }
     return NULL;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// unit test: -W sidcachetest
+
+#define SIDCACHE_TEST_CONVERSIONS 1000
+#define SIDCACHE_TEST_RACES 16
+
+static struct {
+    uint32_t salt;
+    int32_t round;
+    int32_t arrived;
+    bool timed_out;
+    PSID sid;
+    SID_VALUE *seen[2];
+} sidcache_test;
+
+// bytes in use in the default process heap, where LocalAlloc() allocates
+static bool sidcache_test_process_heap_used(size_t *used) {
+    HANDLE heap = GetProcessHeap();
+    PROCESS_HEAP_ENTRY e = { 0 };
+    *used = 0;
+
+    if(!HeapLock(heap))
+        return false;
+
+    while(HeapWalk(heap, &e))
+        if(e.wFlags & PROCESS_HEAP_ENTRY_BUSY)
+            *used += e.cbData;
+
+    DWORD error = GetLastError();
+    HeapUnlock(heap);
+    return error == ERROR_NO_MORE_ITEMS;
+}
+
+// a SID of a random domain, so that it is not in the cache
+static PSID sidcache_test_make_sid(DWORD rid) {
+    SID_IDENTIFIER_AUTHORITY nt = SECURITY_NT_AUTHORITY;
+    PSID sid = NULL;
+    if(!AllocateAndInitializeSid(&nt, 5, SECURITY_NT_NON_UNIQUE,
+                                 sidcache_test.salt, os_random32(), os_random32(), rid, 0, 0, 0, &sid))
+        fatal("SIDCACHE TEST: AllocateAndInitializeSid() failed");
+    return sid;
+}
+
+// replaces lookup_user_in_system(): both threads get here after missing the cache,
+// and wait for each other, so that both publish the same SID
+static void sidcache_test_resolve(SID_VALUE *sv) {
+    int32_t me = __atomic_add_fetch(&sidcache_test.arrived, 1, __ATOMIC_ACQ_REL);
+
+    usec_t until = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while(__atomic_load_n(&sidcache_test.arrived, __ATOMIC_ACQUIRE) < 2) {
+        if(now_monotonic_usec() >= until) {
+            __atomic_store_n(&sidcache_test.timed_out, true, __ATOMIC_RELEASE);
+            break;
+        }
+        tinysleep();
+    }
+
+    // a unique string per candidate, so that the string entries count how many candidates are alive
+    char buf[64];
+    snprintfz(buf, sizeof(buf), "sidcache-test-%u-%d-%d", sidcache_test.salt, sidcache_test.round, me);
+    sv->account = NULL;
+    sv->domain = NULL;
+    sv->full = NULL;
+    sv->sid_str = string_strdupz(buf);
+}
+
+static void *sidcache_test_thread(void *arg) {
+    size_t t = (size_t)arg;
+    sidcache_test.seen[t] = lookup_or_convert_user_id_to_name_lookup(sidcache_test.sid);
+    return NULL;
+}
+
+int cached_sid_username_unittest(void) {
+    int errors = 0;
+    cached_sid_username_init();
+    sidcache_test.salt = os_random32();
+
+    // 1. converting a SID to a string must not leave Windows allocations behind
+    {
+        PSID sid = sidcache_test_make_sid(1000);
+        string_freez(sid_to_sid_str(sid)); // warm up
+
+        size_t before = 0, after = 0;
+        bool walked = sidcache_test_process_heap_used(&before);
+        size_t converted = 0;
+        for(size_t i = 0; i < SIDCACHE_TEST_CONVERSIONS; i++) {
+            STRING *s = sid_to_sid_str(sid);
+            if(s) converted++;
+            string_freez(s);
+        }
+        walked = sidcache_test_process_heap_used(&after) && walked;
+        FreeSid(sid);
+
+        // a leaked "S-1-5-21-..." string costs about 100 bytes per conversion
+        size_t growth = after > before ? after - before : 0;
+        bool ok = walked && converted == SIDCACHE_TEST_CONVERSIONS && growth < SIDCACHE_TEST_CONVERSIONS * 16;
+        fprintf(stderr, "SIDCACHE TEST: %zu SID conversions, %zu converted, heap walk %s, process heap grew by %zu bytes: %s\n",
+                (size_t)SIDCACHE_TEST_CONVERSIONS, converted, walked ? "ok" : "failed", growth, ok ? "OK" : "FAILED");
+        if(!ok) errors++;
+    }
+
+    // 2. two threads missing the cache for the same SID must get the same entry, and the other one must be freed
+    {
+        void (*saved)(SID_VALUE *sv) = sid_resolve;
+        sid_resolve = sidcache_test_resolve;
+
+        size_t entries_before = 0, entries_after = 0;
+        string_statistics(NULL, NULL, NULL, &entries_before, NULL, NULL, NULL, NULL, NULL);
+
+        size_t failed = 0;
+        for(int32_t r = 0; r < SIDCACHE_TEST_RACES; r++) {
+            sidcache_test.sid = sidcache_test_make_sid(2000 + r);
+            sidcache_test.round = r;
+            sidcache_test.arrived = 0;
+            sidcache_test.timed_out = false;
+            sidcache_test.seen[0] = sidcache_test.seen[1] = NULL;
+
+            pthread_t threads[2];
+            for(size_t t = 0; t < 2; t++)
+                if(pthread_create(&threads[t], NULL, sidcache_test_thread, (void *)t) != 0)
+                    fatal("SIDCACHE TEST: pthread_create() failed");
+            for(size_t t = 0; t < 2; t++)
+                pthread_join(threads[t], NULL);
+
+            SID_VALUE *cached = lookup_or_convert_user_id_to_name_lookup(sidcache_test.sid);
+            // both threads must have resolved it (so both missed the cache) and got the cached entry
+            if(sidcache_test.timed_out || !cached || sidcache_test.seen[0] != cached || sidcache_test.seen[1] != cached)
+                failed++;
+
+            FreeSid(sidcache_test.sid);
+            sidcache_test.sid = NULL;
+        }
+
+        string_statistics(NULL, NULL, NULL, &entries_after, NULL, NULL, NULL, NULL, NULL);
+        sid_resolve = saved;
+
+        // each race publishes one candidate with one string; a leaked candidate keeps a second string alive
+        size_t alive = entries_after - entries_before;
+        bool ok = failed == 0 && alive == SIDCACHE_TEST_RACES;
+        fprintf(stderr, "SIDCACHE TEST: %d races of 2 threads, %zu failed (no race, or an entry that is not the cached one), %zu candidates alive (expected %d): %s\n",
+                SIDCACHE_TEST_RACES, failed, alive, SIDCACHE_TEST_RACES, ok ? "OK" : "FAILED");
+        if(!ok) errors++;
+    }
+
+    fprintf(stderr, "SIDCACHE TEST: %s\n", errors ? "FAILED" : "PASSED");
+    return errors ? 1 : 0;
 }
 
 #endif

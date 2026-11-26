@@ -625,6 +625,7 @@ int netdata_main(int argc, char **argv) {
                             if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
+                            if (cached_sid_username_unittest()) return 1;
                             if (netdata_registry_unittest()) return 1;
 #endif
                             // MUST stay last: it runs the real sqlite_close_databases() and
@@ -821,6 +822,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "perflibnamestest") == 0) {
                             unittest_running = true;
                             return perflibnamestest_main();
+                        }
+                        else if(strcmp(optarg, "sidcachetest") == 0) {
+                            unittest_running = true;
+                            return cached_sid_username_unittest();
                         }
                         else if(strcmp(optarg, "registrytest") == 0) {
                             unittest_running = true;
