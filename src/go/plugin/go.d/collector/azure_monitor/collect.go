@@ -68,11 +68,18 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 		allSamples []metricSample
 		errCount   int
 	)
-	for _, res := range results {
+	for i, res := range results {
+		batch := &batches[i]
 		if res.Err != nil {
 			errCount++
-			c.Limit("metrics:batch", 1, time.Hour).Warningf("collection batch failed: %v", res.Err)
+			c.logBatchFailure(batch, res.Err, queryNow)
 			continue
+		}
+		if d := res.Diagnostics; d != nil {
+			c.Debugf("metrics batch: profile=%s region=%s subscription=%.80q grain=%s resources=%d with_samples=%d empty=%d missing=%d "+
+				"unmatched_rows=%d metric_errors=%d empty_examples=%v missing_examples=%v error_examples=%v %s",
+				batch.Profile.Name, batch.Region, batch.SubscriptionID, batch.TimeGrain, len(batch.Resources),
+				d.withSamples, d.empty, d.missing, d.unmatchedRows, d.metricErrors, d.emptyExamples, d.missingExamples, d.errorExamples, batch.debugRequest(queryNow, c.QueryOffset))
 		}
 		allSamples = append(allSamples, res.Samples...)
 	}

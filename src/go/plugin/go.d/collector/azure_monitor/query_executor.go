@@ -5,6 +5,7 @@ package azure_monitor
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
+	"github.com/netdata/netdata/go/plugins/logger"
 )
 
 type queryExecutor struct {
@@ -46,37 +48,32 @@ func (e *queryExecutor) reset() {
 func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatch, queryNow time.Time, queryOffsetSeconds int) []queryBatchResult {
 	workers := min(max(e.maxConcurrency, 1), len(batches))
 
-	input := make(chan queryBatch)
-	output := make(chan queryBatchResult, len(batches))
-
+	// Each worker owns its result slot. The caller can correlate the result
+	// with its request even when batches complete out of order.
+	input := make(chan int)
+	results := make([]queryBatchResult, len(batches))
+	debug := logger.Level.Enabled(slog.LevelDebug)
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Go(func() {
-			for batch := range input {
-				samples, err := e.executeQueryBatch(ctx, batch, queryNow, queryOffsetSeconds)
-				output <- queryBatchResult{Samples: samples, Err: err}
+			for i := range input {
+				results[i] = e.executeQueryBatch(ctx, batches[i], queryNow, queryOffsetSeconds, debug)
 			}
 		})
 	}
-
-	for _, batch := range batches {
-		input <- batch
+	for i := range batches {
+		input <- i
 	}
 	close(input)
 	wg.Wait()
-	close(output)
 
-	results := make([]queryBatchResult, 0, len(batches))
-	for result := range output {
-		results = append(results, result)
-	}
 	return results
 }
 
-func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch, queryNow time.Time, queryOffsetSeconds int) ([]metricSample, error) {
+func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch, queryNow time.Time, queryOffsetSeconds int, debug bool) queryBatchResult {
 	client, err := e.getMetricsClient(batch.Region)
 	if err != nil {
-		return nil, err
+		return queryBatchResult{Err: err}
 	}
 
 	resourceIDs, resourceByID := queryBatchResourceIndex(batch.Resources)
@@ -99,10 +96,14 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 		},
 	)
 	if err != nil {
-		return nil, err
+		return queryBatchResult{Err: err}
 	}
 
-	return samplesFromQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
+	result := queryBatchResult{Samples: samplesFromQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch.Metrics), resourceByID)}
+	if debug {
+		result.Diagnostics = summarizeBatchResponse(batch.Resources, resourceByID, resp.Values, result.Samples)
+	}
+	return result
 }
 
 func queryBatchMetricIndex(metrics []*metricRuntime) map[string]*metricRuntime {
@@ -162,6 +163,9 @@ func samplesFromQueryResponse(metricData []azmetrics.MetricData, profile *profil
 func samplesFromMetricValues(metrics []azmetrics.Metric, resource resourceIdentity, metricToRuntime map[string]*metricRuntime) []metricSample {
 	samples := make([]metricSample, 0, len(metrics))
 	for _, metric := range metrics {
+		if metric.Name == nil {
+			continue
+		}
 		runtimeMetric, ok := metricToRuntime[stringsLowerTrim(derefOrZero(metric.Name.Value))]
 		if !ok {
 			continue
