@@ -571,6 +571,18 @@ static void rrdset_discard_collected_values(RRDSET *st) {
     rrddim_foreach_done(rd);
 }
 
+// Restarts the rates of the dimensions computed from the difference between samples: the values of this sample become
+// their baselines and store no rate, as for a dimension's first value; a dimension this sample did not set starts with
+// its next value.
+static void rrdset_restart_rates(RRDSET *st) {
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL || rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL)
+            rd->collector.counter = rrddim_check_updated(rd) ? 1 : 0;
+    }
+    rrddim_foreach_done(rd);
+}
+
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
 
@@ -590,6 +602,14 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                            rrdhost_hostname(st->rrdhost), rrdset_id(st),
                            (int64_t)-dt_usec_signed(&now, &st->last_collected_time));
 
+            // When the Agent's own clock is not after the chart either, the wall clock stepped back: counters keep
+            // growing while the times stay behind, so the first accepted sample would carry all of that growth into
+            // one point. A frame delivered out of order arrives at the current time and keeps its rate.
+            struct timeval arrival;
+            now_realtime_timeval(&arrival);
+            if(dt_usec_signed(&arrival, &st->last_collected_time) <= 0)
+                st->restart_rates = true;
+
             rrdset_discard_collected_values(st);
             spinlock_unlock(&st->data_collection_lock);
             stream_send_rrdset_metrics_finished(&stream_buffer, st);
@@ -597,6 +617,11 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
 
         rrdset_timed_next(st, now, 0ULL);
+    }
+
+    if(unlikely(st->restart_rates)) {
+        st->restart_rates = false;
+        rrdset_restart_rates(st);
     }
 
     netdata_log_debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));

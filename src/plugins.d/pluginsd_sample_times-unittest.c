@@ -10,12 +10,15 @@
 // sample left them, and the next newer sample is placed at its own time with its own rate. Each case feeds such
 // samples to one chart and the same feed without them to a control chart, and checks both against the points the
 // Agent must store.
-
-// a whole multiple of every update_every used below, far from the wall clock
-#define SAMPLE_TIMES_BASE_S 200000000LL
+//
+// The times count from a base second, a whole multiple of every update_every used below. It is far behind the wall
+// clock, so the Agent's own clock is always after the charts; a case with ahead_of_wall_clock moves it ahead, so the
+// Agent sees its own clock behind the chart, as after a backward wall-clock step.
+#define SAMPLE_TIMES_PAST_BASE_S 200000000LL
+static int64_t sample_times_base_s = SAMPLE_TIMES_PAST_BASE_S;
 
 struct sample_times_sample {
-    int64_t at_us;              // collection time, microseconds after SAMPLE_TIMES_BASE_S (may be negative)
+    int64_t at_us;              // collection time, microseconds after sample_times_base_s (may be negative)
     collected_number value;     // counter value of dimension 'events'
     bool behind;                // not after the chart's clock: the control chart does not receive it
     bool restart;               // the plugin restarts before this sample; the Agent keeps the chart
@@ -25,7 +28,7 @@ struct sample_times_sample {
 };
 
 struct sample_times_point {
-    int64_t at_s;               // slot time, seconds after SAMPLE_TIMES_BASE_S
+    int64_t at_s;               // slot time, seconds after sample_times_base_s
     NETDATA_DOUBLE value;       // NAN for a gap
 };
 
@@ -40,6 +43,9 @@ struct sample_times_case {
     const struct sample_times_point *late_points;   // 'late', when the case adds it
     size_t late_points_count;
     bool late_float;            // 'late' is a `type=float` dimension
+    bool ahead_of_wall_clock;   // the times are after the Agent's own clock
+    const struct sample_times_point *control_points;    // 'events' of the control chart, when they differ
+    size_t control_points_count;
 };
 
 struct sample_times_plugin {
@@ -99,7 +105,7 @@ static RRDSET *sample_times_define(struct sample_times_plugin *p, const char *id
 }
 
 static usec_t sample_times_abs_ut(int64_t at_us) {
-    return (usec_t)(SAMPLE_TIMES_BASE_S * (int64_t)USEC_PER_SEC + at_us);
+    return (usec_t)(sample_times_base_s * (int64_t)USEC_PER_SEC + at_us);
 }
 
 static bool sample_times_send(struct sample_times_plugin *p, const char *id, const struct sample_times_sample *s) {
@@ -164,9 +170,9 @@ static RRDSET *sample_times_feed(const struct sample_times_case *tc, const char 
                     "SAMPLE TIMES unittest '%s': after the sample at %+.6f s the chart clock is at %+.6f s and its "
                     "last point at %+lld s, past the newest collection time %+.6f s\n",
                     id, (double)s->at_us / USEC_PER_SEC,
-                    (double)((int64_t)clock_ut - SAMPLE_TIMES_BASE_S * (int64_t)USEC_PER_SEC) / USEC_PER_SEC,
-                    (long long)(st->last_updated.tv_sec - SAMPLE_TIMES_BASE_S),
-                    (double)((int64_t)newest_ut - SAMPLE_TIMES_BASE_S * (int64_t)USEC_PER_SEC) / USEC_PER_SEC);
+                    (double)((int64_t)clock_ut - sample_times_base_s * (int64_t)USEC_PER_SEC) / USEC_PER_SEC,
+                    (long long)(st->last_updated.tv_sec - sample_times_base_s),
+                    (double)((int64_t)newest_ut - sample_times_base_s * (int64_t)USEC_PER_SEC) / USEC_PER_SEC);
             (*errors)++;
         }
     }
@@ -186,12 +192,12 @@ static int sample_times_check_points(const char *id, RRDSET *st, const char *dim
     }
 
     int errors = 0;
-    time_t first_s = (time_t)(SAMPLE_TIMES_BASE_S + points[0].at_s);
-    time_t last_s = (time_t)(SAMPLE_TIMES_BASE_S + points[points_count - 1].at_s);
+    time_t first_s = (time_t)(sample_times_base_s + points[0].at_s);
+    time_t last_s = (time_t)(sample_times_base_s + points[points_count - 1].at_s);
 
     if(st->last_updated.tv_sec != last_s) {
         fprintf(stderr, "SAMPLE TIMES unittest '%s': last point at %+lld s, expected %+lld s\n",
-                id, (long long)(st->last_updated.tv_sec - SAMPLE_TIMES_BASE_S),
+                id, (long long)(st->last_updated.tv_sec - sample_times_base_s),
                 (long long)points[points_count - 1].at_s);
         errors++;
     }
@@ -209,12 +215,12 @@ static int sample_times_check_points(const char *id, RRDSET *st, const char *dim
         }
 
         const struct sample_times_point *want = &points[found++];
-        bool ok = sp.end_time_s == (time_t)(SAMPLE_TIMES_BASE_S + want->at_s) &&
+        bool ok = sp.end_time_s == (time_t)(sample_times_base_s + want->at_s) &&
                   (isnan(want->value) ? isnan(sp.sum) : (!isnan(sp.sum) && fabsndd(sp.sum - want->value) < 0.0005));
         if(!ok) {
             fprintf(stderr, "SAMPLE TIMES unittest '%s': '%s' point at %+lld s holds " NETDATA_DOUBLE_FORMAT
                     ", expected " NETDATA_DOUBLE_FORMAT " at %+lld s\n",
-                    id, dimension, (long long)(sp.end_time_s - SAMPLE_TIMES_BASE_S), sp.sum, want->value,
+                    id, dimension, (long long)(sp.end_time_s - sample_times_base_s), sp.sum, want->value,
                     (long long)want->at_s);
             errors++;
         }
@@ -230,8 +236,10 @@ static int sample_times_check_points(const char *id, RRDSET *st, const char *dim
     return errors;
 }
 
-static int sample_times_check_chart(const struct sample_times_case *tc, const char *id, RRDSET *st) {
-    int errors = sample_times_check_points(id, st, "events", tc->points, tc->points_count);
+static int sample_times_check_chart(const struct sample_times_case *tc, const char *id, RRDSET *st, bool control) {
+    int errors = (control && tc->control_points_count) ?
+        sample_times_check_points(id, st, "events", tc->control_points, tc->control_points_count) :
+        sample_times_check_points(id, st, "events", tc->points, tc->points_count);
     if(tc->late_points_count) {
         errors += sample_times_check_points(id, st, "late", tc->late_points, tc->late_points_count);
 
@@ -252,13 +260,17 @@ static int sample_times_run_case(const struct sample_times_case *tc) {
     snprintfz(test_id, sizeof(test_id), "%s_behind", tc->name);
     snprintfz(control_id, sizeof(control_id), "%s_control", tc->name);
 
+    // ahead of the wall clock: an hour after the current time, at a whole multiple of every update_every used here
+    if(tc->ahead_of_wall_clock)
+        sample_times_base_s = (now_realtime_sec() + 3600) / 60 * 60;
+
     int errors = 0;
     RRDSET *st = sample_times_feed(tc, test_id, true, &errors);
     RRDSET *control = sample_times_feed(tc, control_id, false, &errors);
 
     if(st && control) {
-        errors += sample_times_check_chart(tc, test_id, st);
-        errors += sample_times_check_chart(tc, control_id, control);
+        errors += sample_times_check_chart(tc, test_id, st, false);
+        errors += sample_times_check_chart(tc, control_id, control, true);
 
         if(timeval_usec(&st->last_collected_time) != timeval_usec(&control->last_collected_time)) {
             fprintf(stderr, "SAMPLE TIMES unittest '%s': chart clock %llu us, control %llu us\n", tc->name,
@@ -270,6 +282,7 @@ static int sample_times_run_case(const struct sample_times_case *tc) {
 
     rrdset_free(st);
     rrdset_free(control);
+    sample_times_base_s = SAMPLE_TIMES_PAST_BASE_S;
     return errors;
 }
 
@@ -424,6 +437,26 @@ int pluginsd_sample_times_unittest(void) {
     late_float_dimension_case.name = "late_float_dimension";
     late_float_dimension_case.late_float = true;
 
+    // The wall clock steps back 3 s after +3.2 s: the next three samples are stamped +1.2 s to +3.2 s again while the
+    // counter keeps growing, and the Agent's own clock is behind the chart too. The first newer sample (+4.2 s) restarts
+    // the rate: its value is the new baseline and its slot is a gap, instead of carrying the 400 the counter grew in
+    // those 4 s into one point (the control chart, fed without the ignored samples, stores that 340 + 160).
+    static const struct sample_times_sample clock_step[] = {
+        { S(0.2), 20 }, { S(1.2), 120 }, { S(2.2), 220 }, { S(3.2), 320 },
+        { S(1.2), 420, true }, { S(2.2), 520, true }, { S(3.2), 620, true },
+        { S(4.2), 720 }, { S(5.2), 820 }, { S(6.2), 920 },
+    };
+    static const struct sample_times_point clock_step_points[] = {
+        { 1, 500.0 / 7.0 }, { 2, 80.0 + 200.0 / 7.0 }, { 3, 100 }, { 4, NAN }, { 5, 80 }, { 6, 100 },
+    };
+    static const struct sample_times_point clock_step_control_points[] = {
+        { 1, 500.0 / 7.0 }, { 2, 80.0 + 200.0 / 7.0 }, { 3, 100 }, { 4, 340 }, { 5, 160 }, { 6, 100 },
+    };
+    struct sample_times_case clock_step_case = SAMPLE_TIMES_CASE("clock_step", 1, false, clock_step, clock_step_points);
+    clock_step_case.ahead_of_wall_clock = true;
+    clock_step_case.control_points = clock_step_control_points;
+    clock_step_case.control_points_count = _countof(clock_step_control_points);
+
     const struct sample_times_case cases[] = {
         SAMPLE_TIMES_CASE("aligned", 1, false, aligned, aligned_points),
         SAMPLE_TIMES_CASE("aligned_store_first", 1, true, aligned_store_first, aligned_store_first_points),
@@ -432,6 +465,7 @@ int pluginsd_sample_times_unittest(void) {
         SAMPLE_TIMES_CASE("slow_scrape", 10, false, slow_scrape, slow_scrape_points),
         late_dimension_case,
         late_float_dimension_case,
+        clock_step_case,
     };
 
     int errors = 0;

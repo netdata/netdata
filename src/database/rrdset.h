@@ -193,6 +193,8 @@ struct rrdset {
 
     uint32_t counter;                               // the number of times we added values to this database
     uint32_t counter_done;                          // the number of times rrdset_done() has been called
+    bool restart_rates;                             // the wall clock stepped back while samples were ignored:
+                                                    // the next accepted sample restarts the difference-based rates
 
     time_t last_accessed_time_s;                    // the last time this RRDSET has been accessed
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
