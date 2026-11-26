@@ -392,8 +392,8 @@ int do_proc_mdstat(int update_every, usec_t dt)
         }
     }
 
+    static RRDSET *st_mdstat_health = NULL;
     if (likely(do_health && redundant_num)) {
-        static RRDSET *st_mdstat_health = NULL;
         if (unlikely(!st_mdstat_health)) {
             st_mdstat_health = rrdset_create_localhost(
                 "mdstat",
@@ -410,23 +410,28 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 RRDSET_TYPE_LINE);
         }
 
-        if (!redundant_num) {
-            if (likely(make_charts_obsolete))
-                make_chart_obsolete("mdstat", "health");
-        } else {
-            for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
-                struct raid *raid = &raids[raid_idx];
+        for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
+            struct raid *raid = &raids[raid_idx];
 
-                if (likely(raid->redundant)) {
-                    if (unlikely(!raid->rd_health && !(raid->rd_health = rrddim_find_active(st_mdstat_health, raid->name))))
-                        raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            if (likely(raid->redundant)) {
+                if (unlikely(!raid->rd_health && !(raid->rd_health = rrddim_find_active(st_mdstat_health, raid->name))))
+                    raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                    rrddim_set_by_pointer(st_mdstat_health, raid->rd_health, raid->failed_disks);
-                }
+                rrddim_set_by_pointer(st_mdstat_health, raid->rd_health, raid->failed_disks);
             }
-
-            rrdset_done(st_mdstat_health);
         }
+
+        rrdset_done(st_mdstat_health);
+    } else if (unlikely(st_mdstat_health && make_charts_obsolete)) {
+        // no redundant arrays left: retire the chart and drop the cached pointers,
+        // so that a returning array binds to the revived or re-created chart.
+        // The lookup refreshes the chart's last-access time before it is flagged obsolete,
+        // like the per-array charts above.
+        make_chart_obsolete("mdstat", "health");
+        st_mdstat_health = NULL;
+
+        for (raid_idx = 0; raid_idx < raids_num; raid_idx++)
+            raids[raid_idx].rd_health = NULL;
     }
 
     for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
