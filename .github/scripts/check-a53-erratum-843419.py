@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Fail if any AArch64 executable or shared object under a directory still contains a Cortex-A53 erratum 843419
-# instruction sequence, i.e. it was linked without --fix-cortex-a53-843419.
+# instruction sequence: either it was linked without --fix-cortex-a53-843419, or the linker missed the sequence.
 #
 # Static aarch64 builds run on Cortex-A53 boards (Raspberry Pi 3, ODROID-C2, ...). There an ADRP at page offset
 # 0xff8/0xffc followed by a load or store can use an address one page off, so a function pointer is loaded from the
@@ -11,7 +11,10 @@
 #
 # The sequence rules are a port of lld's scanner (llvm/llvm-project lld/ELF/AArch64ErrataFix.cpp), which follows
 # the Cortex-A53 Software Developers Errata Notice (ARM-EPM-048406). ld.bfd, which links the static build, patches a
-# superset of these sequences, so a correctly linked binary has none left.
+# superset of these sequences, but it scans for them only once: the stub sections it then inserts can shift later code
+# so that a new sequence lands at 0xff8/0xffc and stays unpatched (binutils bug 34200,
+# https://sourceware.org/bugzilla/show_bug.cgi?id=34200). Such a miss depends on the code layout, so an unrelated code
+# change can make it appear or disappear.
 #
 # Go binaries are linked by the Go linker, which has no workaround for this erratum. They are reported but do not fail
 # the check.
@@ -272,7 +275,8 @@ def report(rel, is_go, hits):
     if is_go:
         print(f'NOTICE: {rel}: {len(hits)} sequence(s) in a Go binary (no Go linker workaround): {addrs}')
         return False
-    print(f'ERROR: {rel}: {len(hits)} sequence(s), linked without --fix-cortex-a53-843419: {addrs}')
+    print(f'ERROR: {rel}: {len(hits)} sequence(s) left unpatched (linked without --fix-cortex-a53-843419, '
+          f'or missed by ld.bfd: binutils bug 34200): {addrs}')
     return True
 
 
