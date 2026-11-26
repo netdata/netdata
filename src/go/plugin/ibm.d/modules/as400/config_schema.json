@@ -3,7 +3,7 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
       "active_jobs": {
-        "default": "nil",
+        "default": [],
         "description": "ActiveJobs lists active jobs to monitor, using fully-qualified job identifiers (JOB_NUMBER/USER/JOB_NAME). When empty, active job collection is disabled.",
         "items": {
           "type": "string"
@@ -154,7 +154,7 @@
         "type": "string"
       },
       "job_queues": {
-        "default": "nil",
+        "default": [],
         "description": "JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings. When empty, job queue collection is disabled.",
         "items": {
           "type": "string"
@@ -194,7 +194,7 @@
         "type": "string"
       },
       "output_queues": {
-        "default": "nil",
+        "default": [],
         "description": "OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings. When empty, output queue collection is disabled.",
         "items": {
           "type": "string"

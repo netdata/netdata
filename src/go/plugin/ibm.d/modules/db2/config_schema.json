@@ -116,7 +116,7 @@
         "type": "string"
       },
       "exclude_bufferpools": {
-        "default": "nil",
+        "default": [],
         "description": "ExcludeBufferpools excludes buffer pools after inclusion.",
         "items": {
           "type": "string"
@@ -136,7 +136,7 @@
         "type": "array"
       },
       "exclude_indexes": {
-        "default": "nil",
+        "default": [],
         "description": "ExcludeIndexes excludes indexes after inclusion.",
         "items": {
           "type": "string"
@@ -145,7 +145,7 @@
         "type": "array"
       },
       "exclude_tables": {
-        "default": "nil",
+        "default": [],
         "description": "ExcludeTables excludes tables after inclusion.",
         "items": {
           "type": "string"
@@ -193,7 +193,7 @@
         "type": "array"
       },
       "include_indexes": {
-        "default": "nil",
+        "default": [],
         "description": "IncludeIndexes filters indexes by schema/name.",
         "items": {
           "type": "string"
@@ -202,7 +202,7 @@
         "type": "array"
       },
       "include_tables": {
-        "default": "nil",
+        "default": [],
         "description": "IncludeTables filters tables by schema/name.",
         "items": {
           "type": "string"
