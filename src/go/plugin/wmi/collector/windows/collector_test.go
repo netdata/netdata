@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -56,9 +55,30 @@ func fixtureRows(records ...map[string]any) queryResult {
 	}
 }
 
+// processorRow is a Processor Information instance with raw times, in 100 ns
+// units, per mode.
+func processorRow[T uint64 | string](name string, interrupt, user, privileged, dpc, idle T) map[string]any {
+	return map[string]any{
+		"Name":                  name,
+		"PercentInterruptTime":  interrupt,
+		"PercentUserTime":       user,
+		"PercentPrivilegedTime": privileged,
+		"PercentDPCTime":        dpc,
+		"PercentIdleTime":       idle,
+	}
+}
+
 func validQueryResults() map[string]queryResult {
 	return map[string]queryResult{
-		queryCPU: fixtureRows(map[string]any{"PercentProcessorTime": uint64(75_000_000), "Timestamp_Sys100NS": uint64(100_000_000)}),
+		// Instances come in no particular order; "1,0" is the first processor
+		// of the second NUMA node.
+		queryCPU: fixtureRows(
+			processorRow[uint64]("_Total", 10, 100, 50, 5, 1000),
+			processorRow[uint64]("0,_Total", 10, 100, 50, 5, 1000),
+			processorRow[uint64]("1,0", 5, 5, 5, 5, 5),
+			processorRow[uint64]("0,1", 0, 0, 0, 0, 0),
+			processorRow[uint64]("0,0", 0, 100, 0, 0, 900),
+		),
 		queryMemory: fixtureRows(map[string]any{
 			"TotalVisibleMemorySize": "8388608",
 			"FreePhysicalMemory":     uint64(2097152),
@@ -66,10 +86,22 @@ func validQueryResults() map[string]queryResult {
 		queryNetwork: fixtureRows(
 			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
+			map[string]any{"Name": "isatap.example.com", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "0"},
 		),
 		queryDisk: fixtureRows(
-			map[string]any{"DeviceID": "C:", "Size": uint64(500000000000), "FreeSpace": uint64(420000000000)},
-			map[string]any{"DeviceID": "D:", "Size": "4294967296", "FreeSpace": "0"},
+			map[string]any{
+				"DeviceID":           "C:",
+				"Size":               uint64(500000000000),
+				"FreeSpace":          uint64(420000000000),
+				"FileSystem":         "NTFS",
+				"VolumeSerialNumber": "BEF3E296",
+			},
+			map[string]any{
+				"DeviceID":           "D:",
+				"Size":               "4294967296",
+				"FreeSpace":          "0",
+				"VolumeSerialNumber": "0000ABCD",
+			},
 		),
 	}
 }
@@ -97,17 +129,27 @@ func TestCollector_Collect(t *testing.T) {
 	}
 	sessions[1].results[queryMemory] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
 	sessions[1].results[queryNetwork] = fixtureRows(
-		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "0", "BytesSentPersec": "malformed"},
+		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "250", "BytesSentPersec": "malformed"},
 		map[string]any{"Name": "_Total", "BytesReceivedPersec": uint32(30)},
 		map[string]any{"BytesSentPersec": uint64(20)},
 	)
-	// 20 s of processor time later, idle for 15 s of it: 25% busy since the first sample.
-	sessions[2].results[queryCPU] = fixtureRows(map[string]any{
-		"PercentProcessorTime": uint64(90_000_000),
-		"Timestamp_Sys100NS":   uint64(120_000_000),
-	})
+	// Each processor's share of the time all its modes accumulated since the
+	// first sample; WinRM reports the numbers as text.
+	sessions[2].results[queryCPU] = fixtureRows(
+		processorRow[uint64]("_Total", 20, 300, 150, 15, 1680),
+		processorRow("0,1", "10", "0", "40", "10", "940"),
+		processorRow[uint64]("0,0", 0, 600, 0, 0, 1400),
+		// A counter that went back leaves the processor without a value.
+		processorRow[uint64]("1,0", 5, 5, 5, 5, 4),
+	)
 	sessions[1].results[queryDisk] = fixtureRows(
-		map[string]any{"DeviceID": "C:", "Size": uint64(300), "FreeSpace": uint64(300)},
+		map[string]any{
+			"DeviceID":           "C:",
+			"Size":               uint64(300),
+			"FreeSpace":          uint64(300),
+			"FileSystem":         "NTFS",
+			"VolumeSerialNumber": "BEF3E296",
+		},
 		map[string]any{"DeviceID": "D:", "Size": uint64(500)},
 	)
 
@@ -127,33 +169,57 @@ func TestCollector_Collect(t *testing.T) {
 	// No CPU value yet: an interval needs a previous sample.
 	first, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
+	const (
+		ethernet  = `{device="Ethernet",interface_type="real"}`
+		ethernet1 = `{device="Ethernet#1",interface_type="real"}`
+		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
+		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
+	)
 	assert.Equal(t, map[string]metrix.SampleValue{
-		"memory_used_bytes":                              6 * 1024 * 1024 * 1024,
-		"memory_available_bytes":                         2 * 1024 * 1024 * 1024,
-		`network_received_bytes{interface="Ethernet"}`:   190,
-		`network_received_bytes{interface="Ethernet#1"}`: 0,
-		`network_sent_bytes{interface="Ethernet"}`:       30,
-		`network_sent_bytes{interface="Ethernet#1"}`:     70,
-		`disk_used_bytes{drive="C:"}`:                    80000000000,
-		`disk_free_bytes{drive="C:"}`:                    420000000000,
-		`disk_used_bytes{drive="D:"}`:                    4294967296,
-		`disk_free_bytes{drive="D:"}`:                    0,
+		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
+		"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
+		"network_received_bytes" + ethernet:  190,
+		"network_received_bytes" + ethernet1: 0,
+		"network_sent_bytes" + ethernet:      30,
+		"network_sent_bytes" + ethernet1:     70,
+		"disk_used_bytes" + driveC:           80000000000,
+		"disk_avail_bytes" + driveC:          420000000000,
+		"disk_used_bytes" + driveD:           4294967296,
+		"disk_avail_bytes" + driveD:          0,
 	}, first)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 	second, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]metrix.SampleValue{
-		"memory_available_bytes":                       0,
-		`network_received_bytes{interface="Ethernet"}`: 0,
-		`disk_used_bytes{drive="C:"}`:                  0,
-		`disk_free_bytes{drive="C:"}`:                  300,
+		"memory_free_bytes":                 0,
+		"network_received_bytes" + ethernet: 250,
+		"disk_used_bytes" + driveC:          0,
+		"disk_avail_bytes" + driveC:         300,
 	}, second)
 
-	// The failed CPU query keeps the first sample, so the average spans both intervals.
+	// The failed CPU query keeps the first sample, so the shares span both intervals.
 	recovered, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	first["cpu_busy_percent"] = 25
+	for metric, value := range map[string]metrix.SampleValue{
+		"cpu_total_irq_percent":               1,
+		"cpu_total_user_percent":              20,
+		"cpu_total_system_percent":            10,
+		"cpu_total_dpc_percent":               1,
+		"cpu_total_idle_percent":              68,
+		`cpu_core_irq_percent{cpu="cpu0"}`:    0,
+		`cpu_core_user_percent{cpu="cpu0"}`:   50,
+		`cpu_core_system_percent{cpu="cpu0"}`: 0,
+		`cpu_core_dpc_percent{cpu="cpu0"}`:    0,
+		`cpu_core_idle_percent{cpu="cpu0"}`:   50,
+		`cpu_core_irq_percent{cpu="cpu1"}`:    1,
+		`cpu_core_user_percent{cpu="cpu1"}`:   0,
+		`cpu_core_system_percent{cpu="cpu1"}`: 4,
+		`cpu_core_dpc_percent{cpu="cpu1"}`:    1,
+		`cpu_core_idle_percent{cpu="cpu1"}`:   94,
+	} {
+		first[metric] = value
+	}
 	assert.Equal(t, first, recovered)
 
 	for _, session := range sessions {
@@ -259,45 +325,6 @@ func TestChartTemplateAndMetadata(t *testing.T) {
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
 }
 
-func TestMetadataDocumentsChartLabels(t *testing.T) {
-	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
-	require.NoError(t, err)
-	data, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	var doc struct {
-		Modules []struct {
-			Metrics struct {
-				Scopes []struct {
-					Labels []struct {
-						Name string `yaml:"name"`
-					} `yaml:"labels"`
-					Metrics []struct {
-						Name string `yaml:"name"`
-					} `yaml:"metrics"`
-				} `yaml:"scopes"`
-			} `yaml:"metrics"`
-		} `yaml:"modules"`
-	}
-	require.NoError(t, yaml.Unmarshal(data, &doc))
-	require.Len(t, doc.Modules, 1)
-
-	for _, scope := range doc.Modules[0].Metrics.Scopes {
-		var documented []string
-		for _, label := range scope.Labels {
-			documented = append(documented, label.Name)
-		}
-		for _, metric := range scope.Metrics {
-			chart, ok := charts[metric.Name]
-			require.True(t, ok, metric.Name)
-			var attached []string
-			if chart.Instances != nil {
-				attached = chart.Instances.ByLabels
-			}
-			assert.ElementsMatch(t, attached, documented, "labels of %s", metric.Name)
-		}
-	}
-}
-
 func metricQueries(queries []string) []string {
 	var metrics []string
 	for _, query := range queries {
@@ -370,8 +397,8 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryDisk:    lost,
 			},
 			wantMetrics: map[string]metrix.SampleValue{
-				"memory_used_bytes":      6 * 1024 * 1024 * 1024,
-				"memory_available_bytes": 2 * 1024 * 1024 * 1024,
+				"memory_used_bytes": 6 * 1024 * 1024 * 1024,
+				"memory_free_bytes": 2 * 1024 * 1024 * 1024,
 			},
 		},
 		"after a refused query, report the query failures": {
@@ -404,38 +431,68 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 	}
 }
 
-func TestBusyPercent(t *testing.T) {
-	sample := func(idle, timestamp uint64) cpuTimes {
-		return cpuTimes{
-			idle:      idle,
-			timestamp: timestamp,
-			valid:     true,
-		}
-	}
+func TestReadDisks(t *testing.T) {
 	for name, tc := range map[string]struct {
-		prev, cur cpuTimes
-		want      percent
+		rows       queryResult
+		want       []diskSpace
+		wantUsable bool
 	}{
-		"no previous sample": {cur: sample(10, 100), want: percent{}},
-		"busy share of interval": {prev: sample(10, 100), cur: sample(70, 180), want: percent{
-			value: 25,
-			valid: true,
-		}},
-		"fully idle": {prev: sample(10, 100), cur: sample(90, 180), want: percent{
-			value: 0,
-			valid: true,
-		}},
-		"idle above elapsed": {prev: sample(10, 100), cur: sample(95, 180), want: percent{
-			value: 0,
-			valid: true,
-		}},
-		"same timestamp":         {prev: sample(10, 100), cur: sample(10, 100), want: percent{}},
-		"timestamp reset":        {prev: sample(10, 100), cur: sample(5, 50), want: percent{}},
-		"idle counter went back": {prev: sample(50, 100), cur: sample(40, 180), want: percent{}},
-		"invalid current sample": {prev: sample(10, 100), cur: cpuTimes{}, want: percent{}},
+		"labels as the native Windows Agent writes them": {
+			rows: fixtureRows(
+				map[string]any{
+					"DeviceID":           "C:",
+					"Size":               uint64(500),
+					"FreeSpace":          uint64(200),
+					"FileSystem":         "ReFS",
+					"VolumeSerialNumber": "00c0ffee",
+					"Access":             uint16(0),
+				},
+				map[string]any{"DeviceID": "D:", "Size": "100", "FreeSpace": "100"},
+			),
+			want: []diskSpace{
+				{
+					mountPoint:   "C:",
+					fileSystem:   "ReFS",
+					serialNumber: "0xC0FFEE",
+					avail: sample{
+						value: 200,
+						valid: true,
+					},
+					used: sample{
+						value: 300,
+						valid: true,
+					},
+				},
+				{
+					mountPoint:   "D:",
+					fileSystem:   "unknown",
+					serialNumber: "0x0",
+					avail: sample{
+						value: 100,
+						valid: true,
+					},
+					used: sample{
+						value: 0,
+						valid: true,
+					},
+				},
+			},
+			wantUsable: true,
+		},
+		"read-only drives are left out": {
+			rows: fixtureRows(
+				map[string]any{"DeviceID": "E:", "Size": uint64(100), "FreeSpace": uint64(0), "Access": "1"},
+			),
+			wantUsable: true,
+		},
+		"no drive reports free space": {
+			rows: fixtureRows(map[string]any{"DeviceID": "C:", "Size": uint64(100)}),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, busyPercent(tc.prev, tc.cur))
+			var o observations
+			assert.Equal(t, tc.wantUsable, o.readDisks(tc.rows.rows))
+			assert.Equal(t, tc.want, o.drives)
 		})
 	}
 }

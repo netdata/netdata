@@ -16,10 +16,12 @@ import (
 const (
 	// Raw performance counters: the formatted classes describe only a moment around
 	// each query, not the interval between polls.
-	queryCPU     = "SELECT PercentProcessorTime, Timestamp_Sys100NS FROM Win32_PerfRawData_PerfOS_Processor WHERE Name = '_Total'"
+	queryCPU = "SELECT Name, PercentInterruptTime, PercentUserTime, PercentPrivilegedTime, PercentDPCTime, " +
+		"PercentIdleTime FROM Win32_PerfRawData_Counters_ProcessorInformation"
 	queryMemory  = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
 	queryNetwork = "SELECT Name, BytesReceivedPersec, BytesSentPersec FROM Win32_PerfRawData_Tcpip_NetworkInterface"
-	queryDisk    = "SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType = 3"
+	queryDisk    = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
+		"WHERE DriveType = 3"
 )
 
 type metricGroup struct {
@@ -112,9 +114,11 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			c.Limit("wmi:"+groups[i].name, 1, time.Minute).Warning(err)
 		}
 	}
-	// Check's poll primes the CPU sample, so the first collection already has an interval.
-	snapshot.cpuBusy = busyPercent(c.lastCPU, snapshot.cpuTimes)
-	if snapshot.cpuTimes.valid {
+	// Check's poll primes the CPU sample, so the first collection already has
+	// an interval. A failed CPU query keeps the previous sample, so the next
+	// interval spans both.
+	snapshot.cpu = cpuUtilizationBetween(c.lastCPU, snapshot.cpuTimes)
+	if !snapshot.cpuTimes.empty() {
 		c.lastCPU = snapshot.cpuTimes
 	}
 	if inventoryDue && !sessionLost {

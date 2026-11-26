@@ -8,14 +8,15 @@ import (
 	"strings"
 )
 
-// observations holds one poll's values in base units: bytes, byte counters and percent.
+// observations holds one poll's values in base units: bytes, byte counters,
+// raw processor times and percent.
 type observations struct {
-	cpuTimes        cpuTimes
-	cpuBusy         percent
-	memoryUsed      sample
-	memoryAvailable sample
-	interfaces      []networkTraffic
-	drives          []diskSpace
+	cpuTimes   cpuSample
+	cpu        cpuUtilization
+	memoryFree sample
+	memoryUsed sample
+	interfaces []networkTraffic
+	drives     []diskSpace
 }
 
 // sample distinguishes a reported zero from a missing or malformed value.
@@ -24,77 +25,43 @@ type sample struct {
 	valid bool
 }
 
-// percent is a computed share that may be unavailable.
-type percent struct {
-	value float64
-	valid bool
-}
-
-// cpuTimes is one raw sample of the _Total processor counters, in 100 ns units.
-type cpuTimes struct {
-	idle      uint64 // PercentProcessorTime: idle time (PERF_100NSEC_TIMER_INV)
-	timestamp uint64 // Timestamp_Sys100NS
-	valid     bool
-}
-
 // networkTraffic holds an interface's byte totals since its counters started.
 type networkTraffic struct {
-	name     string
+	device   string
 	received sample
 	sent     sample
 }
 
 type diskSpace struct {
-	drive string
-	used  sample
-	free  sample
+	mountPoint   string
+	fileSystem   string
+	serialNumber string
+	avail        sample
+	used         sample
 }
 
-func (o *observations) readCPU(rows []map[string]any) bool {
-	if len(rows) != 1 {
-		return false
-	}
-	idle := readUnsigned(rows[0]["percentprocessortime"])
-	timestamp := readUnsigned(rows[0]["timestamp_sys100ns"])
-	if !idle.valid || !timestamp.valid {
-		return false
-	}
-	o.cpuTimes = cpuTimes{
-		idle:      idle.value,
-		timestamp: timestamp.value,
-		valid:     true,
-	}
-	return true
-}
+// Win32_LogicalDisk Access value of media that can only be read.
+const accessReadOnly = 1
 
-// busyPercent is the share of the interval between two samples that the
-// processors were busy. It is unavailable without a previous sample and after
-// a counter reset, such as a reboot.
-func busyPercent(prev, cur cpuTimes) percent {
-	if !prev.valid || !cur.valid || cur.timestamp <= prev.timestamp || cur.idle < prev.idle {
-		return percent{}
-	}
-	elapsed := cur.timestamp - prev.timestamp
-	idle := min(cur.idle-prev.idle, elapsed)
-	return percent{
-		value: 100 * float64(elapsed-idle) / float64(elapsed),
-		valid: true,
-	}
-}
-
-// readMemory converts Win32_OperatingSystem's KiB values to bytes.
+// readMemory converts Win32_OperatingSystem's KiB values to bytes. Free
+// physical memory is the memory available to processes, as the native Windows
+// Agent's free dimension.
 func (o *observations) readMemory(rows []map[string]any) bool {
 	if len(rows) != 1 {
 		return false
 	}
 	total := kibToBytes(readUnsigned(rows[0]["totalvisiblememorysize"]))
 	free := kibToBytes(readUnsigned(rows[0]["freephysicalmemory"]))
-	o.memoryAvailable = free
+	o.memoryFree = free
 	o.memoryUsed = used(total, free)
 	return free.valid
 }
 
+// readNetwork keeps the interfaces that have carried traffic. Like the native
+// Windows Agent, it does not chart an interface whose counters show no byte
+// since they started, such as an unused tunnel adapter.
 func (o *observations) readNetwork(rows []map[string]any) bool {
+	var usable bool
 	for _, row := range rows {
 		name, _ := row["name"].(string)
 		if strings.TrimSpace(name) == "" || name == "_Total" {
@@ -102,18 +69,26 @@ func (o *observations) readNetwork(rows []map[string]any) bool {
 		}
 		received := readUnsigned(row["bytesreceivedpersec"])
 		sent := readUnsigned(row["bytessentpersec"])
-		if received.valid || sent.valid {
-			o.interfaces = append(o.interfaces, networkTraffic{
-				name:     name,
-				received: received,
-				sent:     sent,
-			})
+		if !received.valid && !sent.valid {
+			continue
 		}
+		usable = true
+		if received.value == 0 && sent.value == 0 {
+			continue
+		}
+		o.interfaces = append(o.interfaces, networkTraffic{
+			device:   name,
+			received: received,
+			sent:     sent,
+		})
 	}
-	return len(rows) == 0 || len(o.interfaces) > 0
+	return len(rows) == 0 || usable
 }
 
+// readDisks leaves out read-only drives, as the native Windows Agent does, so
+// a full read-only volume does not hold a disk space alert forever.
 func (o *observations) readDisks(rows []map[string]any) bool {
+	var usable bool
 	for _, row := range rows {
 		drive, _ := row["deviceid"].(string)
 		if strings.TrimSpace(drive) == "" {
@@ -121,15 +96,39 @@ func (o *observations) readDisks(rows []map[string]any) bool {
 		}
 		size := readUnsigned(row["size"])
 		free := readUnsigned(row["freespace"])
-		if free.valid {
-			o.drives = append(o.drives, diskSpace{
-				drive: drive,
-				used:  used(size, free),
-				free:  free,
-			})
+		if !free.valid {
+			continue
 		}
+		usable = true
+		if access := readUnsigned(row["access"]); access.valid && access.value == accessReadOnly {
+			continue
+		}
+		o.drives = append(o.drives, diskSpace{
+			mountPoint:   drive,
+			fileSystem:   fileSystem(row),
+			serialNumber: volumeSerialNumber(row),
+			avail:        free,
+			used:         used(size, free),
+		})
 	}
-	return len(rows) == 0 || len(o.drives) > 0
+	return len(rows) == 0 || usable
+}
+
+// fileSystem names an unformatted volume's file system "unknown", as the
+// native Windows Agent does.
+func fileSystem(row map[string]any) string {
+	if name := textProperty(row, "filesystem"); name != "" {
+		return name
+	}
+	return "unknown"
+}
+
+// volumeSerialNumber formats WMI's hexadecimal serial as the native Windows
+// Agent does: 0x and uppercase digits without leading zeros, and 0x0 when the
+// serial is unknown.
+func volumeSerialNumber(row map[string]any) string {
+	n, _ := strconv.ParseUint(textProperty(row, "volumeserialnumber"), 16, 32)
+	return "0x" + strings.ToUpper(strconv.FormatUint(n, 16))
 }
 
 func used(total, free sample) sample {

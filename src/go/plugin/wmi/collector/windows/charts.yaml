@@ -1,55 +1,115 @@
 version: v1
-# Not the module name: the native Windows plugin already owns the windows.* contexts.
-context_namespace: wmi
+# The native Windows Agent's contexts, dimensions and units, so the standard dashboard sections and the stock Windows
+# alerts apply to the host's node. The contexts have different roots, so the template has no spec-level namespace.
 groups:
-  - family: CPU
-    metrics: [cpu_busy_percent]
+  - family: cpu
+    context_namespace: system
+    metrics:
+      - cpu_total_irq_percent
+      - cpu_total_user_percent
+      - cpu_total_system_percent
+      - cpu_total_dpc_percent
+      - cpu_total_idle_percent
     charts:
-      - context: cpu_utilization
-        title: CPU Utilization
-        units: "%"
-        dimensions:
-          - selector: cpu_busy_percent
-            name: busy
-  - family: Memory
-    metrics: [memory_used_bytes, memory_available_bytes]
-    charts:
-      - context: memory_usage
-        title: Physical Memory Usage
-        units: bytes
+      - context: cpu
+        title: Total CPU Utilization
+        units: percentage
         type: stacked
         dimensions:
+          - selector: cpu_total_irq_percent
+            name: irq
+          - selector: cpu_total_user_percent
+            name: user
+          - selector: cpu_total_system_percent
+            name: system
+          - selector: cpu_total_dpc_percent
+            name: dpc
+          - selector: cpu_total_idle_percent
+            name: idle
+            options:
+              hidden: true
+  - family: utilization
+    context_namespace: cpu
+    metrics:
+      - cpu_core_irq_percent
+      - cpu_core_user_percent
+      - cpu_core_system_percent
+      - cpu_core_dpc_percent
+      - cpu_core_idle_percent
+    charts:
+      - context: cpu
+        title: Core Utilization
+        units: percentage
+        type: stacked
+        instances:
+          by_labels: [cpu]
+        dimensions:
+          - selector: cpu_core_irq_percent
+            name: irq
+          - selector: cpu_core_user_percent
+            name: user
+          - selector: cpu_core_system_percent
+            name: system
+          - selector: cpu_core_dpc_percent
+            name: dpc
+          - selector: cpu_core_idle_percent
+            name: idle
+            options:
+              hidden: true
+  - family: ram
+    context_namespace: system
+    metrics: [memory_free_bytes, memory_used_bytes]
+    charts:
+      - context: ram
+        title: System RAM
+        units: MiB
+        type: stacked
+        dimensions:
+          - selector: memory_free_bytes
+            name: free
+            options:
+              divisor: 1048576
           - selector: memory_used_bytes
             name: used
-          - selector: memory_available_bytes
-            name: available
-  - family: Network
+            options:
+              divisor: 1048576
+  - family: net
+    context_namespace: net
     metrics: [network_received_bytes, network_sent_bytes]
     charts:
-      - context: network_traffic
-        title: Network Interface Traffic
-        units: bytes/s
+      - context: net
+        title: Bandwidth
+        units: kilobits/s
         type: area
         instances:
-          by_labels: [interface]
+          by_labels: [device]
         dimensions:
           - selector: network_received_bytes
             name: received
+            options:
+              multiplier: 8
+              divisor: 1000
           - selector: network_sent_bytes
             name: sent
             options:
-              multiplier: -1
-  - family: Disk
-    metrics: [disk_used_bytes, disk_free_bytes]
+              multiplier: -8
+              divisor: 1000
+  - family: disk space
+    context_namespace: disk
+    metrics: [disk_avail_bytes, disk_used_bytes]
     charts:
-      - context: disk_space
-        title: Fixed Disk Space
-        units: bytes
+      - context: space
+        title: Disk Space Usage
+        units: GiB
         type: stacked
         instances:
-          by_labels: [drive]
+          by_labels: [mount_point]
         dimensions:
+          - selector: disk_avail_bytes
+            name: avail
+            options:
+              divisor: 1073741824
           - selector: disk_used_bytes
             name: used
-          - selector: disk_free_bytes
-            name: free
+            options:
+              divisor: 1073741824

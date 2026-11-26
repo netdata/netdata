@@ -68,13 +68,13 @@
         "properties": {
           "cpu": {
             "title": "CPU",
-            "description": "Collect total processor utilization.",
+            "description": "Collect processor utilization by mode, in total and per logical processor.",
             "type": "boolean",
             "default": true
           },
           "memory": {
             "title": "Memory",
-            "description": "Collect used and available physical memory.",
+            "description": "Collect free and used physical memory.",
             "type": "boolean",
             "default": true
           },
@@ -86,7 +86,7 @@
           },
           "disk": {
             "title": "Disk",
-            "description": "Collect used and free space per fixed drive.",
+            "description": "Collect available and used space per fixed drive.",
             "type": "boolean",
             "default": true
           }

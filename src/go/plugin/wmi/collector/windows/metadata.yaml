@@ -31,11 +31,13 @@ modules:
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
-          - total CPU utilization;
-          - used and available physical memory;
+          - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
+          - free and used physical memory;
           - received and sent traffic per network interface;
-          - used and free space per fixed drive;
+          - available and used space per fixed drive;
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address.
+
+          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent.
         method_description: |
           `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group, and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
@@ -50,7 +52,7 @@ modules:
 
           | Data | WMI classes |
           |---|---|
-          | CPU | `Win32_PerfRawData_PerfOS_Processor` |
+          | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
           | Memory | `Win32_OperatingSystem` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface` |
           | Disk | `Win32_LogicalDisk` |
@@ -79,15 +81,19 @@ modules:
             - Authentication is NTLMv2 only. Hosts or domains that block NTLM and accept only Kerberos cannot be monitored.
             - Every collection logs in again. With a wrong or expired password, each collection adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
-            - CPU is the total across all processors, without a per-core breakdown.
             - Traffic appears from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
+            - Network interface speed is not collected, so the stock alerts that compare traffic with it have no value.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
             On each Windows host, every collection costs up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`). DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+    excluded_alerts:
+      - interface_speed
+      - 1m_received_traffic_overflow
+      - 1m_sent_traffic_overflow
     setup:
       prerequisites:
         list:
@@ -205,12 +211,14 @@ modules:
               required: false
               group: Collection
             - name: collectors.cpu
-              description: "Collect total processor utilization."
+              description: "Collect processor utilization by mode, in total and per logical processor."
               default_value: true
               required: false
               group: Collection
+              detailed_description: |
+                As on the Netdata Agent running on Windows, each mode is its share of the time all modes accumulated in the interval. The privileged time Windows reports (`system`) already includes the interrupt (`irq`) and DPC (`dpc`) time, so those two also count within `system`.
             - name: collectors.memory
-              description: "Collect used and available physical memory."
+              description: "Collect free and used physical memory."
               default_value: true
               required: false
               group: Collection
@@ -220,7 +228,7 @@ modules:
               required: false
               group: Collection
             - name: collectors.disk
-              description: "Collect used and free space per fixed drive."
+              description: "Collect available and used space per fixed drive."
               default_value: true
               required: false
               group: Collection
@@ -241,7 +249,7 @@ modules:
                 | `_system_disk_space` | Total partition size of the fixed drives, in bytes; requires the disk group |
                 | `_net_default_iface`, `_net_default_iface_ip`, `_net_default_iface_detection` | Interface and IPv4 address of the default route |
 
-                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information.
+                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information. Give that node the label `_os: windows`, which the generated node has, so the stock Windows alerts apply to it.
         examples:
           folding:
             title: Configuration example
@@ -390,42 +398,72 @@ modules:
           description: The monitored Windows host.
           labels: []
           metrics:
-            - name: wmi.cpu_utilization
-              description: CPU Utilization
-              unit: '%'
-              chart_type: line
-              dimensions:
-                - name: busy
-            - name: wmi.memory_usage
-              description: Physical Memory Usage
-              unit: bytes
+            - name: system.cpu
+              description: Total CPU Utilization
+              unit: percentage
               chart_type: stacked
               dimensions:
+                - name: irq
+                - name: user
+                - name: system
+                - name: dpc
+                - name: idle
+            - name: system.ram
+              description: System RAM
+              unit: MiB
+              chart_type: stacked
+              dimensions:
+                - name: free
                 - name: used
-                - name: available
-        - name: network interface
-          description: A network interface as Windows performance counters list it, including virtual and tunnel adapters.
+        - name: logical processor
+          description: A logical processor of the host.
           labels:
-            - name: interface
-              description: Performance counter name of the interface, for example `Intel[R] PRO_1000 MT Network Connection`. Windows writes parentheses as square brackets and `#` or `/` as underscores.
+            - name: cpu
+              description: Logical processor as `cpuN`, numbered through the host's NUMA nodes in order, for example `cpu0`.
           metrics:
-            - name: wmi.network_traffic
-              description: Network Interface Traffic
-              unit: bytes/s
+            - name: cpu.cpu
+              description: Core Utilization
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: irq
+                - name: user
+                - name: system
+                - name: dpc
+                - name: idle
+        - name: network interface
+          description: A network interface as Windows performance counters list it, including virtual and tunnel adapters, that has sent or received traffic since its counters started.
+          labels:
+            - name: device
+              description: Performance counter name of the interface, for example `Intel[R] PRO_1000 MT Network Connection`. Windows writes parentheses as square brackets and `#` or `/` as underscores.
+            - name: interface_type
+              description: Always `real`, the value the Netdata Agent on Windows gives the interfaces of this counter set.
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: kilobits/s
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
         - name: drive
-          description: A fixed drive with a drive letter.
+          description: A fixed drive with a drive letter that Windows does not report as read-only.
           labels:
-            - name: drive
+            - name: mount_point
               description: Drive letter, for example `C:`.
+            - name: drive_type
+              description: Always `fixed`, the only drive type the plugin reads.
+            - name: filesystem
+              description: File system of the drive, for example `NTFS`, or `unknown` when Windows reports none.
+            - name: rw_mode
+              description: Always `rw`, because read-only drives are not charted.
+            - name: serial_number
+              description: Volume serial number in hexadecimal, for example `0x1A2B3C4D`, or `0x0` when Windows reports none.
           metrics:
-            - name: wmi.disk_space
-              description: Fixed Disk Space
-              unit: bytes
+            - name: disk.space
+              description: Disk Space Usage
+              unit: GiB
               chart_type: stacked
               dimensions:
+                - name: avail
                 - name: used
-                - name: free
