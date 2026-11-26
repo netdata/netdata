@@ -44,7 +44,7 @@ func runtimeTemplateSet(t *testing.T, id string) *chartengine.TemplateSet {
 func collectNativeFrame(t *testing.T, job *JobV2) jobV2PreparedEmission {
 	t.Helper()
 	job.refreshVnodeSnapshot()
-	prepared, ok := job.collectAndEmit(time.Time{})
+	prepared, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
 	require.True(t, ok)
 	return prepared
 }
@@ -100,7 +100,7 @@ func TestJobV2NativeTriggeringCollectionAndInvalidCandidates(t *testing.T) {
 				}
 				return nil
 			}
-			_, ok := job.collectAndEmit(time.Time{})
+			_, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
 			assert.False(t, ok)
 			assert.Empty(t, out.String())
 			reader := store.Read(metrix.ReadRaw())

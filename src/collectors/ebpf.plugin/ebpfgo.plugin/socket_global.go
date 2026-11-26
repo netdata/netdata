@@ -150,9 +150,9 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 	}
 
-	collectAndPublish := func(sinceLast time.Duration) {
+	collectAndPublish := func(sample netdataapi.SampleTime) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, "socket", handle.Runtime.ArenaDropped(), sinceLast)
+			publishArenaDrops(api, "socket", handle.Runtime.ArenaDropped(), sample)
 		}
 		if shmPublisher == nil && shouldPublish && store != nil {
 			p, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
@@ -197,8 +197,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 	}
 
-	collectAndPublish(0)
-	lastCollection := time.Now()
+	collectAndPublish(pluginSampleClock.Next(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -210,9 +209,6 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		case <-ticker.C:
 		}
 
-		now := time.Now()
-		sinceLast := now.Sub(lastCollection)
-		lastCollection = now
-		collectAndPublish(sinceLast)
+		collectAndPublish(pluginSampleClock.Next(time.Now()))
 	}
 }

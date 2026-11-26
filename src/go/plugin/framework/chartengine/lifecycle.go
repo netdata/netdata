@@ -20,13 +20,10 @@ type materializedChartState struct {
 	emittedMeta        program.ChartMeta
 	lifecycle          program.LifecyclePolicy
 	lastSeenSuccessSeq uint64
-	// lastUpdatedAt is the CollectedAt (unix nanoseconds) of the chart's last
-	// emitted update, zero when unknown; it gives the next update its span.
-	lastUpdatedAt    uint64
-	dimensions       map[string]*materializedDimensionState
-	presentation     *materializedChartPresentation
-	orderedDimsDirty bool
-	scratchEntries   map[string]*dimBuildEntry
+	dimensions         map[string]*materializedDimensionState
+	presentation       *materializedChartPresentation
+	orderedDimsDirty   bool
+	scratchEntries     map[string]*dimBuildEntry
 	// journalToken marks the build that created or already recorded this chart.
 	journalToken uint64
 	// dimDeletes and scratchDeletes count deletions from dimensions and scratchEntries

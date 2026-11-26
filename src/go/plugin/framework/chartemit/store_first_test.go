@@ -56,6 +56,7 @@ func TestApplyPlanStoreFirstOnEveryChartDefinition(t *testing.T) {
 				require.NoError(t, ApplyPlan(netdataapi.New(&out), Plan{
 					Actions: []EngineAction{tc.action},
 				}, EmitEnv{
+					CollectedAt: testSample,
 					TypeID:      "collector.job",
 					UpdateEvery: 1,
 					StoreFirst:  enabled,

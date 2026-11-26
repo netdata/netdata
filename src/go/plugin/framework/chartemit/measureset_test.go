@@ -250,6 +250,7 @@ func emitMeasureSetAvailability(
 	defer attempt.Abort()
 	var wire bytes.Buffer
 	require.NoError(t, ApplyPlan(netdataapi.New(&wire), attempt.Plan(), EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		HostScope:   host,

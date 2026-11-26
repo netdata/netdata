@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -48,6 +47,7 @@ func benchmarkApplyChartLabels(b *testing.B, plan Plan, chartCount, labelCount i
 	writer := &benchmarkByteCounter{}
 	api := netdataapi.New(writer)
 	env := EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "benchmark.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
@@ -87,7 +87,7 @@ func BenchmarkApplyPlanChartValueUpdates(b *testing.B) {
 			plan := benchmarkChartValuePlan(chartCount)
 			writer := &benchmarkByteCounter{}
 			api := netdataapi.New(writer)
-			env := EmitEnv{TypeID: "benchmark.job", UpdateEvery: 1}
+			env := EmitEnv{TypeID: "benchmark.job", UpdateEvery: 1, CollectedAt: testSample}
 			if err := ApplyPlan(api, plan, env); err != nil {
 				b.Fatalf("warm value plan: %v", err)
 			}
@@ -156,8 +156,7 @@ func benchmarkChartValuePlan(chartCount int) Plan {
 	actions := make([]EngineAction, 0, chartCount)
 	for chart := range chartCount {
 		actions = append(actions, chartengine.UpdateChartAction{
-			ChartID:   "chart_" + strconv.Itoa(chart),
-			SinceLast: 10 * time.Second,
+			ChartID: "chart_" + strconv.Itoa(chart),
 			Values: []chartengine.UpdateDimensionValue{{
 				Name:  "value",
 				Int64: int64(chart),

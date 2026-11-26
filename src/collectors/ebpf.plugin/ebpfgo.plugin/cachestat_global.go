@@ -93,6 +93,10 @@ var cachestatGlobalChartsOnce sync.Once
 // this lock they can interleave and corrupt the protocol stream.
 var pluginOutputMu sync.Mutex
 
+// pluginSampleClock times every chart sample of this process, so each chart's
+// END times keep increasing (see netdataapi.SampleClock).
+var pluginSampleClock netdataapi.SampleClock
+
 func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachestatGlobalPublish, bool) {
 	mpa := diffCounters(current.MarkPageAccessed, s.prev.MarkPageAccessed)
 	mbd := diffCounters(current.MarkBufferDirty, s.prev.MarkBufferDirty)
@@ -181,7 +185,7 @@ func emitCachestatGlobalChart(api *netdataapi.API, chart cachestatGlobalChart, u
 	})
 }
 
-func (p cachestatGlobalPublish) write(api *netdataapi.API, sinceLast time.Duration) {
+func (p cachestatGlobalPublish) write(api *netdataapi.API, sample netdataapi.SampleTime) {
 	if api == nil {
 		return
 	}
@@ -199,9 +203,9 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, sinceLast time.Durati
 		{chart: "cachestat_hits", dim: "hit", value: p.Hit},
 		{chart: "cachestat_misses", dim: "miss", value: p.Miss},
 	} {
-		api.BEGIN(cachestatGlobalGroup, item.chart, sinceLast)
+		api.BEGIN(cachestatGlobalGroup, item.chart)
 		api.SET(item.dim, item.value)
-		api.END()
+		api.ENDTimed(sample)
 	}
 }
 
@@ -224,10 +228,9 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 	}
 
 	state := &cachestatGlobalState{}
-	lastCollection := time.Now()
-	collectAndPublish := func(sinceLast time.Duration) {
+	collectAndPublish := func(sample netdataapi.SampleTime) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, cachestatGlobalModule, handle.Runtime.ArenaDropped(), sinceLast)
+			publishArenaDrops(api, cachestatGlobalModule, handle.Runtime.ArenaDropped(), sample)
 		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
@@ -241,7 +244,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 				AccountPageDirtied: snapshot.AccountPageDirtied,
 			})
 			if ok {
-				publish.write(api, sinceLast)
+				publish.write(api, sample)
 			}
 		}
 
@@ -301,8 +304,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		}
 	}
 
-	collectAndPublish(0)
-	lastCollection = time.Now()
+	collectAndPublish(pluginSampleClock.Next(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -314,9 +316,6 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		case <-ticker.C:
 		}
 
-		now := time.Now()
-		sinceLast := now.Sub(lastCollection)
-		lastCollection = now
-		collectAndPublish(sinceLast)
+		collectAndPublish(pluginSampleClock.Next(time.Now()))
 	}
 }

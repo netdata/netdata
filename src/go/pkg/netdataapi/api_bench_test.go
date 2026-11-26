@@ -14,15 +14,17 @@ import (
 func BenchmarkAPIValueUpdate(b *testing.B) {
 	var buf bytes.Buffer
 	api := New(&buf)
+	var clock SampleClock
+	sample := clock.Next(time.Unix(1700000000, 250000000))
 	b.ReportAllocs()
 	for b.Loop() {
 		buf.Reset()
-		api.BEGIN("plugin.job", "chart_with_a_typical_identifier", 10*time.Second)
+		api.BEGIN("plugin.job", "chart_with_a_typical_identifier")
 		api.SET("requests", 123456789)
 		api.SET("errors", 12)
 		api.SETFLOAT("latency", 0.123456)
 		api.SETEMPTY("missing")
-		api.END()
+		api.ENDTimed(sample)
 	}
 }
 

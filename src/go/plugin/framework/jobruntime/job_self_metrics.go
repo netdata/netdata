@@ -3,8 +3,6 @@
 package jobruntime
 
 import (
-	"time"
-
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -16,12 +14,7 @@ type jobSelfMetrics struct {
 	name             string
 	labels           map[string]string
 	published        bool
-	// Run times of each chart's last delivered sample, zero before the first.
-	// The Agent places a sample by the interval it carries, so the interval
-	// spans every run since that sample: the duration chart skips failed runs,
-	// and any run whose output was rejected delivered nothing.
-	statusAt, durationAt time.Time
-	emission             jobSelfMetricsEmission
+	emission         jobSelfMetricsEmission
 }
 
 func newJobSelfMetrics(
@@ -57,10 +50,10 @@ func newJobSelfMetrics(
 	}
 }
 
-// prepare writes the run's samples; run is the time the run started.
+// prepare writes the run's samples, timed at the run's start (sample).
 func (m *jobSelfMetrics) prepare(
 	api *netdataapi.API,
-	run time.Time,
+	sample netdataapi.SampleTime,
 	elapsed int64,
 	success, redefine bool,
 ) *jobSelfMetricsEmission {
@@ -69,7 +62,7 @@ func (m *jobSelfMetrics) prepare(
 		m.createChart(api, m.status, "success", "failed")
 		m.createChart(api, m.duration, "duration")
 	}
-	api.BEGIN("netdata", m.status.ID, calcSinceLastRun(run, m.statusAt))
+	api.BEGIN("netdata", m.status.ID)
 	if success {
 		api.SET("success", 1)
 		api.SET("failed", 0)
@@ -77,16 +70,14 @@ func (m *jobSelfMetrics) prepare(
 		api.SET("success", 0)
 		api.SET("failed", 1)
 	}
-	api.END()
+	api.ENDTimed(sample)
 	if success {
-		api.BEGIN("netdata", m.duration.ID, calcSinceLastRun(run, m.durationAt))
+		api.BEGIN("netdata", m.duration.ID)
 		api.SET("duration", elapsed)
-		api.END()
+		api.ENDTimed(sample)
 	}
 	m.emission = jobSelfMetricsEmission{
 		metrics: m,
-		run:     run,
-		success: success,
 	}
 	return &m.emission
 }
@@ -123,25 +114,17 @@ func (m *jobSelfMetrics) cleanup(api *netdataapi.API) {
 
 func (m *jobSelfMetrics) clear() {
 	m.published = false
-	m.statusAt = time.Time{}
-	m.durationAt = time.Time{}
 	m.emission = jobSelfMetricsEmission{}
 }
 
 type jobSelfMetricsEmission struct {
 	metrics *jobSelfMetrics
-	run     time.Time
-	success bool
 	settled bool
 }
 
 func (e *jobSelfMetricsEmission) Commit() error {
 	if e != nil && !e.settled {
 		e.metrics.published = true
-		e.metrics.statusAt = e.run
-		if e.success {
-			e.metrics.durationAt = e.run
-		}
 		e.settled = true
 	}
 	return nil

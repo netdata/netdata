@@ -872,7 +872,7 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
       Netdata uses this time to place the first update of the chart. For later updates, Netdata uses the `BEGIN` microseconds, and it aligns the chart to its own clock again when the chart is defined again.
 
-  -   `pending` is any non-empty word, for example `1`. With it, Netdata calculates the time since the previous update from `seconds` and `microseconds`, as for its internal collectors. Use it when updates are for past times, for example data that is aggregated and sent some seconds later: `END 1700000010 0 1`. Times must increase for each chart. Use it together with the chart option `store_first`: this aligns the chart to whole seconds and keeps the first update, so that each update is stored at its time.
+  -   `pending` is any non-empty word, for example `1`. With it, Netdata calculates the time since the previous update from `seconds` and `microseconds`, as for its internal collectors, so each update is placed at its collection time even when it arrives late or after missed updates: `END 1700000010 250000 1`. Use it, for example, for data that is aggregated and sent some seconds later. Times must increase for each chart: Netdata reads a time before the previous one as a forward gap. The chart option `store_first` also aligns the chart to whole seconds and keeps the first update, which Netdata otherwise does not store.
 
 More `SET` lines may appear to update all the dimensions of the chart.
 All of them in one `BEGIN` -> `END` block.

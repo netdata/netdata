@@ -99,24 +99,29 @@ retain that inventory; the next nonempty admission on a different host replaces 
 Host changes stage materialized reset in the plan attempt. Rejected output preserves the old host's state, and old-host
 retirements are never sent to the new host. Function-only jobs do not require a chart provider.
 
-## Chart Sample Intervals
+## Chart Sample Times
 
-The Agent places each sample by its `BEGIN` interval, trusting it up to five update intervals, and advances the chart's
-collection time and the health variable `$last_collected_t` by it. A chart's interval MUST therefore be the time since
-that chart's previous delivered sample; a shorter one stores every later sample too early and inflates counter rates.
+Every chart sample a job writes (V1 and V2 collector charts, the job self charts) ends with the run's start time,
+`END <seconds> <microseconds> 1`, and its `BEGIN` carries no interval. With the pending flag the Agent places the sample
+at that time and computes the interval since the chart's previous sample from the two times
+(`pluginsd_end` and `rrdset_timed_done` in the Agent, the path of its internal collectors). Samples therefore land at
+their collection time whatever happened in between: failed runs, charts a run did not observe, rejected host scopes,
+scrapes slower than the update interval, chart redefinitions.
 
-- V2 collector charts: every scope plan carries the run start as `chartengine.PlanOptions.CollectedAt`, and the engine
-  gives each update the span since its chart's last committed update
-  ([update spans](/src/go/plugin/framework/chartengine/README.md#update-spans)). Failed cycles, unobserved charts and
-  rejected scopes lengthen the chart's next span.
-- Job self charts: `jobSelfMetrics` keeps the run time of each chart's last delivered sample (see "Per-job collection
-  charts").
-- V1 collector charts are the remaining exception: they send the time since the previous run, or none when the chart
-  had no value in its last delivered sample, so the first sample after a failed run is placed early.
-- Intervals stay `time.Duration` until `netdataapi.BEGIN`, which writes whole microseconds and omits anything shorter.
+- Times MUST strictly increase per chart: the Agent reads a time behind the chart's clock as a forward gap and runs the
+  chart into the future. All jobs of a plugin process and its runtime charts take their times from one
+  `netdataapi.SampleClock`, created by the agent and passed through `JobConfig.SampleClock`/`JobV2Config.SampleClock`,
+  which never issues a time at or before an earlier one (microsecond resolution), across job restarts and wall-clock
+  steps back. A job without one gets its own clock.
+- The time is the run start, taken after the tick: a whole second plus scheduling delay, never truncated to whole
+  seconds (a time exactly on the update grid makes the Agent turn one missed sample into a gap). Each run renders its
+  `END` line once (`netdataapi.SampleTime`); `chartemit` rejects a plan with chart updates and no time.
+- Health: a chart's `$last_collected_t` is the run start of its last sample; per-dimension `_last_collected_t` stays
+  the Agent's receipt time. Streaming v1 parents still place samples by their own receipt time.
 
-Regression coverage: `job_v2_sample_interval_test.go` (V2 failed cycle, unobserved chart, rejected scope) and
-`TestJobSelfMetricsSampleIntervals`.
+Regression coverage: `job_sample_time_test.go` (V2 failed cycle, unobserved chart, rejected scope, slow scrape with a
+dropped tick; V1 failed run, empty sample, `SkipGaps`, dropped vnode frame, rejected write; one clock across jobs) and
+`TestJobSelfMetricsSampleTimes`.
 
 ## First-sample storage
 
@@ -151,7 +156,7 @@ plugin/module identity, configured job labels, `_collect_job`, and the job's col
   scope fails the cycle.
 - Status reports complementary `success`/`failed` values on ordinary cycles. Duration is sampled only on success and
   measured before output I/O, so output backpressure is excluded. A panic does not publish self samples.
-- Each sample's `BEGIN` interval spans failed, panicked and rejected runs (see "Chart Sample Intervals").
+- Each sample carries its run's start time (see "Chart Sample Times").
 - Autodetection and function-only jobs do not publish these charts.
 
 `jobSelfMetrics` shares definitions, rendering and committed publication state between versions. V1 includes self

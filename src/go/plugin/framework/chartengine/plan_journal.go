@@ -10,7 +10,7 @@ import "slices"
 // objects created by the build carry the build token and need no record. Commit
 // drops the journal; Abort replays it, so an aborted attempt leaves the committed
 // state exactly as it was. Planning an unchanged chart therefore records only
-// sequence and update-time stamps and scratch values instead of cloning the chart.
+// sequence stamps and scratch values instead of cloning the chart.
 //
 // A nil journal mutates without recording (direct state setup in tests).
 type planJournal struct {
@@ -23,7 +23,7 @@ type planJournal struct {
 	charts        []chartUndo
 	dims          []dimUndo
 	entries       []entryUndo
-	stamps        []stampUndo
+	seqs          []seqUndo
 
 	// byChart indexes chart and dimension-map records by chart for committedChart. It
 	// is built on first use and extended with the records appended since.
@@ -82,17 +82,16 @@ type entryUndo struct {
 	old   dimBuildEntry
 }
 
-// stampUndo restores one sequence or time stamp.
-type stampUndo struct {
-	stamp *uint64
-	old   uint64
+type seqUndo struct {
+	seq *uint64
+	old uint64
 }
 
 // journalSizing carries the previous build's record counts so the next journal
 // allocates each record slice once.
 type journalSizing struct {
 	entries int
-	stamps  int
+	seqs    int
 }
 
 func newPlanJournal(token uint64, sizing journalSizing) planJournal {
@@ -102,8 +101,8 @@ func newPlanJournal(token uint64, sizing journalSizing) planJournal {
 	if sizing.entries > 0 {
 		j.entries = make([]entryUndo, 0, sizing.entries)
 	}
-	if sizing.stamps > 0 {
-		j.stamps = make([]stampUndo, 0, sizing.stamps)
+	if sizing.seqs > 0 {
+		j.seqs = make([]seqUndo, 0, sizing.seqs)
 	}
 	return j
 }
@@ -112,7 +111,7 @@ func (j *planJournal) sizing() journalSizing {
 	if j == nil {
 		return journalSizing{}
 	}
-	return journalSizing{entries: len(j.entries), stamps: len(j.stamps)}
+	return journalSizing{entries: len(j.entries), seqs: len(j.seqs)}
 }
 
 // newChart returns a chart owned by this build.
@@ -150,29 +149,23 @@ func (j *planJournal) touchEntry(entry *dimBuildEntry) {
 
 // setChartSeen stamps a chart; a touched or new chart already has its committed value recorded.
 func (j *planJournal) setChartSeen(chart *materializedChartState, seq uint64) {
-	j.setStamp(&chart.lastSeenSuccessSeq, seq, chart.journalToken)
-}
-
-// setChartUpdated stamps a chart's update time. It is independent of the seen
-// stamp: runtime planners emit updates while the source sequence repeats.
-func (j *planJournal) setChartUpdated(chart *materializedChartState, at uint64) {
-	j.setStamp(&chart.lastUpdatedAt, at, chart.journalToken)
+	if chart.lastSeenSuccessSeq == seq {
+		return
+	}
+	if j != nil && chart.journalToken != j.token {
+		j.seqs = append(j.seqs, seqUndo{seq: &chart.lastSeenSuccessSeq, old: chart.lastSeenSuccessSeq})
+	}
+	chart.lastSeenSuccessSeq = seq
 }
 
 func (j *planJournal) setDimSeen(dim *materializedDimensionState, seq uint64) {
-	j.setStamp(&dim.lastSeenSuccessSeq, seq, dim.journalToken)
-}
-
-// setStamp writes a stamp of an object carrying journal token owner, recording
-// its committed value unless the object is new or already recorded in this build.
-func (j *planJournal) setStamp(stamp *uint64, value, owner uint64) {
-	if *stamp == value {
+	if dim.lastSeenSuccessSeq == seq {
 		return
 	}
-	if j != nil && owner != j.token {
-		j.stamps = append(j.stamps, stampUndo{stamp: stamp, old: *stamp})
+	if j != nil && dim.journalToken != j.token {
+		j.seqs = append(j.seqs, seqUndo{seq: &dim.lastSeenSuccessSeq, old: dim.lastSeenSuccessSeq})
 	}
-	*stamp = value
+	dim.lastSeenSuccessSeq = seq
 }
 
 func (j *planJournal) putChart(m map[string]*materializedChartState, id string, chart *materializedChartState) {
@@ -384,8 +377,8 @@ func (j *planJournal) committedChart(chart *materializedChartState) *materialize
 }
 
 // rollback restores every recorded committed value, newest first within each kind.
-// Map membership and whole-object records are independent of stamps, and a stamp
-// record always holds the committed value, so stamps are restored last.
+// Map membership and whole-object records are independent of sequence stamps, and a
+// stamp record always holds the committed value, so stamps are restored last.
 func (j *planJournal) rollback() {
 	if j == nil {
 		return
@@ -423,8 +416,8 @@ func (j *planJournal) rollback() {
 	for i := len(j.entries) - 1; i >= 0; i-- {
 		*j.entries[i].entry = j.entries[i].old
 	}
-	for i := len(j.stamps) - 1; i >= 0; i-- {
-		*j.stamps[i].stamp = j.stamps[i].old
+	for i := len(j.seqs) - 1; i >= 0; i-- {
+		*j.seqs[i].seq = j.seqs[i].old
 	}
 	*j = planJournal{token: j.token}
 }

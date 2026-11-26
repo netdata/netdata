@@ -92,39 +92,9 @@ func TestCLABELCOMMIT(t *testing.T) {
 }
 
 func TestBEGIN(t *testing.T) {
-
-	tests := map[string]struct {
-		sinceLast time.Duration
-		expected  string
-	}{
-		"no interval": {
-			sinceLast: 0,
-			expected:  "BEGIN 'system.cpu'\n",
-		},
-		"interval in microseconds": {
-			sinceLast: 10*time.Second + 1500*time.Nanosecond,
-			expected:  "BEGIN 'system.cpu' 10000001\n",
-		},
-		"interval below one microsecond": {
-			sinceLast: 999 * time.Nanosecond,
-			expected:  "BEGIN 'system.cpu'\n",
-		},
-		"negative interval": {
-			sinceLast: -time.Second,
-			expected:  "BEGIN 'system.cpu'\n",
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			w := &bytes.Buffer{}
-			api := New(w)
-
-			api.BEGIN("system", "cpu", test.sinceLast)
-
-			require.Equal(t, test.expected, w.String())
-		})
-	}
+	w := &bytes.Buffer{}
+	New(w).BEGIN("system", "cpu")
+	assert.Equal(t, "BEGIN 'system.cpu'\n", w.String())
 }
 
 func TestSET(t *testing.T) {
@@ -429,6 +399,8 @@ func (w *plainWriter) Write(p []byte) (int, error) {
 }
 
 func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
+	var clock SampleClock
+	sample := clock.Next(time.Unix(1700000000, 250000000))
 	emit := func(api *API) {
 		api.CHART(ChartOpts{
 			TypeID:      "type",
@@ -446,12 +418,13 @@ func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
 		})
 		api.CLABEL("key", "value", 1)
 		api.HOST("guid")
-		api.BEGIN("type", "id", time.Millisecond)
+		api.BEGIN("type", "id")
 		api.SET("int", -1234567890)
 		api.SETFLOAT("float", 0.25)
 		api.SETEMPTY("empty")
 		api.VARIABLE("var", 1.5)
 		api.END()
+		api.ENDTimed(sample)
 	}
 
 	buffered := &bytes.Buffer{}

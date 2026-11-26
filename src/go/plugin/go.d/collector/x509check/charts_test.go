@@ -100,6 +100,7 @@ func TestCollector_ChartContract(t *testing.T) {
 		Plugin:      "go.d",
 		Module:      "x509check",
 		StoreFirst:  creator.StoreFirst,
+		CollectedAt: (&netdataapi.SampleClock{}).Next(time.Now()),
 	}))
 	assert.Contains(t, output.String(), "store_first")
 	assert.Contains(t, output.String(), "DIMENSION 'expiry' 'expiry'")

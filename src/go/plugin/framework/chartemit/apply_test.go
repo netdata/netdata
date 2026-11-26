@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/stretchr/testify/assert"
@@ -47,8 +46,7 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID:   "win_nic_traffic_eth0",
-				SinceLast: 100 * time.Microsecond,
+				ChartID: "win_nic_traffic_eth0",
 				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "received",
@@ -75,6 +73,7 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 	}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 5,
 		Plugin:      "go.d.plugin",
@@ -94,9 +93,9 @@ CLABEL 'instance' 'localhost' '2'
 CLABEL '_collect_job' 'job01' '1'
 CLABEL_COMMIT
 DIMENSION 'received' 'received' 'incremental' '1' '1' 'type=float'
-BEGIN 'collector.job.win_nic_traffic_eth0' 100
+BEGIN 'collector.job.win_nic_traffic_eth0'
 SET 'received' = 123.5
-END
+END 1700000000 250000 1
 
 CHART 'collector.job.win_nic_traffic_eth0' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '1' '5' '' 'go.d.plugin' 'windows'
 DIMENSION 'received' 'received' 'incremental' '1' '1' 'obsolete type=float'
@@ -153,6 +152,7 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 	}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
@@ -171,7 +171,7 @@ CLABEL_COMMIT
 DIMENSION 'svc.errors_total' 'svc.errors_total' 'incremental' '1' '1' 'type=int'
 BEGIN 'collector.job.svc.errors_total-method=GET'
 SET 'svc.errors_total' = 10
-END
+END 1700000000 250000 1
 
 CHART 'collector.job.svc.errors_total-method=GET' '' 'Metric "svc.errors_total"' 'events/s' 'svc_errors' 'svc.errors_total' 'line' '0' '1' 'obsolete' 'go.d.plugin' 'prometheus'
 `, out)
@@ -206,8 +206,7 @@ func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID:   "runtime_jobs",
-				SinceLast: time.Microsecond,
+				ChartID: "runtime_jobs",
 				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "total",
@@ -221,6 +220,7 @@ func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
 	}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
@@ -236,9 +236,9 @@ CHART 'collector.job.runtime_jobs' '' 'Runtime jobs' 'jobs' 'Runtime' 'runtime.j
 CLABEL '_collect_job' 'job01' '1'
 CLABEL_COMMIT
 DIMENSION 'total' 'total' 'absolute' '1' '1' 'type=int'
-BEGIN 'collector.job.runtime_jobs' 1
+BEGIN 'collector.job.runtime_jobs'
 SET 'total' = 7
-END
+END 1700000000 250000 1
 
 `, out)
 	assert.NotContains(t, out, "SET 'total' = 7.9")
@@ -274,8 +274,7 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID:   "svc_latency",
-				SinceLast: time.Microsecond,
+				ChartID: "svc_latency",
 				Values: []chartengine.UpdateDimensionValue{
 					{Name: "value", IsFloat: true, Float64: math.NaN()},
 				},
@@ -284,6 +283,7 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 	}
 
 	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
@@ -325,6 +325,7 @@ func TestApplyPlanDimensionOnlyCreatePreservesExistingLabels(t *testing.T) {
 	}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
@@ -377,8 +378,7 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID:   "chart'id\n",
-				SinceLast: time.Microsecond,
+				ChartID: "chart'id\n",
 				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "dim'name\n",
@@ -391,6 +391,7 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 	}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.'job\n",
 		UpdateEvery: 1,
 		Plugin:      "go.d'plugin\n",
@@ -411,9 +412,9 @@ CLABEL 'label' 'value ' '1'
 CLABEL '_collect_job' 'job01 ' '1'
 CLABEL_COMMIT
 DIMENSION 'dimname' 'dimname' 'absolute' '1' '1' 'type=int'
-BEGIN 'collector.job.chartid' 1
+BEGIN 'collector.job.chartid'
 SET 'dimname' = 5
-END
+END 1700000000 250000 1
 
 `, out)
 }
@@ -439,7 +440,8 @@ func TestApplyPlanRejectsEmptyTypeID(t *testing.T) {
 			api := netdataapi.New(&buf)
 
 			err := ApplyPlan(api, Plan{}, EmitEnv{
-				TypeID: tc.typeID,
+				CollectedAt: testSample,
+				TypeID:      tc.typeID,
 			})
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.wantErr)
@@ -516,6 +518,7 @@ CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line'
 			err := ApplyPlan(api, Plan{
 				Actions: tc.actions,
 			}, EmitEnv{
+				CollectedAt: testSample,
 				TypeID:      "collector.job",
 				UpdateEvery: 1,
 				Plugin:      "go.d.plugin",
@@ -681,11 +684,46 @@ func TestApplyPlanBackslashesCannotEscapeFieldBoundaries(t *testing.T) {
 		},
 		Labels: map[string]string{"path": `C:\checks\`, "plain": "unchanged"},
 	}}}
-	require.NoError(t, ApplyPlan(netdataapi.New(&out), plan, EmitEnv{TypeID: "test", UpdateEvery: 1, JobName: "job"}))
+	require.NoError(t, ApplyPlan(netdataapi.New(&out), plan, EmitEnv{TypeID: "test", UpdateEvery: 1, JobName: "job", CollectedAt: testSample}))
 	// The Agent already converts label backslashes to slashes. Leaving a trailing
 	// backslash in a quoted field instead makes its splitter consume the closing
 	// quote and merge label source into the value ("C:/checks/_", rather than this).
 	assert.Contains(t, out.String(), "CLABEL 'path' 'C:/checks/' '1'\n")
 	assert.Contains(t, out.String(), "CLABEL 'plain' 'unchanged' '1'\n")
 	assert.Contains(t, out.String(), "'Service/Check/'")
+}
+
+// Every chart update ends with its collection time, so a plan with updates needs
+// one; a plan without updates (for example cleanup obsoletion) does not.
+func TestApplyPlanCollectionTimeRule(t *testing.T) {
+	meta := chartengine.ChartMeta{Title: "Work", Units: "ops", Family: "Work", Context: "work", Type: chartengine.ChartTypeLine}
+	tests := map[string]struct {
+		actions []EngineAction
+		sample  netdataapi.SampleTime
+		wantErr bool
+	}{
+		"updates without a collection time": {
+			actions: []EngineAction{UpdateChartAction{ChartID: "work", Values: []UpdateDimensionValue{{Name: "ops", Int64: 1}}}},
+			wantErr: true,
+		},
+		"updates with a collection time": {
+			actions: []EngineAction{UpdateChartAction{ChartID: "work", Values: []UpdateDimensionValue{{Name: "ops", Int64: 1}}}},
+			sample:  testSample,
+		},
+		"removal without a collection time": {
+			actions: []EngineAction{RemoveChartAction{ChartID: "work", Meta: meta}},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := ApplyPlan(netdataapi.New(&buf), Plan{Actions: tc.actions}, EmitEnv{TypeID: "job", UpdateEvery: 1, CollectedAt: tc.sample})
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Empty(t, buf.String())
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

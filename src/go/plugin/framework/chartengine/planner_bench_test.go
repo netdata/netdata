@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
@@ -298,14 +297,12 @@ func benchmarkAggregationReader(b *testing.B, seriesCount, chartCount int) metri
 	return store.Read(metrix.ReadRaw())
 }
 
-// Each iteration represents a new successful collection, timed like a job run.
-// Repeating a committed sequence intentionally deduplicates updates and does not
-// measure steady planning.
+// Each iteration represents a new successful collection. Repeating a committed
+// sequence intentionally deduplicates updates and does not measure steady planning.
 func benchmarkSteadySeriesPlan(b *testing.B, engine *Engine, reader *benchmarkSequenceReader, charts, series int) {
 	b.Helper()
 	reader.seq = 1
-	at := time.Unix(1_000_000, 0)
-	if _, err := buildPlanAt(engine, reader, at); err != nil {
+	if _, err := buildPlan(engine, reader); err != nil {
 		b.Fatalf("warm plan: %v", err)
 	}
 	var plan Plan
@@ -313,9 +310,8 @@ func benchmarkSteadySeriesPlan(b *testing.B, engine *Engine, reader *benchmarkSe
 	b.ResetTimer()
 	for i := range b.N {
 		reader.seq = uint64(i) + 2
-		at = at.Add(time.Second)
 		var err error
-		plan, err = buildPlanAt(engine, reader, at)
+		plan, err = buildPlan(engine, reader)
 		if err != nil {
 			b.Fatalf("build plan: %v", err)
 		}
@@ -327,9 +323,6 @@ func benchmarkSteadySeriesPlan(b *testing.B, engine *Engine, reader *benchmarkSe
 		update, ok := action.(UpdateChartAction)
 		if !ok {
 			b.Fatalf("unexpected warmed action %T", action)
-		}
-		if update.SinceLast != time.Second {
-			b.Fatalf("update span = %v, want 1s", update.SinceLast)
 		}
 		updates++
 		for _, value := range update.Values {

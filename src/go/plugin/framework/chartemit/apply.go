@@ -89,6 +89,9 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if err := validateTypeIDBudget(env.TypeID, normalized); err != nil {
 		return err
 	}
+	if len(normalized.updateCharts) > 0 && env.CollectedAt.IsZero() {
+		return fmt.Errorf("chartemit: emit env collection time is required for chart updates")
+	}
 	if !hasEmissions(normalized) {
 		return nil
 	}
@@ -264,7 +267,7 @@ func visitLabelUpdatePhase[V definitionVisitor](visitor V, updates []UpdateChart
 
 func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartAction) {
 	for _, update := range updates {
-		api.BEGIN(sanitizeWireID(env.TypeID), sanitizeWireID(update.ChartID), update.SinceLast)
+		api.BEGIN(sanitizeWireID(env.TypeID), sanitizeWireID(update.ChartID))
 		for _, dim := range update.Values {
 			if dim.IsEmpty {
 				api.SETEMPTY(sanitizeWireID(dim.Name))
@@ -282,7 +285,7 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 			}
 			api.SET(sanitizeWireID(dim.Name), dim.Int64)
 		}
-		api.END()
+		api.ENDTimed(env.CollectedAt)
 	}
 }
 

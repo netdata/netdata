@@ -126,7 +126,7 @@ func emitFDGlobalChart(api *netdataapi.API, chart fdGlobalChart, updateEvery int
 // writeFDGlobal emits the cumulative counters.  No delta is computed here: the
 // dimensions are `incremental`, so the agent derives the rate itself and a
 // restart of this plugin cannot produce a spike.
-func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, sinceLast time.Duration, reportErrors bool) {
+func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, sample netdataapi.SampleTime, reportErrors bool) {
 	if api == nil {
 		return
 	}
@@ -134,19 +134,19 @@ func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, sinceL
 	pluginOutputMu.Lock()
 	defer pluginOutputMu.Unlock()
 
-	api.BEGIN(fdGlobalGroup, "file_descriptor", sinceLast)
+	api.BEGIN(fdGlobalGroup, "file_descriptor")
 	api.SET("open", int64(snapshot.OpenCall))
 	api.SET("close", int64(snapshot.CloseCall))
-	api.END()
+	api.ENDTimed(sample)
 
 	if !reportErrors {
 		return
 	}
 
-	api.BEGIN(fdGlobalGroup, "file_error", sinceLast)
+	api.BEGIN(fdGlobalGroup, "file_error")
 	api.SET("open", int64(snapshot.OpenErr))
 	api.SET("close", int64(snapshot.CloseErr))
-	api.END()
+	api.ENDTimed(sample)
 }
 
 // runFDGlobalCollector is fd's single collection loop.  The global metric
@@ -177,17 +177,16 @@ func runFDGlobalCollector(
 		createArenaDropsChart(api, fdGlobalModule, updateEvery)
 	}
 
-	lastCollection := time.Now()
-	collectAndPublish := func(sinceLast time.Duration) {
+	collectAndPublish := func(sample netdataapi.SampleTime) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, fdGlobalModule, handle.Runtime.ArenaDropped(), sinceLast)
+			publishArenaDrops(api, fdGlobalModule, handle.Runtime.ArenaDropped(), sample)
 		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("fd.snapshot", "fd", "snapshot", err)
 		} else {
-			writeFDGlobal(api, snapshot, sinceLast, handle.ReportErrors)
+			writeFDGlobal(api, snapshot, sample, handle.ReportErrors)
 		}
 
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
@@ -269,8 +268,7 @@ func runFDGlobalCollector(
 		publishSharedStore()
 	}
 
-	collectAndPublish(0)
-	lastCollection = time.Now()
+	collectAndPublish(pluginSampleClock.Next(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -282,9 +280,6 @@ func runFDGlobalCollector(
 		case <-ticker.C:
 		}
 
-		now := time.Now()
-		sinceLast := now.Sub(lastCollection)
-		lastCollection = now
-		collectAndPublish(sinceLast)
+		collectAndPublish(pluginSampleClock.Next(time.Now()))
 	}
 }

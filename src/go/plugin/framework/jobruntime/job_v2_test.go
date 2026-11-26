@@ -534,7 +534,7 @@ func TestJobV2SteadyStateCollectorFailuresAreSanitizedBeforeLogging(t *testing.T
 			job.Logger = captured
 			mod.GetBase().Logger = captured
 
-			_, _ = job.collectAndEmit(time.Time{})
+			_, _ = job.collectAndEmit(job.sampleClock.Next(time.Now()))
 
 			require.NotContains(t, logs.String(), "resolved-v2-collect-error-marker")
 			require.NotContains(t, logs.String(), "resolved-v2-collect-panic-marker")
@@ -802,7 +802,7 @@ END`, chartengine.Priority))
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.runOnce()
 
-				wire := out.String()
+				wire := plainENDs(out.String())
 				assert.Contains(
 					t,
 					wire,
@@ -1735,9 +1735,9 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				jobA := newRegistryTestJobV2(t, "module_job_a", registry, jobAOut, vnode)
 				jobB := newRegistryTestJobV2(t, "module_job_b", registry, jobBOut, vnode)
 
-				preparedA, ok := jobA.collectAndEmit(time.Time{})
+				preparedA, ok := jobA.collectAndEmit(jobA.sampleClock.Next(time.Now()))
 				require.True(t, ok)
-				preparedB, ok := jobB.collectAndEmit(time.Time{})
+				preparedB, ok := jobB.collectAndEmit(jobB.sampleClock.Next(time.Now()))
 				require.True(t, ok)
 
 				require.NoError(t, jobB.finishPreparedEmission(preparedB))
@@ -1867,7 +1867,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				})
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
-				prepared, ok := job.collectAndEmit(time.Time{})
+				prepared, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
 				require.True(t, ok)
 				require.Len(t, prepared.scopes, 1)
 				require.NotEmpty(t, prepared.scopes[0].output)
@@ -2324,7 +2324,7 @@ CHART 'module_job.workers_busy'`)
 				})
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
-				prepared, ok := job.collectAndEmit(time.Time{})
+				prepared, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
 				require.True(t, ok)
 				require.Len(t, prepared.scopes, 2)
 				for _, scope := range prepared.scopes {

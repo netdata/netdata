@@ -85,13 +85,23 @@ type runtimeMetricsJob struct {
 	buf *bytes.Buffer
 	api *netdataapi.API
 
+	// clock times every chart sample, including finalization output.
+	clock       *netdataapi.SampleClock
 	components  map[string]*runtimeComponentState
 	skipTracker tickstate.SkipTracker
 }
 
-func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Logger) *runtimeMetricsJob {
+func newRuntimeMetricsJob(
+	out io.Writer,
+	reg *componentRegistry,
+	log *logger.Logger,
+	clock *netdataapi.SampleClock,
+) *runtimeMetricsJob {
 	if out == nil {
 		out = io.Discard
+	}
+	if clock == nil {
+		clock = &netdataapi.SampleClock{}
 	}
 	if log == nil {
 		log = logger.New().With(slog.String("component", "runtime-metrics-job"))
@@ -105,6 +115,7 @@ func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Log
 		tick:       make(chan int, 1),
 		buf:        &buf,
 		api:        netdataapi.New(&buf),
+		clock:      clock,
 		components: make(map[string]*runtimeComponentState),
 	}
 }
@@ -171,7 +182,7 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 
 	specs := j.registry.snapshot()
 	seen := make(map[string]struct{}, len(specs))
-	now := time.Now()
+	sample := j.clock.Next(time.Now())
 	var commit runtimeTickCommit
 
 	for _, spec := range specs {
@@ -181,7 +192,7 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 			continue
 		}
 
-		step, buf, ok := j.prepareComponentStep(spec, now)
+		step, buf, ok := j.prepareComponentStep(spec, sample)
 		if !ok {
 			continue
 		}
@@ -253,7 +264,7 @@ func (j *runtimeMetricsJob) finalizeComponent(name string) {
 	if spec == nil {
 		return
 	}
-	step, buf, ok := j.prepareComponentStep(*spec, time.Now())
+	step, buf, ok := j.prepareComponentStep(*spec, j.clock.Next(time.Now()))
 	if !ok {
 		return
 	}
@@ -306,10 +317,13 @@ func (j *runtimeMetricsJob) newComponentState(spec componentSpec) (*runtimeCompo
 	return state, nil
 }
 
-func (j *runtimeMetricsJob) prepareComponentStep(spec componentSpec, now time.Time) (runtimeTickCommitStep, *bytes.Buffer, bool) {
+func (j *runtimeMetricsJob) prepareComponentStep(
+	spec componentSpec,
+	sample netdataapi.SampleTime,
+) (runtimeTickCommitStep, *bytes.Buffer, bool) {
 	current := j.components[spec.Name]
 	if current != nil && current.spec.Generation == spec.Generation {
-		emission, buf, ok := j.prepareEmissionToBuffer(current, now)
+		emission, buf, ok := j.prepareEmissionToBuffer(current, sample)
 		if !ok {
 			return runtimeTickCommitStep{}, nil, false
 		}
@@ -333,7 +347,7 @@ func (j *runtimeMetricsJob) prepareComponentStep(spec componentSpec, now time.Ti
 		j.Warningf("runtime metrics component %q obsolete emit failed: %v", spec.Name, err)
 		return runtimeTickCommitStep{}, nil, false
 	}
-	emission, ok := j.prepareEmission(api, next, now)
+	emission, ok := j.prepareEmission(api, next, sample)
 	if !ok {
 		return runtimeTickCommitStep{}, nil, false
 	}
@@ -364,23 +378,30 @@ func (j *runtimeMetricsJob) prepareRemovalStep(name string, state *runtimeCompon
 	}, &buf, true
 }
 
-func (j *runtimeMetricsJob) prepareEmissionToBuffer(state *runtimeComponentState, now time.Time) (runtimePreparedEmission, *bytes.Buffer, bool) {
+func (j *runtimeMetricsJob) prepareEmissionToBuffer(
+	state *runtimeComponentState,
+	sample netdataapi.SampleTime,
+) (runtimePreparedEmission, *bytes.Buffer, bool) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
-	emission, ok := j.prepareEmission(api, state, now)
+	emission, ok := j.prepareEmission(api, state, sample)
 	if !ok {
 		return runtimePreparedEmission{}, nil, false
 	}
 	return emission, &buf, true
 }
 
-func (j *runtimeMetricsJob) prepareEmission(api *netdataapi.API, state *runtimeComponentState, now time.Time) (runtimePreparedEmission, bool) {
+func (j *runtimeMetricsJob) prepareEmission(
+	api *netdataapi.API,
+	state *runtimeComponentState,
+	sample netdataapi.SampleTime,
+) (runtimePreparedEmission, bool) {
 	if state == nil {
 		return runtimePreparedEmission{}, false
 	}
 
 	reader := state.spec.Store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
-	attempt, err := state.engine.PreparePlanWithOptions(reader, chartengine.PlanOptions{CollectedAt: now})
+	attempt, err := state.engine.PreparePlan(reader)
 	if err != nil {
 		j.Warningf("runtime metrics component %q build plan failed: %v", state.spec.Name, err)
 		return runtimePreparedEmission{}, false
@@ -388,6 +409,7 @@ func (j *runtimeMetricsJob) prepareEmission(api *netdataapi.API, state *runtimeC
 
 	plan := attempt.Plan()
 	env := cloneEmitEnv(state.spec.EmitEnv)
+	env.CollectedAt = sample
 	if err := chartemit.ApplyPlan(api, plan, env); err != nil {
 		attempt.Abort()
 		j.Warningf("runtime metrics component %q apply plan failed: %v", state.spec.Name, err)

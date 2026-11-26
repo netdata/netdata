@@ -8,7 +8,6 @@ import (
 	"io"
 	"sort"
 	"strconv"
-	"time"
 )
 
 // API implements Netdata external plugins API.
@@ -134,20 +133,14 @@ func (a *API) CLABELCOMMIT() {
 	_, _ = a.Write(clabelCommit)
 }
 
-// BEGIN initializes data collection for a chart. sinceLast is the time since
-// the chart's previous sample; the wire carries it in whole microseconds, and a
-// value below one microsecond is omitted, so the Agent measures the gap itself.
-func (a *API) BEGIN(typeID string, id string, sinceLast time.Duration) {
+// BEGIN initializes data collection for a chart. It carries no interval: the
+// sample's time comes from ENDTimed (or, with a plain END, the Agent's clock).
+func (a *API) BEGIN(typeID string, id string) {
 	b := append(a.line(), "BEGIN '"...)
 	b = append(b, typeID...)
 	b = append(b, '.')
 	b = append(b, id...)
-	b = append(b, '\'')
-	if usec := sinceLast.Microseconds(); usec > 0 {
-		b = append(b, ' ')
-		b = strconv.AppendInt(b, usec, 10)
-	}
-	b = append(b, '\n')
+	b = append(b, "'\n"...)
 	a.send(b)
 }
 

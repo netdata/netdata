@@ -40,20 +40,19 @@ func (inventory jobV1ChartInventory) cleanup(api *netdataapi.API) {
 }
 
 type jobV1ChartChange struct {
-	chart                     *collectorapi.Chart
-	created, updated, ignored bool
-	retries, priority         int
-	typeID, id                string
-	pruneDims                 bool
-	definition                *netdataapi.ChartOpts
-	obsolete                  bool
+	chart             *collectorapi.Chart
+	created, ignored  bool
+	retries, priority int
+	typeID, id        string
+	pruneDims         bool
+	definition        *netdataapi.ChartOpts
+	obsolete          bool
 }
 
 func (change *jobV1ChartChange) prepare(chart *collectorapi.Chart, j *Job) {
 	*change = jobV1ChartChange{
 		chart:    chart,
 		created:  chart.IsCreated(),
-		updated:  chart.IsUpdated(),
 		ignored:  chart.IsIgnored(),
 		retries:  chart.Retries,
 		priority: chart.Priority,
@@ -72,17 +71,19 @@ type jobV1Emission struct {
 	guid        string
 	priority    int
 	started     time.Time
+	sample      netdataapi.SampleTime
 	hostBytes   int
 	pruneCharts bool
 	settled     bool
 	self        *jobSelfMetricsEmission
 }
 
-func (j *Job) prepareEmission(started time.Time) (*jobV1Emission, error) {
+func (j *Job) prepareEmission(started time.Time, sample netdataapi.SampleTime) (*jobV1Emission, error) {
 	tx := &j.emission
 	tx.job = j
 	tx.settled = false
 	tx.started = started
+	tx.sample = sample
 	tx.priority = j.priority
 	tx.guid = j.vnode.GUID
 	tx.owner = j.hostOwner
@@ -113,7 +114,6 @@ func (j *Job) prepareEmission(started time.Time) (*jobV1Emission, error) {
 func (tx *jobV1Emission) record(change *jobV1ChartChange) {
 	c := change.chart
 	if change.definition != nil || change.pruneDims || change.created != c.IsCreated() ||
-		change.updated != c.IsUpdated() ||
 		change.ignored != c.IsIgnored() ||
 		change.retries != c.Retries ||
 		change.priority != c.Priority ||
@@ -144,7 +144,6 @@ func (tx *jobV1Emission) Commit() error {
 	for _, change := range tx.changes {
 		c := change.chart
 		c.SetCreated(change.created)
-		c.SetUpdated(change.updated)
 		c.SetIgnored(change.ignored)
 		c.Retries = change.retries
 		c.Priority = change.priority
@@ -178,7 +177,6 @@ func (tx *jobV1Emission) Commit() error {
 		*j.charts = kept
 	}
 	j.priority = tx.priority
-	j.prevRun = tx.started
 	_ = tx.self.Commit()
 	tx.finish()
 	return nil

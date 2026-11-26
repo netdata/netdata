@@ -50,6 +50,9 @@ type JobV2Config struct {
 	StoreFirst              bool
 	RuntimeService          runtimecomp.Service
 	LifecycleErrorSanitizer func(error) error
+	// SampleClock times chart samples; share one per plugin process (see
+	// netdataapi.SampleClock). Nil gives the job a clock of its own.
+	SampleClock *netdataapi.SampleClock
 }
 
 func NewJobV2(cfg JobV2Config) *JobV2 {
@@ -60,6 +63,10 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	publisher := cfg.Publication
 	if publisher == nil {
 		publisher = hostoutput.New()
+	}
+	clock := cfg.SampleClock
+	if clock == nil {
+		clock = &netdataapi.SampleClock{}
 	}
 
 	j := &JobV2{
@@ -86,6 +93,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		vnodeMetadataRevision:   cfg.VnodeMetadataRevision,
 		vnodeLookup:             cfg.VnodeLookup,
 		publication:             publisher,
+		sampleClock:             clock,
 		runtimeService:          cfg.RuntimeService,
 		lifecycleErrorSanitizer: cfg.LifecycleErrorSanitizer,
 	}
@@ -145,6 +153,7 @@ type JobV2 struct {
 
 	retries     atomic.Int64
 	selfMetrics jobSelfMetrics
+	sampleClock *netdataapi.SampleClock
 
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
@@ -552,7 +561,8 @@ func (j *JobV2) runOnce() {
 	j.refreshVnodeSnapshot()
 
 	curTime := time.Now()
-	prepared, ok := j.collectAndEmit(curTime)
+	sample := j.sampleClock.Next(curTime)
+	prepared, ok := j.collectAndEmit(sample)
 	elapsed := int64(durationTo(time.Since(curTime), time.Millisecond))
 	if ok && !j.panicked.Load() {
 		if err := j.finishPreparedEmission(prepared); err != nil {
@@ -567,7 +577,7 @@ func (j *JobV2) runOnce() {
 	}
 	j.buf.Reset()
 	if !j.panicked.Load() {
-		self := j.selfMetrics.prepare(j.api, curTime, elapsed, ok, false)
+		self := j.selfMetrics.prepare(j.api, sample, elapsed, ok, false)
 		if _, err := commitHostOutput(j.out, hostoutput.Request{
 			Payload: j.buf.Bytes(),
 		}, self); err != nil {
@@ -583,9 +593,9 @@ func (j *JobV2) flushRuntimeAggregator() {
 	}
 }
 
-// collectAndEmit runs one collection started at curTime and prepares each host
-// scope's output; curTime also gives every chart update its span.
-func (j *JobV2) collectAndEmit(curTime time.Time) (prepared jobV2PreparedEmission, ok bool) {
+// collectAndEmit runs one collection and prepares each host scope's output, with
+// every chart sample timed at the run's start (sample).
+func (j *JobV2) collectAndEmit(sample netdataapi.SampleTime) (prepared jobV2PreparedEmission, ok bool) {
 	j.panicked.Store(false)
 	cycleOpen := false
 
@@ -640,7 +650,7 @@ func (j *JobV2) collectAndEmit(curTime time.Time) (prepared jobV2PreparedEmissio
 	// Scope outputs share one block per cycle; each scope's output is capped at its own end.
 	outputs := make([]byte, 0, j.lastOutputBytes)
 	for _, item := range work {
-		scopePrepared, scopeOK := j.prepareScopeEmission(item.scope, item.live, curTime, candidate, &outputs)
+		scopePrepared, scopeOK := j.prepareScopeEmission(item.scope, item.live, sample, candidate, &outputs)
 		if !scopeOK {
 			prepared.scopeFailure = true
 			continue
@@ -697,7 +707,7 @@ func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
 func (j *JobV2) prepareScopeEmission(
 	scope metrix.HostScope,
 	live bool,
-	curTime time.Time,
+	sample netdataapi.SampleTime,
 	candidate *chartengine.TemplateSet,
 	outputs *[]byte,
 ) (prepared jobV2PreparedScopeEmission, ok bool) {
@@ -743,11 +753,7 @@ func (j *JobV2) prepareScopeEmission(
 
 	attempt, err = state.engine.PreparePlanWithOptions(
 		j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)),
-		chartengine.PlanOptions{
-			TemplateSet:       candidate,
-			ResetMaterialized: decision.needEngineReload,
-			CollectedAt:       curTime,
-		},
+		chartengine.PlanOptions{TemplateSet: candidate, ResetMaterialized: decision.needEngineReload},
 	)
 	if err != nil {
 		j.Warningf("build plan for host scope %q failed: %v", state.scopeKey, err)
@@ -761,6 +767,7 @@ func (j *JobV2) prepareScopeEmission(
 
 	j.buf.Reset()
 	env := j.emitEnv(decision)
+	env.CollectedAt = sample
 	if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
 		j.Warningf("apply plan for host scope %q failed: %v", state.scopeKey, err)
 		return jobV2PreparedScopeEmission{}, false

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -102,6 +103,7 @@ groups:
 					var wire bytes.Buffer
 					require.NoError(t, chartemit.ApplyPlan(netdataapi.New(&wire), attempt.Plan(), chartemit.EmitEnv{
 						TypeID: "test_localhost", UpdateEvery: 1, Plugin: "test", Module: "test", JobName: "localhost",
+						CollectedAt: (&netdataapi.SampleClock{}).Next(time.Unix(1700000000+int64(cycle), 0)),
 					}))
 					if wantRemoval {
 						assert.Contains(t, wire.String(), "obsolete")

@@ -188,7 +188,6 @@ type planBuildContext struct {
 	reader            metrix.Reader
 	collectMeta       metrix.CollectMeta
 	buildCycle        uint64
-	collectedAt       uint64 // PlanOptions.CollectedAt as a stamp
 	prog              *program.Program
 	cache             *routeCache
 	routeCacheEnabled bool
@@ -233,7 +232,6 @@ func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
 // fails or panics leaves committed state unchanged.
 func (e *Engine) buildPlan(
 	reader metrix.Reader,
-	collectedAt uint64,
 	retired map[string]*materializedChartState,
 	journal *planJournal,
 ) (Plan, materializedState, bool, error) {
@@ -286,7 +284,6 @@ func (e *Engine) buildPlan(
 	}
 	ctx.retired = retired
 	ctx.journal = journal
-	ctx.collectedAt = collectedAt
 	phaseStartedAt = time.Now()
 	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
 		sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
@@ -1014,8 +1011,6 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			})
 		}
 		ctx.journal.setChartSeen(matChart, ctx.collectMeta.LastSuccessSeq)
-		sinceLast := sinceLastUpdate(ctx.collectedAt, matChart.lastUpdatedAt)
-		ctx.journal.setChartUpdated(matChart, ctx.collectedAt)
 
 		observedNames := observedDimensionNames(ctx.journal, cs, matChart)
 		for _, name := range observedNames {
@@ -1075,9 +1070,8 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		// Each chart owns a capacity-limited window of the build's value block.
 		ctx.values = values
 		ctx.out.Actions = append(ctx.out.Actions, UpdateChartAction{
-			ChartID:   cs.chartID,
-			SinceLast: sinceLast,
-			Values:    values[start:len(values):len(values)],
+			ChartID: cs.chartID,
+			Values:  values[start:len(values):len(values)],
 		})
 		matChart.storeScratchEntries(ctx.journal, cs.adoptedScratchEntries(), cs.entriesOwner)
 		matChart.pruneScratchEntries(ctx.journal, cs.currentBuildSeq)

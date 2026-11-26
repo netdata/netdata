@@ -100,6 +100,10 @@ type Agent struct {
 	process      *composition.Process
 	processReady chan struct{}
 	readyOnce    sync.Once
+
+	// sampleClock times every chart sample of this plugin process: jobs (across
+	// restarts) and runtime charts (see netdataapi.SampleClock).
+	sampleClock netdataapi.SampleClock
 }
 
 // New creates a new Agent.
@@ -220,6 +224,7 @@ func (a *Agent) run(ctx context.Context) error {
 		InitialVnodes:         a.setupVnodeRegistry(),
 		SNMPVnodeAcquirer:     a.SNMPVnodeAcquirer,
 		Runtime:               a.setupRuntimeService(),
+		SampleClock:           &a.sampleClock,
 		Services:              a.Services,
 		KeepAlive:             !a.runModePolicy.IsTerminal,
 		ShutdownTimeout:       a.ShutdownTimeout,
@@ -252,6 +257,7 @@ func (a *Agent) setupRuntimeService() composition.RuntimeService {
 
 	return runtimechartemit.New(
 		a.Logger.With(slog.String("component", "runtime metrics service")),
+		&a.sampleClock,
 	)
 }
 
