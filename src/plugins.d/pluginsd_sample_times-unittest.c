@@ -353,9 +353,10 @@ int pluginsd_sample_times_unittest(void) {
     // the Agent's effective default: the configured 1 plus the 2 it always adds
     gap_when_lost_iterations_above = 3;
 
-    // The first sample at +0.1 s puts the chart clock at +0.5 s. A backward wall-clock step then makes the plugin's
-    // own clock hand out +0.100001 s and +0.100002 s, and two more samples arrive at +0.3 s and at the clock itself.
-    // Counters grow 100/s with the collection time.
+    // The first sample at +0.1 s puts the chart clock at +0.5 s. The plugin's own clock then hands out +0.100001 s
+    // and +0.100002 s (as a per-process clock does when its wall clock is behind), and two more samples arrive at
+    // +0.3 s and at the clock itself. Counters grow 100/s with the collection time. The Agent's own clock is not
+    // behind the chart (the times are far in the past), so the counter baseline carries over.
     static const struct sample_times_sample aligned[] = {
         { S(0.1), 10 },
         { S(0.100001), 10, true }, { S(0.100002), 10, true }, { S(0.3), 30, true }, { S(0.5), 50, true },
@@ -377,9 +378,10 @@ int pluginsd_sample_times_unittest(void) {
         { 0, 1010 }, { 1, 1000.0 / 11.0 }, { 2, 90.0 + 100.0 / 11.0 }, { 3, 100 }, { 4, 100 },
     };
 
-    // The plugin restarts during a 30 s backward wall-clock step and the Agent keeps the chart: the new process
-    // sends times 30 s behind the chart before its own clock catches up. The control chart restarts at the same
-    // point (the restart is checked before the sample is skipped).
+    // The plugin restarts and the Agent keeps the chart: the new process sends times 30 s behind the chart before
+    // its own clock catches up. The times are far in the past, so the Agent's own clock is not behind the chart and
+    // the counter baseline carries over (clock_step covers the Agent seeing the step). The control chart restarts at
+    // the same point (the restart is checked before the sample is skipped).
     static const struct sample_times_sample retained[] = {
         { S(96.2), 9620 }, { S(97.2), 9720 }, { S(98.2), 9820 }, { S(99.2), 9920 }, { S(100.2), 10020 },
         { S(70.2), 7020, true, true }, { S(71.2), 7120, true }, { S(72.2), 7220, true },
