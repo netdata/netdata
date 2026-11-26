@@ -408,7 +408,7 @@ modules:
 
               In a container, run the same command inside it only when the container keeps `cap_net_raw` in its capability bounding set (`capsh --print` lists it under `Bounding set`). A binary whose file capability the container does not allow fails to start, which would stop all WMI collection.
           - error: 'ICMP ping failed: could not resolve the host'
-            cause: The poller could not resolve the configured `host` name when it pinged the host, while the WMI queries of that collection succeeded. The usual cause is an intermittent DNS failure.
+            cause: The poller could not resolve the configured `host` name when it pinged the host, while the WMI queries of that collection succeeded. The usual cause is an intermittent DNS failure, or a DNS server that does not answer within the ping time limit of up to 3 seconds.
             fix: Use a name the poller resolves reliably, such as the host's fully qualified domain name, or its IP address.
           - error: 'ICMP ping failed: `reason`'
             cause: The poller could not send the echo requests, for example because a firewall on the poller rejects outgoing ICMP (`operation not permitted`) or has no route to the host (`no route to host`).
