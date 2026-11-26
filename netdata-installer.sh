@@ -866,9 +866,6 @@ if ! cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
 
-# The analytics script is no longer shipped; an install over an old one would keep it.
-run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/anonymous-statistics.sh"
-
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
 
@@ -1174,6 +1171,9 @@ fi
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
+
+# The analytics script is no longer shipped; an install over an old one would keep it.
+run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/anonymous-statistics.sh"
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
