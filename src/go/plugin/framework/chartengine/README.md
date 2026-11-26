@@ -255,6 +255,9 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 3. update values
 4. remove dimensions/charts
 
+`chartemit.EmittedCharts` applies the same order to record which charts a plan leaves defined on the Agent; V2 job
+cleanup and runtime components obsolete that set through its `ObsoletePlan`.
+
 ## Routing and Collision Rules
 
 Each metric series is routed to a chart and dimension based on template selectors.

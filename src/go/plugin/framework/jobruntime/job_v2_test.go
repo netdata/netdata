@@ -2864,13 +2864,27 @@ func TestJobV2CleanupNoSuccessfulEmissionsIsNoOp(t *testing.T) {
 	assert.True(t, mod.cleaned)
 }
 
-func TestJobV2CleanupTrackerUsesEffectiveEmittedChartSet(t *testing.T) {
-	meta := chartengine.ChartMeta{
+func TestJobV2CleanupTrackerRecordsCommittedPlansPerOwner(t *testing.T) {
+	globalMeta := chartengine.ChartMeta{
 		Title:   "Workers Busy",
 		Family:  "Workers",
 		Context: "workers_busy",
 		Units:   "workers",
 		Type:    chartengine.ChartTypeLine,
+	}
+	vnodeMeta := chartengine.ChartMeta{
+		Title:   "Queue Depth",
+		Family:  "Queue",
+		Context: "queue_depth",
+		Units:   "items",
+		Type:    chartengine.ChartTypeLine,
+	}
+	globalHost := jobV2HostRef{
+		kind: jobV2HostGlobal,
+	}
+	vnodeHost := jobV2HostRef{
+		kind: jobV2HostVnode,
+		guid: "node-guid",
 	}
 
 	job := &JobV2{
@@ -2879,37 +2893,54 @@ func TestJobV2CleanupTrackerUsesEffectiveEmittedChartSet(t *testing.T) {
 		},
 	}
 	state := requireDefaultScopeState(t, job)
-	decision := jobV2EmissionDecision{
-		targetHost: jobV2HostRef{
-			kind: jobV2HostGlobal,
-		},
-	}
+
 	state.host.commitSuccessfulEmission(chartengine.Plan{
 		Actions: []chartengine.EngineAction{
 			chartengine.CreateDimensionAction{
 				ChartID:   "workers_busy",
-				ChartMeta: meta,
+				ChartMeta: globalMeta,
 				Name:      "busy",
 			},
 		},
-	}, decision)
+	}, jobV2EmissionDecision{
+		targetHost: globalHost,
+	})
 
-	require.Len(t, state.host.cleanupCharts, 1)
-	assert.Equal(t, meta, state.host.cleanupCharts["workers_busy"])
-	assert.Equal(t, jobV2HostRef{
-		kind: jobV2HostGlobal,
-	}, state.host.cleanupOwner)
+	assert.Equal(t, chartemit.EmittedCharts{
+		"workers_busy": globalMeta,
+	}, state.host.cleanupCharts)
+	assert.Equal(t, globalHost, state.host.cleanupOwner)
+
+	// A nonempty emission on another host replaces the old host's inventory.
+	state.host.commitSuccessfulEmission(chartengine.Plan{
+		Actions: []chartengine.EngineAction{
+			chartengine.CreateChartAction{
+				ChartID: "queue_depth",
+				Meta:    vnodeMeta,
+			},
+		},
+	}, jobV2EmissionDecision{
+		targetHost: vnodeHost,
+	})
+
+	assert.Equal(t, chartemit.EmittedCharts{
+		"queue_depth": vnodeMeta,
+	}, state.host.cleanupCharts)
+	assert.Equal(t, vnodeHost, state.host.cleanupOwner)
 
 	state.host.commitSuccessfulEmission(chartengine.Plan{
 		Actions: []chartengine.EngineAction{
 			chartengine.RemoveChartAction{
-				ChartID: "workers_busy",
-				Meta:    meta,
+				ChartID: "queue_depth",
+				Meta:    vnodeMeta,
 			},
 		},
-	}, decision)
+	}, jobV2EmissionDecision{
+		targetHost: vnodeHost,
+	})
 
 	assert.Empty(t, state.host.cleanupCharts)
+	assert.Equal(t, vnodeHost, state.host.cleanupOwner)
 }
 
 func TestJobV2StopBeforeStartDoesNotBlock(t *testing.T) {

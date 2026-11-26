@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"maps"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,12 +23,12 @@ import (
 type runtimeComponentState struct {
 	spec        componentSpec
 	engine      *chartengine.Engine
-	knownCharts map[string]chartengine.ChartMeta
+	knownCharts chartemit.EmittedCharts
 }
 
 type runtimePreparedEmission struct {
 	attempt         chartengine.PlanAttempt
-	nextKnownCharts map[string]chartengine.ChartMeta
+	nextKnownCharts chartemit.EmittedCharts
 }
 
 type runtimeTickCommitStep struct {
@@ -310,9 +309,8 @@ func (j *runtimeMetricsJob) newComponentState(spec componentSpec) (*runtimeCompo
 	}
 
 	state := &runtimeComponentState{
-		spec:        spec,
-		engine:      engine,
-		knownCharts: make(map[string]chartengine.ChartMeta),
+		spec:   spec,
+		engine: engine,
 	}
 	return state, nil
 }
@@ -416,9 +414,12 @@ func (j *runtimeMetricsJob) prepareEmission(
 		return runtimePreparedEmission{}, false
 	}
 
+	// The attempt may still be aborted, so record into a copy the commit installs.
+	nextKnownCharts := maps.Clone(state.knownCharts)
+	nextKnownCharts.Record(plan)
 	return runtimePreparedEmission{
 		attempt:         attempt,
-		nextKnownCharts: applyEffectiveChartSet(state.knownCharts, plan),
+		nextKnownCharts: nextKnownCharts,
 	}, true
 }
 
@@ -427,53 +428,5 @@ func (j *runtimeMetricsJob) emitComponentObsolete(api *netdataapi.API, state *ru
 		return nil
 	}
 
-	chartIDs := make([]string, 0, len(state.knownCharts))
-	for chartID := range state.knownCharts {
-		chartIDs = append(chartIDs, chartID)
-	}
-	sort.Strings(chartIDs)
-
-	actions := make([]chartengine.EngineAction, 0, len(chartIDs))
-	for _, chartID := range chartIDs {
-		meta := state.knownCharts[chartID]
-		actions = append(actions, chartengine.RemoveChartAction{
-			ChartID: chartID,
-			Meta:    meta,
-		})
-	}
-
-	return chartemit.ApplyPlan(api, chartengine.Plan{Actions: actions}, cloneEmitEnv(state.spec.EmitEnv))
-}
-
-func applyEffectiveChartSet(known map[string]chartengine.ChartMeta, plan chartengine.Plan) map[string]chartengine.ChartMeta {
-	out := maps.Clone(known)
-	if out == nil {
-		out = make(map[string]chartengine.ChartMeta)
-	}
-
-	createCharts := make(map[string]chartengine.ChartMeta)
-	dimensionOnlyCharts := make(map[string]chartengine.ChartMeta)
-	for _, action := range plan.Actions {
-		switch v := action.(type) {
-		case chartengine.CreateChartAction:
-			createCharts[v.ChartID] = v.Meta
-		case chartengine.CreateDimensionAction:
-			if _, ok := createCharts[v.ChartID]; ok {
-				continue
-			}
-			if _, ok := dimensionOnlyCharts[v.ChartID]; !ok {
-				dimensionOnlyCharts[v.ChartID] = v.ChartMeta
-			}
-		case chartengine.RemoveChartAction:
-			delete(out, v.ChartID)
-		}
-	}
-	maps.Copy(out, createCharts)
-	for chartID, meta := range dimensionOnlyCharts {
-		if _, ok := out[chartID]; ok {
-			continue
-		}
-		out[chartID] = meta
-	}
-	return out
+	return chartemit.ApplyPlan(api, state.knownCharts.ObsoletePlan(), cloneEmitEnv(state.spec.EmitEnv))
 }

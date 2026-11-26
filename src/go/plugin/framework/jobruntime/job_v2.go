@@ -309,7 +309,7 @@ func (j *JobV2) cleanup(emit bool) {
 			}
 		}
 		j.buf.Reset()
-		if err := chartemit.ApplyPlan(j.api, buildJobV2CleanupPlan(snapshot.charts), env); err != nil {
+		if err := chartemit.ApplyPlan(j.api, snapshot.charts.ObsoletePlan(), env); err != nil {
 			j.Warningf("cleanup apply plan failed for host scope %q: %v", snapshot.scopeKey, err)
 			j.buf.Reset()
 			continue
