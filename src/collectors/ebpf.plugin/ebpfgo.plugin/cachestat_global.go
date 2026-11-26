@@ -93,10 +93,6 @@ var cachestatGlobalChartsOnce sync.Once
 // this lock they can interleave and corrupt the protocol stream.
 var pluginOutputMu sync.Mutex
 
-// pluginSampleClock times every chart sample of this process, so each chart's
-// END times keep increasing (see netdataapi.SampleClock).
-var pluginSampleClock netdataapi.SampleClock
-
 func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachestatGlobalPublish, bool) {
 	mpa := diffCounters(current.MarkPageAccessed, s.prev.MarkPageAccessed)
 	mbd := diffCounters(current.MarkBufferDirty, s.prev.MarkBufferDirty)
@@ -304,7 +300,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		}
 	}
 
-	collectAndPublish(pluginSampleClock.Next(time.Now()))
+	collectAndPublish(netdataapi.NewSampleTime(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -316,6 +312,6 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		case <-ticker.C:
 		}
 
-		collectAndPublish(pluginSampleClock.Next(time.Now()))
+		collectAndPublish(netdataapi.NewSampleTime(time.Now()))
 	}
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
@@ -266,44 +265,6 @@ func TestJobV1ChartSampleTimes(t *testing.T) {
 			job.runOnce()
 			assert.Empty(t, collectorSampleTimes(out.String(), "test_job"))
 		})
-	})
-}
-
-// One clock per plugin process keeps each chart's times increasing across jobs,
-// including a job recreated under the same name.
-func TestJobsShareSampleClock(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		var clock netdataapi.SampleClock
-		newJob := func(out *bytes.Buffer) *JobV2 {
-			store := metrix.NewCollectorStore()
-			job := NewJobV2(JobV2Config{
-				PluginName: "go.d",
-				ModuleName: "test",
-				Name:       "job",
-				FullName:   "test_job",
-				Module: &mockModuleV2{
-					store:    store,
-					template: chartTemplateV2(),
-					collectFunc: func(context.Context) error {
-						store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(7)
-						return nil
-					},
-				},
-				Out:         out,
-				UpdateEvery: 10,
-				SampleClock: &clock,
-			})
-			require.NoError(t, job.AutoDetectionManaged(context.Background()))
-			return job
-		}
-		var first, second bytes.Buffer
-		newJob(&first).runOnce()
-		newJob(&second).runOnce()
-
-		now := time.Now()
-		assert.Equal(t, map[string]string{"/workers_busy": endAt(now)}, collectorSampleTimes(first.String(), "test_job"))
-		assert.Equal(t, map[string]string{"/workers_busy": endAt(now.Add(time.Microsecond))},
-			collectorSampleTimes(second.String(), "test_job"))
 	})
 }
 

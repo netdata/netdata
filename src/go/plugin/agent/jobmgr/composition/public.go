@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
@@ -90,10 +89,6 @@ type Config struct {
 	ProcessFunctions []funcapi.ProcessFunctionProvider // independent of collector selection
 
 	Runtime RuntimeService // runtime service (charts/host-scope; nil disables runtime charts)
-
-	// SampleClock times every job's chart samples; one per plugin process, shared
-	// with the runtime service. Nil gives the process a clock of its own.
-	SampleClock *netdataapi.SampleClock
 
 	ShutdownTimeout time.Duration // per-run shutdown budget
 	KeepAlive       bool          // emit keepalive frames (long-lived agent mode)
@@ -201,10 +196,6 @@ func NewProcess(config Config) (*Process, error) {
 	if config.Runtime != nil {
 		finalizeOutput = config.Runtime.Stop
 	}
-	sampleClock := config.SampleClock
-	if sampleClock == nil {
-		sampleClock = &netdataapi.SampleClock{}
-	}
 	core, err := newProcessCore(processCoreConfig{
 		Input:            config.Input,
 		Output:           config.Output,
@@ -216,7 +207,6 @@ func NewProcess(config Config) (*Process, error) {
 			PluginName:        config.PluginName,
 			Defaults:          defaults,
 			Runtime:           config.Runtime,
-			SampleClock:       sampleClock,
 			InitialVnodes:     initialVnodes,
 			SNMPVnodeAcquirer: config.SNMPVnodeAcquirer,
 		},

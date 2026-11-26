@@ -51,7 +51,6 @@ type publicationBench struct {
 	aggregator *chartengine.RuntimeAggregator
 	buf        bytes.Buffer
 	api        *netdataapi.API
-	clock      netdataapi.SampleClock
 }
 
 func newPublicationBench(b *testing.B, collector interface {
@@ -115,7 +114,7 @@ func (p *publicationBench) cycle(b *testing.B, collect func(context.Context) err
 		b.Fatalf("collecttest: commit: %v", err)
 	}
 	updates := 0
-	sample := p.clock.Next(time.Now())
+	sample := netdataapi.NewSampleTime(time.Now())
 	reader := p.store.Read(metrix.ReadFlatten()).(metrix.FreshVisibleHostScopesReader)
 	for _, scope := range reader.FreshVisibleHostScopes() {
 		engine := p.engines[scope.ScopeKey]

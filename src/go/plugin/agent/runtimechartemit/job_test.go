@@ -90,7 +90,7 @@ func TestRuntimeMetricsJobStartStopLifecycle(t *testing.T) {
 			})
 
 			out := &safeBuffer{}
-			job := newRuntimeMetricsJob(out, reg, nil, nil)
+			job := newRuntimeMetricsJob(out, reg, nil)
 
 			done := make(chan struct{})
 			go func() {
@@ -130,7 +130,7 @@ func TestRuntimeMetricsJobTickSkipWhenBusy(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil, nil)
+			job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil)
 
 			// Fill single-slot queue to force skip path.
 			job.tick <- 1
@@ -168,7 +168,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 					},
 				})
 
-				job := newRuntimeMetricsJob(failingWriter{}, reg, nil, nil)
+				job := newRuntimeMetricsJob(failingWriter{}, reg, nil)
 				job.runOnce(1)
 
 				state := job.components["component"]
@@ -252,7 +252,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 					},
 				})
 
-				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil, nil)
+				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil)
 				current := &runtimeComponentState{
 					spec: componentSpec{
 						Name:       "component",
@@ -283,7 +283,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 		},
 		"removal keeps old state when obsolete emit fails": {
 			run: func(t *testing.T) {
-				job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil, nil)
+				job := newRuntimeMetricsJob(&safeBuffer{}, newComponentRegistry(), nil)
 				current := &runtimeComponentState{
 					spec: componentSpec{
 						Name:       "component",

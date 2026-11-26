@@ -399,8 +399,7 @@ func (w *plainWriter) Write(p []byte) (int, error) {
 }
 
 func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
-	var clock SampleClock
-	sample := clock.Next(time.Unix(1700000000, 250000000))
+	sample := NewSampleTime(time.Unix(1700000000, 250000000))
 	emit := func(api *API) {
 		api.CHART(ChartOpts{
 			TypeID:      "type",

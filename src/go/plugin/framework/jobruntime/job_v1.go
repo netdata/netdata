@@ -45,9 +45,6 @@ type JobConfig struct {
 	VnodeLookup             VnodeLookup
 	FunctionOnly            bool
 	LifecycleErrorSanitizer func(error) error
-	// SampleClock times chart samples; share one per plugin process (see
-	// netdataapi.SampleClock). Nil gives the job a clock of its own.
-	SampleClock *netdataapi.SampleClock
 }
 
 func NewJob(cfg JobConfig) *Job {
@@ -63,12 +60,8 @@ func NewJob(cfg JobConfig) *Job {
 	if cfg.Publication == nil {
 		cfg.Publication = hostoutput.New()
 	}
-	if cfg.SampleClock == nil {
-		cfg.SampleClock = &netdataapi.SampleClock{}
-	}
 	j := &Job{
 		publication:     cfg.Publication,
-		sampleClock:     cfg.SampleClock,
 		hostCharts:      make(jobV1ChartInventory),
 		autoDetectEvery: cfg.AutoDetectEvery,
 		autoDetectTries: infTries,
@@ -170,8 +163,7 @@ type Job struct {
 	vnodeMetadataRevision uint64
 	vnodeLookup           VnodeLookup
 
-	retries     atomic.Int64
-	sampleClock *netdataapi.SampleClock
+	retries atomic.Int64
 
 	stopCtrl stopController
 
@@ -507,7 +499,7 @@ func (j *Job) postCheck() error {
 func (j *Job) runOnce() {
 	defer j.ResetAllOnce()
 	curTime := time.Now()
-	sample := j.sampleClock.Next(curTime)
+	sample := netdataapi.NewSampleTime(curTime)
 	j.refreshVnodeSnapshot()
 	metrics := j.collect()
 	if j.panicked.Load() {

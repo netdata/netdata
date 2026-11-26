@@ -10,9 +10,6 @@ import (
 
 // testSample is the collection time the tests pass to ApplyPlan; testEnd is the
 // END line it renders.
-var testSample = func() netdataapi.SampleTime {
-	var clock netdataapi.SampleClock
-	return clock.Next(time.Unix(1700000000, 250000000))
-}()
+var testSample = netdataapi.NewSampleTime(time.Unix(1700000000, 250000000))
 
 const testEnd = "END 1700000000 250000 1"
