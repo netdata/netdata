@@ -7,11 +7,13 @@ import (
 	"context"
 	"crypto/tls"
 	_ "embed"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
 )
@@ -86,7 +88,8 @@ func (c *Collector) Init(ctx context.Context) error {
 			TLSCA: c.TLSCA,
 		})
 		if err != nil {
-			return err
+			// The loader's message names the file, so only the wrapping text carries it.
+			return fmt.Errorf("%w: %v", dyncfg.NewPublicError("could not load tls_ca", err), err)
 		}
 		c.winrmTLS = cfg
 	}

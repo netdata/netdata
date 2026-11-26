@@ -228,6 +228,8 @@ collector guarantees to be secret-free in `dyncfg.NewPublicError(message, cause)
   `With` keeps only its own public message. Messages and values without one stay redacted.
 - `PublicError.Error()` returns only the message for every job, so the private cause is not shown even without
   secret references. Panics are never public.
+- Wrapping text stays visible to jobs without secret references, so a configuration value the public message must omit
+  MAY go there, as in `fmt.Errorf("%w of %s", dyncfg.NewPublicError("collection timed out", err), timeout)`.
 
 Several source configs can share a module/job name. Before any candidate reaches readiness, an enabled source-owned
 job tries eligible alternatives at the highest owning source tier, including alternatives in other files. Each gets

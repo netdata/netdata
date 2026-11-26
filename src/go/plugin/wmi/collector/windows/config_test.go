@@ -115,6 +115,13 @@ func TestCollector_ValidateConfig(t *testing.T) {
 		"UPN account":       {change: func(c *Collector) { c.Username = "monitor@example.com" }},
 		"missing password":  {change: func(c *Collector) { c.Password = "" }, wantError: "password is required"},
 		"zero timeout":      {change: func(c *Collector) { c.Timeout = 0 }, wantError: "timeout must be positive"},
+		"unreadable CA": {
+			change: func(c *Collector) {
+				c.Transport = "winrm"
+				c.TLSCA = "/nonexistent/lab-ca.pem"
+			},
+			wantError: `could not load tls_ca: could not read certificate "/nonexistent/lab-ca.pem"`,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := configuredCollector()

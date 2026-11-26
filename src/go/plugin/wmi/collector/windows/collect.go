@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
 )
 
@@ -86,7 +88,7 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		case err != nil:
 			failures[i] = safeTransportError(group.name+" WMI query failed", err)
 		case !group.read(rows):
-			failures[i] = fmt.Errorf("%s WMI query returned no usable observations", group.name)
+			failures[i] = publicError(group.name + " WMI query returned no usable observations")
 		default:
 			succeeded = true
 		}
@@ -96,7 +98,14 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		return observations{}, c.interrupted(parent, ctx)
 	}
 	if !succeeded {
-		return observations{}, fmt.Errorf("no enabled WMI query group succeeded: %w", errors.Join(failures[:]...))
+		var messages []string
+		for _, failure := range failures {
+			if message, ok := dyncfg.PublicMessage(failure); ok {
+				messages = append(messages, message)
+			}
+		}
+		summary := "no enabled WMI query group succeeded: " + strings.Join(messages, "\n")
+		return observations{}, dyncfg.NewPublicError(summary, errors.Join(failures[:]...))
 	}
 	for i, err := range failures {
 		if err != nil {
@@ -119,16 +128,25 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 // timeout, or the job's own cancellation.
 func (c *Collector) interrupted(parent, ctx context.Context) error {
 	if parent.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("WMI collection did not finish within the %s timeout: %w", c.Timeout.Duration(), ctx.Err())
+		// The timeout is a configuration value, so only the wrapping text names it.
+		expired := dyncfg.NewPublicError("WMI collection did not finish within the timeout", ctx.Err())
+		return fmt.Errorf("%w of %s", expired, c.Timeout.Duration())
 	}
 	return ctx.Err()
 }
 
-// safeTransportError keeps only the transport's classified messages; other
-// error text can carry account names or server-supplied details.
+// safeTransportError keeps only the operation and the transport's classified
+// message, which hold fixed text and protocol status codes. Other error text can
+// carry account names or server-supplied details, so it stays the private cause.
 func safeTransportError(operation string, err error) error {
 	if detail := wmiquery.SafeMessage(err); detail != "" {
-		return fmt.Errorf("%s: %s", operation, detail)
+		return dyncfg.NewPublicError(operation+": "+detail, err)
 	}
-	return errors.New(operation)
+	return dyncfg.NewPublicError(operation, err)
+}
+
+// publicError reports a failure in fixed text, which the Agent shows even for
+// jobs whose options use secret references.
+func publicError(message string) error {
+	return dyncfg.NewPublicError(message, errors.New(message))
 }
