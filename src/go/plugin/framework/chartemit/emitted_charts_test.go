@@ -3,8 +3,11 @@
 package chartemit
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -218,14 +221,19 @@ func TestEmittedChartsRecordMatchesApplyPlanRemovalOrder(t *testing.T) {
 		},
 	}
 
-	inspection, err := InspectPlan(plan, EmitEnv{
+	var buf bytes.Buffer
+	require.NoError(t, ApplyPlan(netdataapi.New(&buf), plan, EmitEnv{
 		TypeID: "app",
-	})
-	require.NoError(t, err)
-	require.NotEmpty(t, inspection.Charts)
-	last := inspection.Charts[len(inspection.Charts)-1]
-	require.Equal(t, "load", last.SourceChartID)
-	require.True(t, last.Obsolete, "ApplyPlan must emit the removal after the definition")
+	}))
+	var chartLines []string
+	for line := range strings.Lines(buf.String()) {
+		if strings.HasPrefix(line, "CHART 'app.load'") {
+			chartLines = append(chartLines, line)
+		}
+	}
+	require.Len(t, chartLines, 2)
+	assert.NotContains(t, chartLines[0], "'obsolete'")
+	assert.Contains(t, chartLines[1], "'obsolete'", "ApplyPlan must emit the removal after the definition")
 
 	var charts EmittedCharts
 	charts.Record(plan)
