@@ -43,8 +43,11 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
 #define sender_commit(s, wb, type) sender_thread_commit_with_trace(s, wb, type, __FUNCTION__)
 
 // commit any buffer
+// returns true when the whole payload was queued for sending
+bool sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type);
+
+// commit a buffer that is not one of the above
 // this is the preferred buffer for occasional senders, as it avoids a permanently allocated buffer
-void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type);
-#define sender_commit_clean_buffer(s, wb, type) sender_buffer_commit(s, wb, NULL, type)
+void sender_commit_clean_buffer(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type);
 
 #endif //NETDATA_STREAM_SENDER_COMMIT_H

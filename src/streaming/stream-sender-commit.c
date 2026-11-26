@@ -68,14 +68,15 @@ BUFFER *sender_host_buffer_with_trace(struct rrdhost *host, const char *func) {
 }
 
 // Collector thread finishing a transmission
-void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type) {
+// returns true when the whole payload was queued for sending
+bool sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type) {
     struct stream_opcode msg;
 
     char *src = (char *)buffer_tostring(wb);
     size_t src_len = buffer_strlen(wb);
 
     if (unlikely(!src || !src_len))
-        return;
+        return false;
 
     waitq_acquire(&s->waitq, (rrdhost_is_this_a_stream_thread(s->host)) ? WAITQ_PRIO_HIGH : WAITQ_PRIO_NORMAL);
     stream_sender_lock(s);
@@ -93,7 +94,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
         stream_sender_unlock(s);
         waitq_release(&s->waitq);
-        return;
+        return false;
     }
 
     if (unlikely(stream_circular_buffer_set_max_size_unsafe(
@@ -200,7 +201,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         stream_sender_send_opcode(s, msg);
     }
 
-    return;
+    return true;
 
 overflow_with_lock: {
         STREAM_CIRCULAR_BUFFER_STATS stats_snapshot = *stats;
@@ -216,7 +217,7 @@ overflow_with_lock: {
                      "Restarting connection.",
                      rrdhost_hostname(s->host), s->remote_ip,
                      stats_snapshot.bytes_size, stats_snapshot.bytes_max_size, stats_snapshot.bytes_available);
-        return;
+        return false;
     }
 
 compression_failed_with_lock: {
@@ -233,6 +234,29 @@ compression_failed_with_lock: {
                      "Deactivating compression and restarting connection.",
                      rrdhost_hostname(s->host), s->remote_ip);
     }
+    return false;
+}
+
+// Commit a buffer that is not one of the sender commit buffers.
+// On a parent, the receiver thread keeps forwarded DATA staged in the host commit buffer
+// (see sender_thread_commit_with_trace()). A clean commit from that thread must not overtake it:
+// an obsolete CHART sent ahead of the chart's last BEGIN2/END2 is revived by that BEGIN2 upstream.
+// So the staged DATA is sent first. A busy host buffer (an update still being built) is left alone.
+void sender_commit_clean_buffer(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type) {
+    if (unlikely(!buffer_strlen(wb)))
+        return;
+
+    struct sender_buffer *commit = &s->host->stream.snd.commit;
+    pid_t receiver_tid = __atomic_load_n(&commit->receiver_tid, __ATOMIC_RELAXED);
+    if (receiver_tid && receiver_tid == gettid_cached() && s == s->host->sender &&
+        !commit->used && commit->reused && commit->wb && buffer_strlen(commit->wb)) {
+        bool sent = sender_buffer_commit(s, commit->wb, commit, STREAM_TRAFFIC_TYPE_DATA);
+        commit->reused = 0;
+        if (!sent)
+            return;
+    }
+
+    sender_buffer_commit(s, wb, NULL, type);
 }
 
 void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
