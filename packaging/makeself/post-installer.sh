@@ -30,6 +30,8 @@ if [ "$DP_ENABLED" = 1 ]; then
     trap 'exit 143' TERM HUP
     dem_pair_begin || exit $?
 fi
+dashboard_upgrade=0
+if [ -x /opt/netdata/bin/netdata ]; then dashboard_upgrade=1; fi
 # The ordinary static installer owns payload replacement on both routes.
 dem_pair_run mkdir -p /opt/netdata || exit $?
 (
@@ -44,6 +46,10 @@ dem_pair_run mkdir -p /opt/netdata || exit $?
         --exclude=./var/cache/netdata --exclude=./var/log/netdata . |
         dem_pair_run tar -xpf - "$@" -C /opt/netdata
 ) || exit $?
+if [ "$dashboard_upgrade" = 1 ]; then
+    run sh "$DP_STAGE/system/cleanup-dashboard.sh" "$DP_STAGE/usr/share/netdata/web/v3" \
+        /opt/netdata usr/share/netdata/web || warning "Dashboard cleanup failed: $?. Continuing installation."
+fi
 if [ ! -d /opt/netdata/etc/netdata ]; then
     dem_pair_run mkdir -p /opt/netdata/etc || exit $?
     dem_pair_run cp -a "$DP_STAGE/etc/netdata" /opt/netdata/etc/netdata || exit $?

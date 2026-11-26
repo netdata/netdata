@@ -861,7 +861,14 @@ if [ "${DP_ENABLED}" = 1 ]; then
   dem_pair_begin || exit $?
   DONOTSTART=1
 fi
-# CMake owns installation for both enrolled and ordinary Agents.
+# CMake owns installation for both enrolled and ordinary Agents. The dashboard
+# component removes stale v3 files only when it replaces an existing Agent.
+NETDATA_INSTALLER_DASHBOARD_UPGRADE=0
+if [ -x "${DESTDIR:-}${NETDATA_PREFIX}/usr/sbin/netdata" ]; then
+  NETDATA_INSTALLER_DASHBOARD_UPGRADE=1
+fi
+# Export it: POSIX leaves exporting `VAR=value function` assignments unspecified.
+export NETDATA_INSTALLER_DASHBOARD_UPGRADE
 if ! cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
