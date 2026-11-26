@@ -54,7 +54,8 @@ cache_path() {
   # A dependency built with other compiler flags or another recipe must not be reused, so both are part of the cache
   # identity. Every dependency recipe counts, not only the key's own: a cached build can embed an earlier dependency
   # (the curl executable links OpenSSL), and this file's helpers shape the links. The CI cache key
-  # (.github/scripts/get-static-cache-key.sh) hashes the same files, plus the builder image's packages.
+  # (.github/scripts/get-static-cache-key.sh) also hashes all of build-static.sh (here only TUNING_FLAGS) and the
+  # builder image's packages.
   local makeself="${NETDATA_SOURCE_PATH}/packaging/makeself"
   local id f
   id="$(
