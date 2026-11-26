@@ -101,7 +101,7 @@ groups:
 					assert.Equal(t, wantRemoval, removed, "removal at cycle %d", cycle)
 					var wire bytes.Buffer
 					require.NoError(t, chartemit.ApplyPlan(netdataapi.New(&wire), attempt.Plan(), chartemit.EmitEnv{
-						TypeID: "test_localhost", UpdateEvery: 1, Plugin: "test", Module: "test", JobName: "localhost", MSSinceLast: 1000,
+						TypeID: "test_localhost", UpdateEvery: 1, Plugin: "test", Module: "test", JobName: "localhost",
 					}))
 					if wantRemoval {
 						assert.Contains(t, wire.String(), "obsolete")

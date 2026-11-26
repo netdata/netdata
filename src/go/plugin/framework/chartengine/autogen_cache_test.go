@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
@@ -178,28 +179,39 @@ groups:
 
 func TestAutogenWarmPlanAllocationEnvelope(t *testing.T) {
 	for _, n := range []int{128, 512} {
-		t.Run(fmt.Sprint(n), func(t *testing.T) {
-			e := newAutogenCacheTestEngine(t, WithRuntimePlannerMode())
-			reader := autogenCacheTestReader(t, func(m metrix.SnapshotMeter) {
-				g := m.Gauge("work")
-				for i := range n {
-					g.Observe(float64(i), m.LabelSet(metrix.Label{
-						Key:   "id",
-						Value: fmt.Sprint(i),
-					}))
+		for name, timed := range map[string]bool{"untimed": false, "timed": true} {
+			t.Run(fmt.Sprintf("%d/%s", n, name), func(t *testing.T) {
+				e := newAutogenCacheTestEngine(t, WithRuntimePlannerMode())
+				reader := autogenCacheTestReader(t, func(m metrix.SnapshotMeter) {
+					g := m.Gauge("work")
+					for i := range n {
+						g.Observe(float64(i), m.LabelSet(metrix.Label{
+							Key:   "id",
+							Value: fmt.Sprint(i),
+						}))
+					}
+				})
+				// Timed plans also stamp every updated chart's update time.
+				at := time.Unix(1_000_000, 0)
+				plan := func() (Plan, error) {
+					if !timed {
+						return buildPlan(e, reader)
+					}
+					at = at.Add(time.Second)
+					return buildPlanAt(e, reader, at)
 				}
+				_, err := plan()
+				require.NoError(t, err)
+				allocs := testing.AllocsPerRun(
+					10,
+					func() { plan, err := plan(); require.NoError(t, err); require.Len(t, plan.Actions, n) },
+				)
+				// Planning stages lifecycle state in place, so an unchanged chart allocates only
+				// its boxed update action; the constant covers per-plan setup. It also excludes
+				// rebuilding O(series) autogen strings/routes on every hit.
+				assert.LessOrEqual(t, allocs, float64(n+18))
 			})
-			_, err := buildPlan(e, reader)
-			require.NoError(t, err)
-			allocs := testing.AllocsPerRun(
-				10,
-				func() { plan, err := buildPlan(e, reader); require.NoError(t, err); require.Len(t, plan.Actions, n) },
-			)
-			// Planning stages lifecycle state in place, so an unchanged chart allocates only
-			// its boxed update action; the constant covers per-plan setup. It also excludes
-			// rebuilding O(series) autogen strings/routes on every hit.
-			assert.LessOrEqual(t, allocs, float64(n+18))
-		})
+		}
 	}
 }
 

@@ -143,7 +143,6 @@ type JobV2 struct {
 	runtimeStore      metrix.RuntimeStore
 	runtimeAggregator *chartengine.RuntimeAggregator
 
-	prevRun     time.Time
 	retries     atomic.Int64
 	selfMetrics jobSelfMetrics
 
@@ -294,7 +293,7 @@ func (j *JobV2) cleanup(emit bool) {
 			continue
 		}
 
-		env := j.emitEnv(0, jobV2EmissionDecision{})
+		env := j.emitEnv(jobV2EmissionDecision{})
 		if snapshot.host.isVnode() {
 			env.HostScope = &chartemit.HostScope{
 				GUID: snapshot.host.guid,
@@ -553,10 +552,7 @@ func (j *JobV2) runOnce() {
 	j.refreshVnodeSnapshot()
 
 	curTime := time.Now()
-	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
-	j.prevRun = curTime
-
-	prepared, ok := j.collectAndEmit(sinceLastRun)
+	prepared, ok := j.collectAndEmit(curTime)
 	elapsed := int64(durationTo(time.Since(curTime), time.Millisecond))
 	if ok && !j.panicked.Load() {
 		if err := j.finishPreparedEmission(prepared); err != nil {
@@ -587,7 +583,9 @@ func (j *JobV2) flushRuntimeAggregator() {
 	}
 }
 
-func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission, ok bool) {
+// collectAndEmit runs one collection started at curTime and prepares each host
+// scope's output; curTime also gives every chart update its span.
+func (j *JobV2) collectAndEmit(curTime time.Time) (prepared jobV2PreparedEmission, ok bool) {
 	j.panicked.Store(false)
 	cycleOpen := false
 
@@ -642,7 +640,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	// Scope outputs share one block per cycle; each scope's output is capped at its own end.
 	outputs := make([]byte, 0, j.lastOutputBytes)
 	for _, item := range work {
-		scopePrepared, scopeOK := j.prepareScopeEmission(item.scope, item.live, sinceLastRun, candidate, &outputs)
+		scopePrepared, scopeOK := j.prepareScopeEmission(item.scope, item.live, curTime, candidate, &outputs)
 		if !scopeOK {
 			prepared.scopeFailure = true
 			continue
@@ -699,7 +697,7 @@ func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
 func (j *JobV2) prepareScopeEmission(
 	scope metrix.HostScope,
 	live bool,
-	sinceLastRun int,
+	curTime time.Time,
 	candidate *chartengine.TemplateSet,
 	outputs *[]byte,
 ) (prepared jobV2PreparedScopeEmission, ok bool) {
@@ -745,7 +743,11 @@ func (j *JobV2) prepareScopeEmission(
 
 	attempt, err = state.engine.PreparePlanWithOptions(
 		j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)),
-		chartengine.PlanOptions{TemplateSet: candidate, ResetMaterialized: decision.needEngineReload},
+		chartengine.PlanOptions{
+			TemplateSet:       candidate,
+			ResetMaterialized: decision.needEngineReload,
+			CollectedAt:       curTime,
+		},
 	)
 	if err != nil {
 		j.Warningf("build plan for host scope %q failed: %v", state.scopeKey, err)
@@ -758,7 +760,7 @@ func (j *JobV2) prepareScopeEmission(
 	}
 
 	j.buf.Reset()
-	env := j.emitEnv(sinceLastRun, decision)
+	env := j.emitEnv(decision)
 	if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
 		j.Warningf("apply plan for host scope %q failed: %v", state.scopeKey, err)
 		return jobV2PreparedScopeEmission{}, false
@@ -799,7 +801,7 @@ func (j *JobV2) abortPreparedEmission(prepared jobV2PreparedEmission) {
 	}
 }
 
-func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) chartemit.EmitEnv {
+func (j *JobV2) emitEnv(decision jobV2EmissionDecision) chartemit.EmitEnv {
 	env := chartemit.EmitEnv{
 		TypeID:      j.fullName,
 		UpdateEvery: j.updateEvery,
@@ -807,7 +809,6 @@ func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) charte
 		Module:      j.moduleName,
 		JobName:     j.name,
 		JobLabels:   j.labels,
-		MSSinceLast: sinceLastRun,
 		StoreFirst:  j.storeFirst,
 	}
 	env.HostScope = decision.hostScope

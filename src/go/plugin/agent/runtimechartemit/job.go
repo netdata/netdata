@@ -24,13 +24,11 @@ import (
 type runtimeComponentState struct {
 	spec        componentSpec
 	engine      *chartengine.Engine
-	prev        time.Time
 	knownCharts map[string]chartengine.ChartMeta
 }
 
 type runtimePreparedEmission struct {
 	attempt         chartengine.PlanAttempt
-	nextPrev        time.Time
 	nextKnownCharts map[string]chartengine.ChartMeta
 }
 
@@ -318,7 +316,6 @@ func (j *runtimeMetricsJob) prepareComponentStep(spec componentSpec, now time.Ti
 		return runtimeTickCommitStep{
 			attempt: emission.attempt,
 			finalize: func() {
-				current.prev = emission.nextPrev
 				current.knownCharts = emission.nextKnownCharts
 			},
 		}, buf, true
@@ -343,7 +340,6 @@ func (j *runtimeMetricsJob) prepareComponentStep(spec componentSpec, now time.Ti
 	return runtimeTickCommitStep{
 		attempt: emission.attempt,
 		finalize: func() {
-			next.prev = emission.nextPrev
 			next.knownCharts = emission.nextKnownCharts
 			j.components[spec.Name] = next
 		},
@@ -384,7 +380,7 @@ func (j *runtimeMetricsJob) prepareEmission(api *netdataapi.API, state *runtimeC
 	}
 
 	reader := state.spec.Store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
-	attempt, err := state.engine.PreparePlan(reader)
+	attempt, err := state.engine.PreparePlanWithOptions(reader, chartengine.PlanOptions{CollectedAt: now})
 	if err != nil {
 		j.Warningf("runtime metrics component %q build plan failed: %v", state.spec.Name, err)
 		return runtimePreparedEmission{}, false
@@ -392,7 +388,6 @@ func (j *runtimeMetricsJob) prepareEmission(api *netdataapi.API, state *runtimeC
 
 	plan := attempt.Plan()
 	env := cloneEmitEnv(state.spec.EmitEnv)
-	env.MSSinceLast = calcRuntimeSinceLast(now, state.prev)
 	if err := chartemit.ApplyPlan(api, plan, env); err != nil {
 		attempt.Abort()
 		j.Warningf("runtime metrics component %q apply plan failed: %v", state.spec.Name, err)
@@ -401,7 +396,6 @@ func (j *runtimeMetricsJob) prepareEmission(api *netdataapi.API, state *runtimeC
 
 	return runtimePreparedEmission{
 		attempt:         attempt,
-		nextPrev:        now,
 		nextKnownCharts: applyEffectiveChartSet(state.knownCharts, plan),
 	}, true
 }
@@ -426,9 +420,7 @@ func (j *runtimeMetricsJob) emitComponentObsolete(api *netdataapi.API, state *ru
 		})
 	}
 
-	env := cloneEmitEnv(state.spec.EmitEnv)
-	env.MSSinceLast = 0
-	return chartemit.ApplyPlan(api, chartengine.Plan{Actions: actions}, env)
+	return chartemit.ApplyPlan(api, chartengine.Plan{Actions: actions}, cloneEmitEnv(state.spec.EmitEnv))
 }
 
 func applyEffectiveChartSet(known map[string]chartengine.ChartMeta, plan chartengine.Plan) map[string]chartengine.ChartMeta {
@@ -462,12 +454,4 @@ func applyEffectiveChartSet(known map[string]chartengine.ChartMeta, plan charten
 		out[chartID] = meta
 	}
 	return out
-}
-
-func calcRuntimeSinceLast(cur, prev time.Time) int {
-	if prev.IsZero() {
-		return 0
-	}
-	// Keep parity with module.Job calcSinceLastRun() units.
-	return int((cur.UnixNano() - prev.UnixNano()) / 1000)
 }

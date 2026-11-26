@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
@@ -108,9 +109,15 @@ func newNoopAttempt(plan Plan) PlanAttempt {
 // PlanOptions selects a complete desired snapshot and an optional host reset.
 // Nil TemplateSet keeps the current program. ResetMaterialized starts a new host's
 // presentation; it never emits retirements for the previous host.
+//
+// CollectedAt is when the plan's samples were collected (the job run start). Each
+// UpdateChartAction carries the time since its chart's previous update, which
+// counts only once the attempt that emitted it is committed. Zero CollectedAt
+// sends no spans and makes the next timed update of each chart send none.
 type PlanOptions struct {
 	TemplateSet       *TemplateSet
 	ResetMaterialized bool
+	CollectedAt       time.Time
 }
 
 func (e *Engine) PreparePlan(reader metrix.Reader) (PlanAttempt, error) {
@@ -148,7 +155,7 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 			journal.rollback()
 		}
 	}()
-	plan, materialized, prepared, err := view.buildPlan(reader, retired, journal)
+	plan, materialized, prepared, err := view.buildPlan(reader, sampleStamp(opts.CollectedAt), retired, journal)
 	view.state.hints.journal = journal.sizing()
 	if view != e {
 		// Attempt diagnostics describe builds, including aborted builds. They are

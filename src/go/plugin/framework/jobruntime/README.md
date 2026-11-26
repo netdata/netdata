@@ -99,6 +99,25 @@ retain that inventory; the next nonempty admission on a different host replaces 
 Host changes stage materialized reset in the plan attempt. Rejected output preserves the old host's state, and old-host
 retirements are never sent to the new host. Function-only jobs do not require a chart provider.
 
+## Chart Sample Intervals
+
+The Agent places each sample by its `BEGIN` interval, trusting it up to five update intervals, and advances the chart's
+collection time and the health variable `$last_collected_t` by it. A chart's interval MUST therefore be the time since
+that chart's previous delivered sample; a shorter one stores every later sample too early and inflates counter rates.
+
+- V2 collector charts: every scope plan carries the run start as `chartengine.PlanOptions.CollectedAt`, and the engine
+  gives each update the span since its chart's last committed update
+  ([update spans](/src/go/plugin/framework/chartengine/README.md#update-spans)). Failed cycles, unobserved charts and
+  rejected scopes lengthen the chart's next span.
+- Job self charts: `jobSelfMetrics` keeps the run time of each chart's last delivered sample (see "Per-job collection
+  charts").
+- V1 collector charts are the remaining exception: they send the time since the previous run, or none when the chart
+  had no value in its last delivered sample, so the first sample after a failed run is placed early.
+- Intervals stay `time.Duration` until `netdataapi.BEGIN`, which writes whole microseconds and omits anything shorter.
+
+Regression coverage: `job_v2_sample_interval_test.go` (V2 failed cycle, unobserved chart, rejected scope) and
+`TestJobSelfMetricsSampleIntervals`.
+
 ## First-sample storage
 
 A V2 collector MAY set `StoreFirst: true` in its `collectorapi.Creator` registration to enable the Agent's existing
@@ -132,9 +151,7 @@ plugin/module identity, configured job labels, `_collect_job`, and the job's col
   scope fails the cycle.
 - Status reports complementary `success`/`failed` values on ordinary cycles. Duration is sampled only on success and
   measured before output I/O, so output backpressure is excluded. A panic does not publish self samples.
-- Each sample's `BEGIN` interval is the time since that chart's previous delivered sample, so it spans failed,
-  panicked and rejected runs. The Agent places a sample by that interval (it trusts up to five update intervals), so
-  a shorter one would leave the chart's samples and the health variable `$last_collected_t` behind.
+- Each sample's `BEGIN` interval spans failed, panicked and rejected runs (see "Chart Sample Intervals").
 - Autodetection and function-only jobs do not publish these charts.
 
 `jobSelfMetrics` shares definitions, rendering and committed publication state between versions. V1 includes self

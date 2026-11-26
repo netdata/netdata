@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -207,7 +208,7 @@ func TestBufferedScopeUsesCurrentAuthority(t *testing.T) {
 			)
 			require.NoError(t, job.AutoDetectionManaged(context.Background()))
 			defer job.Cleanup()
-			prepared, ok := job.collectAndEmit(0)
+			prepared, ok := job.collectAndEmit(time.Time{})
 			require.True(t, ok)
 			configured, err := hostoutput.NewDefinition(
 				netdataapi.HostInfo{

@@ -587,11 +587,13 @@ func getChartID(chart *collectorapi.Chart) string {
 	return chart.ID
 }
 
-func calcSinceLastRun(curTime, prevRun time.Time) int {
+// calcSinceLastRun is the wall-clock time between two runs, the clock the Agent
+// compares plugin intervals with; zero before the first run.
+func calcSinceLastRun(curTime, prevRun time.Time) time.Duration {
 	if prevRun.IsZero() {
 		return 0
 	}
-	return int((curTime.UnixNano() - prevRun.UnixNano()) / 1000)
+	return time.Duration(curTime.UnixNano() - prevRun.UnixNano())
 }
 
 func durationTo(duration time.Duration, to time.Duration) int {

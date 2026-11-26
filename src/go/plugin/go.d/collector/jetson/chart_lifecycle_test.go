@@ -78,7 +78,7 @@ func TestTemperatureChartsSurviveUnavailableSensor(t *testing.T) {
 			assert.Equal(t, tc.gpu != nil, gpuUpdated)
 			var wire bytes.Buffer
 			require.NoError(t, chartemit.ApplyPlan(netdataapi.New(&wire), attempt.Plan(), chartemit.EmitEnv{
-				TypeID: "jetson_localhost", UpdateEvery: 1, Plugin: "go.d.plugin", Module: "jetson", JobName: "localhost", MSSinceLast: 1000,
+				TypeID: "jetson_localhost", UpdateEvery: 1, Plugin: "go.d.plugin", Module: "jetson", JobName: "localhost",
 			}))
 			assert.NotContains(t, wire.String(), "obsolete")
 			require.NoError(t, attempt.Commit())

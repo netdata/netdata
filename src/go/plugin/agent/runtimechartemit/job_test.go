@@ -178,7 +178,6 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 
 				state = job.components["component"]
 				require.NotNil(t, state)
-				require.False(t, state.prev.IsZero())
 				require.NotEmpty(t, state.knownCharts)
 				requireInOrder(
 					t,
@@ -255,7 +254,6 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 							JobName:     "component",
 						},
 					},
-					prev: time.Unix(1, 0),
 					knownCharts: map[string]chartengine.ChartMeta{
 						"component_load": {
 							Title:   "Component Load",
@@ -287,7 +285,6 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 							JobName:     "component",
 						},
 					},
-					prev: time.Unix(1, 0),
 					knownCharts: map[string]chartengine.ChartMeta{
 						"component_load": {
 							Title:   "Component Load",

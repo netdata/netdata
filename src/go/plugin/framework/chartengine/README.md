@@ -113,7 +113,8 @@ fail startup validation. Function-only jobs retain their exemption.
 
 Direct engine callers bind job overrides with `PrepareTemplateSet` before passing the snapshot to
 `PreparePlanWithOptions`. `PlanOptions.TemplateSet` selects the desired prepared snapshot; nil keeps the loaded program.
-`ResetMaterialized` stages a new host's presentation without retiring the previous host on the new host. Commit the
+`ResetMaterialized` stages a new host's presentation without retiring the previous host on the new host.
+`CollectedAt` is the plan's collection time and gives each update its span (see "Update Spans"). Commit the
 attempt only after complete output admission; abort preserves the previously committed program and presentation.
 `Load`, `LoadYAML`, `Compile`, `ChartTemplateIDAt` and immediate `ResetMaterialized` retain their document/component
 contracts. `Load` and `Compile` still expect defaults already applied; active-set transitions do not call destructive Load.
@@ -241,7 +242,7 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 | `CreateChartAction`     | Materialize chart instance (with chart metadata and labels)                                                                          |
 | `CreateDimensionAction` | Materialize dimension for a chart                                                                                                    |
 | `UpdateChartLabelsAction` | Re-emit chart metadata and replace chart labels                                                                                   |
-| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0) |
+| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0); `SinceLast` is the chart's update span |
 | `RemoveDimensionAction` | Obsolete one dimension                                                                                                               |
 | `RemoveChartAction`     | Obsolete one chart                                                                                                                   |
 
@@ -251,6 +252,26 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 2. update chart labels
 3. update values
 4. remove dimensions/charts
+
+### Update Spans
+
+`chartemit` writes each update's `SinceLast` as its `BEGIN` interval. The Agent places a sample by that interval and
+trusts it up to five update intervals, so it MUST be the time since the chart's previous delivered sample, not since
+the previous plan: a chart misses samples when a cycle fails, when none of its series is observed, or when its scope's
+output is rejected.
+
+- Each chart keeps the `CollectedAt` of its last emitted update, committed and rolled back with its attempt, so only
+  accepted output counts. `SinceLast` is `CollectedAt` minus that stamp.
+- `SinceLast` is zero, so `BEGIN` carries no interval and the Agent measures the gap itself, for the first update of a
+  new chart, including revival, template transition, ownership change and `ResetMaterialized`, and when either time is
+  unknown.
+- A plan with zero `CollectedAt` clears the stamps of the charts it updates, so their next span never covers a sample
+  delivered without a time. A `CollectedAt` at or before the stamp (a wall-clock step back) gives zero and restamps.
+- Runtime planner mode stamps every emitted update, including updates of a repeated source sequence.
+- If an attempt commit fails after its output was written, those samples are delivered but unstamped; the next span
+  is too long, and the Agent ignores an interval beyond five update intervals. Only a stale attempt can fail to
+  commit, and the job and runtime emitters plan and commit one attempt at a time.
+- Gaps of single dimensions inside an updated chart are outside this contract: the protocol has one interval per chart.
 
 ## Routing and Collision Rules
 
@@ -478,11 +499,12 @@ Benchmarks should verify emitted chart/dimension counts and values after warmup.
 
 Planning work is O(scanned series + retained charts); allocations follow what changed and the plan output. An
 unchanged chart allocates only its boxed update action: per-build chart state and update values come from blocks sized
-by the previous build, and the abort journal records only sequence stamps and scratch values of observed charts
-(transient per attempt). New or changed charts, labels and dimensions additionally allocate their definitions. Each
-plan also pays a small constant setup (build context and its maps and blocks, the attempt with its inline journal, one
-callback per series pass). `TestAutogenWarmPlanAllocationEnvelope` guards the steady envelope and
-`TestPlanAbortRestoresCommittedState` the abort contract.
+by the previous build, and the abort journal records only sequence and update-time stamps and scratch values of
+observed charts (transient per attempt, one slice of stamp records sized by the previous build). New or changed
+charts, labels and dimensions additionally allocate their definitions. Each plan also pays a small constant setup
+(build context and its maps and blocks, the attempt with its inline journal, one callback per series pass).
+`TestAutogenWarmPlanAllocationEnvelope` guards the steady envelope, untimed and timed, and
+`TestPlanAbortRestoresCommittedState` the abort contract, update stamps included.
 
 `BenchmarkAutogenMixedChurn` measures a bounded population with stable, partially replaced, or fully replaced
 identities; `BenchmarkCollectExpiryRemovals` covers stable, partial, and mass expiry across chart/dimension shapes.

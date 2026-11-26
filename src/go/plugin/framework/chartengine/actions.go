@@ -3,6 +3,8 @@
 package chartengine
 
 import (
+	"time"
+
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
@@ -66,9 +68,12 @@ type UpdateDimensionValue struct {
 }
 
 // UpdateChartAction updates one chart instance values in deterministic order.
+// SinceLast is the time since the chart's previous update, zero when unknown
+// (see PlanOptions.CollectedAt).
 type UpdateChartAction struct {
-	ChartID string
-	Values  []UpdateDimensionValue
+	ChartID   string
+	SinceLast time.Duration
+	Values    []UpdateDimensionValue
 }
 
 func (a UpdateChartAction) Kind() ActionKind { return ActionUpdateChart }

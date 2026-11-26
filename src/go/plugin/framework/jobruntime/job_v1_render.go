@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) bool {
+func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun time.Duration) bool {
 	j := tx.job
 	createCharts := j.hostGUID != tx.guid
 	// pluginsd_validate_machine_guid in src/plugins.d/pluginsd_parser.c canonicalizes
@@ -133,7 +133,7 @@ func (tx *jobV1Emission) createChart(change *jobV1ChartChange) {
 	_ = j.api.EMPTYLINE()
 }
 
-func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetrics, sinceLastRun int) bool {
+func (tx *jobV1Emission) updateChart(change *jobV1ChartChange, mx collectedMetrics, sinceLastRun time.Duration) bool {
 	j := tx.job
 	chart := change.chart
 	if change.ignored {

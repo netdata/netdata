@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -104,6 +105,7 @@ groups:
 // inferred dimensions, autogen, template-set transitions and host resets) and
 // aborts attempts at random. After every Abort the materialized state must equal
 // its state before Prepare, and preparing again must reproduce the aborted plan.
+// Plans are timed (with an occasional untimed one), so update stamps take part.
 func TestPlanAbortRestoresCommittedState(t *testing.T) {
 	for seed := range uint64(40) {
 		t.Run(fmt.Sprint(seed), func(t *testing.T) {
@@ -166,6 +168,9 @@ func runPlanAbortScenario(t *testing.T, seed uint64, cycles int) {
 			active = 1 - active
 		}
 		opts := PlanOptions{TemplateSet: sets[active], ResetMaterialized: rng.IntN(30) == 0}
+		if cycle%17 != 16 {
+			opts.CollectedAt = time.Unix(int64(1_000_000+10*cycle), 0)
+		}
 		reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
 
 		before := snapshotMaterialized(engine.state.materialized)
@@ -270,6 +275,7 @@ func TestPlanJournalRollbackRestoresEveryRecordKind(t *testing.T) {
 	d1, _ := chart.ensureDimension(nil, "d1", dimensionState{order: 1, static: true})
 	d2, _ := chart.ensureDimension(nil, "d2", dimensionState{order: 2, static: true})
 	d1.lastSeenSuccessSeq, d2.lastSeenSuccessSeq, chart.lastSeenSuccessSeq = 4, 4, 4
+	chart.lastUpdatedAt = 40
 	chart.orderedDimensionNames(nil)
 	chart.replaceLabels(nil, map[string]string{"k": "v"}, nil)
 	chart.scratchEntries = map[string]*dimBuildEntry{"d1": {seenSeq: 4, value: 7}}
@@ -279,6 +285,8 @@ func TestPlanJournalRollbackRestoresEveryRecordKind(t *testing.T) {
 
 	j := new(newPlanJournal(9, journalSizing{}))
 	j.setChartSeen(chart, 5)
+	// A later whole-chart record copies this staged stamp; stamps restore last.
+	j.setChartUpdated(chart, 50)
 	j.setDimSeen(d1, 5)
 	chart.ensureDimension(j, "d2", dimensionState{order: 7})
 	entry := chart.scratchEntries["d1"]
@@ -298,6 +306,7 @@ func TestPlanJournalRollbackRestoresEveryRecordKind(t *testing.T) {
 	j.deleteChart(state.charts, "b")
 	created, _ := state.ensureChart(j, "c", "tpl.c", program.ChartMeta{Title: "C"}, program.LifecyclePolicy{})
 	j.setChartSeen(created, 5)
+	j.setChartUpdated(created, 50)
 	require.NotEqual(t, before, snapshotMaterialized(state))
 
 	j.rollback()

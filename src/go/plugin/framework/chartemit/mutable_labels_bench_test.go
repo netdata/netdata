@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -155,7 +156,8 @@ func benchmarkChartValuePlan(chartCount int) Plan {
 	actions := make([]EngineAction, 0, chartCount)
 	for chart := range chartCount {
 		actions = append(actions, chartengine.UpdateChartAction{
-			ChartID: "chart_" + strconv.Itoa(chart),
+			ChartID:   "chart_" + strconv.Itoa(chart),
+			SinceLast: 10 * time.Second,
 			Values: []chartengine.UpdateDimensionValue{{
 				Name:  "value",
 				Int64: int64(chart),

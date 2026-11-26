@@ -22,7 +22,6 @@ type EmitEnv struct {
 	JobName     string
 	JobLabels   map[string]string
 	HostScope   *HostScope
-	MSSinceLast int
 	StoreFirst  bool
 }
 

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +47,8 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID: "win_nic_traffic_eth0",
+				ChartID:   "win_nic_traffic_eth0",
+				SinceLast: 100 * time.Microsecond,
 				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "received",
@@ -81,7 +83,6 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 		JobLabels: map[string]string{
 			"instance": "localhost",
 		},
-		MSSinceLast: 100,
 	})
 	require.NoError(t, err)
 
@@ -205,7 +206,8 @@ func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID: "runtime_jobs",
+				ChartID:   "runtime_jobs",
+				SinceLast: time.Microsecond,
 				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "total",
@@ -224,7 +226,6 @@ func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
 		Plugin:      "go.d.plugin",
 		Module:      "runtime",
 		JobName:     "job01",
-		MSSinceLast: 1,
 	})
 	require.NoError(t, err)
 
@@ -273,7 +274,8 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID: "svc_latency",
+				ChartID:   "svc_latency",
+				SinceLast: time.Microsecond,
 				Values: []chartengine.UpdateDimensionValue{
 					{Name: "value", IsFloat: true, Float64: math.NaN()},
 				},
@@ -287,7 +289,6 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 		Plugin:      "go.d.plugin",
 		Module:      "prometheus",
 		JobName:     "job01",
-		MSSinceLast: 1,
 	}))
 
 	out := buf.String()
@@ -376,7 +377,8 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
-				ChartID: "chart'id\n",
+				ChartID:   "chart'id\n",
+				SinceLast: time.Microsecond,
 				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "dim'name\n",
@@ -397,7 +399,6 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 		JobLabels: map[string]string{
 			"inst'ance\n": "local'host\n",
 		},
-		MSSinceLast: 1,
 	})
 	require.NoError(t, err)
 

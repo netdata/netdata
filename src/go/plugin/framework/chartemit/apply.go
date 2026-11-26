@@ -264,7 +264,7 @@ func visitLabelUpdatePhase[V definitionVisitor](visitor V, updates []UpdateChart
 
 func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartAction) {
 	for _, update := range updates {
-		api.BEGIN(sanitizeWireID(env.TypeID), sanitizeWireID(update.ChartID), env.MSSinceLast)
+		api.BEGIN(sanitizeWireID(env.TypeID), sanitizeWireID(update.ChartID), update.SinceLast)
 		for _, dim := range update.Values {
 			if dim.IsEmpty {
 				api.SETEMPTY(sanitizeWireID(dim.Name))
