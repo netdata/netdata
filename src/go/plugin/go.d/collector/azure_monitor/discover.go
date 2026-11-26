@@ -82,7 +82,7 @@ func (c *Collector) applyDiscovery(fetched discoveryFetchResult, now time.Time) 
 			logSummary = c.Infof
 		}
 		logSummary("resource discovery: mode=%s profile_mode=%s profile=%s candidates=%d matched=%d",
-			c.Discovery.Mode, c.Profiles.Mode, profile.Name, len(candidates), len(matched))
+			stringsLowerTrim(c.Discovery.Mode), stringsLowerTrim(c.Profiles.Mode), profile.Name, len(candidates), len(matched))
 	}
 	c.discovery = state
 	c.warnDiscoveryScopeFallbacks(state, c.runtime)

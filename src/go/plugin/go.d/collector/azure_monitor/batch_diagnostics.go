@@ -18,8 +18,8 @@ import (
 )
 
 type batchDiagnostics struct {
-	withSamples, empty, missing, metricErrors     int
-	emptyExamples, missingExamples, errorExamples []string
+	withSamples, empty, missing, unmatchedRows, metricErrors int
+	emptyExamples, missingExamples, errorExamples            []string
 }
 
 // Summarize what this request produced before cached observations are replayed.
@@ -28,23 +28,13 @@ func summarizeBatchResponse(requested []resourceInfo, byID map[string]resourceIn
 	hasSamples := make(map[string]bool, len(requested))
 	for _, row := range response {
 		resource, ok := byID[stringsLowerTrim(derefOrZero(row.ResourceID))]
-		if !ok {
-			continue
+		if ok {
+			hasSamples[resource.UID] = false
+		} else {
+			d.unmatchedRows++
 		}
-		hasSamples[resource.UID] = false
 		for _, metric := range row.Values {
-			code := derefOrZero(metric.ErrorCode)
-			if code == "" || strings.EqualFold(code, "Success") {
-				continue
-			}
-			d.metricErrors++
-			if len(d.errorExamples) < diagnosticExampleLimit {
-				name := "<unknown>"
-				if metric.Name != nil && metric.Name.Value != nil {
-					name = *metric.Name.Value
-				}
-				d.errorExamples = append(d.errorExamples, fmt.Sprintf("%s metric=%.80q code=%.80q", resource.diagnosticName(), name, code))
-			}
+			d.observeMetricError(resource, ok, metric)
 		}
 	}
 	for _, sample := range samples {
@@ -70,11 +60,44 @@ func summarizeBatchResponse(requested []resourceInfo, byID map[string]resourceIn
 	return &d
 }
 
-func (c *Collector) logBatchFailure(batch *queryBatch, err error) {
+func (d *batchDiagnostics) observeMetricError(resource resourceInfo, matched bool, metric azmetrics.Metric) {
+	code := derefOrZero(metric.ErrorCode)
+	if strings.EqualFold(code, "Success") {
+		return
+	}
+	if code == "" {
+		if stringsTrim(derefOrZero(metric.ErrorMessage)) == "" {
+			return
+		}
+		code = "<unspecified>"
+	}
+	d.metricErrors++
+	if len(d.errorExamples) >= diagnosticExampleLimit {
+		return
+	}
+	label := "<unmatched>"
+	if matched {
+		label = resource.diagnosticName()
+	}
+	name := "<unknown>"
+	if metric.Name != nil && metric.Name.Value != nil {
+		name = *metric.Name.Value
+	}
+	d.errorExamples = append(d.errorExamples, fmt.Sprintf("%s metric=%.80q code=%.80q", label, name, code))
+}
+
+func (b *queryBatch) debugRequest(now time.Time, offset int) string {
+	start, end, _, aggregation := queryBatchWindow(*b, now, offset)
+	// A request contains at most 20 metric names. Quote and bound each name.
+	return fmt.Sprintf("start=%s end=%s metrics=%.80q aggregation=%s", start, end, b.MetricNames, aggregation)
+}
+
+func (c *Collector) logBatchFailure(batch *queryBatch, err error, queryNow time.Time) {
 	class, detail := batchFailureReason(err)
 	const format = "collection batch failed: profile=%s region=%s subscription=%.80q grain=%s resources=%d class=%s %s"
 	if logger.Level.Enabled(slog.LevelDebug) {
-		c.Debugf(format, batch.Profile.Name, batch.Region, batch.SubscriptionID, batch.TimeGrain, len(batch.Resources), class, detail)
+		c.Debugf(format+" %s", batch.Profile.Name, batch.Region, batch.SubscriptionID, batch.TimeGrain, len(batch.Resources),
+			class, detail, batch.debugRequest(queryNow, c.QueryOffset))
 	}
 	c.Limit("metrics:batch:"+batch.Profile.Name+":"+class, 1, time.Hour).Warningf(format,
 		batch.Profile.Name, batch.Region, batch.SubscriptionID, batch.TimeGrain, len(batch.Resources), class, detail)

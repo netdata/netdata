@@ -40,6 +40,8 @@ func TestDiscoveryDiagnostics(t *testing.T) {
 	c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
 	c.Logger = logger.NewWithWriter(&logs)
 	c.Config = testConfig()
+	c.Profiles.Mode = " EXACT "
+	c.Discovery.Mode = " FILTERS "
 	c.Profiles.ModeExact = testProfilesModeEntries("storage_accounts", "front_door")
 	c.Profiles.ModeExact.Entries[0].Filters = &ResourceFiltersConfig{
 		ResourceGroups: []string{"rg-a"}, Regions: []string{"eastus"},
@@ -83,19 +85,21 @@ func TestBatchDiagnosticsMixedResponse(t *testing.T) {
 	empty := testResource(typ, "empty-account", nil)
 	missing := testResource(typ, "missing-account", nil)
 	rg := &mockResourceGraph{resources: []map[string]any{active, empty, missing}}
-	now := time.Now()
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	mx := &mockMetricsClient{}
 	mx.queryResponse.Values = []azmetrics.MetricData{
 		{ResourceID: new(active["id"].(string)), Values: []azmetrics.Metric{metricWithAvg("Availability", now, 0)}},
 		{ResourceID: new(empty["id"].(string)), Values: []azmetrics.Metric{
 			{Name: &azmetrics.LocalizableString{Value: new("Transactions")}, ErrorCode: new("BadArgument"), ErrorMessage: new("private response details")},
-			{ErrorCode: new("InternalServerError")},
+			{ErrorMessage: new("private response details")},
 		}},
+		{Values: []azmetrics.Metric{{ErrorMessage: new("private response details")}}},
 	}
 	var logs bytes.Buffer
 	c := newTestCollectorWithMocks(rg, mx)
 	c.Config = testConfig()
 	c.Profiles.ModeExact = testProfilesModeEntries("storage_accounts")
+	c.now = func() time.Time { return now }
 	c.Logger = logger.NewWithWriter(&logs)
 	require.NoError(t, c.Init(t.Context()))
 	require.NoError(t, c.Check(t.Context()))
@@ -105,8 +109,9 @@ func TestBatchDiagnosticsMixedResponse(t *testing.T) {
 	value, ok := seriesValue(series, "availability_average", "active-account")
 	require.True(t, ok)
 	assert.Zero(t, value)
-	assert.Contains(t, logs.String(), "grain=PT1M resources=3 with_samples=1 empty=1 missing=1 metric_errors=2")
-	for _, want := range []string{"empty-account", "missing-account", "Transactions", "BadArgument", "InternalServerError"} {
+	assert.Contains(t, logs.String(), "grain=PT1M resources=3 with_samples=1 empty=1 missing=1 unmatched_rows=1 metric_errors=3")
+	for _, want := range []string{"empty-account", "missing-account", "Transactions", "BadArgument", "<unmatched>", "unspecified",
+		"metrics=", "Availability", "start=2026-01-01T11:56:00Z end=2026-01-01T11:57:00Z"} {
 		assert.Contains(t, logs.String(), want)
 	}
 	assert.NotContains(t, logs.String(), "private response details")
