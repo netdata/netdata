@@ -470,6 +470,8 @@ jobs:
       - name: Run install state tests
         run:
           python3 -m unittest discover packaging/installer/tests test_install_state.py -v
+      - name: Install BusyBox for the kickstart wget tests
+        run: sudo apt-get update && sudo apt-get install -y busybox
       - name: Run kickstart fixtures
         run: python3 -B -m unittest discover -s packaging/installer/tests -p 'test_kickstart_*.py' -v
 

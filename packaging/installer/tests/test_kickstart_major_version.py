@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -344,11 +345,17 @@ printf '%s\\n' "$NETDATA_WARNINGS"
         self.assertEqual(prefixed_urls, [f'check {url}', f'download {url} force'])
 
     def test_invalid_major_version_is_fatal(self):
-        for major in ('2/../x', 'v', 'vv2', '2.1', 'abc', '2 '):
+        for major in ('2/../x', 'v', 'vv2', '2.1', 'abc', '2 ', '0', 'v0', '02', 'v02'):
             with self.subTest(major=major):
                 result, urls = self.run_major({}, major, success=False)
                 self.assertIn('F0533', result.stderr)
                 self.assertEqual(urls, [])
+
+    def test_multi_digit_major_version_is_accepted(self):
+        url = version_url('stable', '10')
+        result, urls = self.run_major({url: (0, 'v10.2.3\n')}, '10')
+        self.assertEqual(result.stdout, 'INSTALL_VERSION=10.2.3\n')
+        self.assertEqual(urls, [f'check {url}', f'download {url} force'])
 
     def test_empty_major_version_does_nothing(self):
         result, urls = self.run_major({}, '', version='keep')
@@ -368,6 +375,50 @@ printf '%s\\n' "$NETDATA_WARNINGS"
             with self.subTest(name):
                 result, _ = self.run_major({major: (1, None), latest: (0, content)}, '2', selected='nightly')
                 self.assertEqual(result.stdout, f'INSTALL_VERSION={expected}\n')
+
+
+class KickstartMajorVersionCLI(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='kickstart-major-version-cli-')
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        # Reserving a non-listening port prevents another process from taking the proxy address.
+        self.proxy = socket.socket()
+        self.addCleanup(self.proxy.close)
+        self.proxy.bind(('127.0.0.1', 0))
+        proxy_url = f'http://127.0.0.1:{self.proxy.getsockname()[1]}'
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith('NETDATA_')}
+        for name in ('http_proxy', 'https_proxy', 'ftp_proxy', 'all_proxy'):
+            self.env[name] = self.env[name.upper()] = proxy_url
+        self.env['no_proxy'] = self.env['NO_PROXY'] = ''
+        self.env['INSTALL_VERSION'] = ''
+        self.env['TERM'] = 'dumb'
+
+    def assert_rejected(self, values, message):
+        result = subprocess.run(
+            ['sh', str(SCRIPT), '--dry-run', '--non-interactive', '--disable-telemetry',
+             '--install-major-version', *values],
+            cwd=self.root, env=self.env, text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(result.stdout, '')
+        # fatal() prints the validation message; the F-code is only passed to telemetry.
+        self.assertIn(f'ABORTED  {message}', result.stderr)
+        self.assertNotIn('Failed to connect to remote host', result.stderr)
+        self.assertNotIn('Could not determine the latest release', result.stderr)
+
+    def test_missing_major_version_is_rejected_before_network(self):
+        self.assert_rejected([], "The --install-major-version option requires a major version, "
+                                 "for example '2' or 'v2'.")
+
+    def test_empty_major_version_is_rejected_before_network(self):
+        self.assert_rejected([''], "The --install-major-version option requires a major version, "
+                                   "for example '2' or 'v2'.")
+
+    def test_leading_zero_major_version_is_rejected_before_network(self):
+        self.assert_rejected(['02'], "Invalid major version '02'. It must be a number, for example '2' or 'v2'.")
+
+    def test_leading_v_zero_major_version_is_rejected_before_network(self):
+        self.assert_rejected(['v02'], "Invalid major version 'v02'. It must be a number, for example '2' or 'v2'.")
 
 
 if __name__ == '__main__':

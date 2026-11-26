@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0534
+# Next unused error code: F0535
 
 # ======================================================================
 # Constants
@@ -804,6 +804,11 @@ handle_curl_result() {
   esac
 }
 
+# Prints the last HTTP status code in a wget log, or nothing if it has none.
+wget_http_status() {
+  sed -n 's/.*HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' "${1}" | tail -n 1
+}
+
 handle_wget_result() {
   ret="${1}"
   url="${2}"
@@ -813,9 +818,14 @@ handle_wget_result() {
 
   case "${ret}" in
     0) return 0 ;;
-    8)
-      status="$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')"
+    1|8)
+      status="$(wget_http_status "${dl_log}")"
       [ -n "${dest}" ] && rm -f "${dest}"
+      # GNU wget exits 8 for HTTP errors. BusyBox wget exits 1 for them, and
+      # also for failures that log no status line (DNS, connection refused).
+      if [ "${ret}" -eq 1 ] && [ -z "${status}" ]; then
+        fatal "Unknown error when ${action} ${url}" F0520
+      fi
       handle_http_status "${status}" "${url}" "${action}"
       return "$?"
       ;;
@@ -3144,8 +3154,9 @@ handle_major_version() {
   # Accept both '2' and 'v2'.
   major_version="${INSTALL_MAJOR_VERSION#v}"
 
+  # A leading zero is rejected because '02' would never match major version 2.
   case "${major_version}" in
-    ""|*[!0-9]*)
+    ""|0*|*[!0-9]*)
       fatal "Invalid major version '${INSTALL_MAJOR_VERSION}'. It must be a number, for example '2' or 'v2'." F0533
       ;;
   esac
@@ -3355,6 +3366,10 @@ parse_args() {
         shift 1
         ;;
       "--install-major-version")
+        # An ignored empty value would silently install the unpinned latest version.
+        if [ -z "${2}" ]; then
+          fatal "The --install-major-version option requires a major version, for example '2' or 'v2'." F0534
+        fi
         INSTALL_MAJOR_VERSION="${2}"
         shift 1
         ;;
