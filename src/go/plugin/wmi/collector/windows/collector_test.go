@@ -112,7 +112,22 @@ func configuredCollector() *Collector {
 	c.Auth = "ntlm"
 	c.Username = "fixture-account"
 	c.Password = "fixture-secret"
+	ping := &fakePinger{
+		sample: answeredPing(),
+	}
+	c.newPinger = ping.factory
 	return c
+}
+
+// withAnsweredPing adds the metrics of answeredPing to a collection's metrics.
+func withAnsweredPing(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	const host = `{host="windows.example.com"}`
+	metrics["ping_packet_loss"+host] = 0
+	metrics["ping_rtt_min"+host] = 1200
+	metrics["ping_rtt_max"+host] = 2500
+	metrics["ping_rtt_avg"+host] = 1800
+	metrics["ping_rtt_std_dev"+host] = 500
+	return metrics
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -175,7 +190,7 @@ func TestCollector_Collect(t *testing.T) {
 		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
 		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
 	)
-	assert.Equal(t, map[string]metrix.SampleValue{
+	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
 		"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
 		"network_received_bytes" + ethernet:  190,
@@ -186,17 +201,17 @@ func TestCollector_Collect(t *testing.T) {
 		"disk_avail_bytes" + driveC:          420000000000,
 		"disk_used_bytes" + driveD:           4294967296,
 		"disk_avail_bytes" + driveD:          0,
-	}, first)
+	}), first)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 	second, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]metrix.SampleValue{
+	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_free_bytes":                 0,
 		"network_received_bytes" + ethernet: 250,
 		"disk_used_bytes" + driveC:          0,
 		"disk_avail_bytes" + driveC:         300,
-	}, second)
+	}), second)
 
 	// The failed CPU query keeps the first sample, so the shares span both intervals.
 	recovered, err := collecttest.CollectScalarSeries(c)
@@ -323,6 +338,11 @@ func TestChartTemplateAndMetadata(t *testing.T) {
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+	// The ping charts reuse the go.d ping collector's contexts for its alerts,
+	// which state their own units (ms, %, up/down), so only targets are checked.
+	ping, err := os.ReadFile("../../../../../health/health.d/ping.conf")
+	require.NoError(t, err)
+	collecttest.AssertHealthAlertsTargetChartTemplate(t, ping, chartTemplateYAML)
 }
 
 func metricQueries(queries []string) []string {
@@ -396,10 +416,10 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryNetwork: lost,
 				queryDisk:    lost,
 			},
-			wantMetrics: map[string]metrix.SampleValue{
+			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
 				"memory_used_bytes": 6 * 1024 * 1024 * 1024,
 				"memory_free_bytes": 2 * 1024 * 1024 * 1024,
-			},
+			}),
 		},
 		"after a refused query, report the query failures": {
 			results: map[string]queryResult{

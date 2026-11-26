@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
 )
 
@@ -53,14 +55,19 @@ type Collector struct {
 
 	winrmTLS   *tls.Config
 	newSession func(context.Context) (querySession, error)
+
+	// pingClient is nil once the poller turned out to lack the privilege to ping.
+	pingClient pinger.Client
+	newPinger  func(pinger.Config, *logger.Logger) (pinger.Client, error)
 }
 
 func New() *Collector {
 	store := metrix.NewCollectorStore()
 	c := &Collector{
-		Config:  defaultConfig(),
-		store:   store,
-		metrics: newCollectorMetrics(store),
+		Config:    defaultConfig(),
+		store:     store,
+		metrics:   newCollectorMetrics(store),
+		newPinger: pinger.New,
 	}
 	c.newSession = c.openSession
 	return c
@@ -93,6 +100,9 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 		c.winrmTLS = cfg
 	}
+	if err := c.initPinger(); err != nil {
+		return err
+	}
 	c.vnode = newVirtualNode(c.Host)
 	return nil
 }
@@ -103,13 +113,20 @@ func (c *Collector) Check(ctx context.Context) error {
 	return err
 }
 
+// Collect pings the host alongside the WMI poll. A failed poll fails the
+// collection, so the job never publishes ping alone.
 func (c *Collector) Collect(ctx context.Context) error {
 	inventoryDue := c.Vnode == "" && !time.Now().Before(c.nextInventory)
+	waitPing := c.startPing(ctx)
 	snapshot, err := c.poll(ctx, inventoryDue)
+	ping, pinged := waitPing(err != nil)
 	if err != nil {
 		return err
 	}
 	c.metrics.write(snapshot)
+	if pinged {
+		c.metrics.writePing(c.Host, ping)
+	}
 	return nil
 }
 

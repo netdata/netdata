@@ -2,7 +2,10 @@
 
 package windows
 
-import "github.com/netdata/netdata/go/plugins/pkg/metrix"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
+)
 
 // Chart label keys and fixed values of the native Windows Agent's charts.
 const (
@@ -14,6 +17,8 @@ const (
 	fileSystemLabel    = "filesystem"
 	readWriteModeLabel = "rw_mode"
 	serialNumberLabel  = "serial_number"
+	// The go.d ping collector's label: the target as configured.
+	hostLabel = "host"
 
 	// The Network Interface counter set lists the interfaces the native agent
 	// calls real; it calls the extra Network Adapter instances virtual.
@@ -33,6 +38,11 @@ type collectorMetrics struct {
 	netSent     metrix.SnapshotCounter
 	diskAvail   metrix.SnapshotGauge
 	diskUsed    metrix.SnapshotGauge
+	pingRTTMin  metrix.SnapshotGauge
+	pingRTTMax  metrix.SnapshotGauge
+	pingRTTAvg  metrix.SnapshotGauge
+	pingRTTDev  metrix.SnapshotGauge
+	pingLoss    metrix.SnapshotGauge
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
@@ -45,6 +55,11 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		netSent:     m.Counter("network_sent_bytes"),
 		diskAvail:   m.Gauge("disk_avail_bytes"),
 		diskUsed:    m.Gauge("disk_used_bytes"),
+		pingRTTMin:  m.Gauge("ping_rtt_min"),
+		pingRTTMax:  m.Gauge("ping_rtt_max"),
+		pingRTTAvg:  m.Gauge("ping_rtt_avg"),
+		pingRTTDev:  m.Gauge("ping_rtt_std_dev"),
+		pingLoss:    m.Gauge("ping_packet_loss"),
 	}
 	for i, mode := range cpuModes {
 		metrics.cpuTotal[i] = m.Gauge("cpu_total_"+mode+"_percent", metrix.WithFloat(true))
@@ -89,6 +104,24 @@ func (m collectorMetrics) write(snapshot observations) {
 		observe(m.diskAvail, drive.avail, labels)
 		observe(m.diskUsed, drive.used, labels)
 	}
+}
+
+// writePing records a probe in the go.d ping collector's units, which the
+// chart template scales: round-trip times in microseconds and loss in
+// thousandths of a percent. Round-trip times exist only when a reply arrived.
+func (m collectorMetrics) writePing(host string, s pinger.Sample) {
+	labels := m.meter.LabelSet(metrix.Label{
+		Key:   hostLabel,
+		Value: host,
+	})
+	m.pingLoss.Observe(s.PacketLossPct*1000, labels)
+	if !s.RTT.Valid {
+		return
+	}
+	m.pingRTTMin.Observe(float64(s.RTT.Min.Microseconds()), labels)
+	m.pingRTTMax.Observe(float64(s.RTT.Max.Microseconds()), labels)
+	m.pingRTTAvg.Observe(float64(s.RTT.Avg.Microseconds()), labels)
+	m.pingRTTDev.Observe(float64(s.RTT.StdDev.Microseconds()), labels)
 }
 
 func (d diskSpace) labels() []metrix.Label {

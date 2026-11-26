@@ -7,12 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net"
 	"os"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -20,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
 
 const (
@@ -44,6 +48,7 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 	tests := map[string]struct {
 		options    map[string]any
 		newSession func(context.Context) (querySession, error)
+		pingErr    error
 		// collect runs a collection after the test, with the module's logger.
 		collect bool
 		wantErr string
@@ -95,8 +100,12 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 		"failed inventory queries are logged": {
 			newSession: sessionWith(func() map[string]queryResult {
 				results := validQueryResults()
-				results[queryOSInfo] = queryResult{err: classified}
-				results[querySystemInfo] = queryResult{err: unclassified}
+				results[queryOSInfo] = queryResult{
+					err: classified,
+				}
+				results[querySystemInfo] = queryResult{
+					err: unclassified,
+				}
 				return results
 			}()),
 			collect: true,
@@ -104,6 +113,23 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 				"operating system WMI inventory query failed: WMI collection timed out",
 				"computer system WMI inventory query failed",
 			},
+		},
+		"missing ping privilege is logged": {
+			pingErr: fmt.Errorf("%w: %s", notPermitted(syscall.EPERM), resolvedMarker),
+			collect: true,
+			wantLog: []string{pingDisabledMessage},
+		},
+		"failed ping is logged": {
+			pingErr: &pinger.ProbeError{
+				Host:  resolvedMarker,
+				Stage: "resolve",
+				Err: &net.DNSError{
+					Err:  "no such host",
+					Name: resolvedMarker,
+				},
+			},
+			collect: true,
+			wantLog: []string{"ICMP ping failed: could not resolve the host"},
 		},
 	}
 	for name, tc := range tests {
@@ -113,7 +139,11 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 			if newSession == nil {
 				newSession = sessionWith(validQueryResults())
 			}
-			factory, moduleLog, created := referenceJobFactory(t, newSession)
+			ping := &fakePinger{
+				sample: answeredPing(),
+				err:    tc.pingErr,
+			}
+			factory, moduleLog, created := referenceJobFactory(t, newSession, ping.factory)
 
 			err := factory.Test(t.Context(), referenceJob(tc.options))
 			if tc.collect {
@@ -168,6 +198,7 @@ func assertErrorTreeOmits(t *testing.T, err error, marker string) {
 func referenceJobFactory(
 	t *testing.T,
 	newSession func(context.Context) (querySession, error),
+	newPinger func(pinger.Config, *logger.Logger) (pinger.Client, error),
 ) (*joboutput.ConfigModuleFactory, string, func() *Collector) {
 	t.Helper()
 	resolver, err := secretresolver.NewDefaultAtomicResolver()
@@ -193,6 +224,7 @@ func referenceJobFactory(
 				CreateV2: func() collectorapi.CollectorV2 {
 					last = New()
 					last.newSession = newSession
+					last.newPinger = newPinger
 					return last
 				},
 				Config: func() any { return &Config{} },

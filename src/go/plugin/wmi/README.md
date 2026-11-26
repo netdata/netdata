@@ -1,8 +1,8 @@
 # Remote Windows WMI plugin
 
 `wmi.plugin` monitors Windows hosts without installing anything on them. It runs on a Netdata Agent (the poller) and
-reads CPU, memory, network and disk metrics from each configured host over WMI, using DCOM or WinRM HTTPS. Each host
-appears in Netdata as its own virtual node.
+reads CPU, memory, network and disk metrics from each configured host over WMI, using DCOM or WinRM HTTPS, and pings
+each host. Each host appears in Netdata as its own virtual node.
 
 What it collects, how to prepare the Windows hosts, every option and the known errors are on the Windows (WMI)
 integration page, generated from [`collector/windows/metadata.yaml`](collector/windows/metadata.yaml).
@@ -20,7 +20,8 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o wmi.plugin.exe ./cmd/wmiplug
 ```
 
 A standalone Linux or macOS build cannot read `tls_ca` until it finds the `nd-run` helper; see "Configured credential
-and TLS files" in [helper-packages.md](../go.d/docs/helper-packages.md).
+and TLS files" in [helper-packages.md](../go.d/docs/helper-packages.md). It pings the hosts only with the privilege to
+open raw ICMP sockets: on Linux, `sudo setcap cap_net_raw+ep wmi.plugin`; on macOS, run it as root.
 
 ## Run one job in the foreground
 

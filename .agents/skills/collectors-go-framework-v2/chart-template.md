@@ -142,6 +142,8 @@ a *leaf* is the innermost family that holds charts.
   so the stock alerts and dashboard sections apply (`src/go/plugin/wmi/collector/windows/`). It MUST match the
   native producer as the next bullet requires, test that against the native source, set the vnode's `_os` label, and
   list its plugin's platform in `PLUGIN_PLATFORMS` (`integrations/health_alerts.py`).
+- A remote-target collector MAY reuse another collector's contexts for the same measurement of the same target, so
+  that collector's stock alerts apply: `wmi` publishes its host's ping as the go.d ping collector's `ping.host_*`.
 - Reusing a shared context requires the same units, dimension names and states and equivalent labels as the other
   producers: the agent merges title, family, units, type and priority of every instance of a context into one
   definition (`rrdcontext_merge_with` in `src/database/contexts/rrdcontext-context.c`), and the model requires
