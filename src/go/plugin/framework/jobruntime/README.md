@@ -99,6 +99,33 @@ retain that inventory; the next nonempty admission on a different host replaces 
 Host changes stage materialized reset in the plan attempt. Rejected output preserves the old host's state, and old-host
 retirements are never sent to the new host. Function-only jobs do not require a chart provider.
 
+## Chart Sample Times
+
+Every chart sample a job writes (V1 and V2 collector charts, the job self charts) ends with the run's start time,
+`END <seconds> <microseconds> 1`, and its `BEGIN` carries no interval. With the pending flag the Agent places the sample
+at that time and computes the interval since the chart's previous sample from the two times
+(`pluginsd_end` and `rrdset_timed_done` in the Agent, the path of its internal collectors). Samples therefore land at
+their collection time whatever happened in between: failed runs, charts a run did not observe, rejected host scopes,
+scrapes slower than the update interval, chart redefinitions.
+
+- Times MUST strictly increase per chart: the Agent reads a time behind the chart's clock as a forward gap and runs the
+  chart into the future. Known exception: two engine charts whose IDs sanitize to one wire chart both send the run's
+  time (the Agent adds a zero-interval sample). All jobs of a plugin process and its runtime charts take their times
+  from one `netdataapi.SampleClock`, created by the agent and passed through `JobConfig.SampleClock`/
+  `JobV2Config.SampleClock`, which never issues a time at or before an earlier one (microsecond resolution), across job
+  restarts and wall-clock steps back. A job without one gets its own clock.
+- The time is the run start, taken after the tick: a whole second plus scheduling delay, never truncated to whole
+  seconds (a time exactly on the update grid makes the Agent turn one missed sample into a gap). Each run renders its
+  `END` line once (`netdataapi.SampleTime`); `chartemit` rejects a plan with chart updates and no time.
+- Health: a chart's `$last_collected_t` is the run start of its last sample (on a chart's first sample, and after an
+  Agent reset, the `update_every` boundary it aligns to); per-dimension `_last_collected_t` stays the Agent's receipt
+  time. Streaming v1 children forward intervals (now derived from collection times), so a v1 parent still re-anchors to
+  its own receipt time on a chart's first sample, after redefinitions and after gaps over five update intervals.
+
+Regression coverage: `job_sample_time_test.go` (V2 failed cycle, unobserved chart, rejected scope, slow scrape with a
+dropped tick; V1 failed run, empty sample, `SkipGaps`, dropped vnode frame, rejected write; one clock across jobs) and
+`TestJobSelfMetricsSampleTimes`.
+
 ## First-sample storage
 
 A V2 collector MAY set `StoreFirst: true` in its `collectorapi.Creator` registration to enable the Agent's existing
@@ -132,6 +159,7 @@ plugin/module identity, configured job labels, `_collect_job`, and the job's col
   scope fails the cycle.
 - Status reports complementary `success`/`failed` values on ordinary cycles. Duration is sampled only on success and
   measured before output I/O, so output backpressure is excluded. A panic does not publish self samples.
+- Each sample carries its run's start time (see "Chart Sample Times").
 - Autodetection and function-only jobs do not publish these charts.
 
 `jobSelfMetrics` shares definitions, rendering and committed publication state between versions. V1 includes self

@@ -14,7 +14,6 @@ type jobSelfMetrics struct {
 	name             string
 	labels           map[string]string
 	published        bool
-	durationUpdated  bool
 	emission         jobSelfMetricsEmission
 }
 
@@ -51,9 +50,10 @@ func newJobSelfMetrics(
 	}
 }
 
+// prepare writes the run's samples, timed at the run's start (sample).
 func (m *jobSelfMetrics) prepare(
 	api *netdataapi.API,
-	sinceLastRun int,
+	sample netdataapi.SampleTime,
 	elapsed int64,
 	success, redefine bool,
 ) *jobSelfMetricsEmission {
@@ -62,11 +62,7 @@ func (m *jobSelfMetrics) prepare(
 		m.createChart(api, m.status, "success", "failed")
 		m.createChart(api, m.duration, "duration")
 	}
-	statusInterval := sinceLastRun
-	if !m.published {
-		statusInterval = 0
-	}
-	api.BEGIN("netdata", m.status.ID, statusInterval)
+	api.BEGIN("netdata", m.status.ID)
 	if success {
 		api.SET("success", 1)
 		api.SET("failed", 0)
@@ -74,19 +70,14 @@ func (m *jobSelfMetrics) prepare(
 		api.SET("success", 0)
 		api.SET("failed", 1)
 	}
-	api.END()
+	api.ENDTimed(sample)
 	if success {
-		durationInterval := sinceLastRun
-		if !m.durationUpdated {
-			durationInterval = 0
-		}
-		api.BEGIN("netdata", m.duration.ID, durationInterval)
+		api.BEGIN("netdata", m.duration.ID)
 		api.SET("duration", elapsed)
-		api.END()
+		api.ENDTimed(sample)
 	}
 	m.emission = jobSelfMetricsEmission{
-		metrics:         m,
-		durationUpdated: m.durationUpdated || success,
+		metrics: m,
 	}
 	return &m.emission
 }
@@ -123,20 +114,17 @@ func (m *jobSelfMetrics) cleanup(api *netdataapi.API) {
 
 func (m *jobSelfMetrics) clear() {
 	m.published = false
-	m.durationUpdated = false
 	m.emission = jobSelfMetricsEmission{}
 }
 
 type jobSelfMetricsEmission struct {
-	metrics         *jobSelfMetrics
-	durationUpdated bool
-	settled         bool
+	metrics *jobSelfMetrics
+	settled bool
 }
 
 func (e *jobSelfMetricsEmission) Commit() error {
 	if e != nil && !e.settled {
 		e.metrics.published = true
-		e.metrics.durationUpdated = e.durationUpdated
 		e.settled = true
 	}
 	return nil

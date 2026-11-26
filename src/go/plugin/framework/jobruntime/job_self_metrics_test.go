@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -325,6 +327,114 @@ func TestJobSelfMetricsVersionSemantics(t *testing.T) {
 			assertSelfChartsLocal(t, out.String())
 		})
 	}
+}
+
+// Each self chart sample ends with its run's start time, so the Agent places it
+// at that time whatever happened to earlier samples (failed or rejected runs).
+func TestJobSelfMetricsSampleTimes(t *testing.T) {
+	type run struct {
+		failed, rejected bool
+	}
+	// Runs are ten seconds apart. A failed run delivers status but no duration;
+	// a rejected run delivers nothing.
+	runs := []run{{}, {failed: true}, {failed: true}, {}, {rejected: true}, {}}
+	for name, version := range map[string]int{"v1": 1, "v2": 2} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var out bytes.Buffer
+				var current run
+				output := writeFunc(func(payload []byte) (int, error) {
+					if current.rejected && bytes.Contains(payload, []byte("_data_collection_")) {
+						return 0, errors.New("self output rejected")
+					}
+					return out.Write(payload)
+				})
+				var runOnce func()
+				if version == 1 {
+					charts := collectorapi.Charts{&collectorapi.Chart{
+						ID:    "work",
+						Title: "Work",
+						Units: "units",
+						Dims:  collectorapi.Dims{{ID: "value"}},
+					}}
+					job := NewJob(JobConfig{
+						PluginName: "go.d",
+						ModuleName: "test",
+						Name:       "job",
+						FullName:   "test_job",
+						Module: &collectorapi.MockCollectorV1{
+							ChartsFunc: func() *collectorapi.Charts { return &charts },
+							CollectFunc: func(context.Context) map[string]int64 {
+								if current.failed {
+									return nil
+								}
+								return map[string]int64{"value": 7}
+							},
+						},
+						Out: output,
+					})
+					require.NoError(t, job.AutoDetectionManaged(context.Background()))
+					runOnce = job.runOnce
+				} else {
+					store := metrix.NewCollectorStore()
+					job := NewJobV2(JobV2Config{
+						PluginName: "go.d",
+						ModuleName: "test",
+						Name:       "job",
+						FullName:   "test_job",
+						Module: &mockModuleV2{
+							store:    store,
+							template: chartTemplateV2(),
+							collectFunc: func(context.Context) error {
+								if current.failed {
+									return errors.New("scrape failed")
+								}
+								store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(7)
+								return nil
+							},
+						},
+						Out: output,
+					})
+					require.NoError(t, job.AutoDetectionManaged(context.Background()))
+					runOnce = job.runOnce
+				}
+
+				start := time.Now()
+				at := func(s int) string { return endAt(start.Add(time.Duration(s) * time.Second)) }
+				want := []map[string]string{
+					{"status": at(0), "duration": at(0)},
+					{"status": at(10)},
+					{"status": at(20)},
+					{"status": at(30), "duration": at(30)},
+					{},
+					{"status": at(50), "duration": at(50)},
+				}
+				var got []map[string]string
+				for i, r := range runs {
+					if i > 0 {
+						time.Sleep(10 * time.Second)
+					}
+					current = r
+					out.Reset()
+					runOnce()
+					got = append(got, selfChartTimes(out.String()))
+				}
+				assert.Equal(t, want, got)
+			})
+		})
+	}
+}
+
+// selfChartTimes maps each self chart sample ("status", "duration") to the time
+// its END carries.
+func selfChartTimes(wire string) map[string]string {
+	out := make(map[string]string)
+	for key, end := range sampleTimes(wire) {
+		if _, chart, ok := strings.Cut(key, "/netdata."); ok && strings.Contains(chart, "_data_collection_") {
+			out[chart[strings.LastIndex(chart, "_")+1:]] = end
+		}
+	}
+	return out
 }
 
 func TestPrometheusJobCollectionSelfMetrics(t *testing.T) {

@@ -480,6 +480,7 @@ func (f *revivalFixture) publish(t *testing.T, attempt chartengine.PlanAttempt) 
 			netdataapi.New(&wire),
 			attempt.Plan(),
 			EmitEnv{
+				CollectedAt: testSample,
 				TypeID:      "collector.job",
 				UpdateEvery: 1,
 				Plugin:      "go.d.plugin",

@@ -36,6 +36,7 @@ func TestApplyPlanUpdatesChartLabelsWithoutDimensions(t *testing.T) {
 	}}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",
@@ -53,7 +54,7 @@ func TestApplyPlanUpdatesChartLabelsWithoutDimensions(t *testing.T) {
 		"CLABEL_COMMIT\n"+
 		"BEGIN 'collector.job.service_node-1'\n"+
 		"SET 'value' = 1\n"+
-		"END\n\n", buf.String())
+		testEnd+"\n\n", buf.String())
 	assert.NotContains(t, buf.String(), "DIMENSION")
 }
 
@@ -75,6 +76,7 @@ func TestApplyPlanLabelReplacementKeepsConfiguredAndReservedLabels(t *testing.T)
 	}}
 
 	err := ApplyPlan(api, plan, EmitEnv{
+		CollectedAt: testSample,
 		TypeID:      "collector.job",
 		UpdateEvery: 1,
 		Plugin:      "go.d.plugin",

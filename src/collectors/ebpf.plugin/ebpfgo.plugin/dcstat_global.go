@@ -162,7 +162,7 @@ func emitDCStatGlobalChart(api *netdataapi.API, chart dcstatGlobalChart, updateE
 	}
 }
 
-func (p dcstatGlobalPublish) write(api *netdataapi.API, usecSince int) {
+func (p dcstatGlobalPublish) write(api *netdataapi.API, sample netdataapi.SampleTime) {
 	if api == nil {
 		return
 	}
@@ -170,15 +170,15 @@ func (p dcstatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 	pluginOutputMu.Lock()
 	defer pluginOutputMu.Unlock()
 
-	api.BEGIN(dcstatGlobalGroup, "dc_hit_ratio", usecSince)
+	api.BEGIN(dcstatGlobalGroup, "dc_hit_ratio")
 	api.SET("ratio", p.Ratio)
-	api.END()
+	api.ENDTimed(sample)
 
-	api.BEGIN(dcstatGlobalGroup, "dc_reference", usecSince)
+	api.BEGIN(dcstatGlobalGroup, "dc_reference")
 	api.SET("reference", p.Reference)
 	api.SET("slow", p.Slow)
 	api.SET("miss", p.Miss)
-	api.END()
+	api.ENDTimed(sample)
 }
 
 // runDCStatGlobalCollector is dcstat's single collection loop.  The global
@@ -210,10 +210,9 @@ func runDCStatGlobalCollector(
 	}
 
 	state := &dcstatGlobalState{}
-	lastCollection := time.Now()
-	collectAndPublish := func(usecSince int) {
+	collectAndPublish := func(sample netdataapi.SampleTime) {
 		if handle.Plan.Flavor == ObjectFlavorArena {
-			publishArenaDrops(api, dcstatGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+			publishArenaDrops(api, dcstatGlobalModule, handle.Runtime.ArenaDropped(), sample)
 		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
@@ -226,7 +225,7 @@ func runDCStatGlobalCollector(
 				Miss:      snapshot.Miss,
 			})
 			if ok {
-				publish.write(api, usecSince)
+				publish.write(api, sample)
 			}
 		}
 
@@ -310,8 +309,7 @@ func runDCStatGlobalCollector(
 		publishSharedStore()
 	}
 
-	collectAndPublish(0)
-	lastCollection = time.Now()
+	collectAndPublish(pluginSampleClock.Next(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -323,9 +321,6 @@ func runDCStatGlobalCollector(
 		case <-ticker.C:
 		}
 
-		now := time.Now()
-		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
-		lastCollection = now
-		collectAndPublish(usecSince)
+		collectAndPublish(pluginSampleClock.Next(time.Now()))
 	}
 }

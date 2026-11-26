@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
@@ -30,6 +31,7 @@ type runJobServices struct {
 	PluginName        string                    // owning plugin name
 	Defaults          confgroup.Registry        // per-module config defaults
 	Runtime           runtimecomp.Service       // runtime service dependency
+	SampleClock       *netdataapi.SampleClock   // process sample clock for every job
 	InitialVnodes     map[string]*vnodes.Config // file-configured vnodes
 }
 
@@ -270,6 +272,7 @@ func newRunGeneration(
 		CleanupOutput:   config.CleanupOutput,
 		ConfigModules:   configModules,
 		Runtime:         config.Jobs.Runtime,
+		SampleClock:     config.Jobs.SampleClock,
 		Publication:     config.Publication,
 		Vnode:           vnodeConfig.Lookup,
 		HandlerStager:   functionJobs,
