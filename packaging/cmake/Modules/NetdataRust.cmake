@@ -6,6 +6,81 @@
 
 include_guard()
 
+# Memory available to this build, in MiB: the host's RAM, or a smaller cgroup
+# memory limit on this process (a container or a systemd scope), whichever is
+# lower. Checks the process's own cgroup and every ancestor visible to it, in
+# the cgroup v2 hierarchy and the v1 memory hierarchy, wherever /proc/self/mountinfo
+# says they are mounted. Without a readable limit, the host's RAM is the answer.
+function(_netdata_build_memory_mib out_mib out_source)
+    cmake_host_system_information(RESULT _mib QUERY TOTAL_PHYSICAL_MEMORY)
+    set(_source "host RAM")
+
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND EXISTS "/proc/self/cgroup" AND EXISTS "/proc/self/mountinfo")
+        file(STRINGS "/proc/self/cgroup" _lines)
+        foreach(_line IN LISTS _lines)
+            if(_line MATCHES "^0::(/.*)$")
+                set(_cgroup_v2 "${CMAKE_MATCH_1}")
+            elseif(_line MATCHES "^[0-9]+:([^:]*,)?memory(,[^:]*)?:(/.*)$")
+                set(_cgroup_v1 "${CMAKE_MATCH_3}")
+            endif()
+        endforeach()
+
+        set(_files "")
+        file(STRINGS "/proc/self/mountinfo" _mounts)
+        foreach(_mount IN LISTS _mounts)
+            # Fields 4 and 5: the cgroup mounted there and the mount point.
+            if(DEFINED _cgroup_v2 AND _mount MATCHES "^[^ ]+ [^ ]+ [^ ]+ ([^ ]+) ([^ ]+) .* - cgroup2 ")
+                set(_cgroup "${_cgroup_v2}")
+                set(_leaf "memory.max")
+            elseif(DEFINED _cgroup_v1 AND _mount MATCHES "^[^ ]+ [^ ]+ [^ ]+ ([^ ]+) ([^ ]+) .* - cgroup [^ ]+ (.*,)?memory(,.*)?$")
+                set(_cgroup "${_cgroup_v1}")
+                set(_leaf "memory.limit_in_bytes")
+            else()
+                continue()
+            endif()
+            set(_mount_root "${CMAKE_MATCH_1}")
+            set(_mount_point "${CMAKE_MATCH_2}")
+
+            # Only the part of the process's cgroup path below the mounted cgroup is visible here.
+            if(_mount_root STREQUAL "/")
+                set(_rel "${_cgroup}")
+            else()
+                string(FIND "${_cgroup}/" "${_mount_root}/" _pos)
+                if(NOT _pos EQUAL 0)
+                    continue()
+                endif()
+                string(LENGTH "${_mount_root}" _len)
+                string(SUBSTRING "${_cgroup}" ${_len} -1 _rel)
+            endif()
+
+            while(NOT _rel STREQUAL "" AND NOT _rel STREQUAL "/")
+                list(APPEND _files "${_mount_point}${_rel}/${_leaf}")
+                get_filename_component(_rel "${_rel}" DIRECTORY)
+            endwhile()
+            list(APPEND _files "${_mount_point}/${_leaf}")
+        endforeach()
+
+        list(REMOVE_DUPLICATES _files)
+        foreach(_file IN LISTS _files)
+            if(EXISTS "${_file}")
+                file(READ "${_file}" _limit)
+                string(STRIP "${_limit}" _limit)
+                # cgroup v2 writes "max" for no limit; v1 a huge byte count.
+                if(_limit MATCHES "^[0-9]+$")
+                    math(EXPR _limit_mib "${_limit} / 1048576")
+                    if(_limit_mib LESS _mib)
+                        set(_mib ${_limit_mib})
+                        set(_source "the cgroup limit in ${_file}")
+                    endif()
+                endif()
+            endif()
+        endforeach()
+    endif()
+
+    set(${out_mib} ${_mib} PARENT_SCOPE)
+    set(${out_source} "${_source}" PARENT_SCOPE)
+endfunction()
+
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
     # Check for the toolchain before fetching Corrosion: without this, a missing
     # rustc surfaces as an error deep inside Corrosion's FindRust with no hint of
@@ -48,12 +123,13 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     FetchContent_Declare(
         Corrosion
         GIT_REPOSITORY https://github.com/netdata/corrosion.git
-        GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
+        GIT_TAG f23459775a9fe2157fa3a9100c2bcbaaf326d870 # stable/v0.5 + parallel-cargo-builds
     )
     FetchContent_MakeAvailable(Corrosion)
 
     # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/
-    # (see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
+    # (build/, or build-<target>/ per target with ISOLATE_CARGO_TARGET_DIRS;
+    # see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
     # ninja clean removes it.  If a future Corrosion version changes this
     # path, this line must be updated to match.
     set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/cargo")
@@ -71,10 +147,50 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     if(ENABLE_PLUGIN_NETFLOW)
         list(APPEND _WORKSPACE_CRATES netflow-plugin)
     endif()
+    # otel-plugin and netflow-plugin build one after the other by default: each
+    # cargo build runs in Ninja's console pool, and both share one cargo target
+    # directory, which cargo locks for the whole build. Removing both lets them
+    # build at the same time, at the cost of compiling the shared dependencies
+    # twice and roughly doubling the peak memory of the Rust part of the build.
+    set(_nd_rust_parallel_args "")
+    if(ENABLE_PLUGIN_OTEL AND ENABLE_PLUGIN_NETFLOW)
+        string(TOUPPER "${USE_PARALLEL_RUST_BUILDS}" _nd_rust_parallel_mode)
+        if(_nd_rust_parallel_mode STREQUAL "AUTO")
+            _netdata_build_memory_mib(_nd_build_memory_mib _nd_build_memory_source)
+            # 15 GiB rather than 16: a 16 GB machine reports about 15.6 GiB.
+            if(_nd_build_memory_mib GREATER_EQUAL 15360)
+                set(_nd_rust_parallel ON)
+            else()
+                set(_nd_rust_parallel OFF)
+            endif()
+            set(_nd_rust_parallel_reason "AUTO: ${_nd_build_memory_mib} MiB of ${_nd_build_memory_source}, needs 15360")
+            unset(_nd_build_memory_mib)
+            unset(_nd_build_memory_source)
+        elseif(USE_PARALLEL_RUST_BUILDS)
+            set(_nd_rust_parallel ON)
+            set(_nd_rust_parallel_reason "USE_PARALLEL_RUST_BUILDS=${USE_PARALLEL_RUST_BUILDS}")
+        else()
+            set(_nd_rust_parallel OFF)
+            set(_nd_rust_parallel_reason "USE_PARALLEL_RUST_BUILDS=${USE_PARALLEL_RUST_BUILDS}")
+        endif()
+
+        if(_nd_rust_parallel)
+            set(_nd_rust_parallel_args NO_USES_TERMINAL ISOLATE_CARGO_TARGET_DIRS)
+            message(STATUS "Building the Rust plugins in parallel (${_nd_rust_parallel_reason})")
+        else()
+            message(STATUS "Building the Rust plugins one after the other (${_nd_rust_parallel_reason})")
+        endif()
+        unset(_nd_rust_parallel)
+        unset(_nd_rust_parallel_mode)
+        unset(_nd_rust_parallel_reason)
+    endif()
+
     if(_WORKSPACE_CRATES)
         corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES ${_WORKSPACE_CRATES})
+                               CRATES ${_WORKSPACE_CRATES}
+                               ${_nd_rust_parallel_args})
     endif()
+    unset(_nd_rust_parallel_args)
 
     # Cargo links the Rust executables through the bare compiler driver, so CMAKE_EXE_LINKER_FLAGS never reach those
     # links. When the build asks for the Cortex-A53 erratum workarounds (static aarch64), have the linker apply them to
