@@ -36,13 +36,16 @@ modules:
           - received and sent traffic per network interface;
           - available and used space per fixed drive;
           - round-trip time and packet loss of ICMP ping from the poller;
-          - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address.
+          - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
+          - host status: when the poller can no longer collect from the host, its node turns Stale and an alert on the poller notifies you.
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
         method_description: |
           `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group, and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
+
+          A collection that fails publishes nothing for the host. When no collection has succeeded for `3 × update_every + timeout` seconds (105 by default, about three missed collections), the Agent marks the host's node Stale, as it does for a child Agent that stops streaming. The Agent checks for stale nodes at that same interval, so marking can take up to about twice as long. The next successful collection makes the node live again. On the poller, the `wmi_host_last_collected_secs` alert ([wmi.plugin.conf](https://github.com/netdata/netdata/blob/master/src/health/health.d/wmi.plugin.conf)) counts the seconds since each job's last successful collection, turns critical after three missed collections, and notifies the `sysadmin` role. Its value is on the job's Data Collection Duration chart of the poller, so the alert table below, which covers the host's own charts, does not list it.
 
           It authenticates as the configured Windows account with NTLMv2 and uses one of two transports:
 
@@ -90,7 +93,9 @@ modules:
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
             - Network interface speed is not collected, so the stock alerts that compare traffic with it have no value.
             - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
-            - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it.
+            - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it; its node turns Stale and the `wmi_host_last_collected_secs` alert reports it instead.
+            - A host that cannot be reached when its job starts gets no node and no host status alert until the job's first successful collection. Set `autodetection_retry` so the job keeps trying.
+            - After five failed collections in a row, the plugin waits longer between attempts, up to 10 minutes more than `update_every`. A host that comes back after a long outage can take that long to turn live again.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
           description: |
@@ -266,7 +271,9 @@ modules:
                 | `_system_disk_space` | Total partition size of the fixed drives, in bytes; requires the disk group |
                 | `_net_default_iface`, `_net_default_iface_ip`, `_net_default_iface_detection` | Interface and IPv4 address of the default route |
 
-                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information. Give that node the label `_os: windows`, which the generated node has, so the stock Windows alerts apply to it.
+                The generated node turns Stale after about three missed collections, as the Overview describes.
+
+                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information. Give that node the label `_os: windows`, which the generated node has, so the stock Windows alerts apply to it. Such a node turns Stale only after its own `stale_after` time; without one it stays live, with gaps in its charts, while the host is down.
         examples:
           folding:
             title: Configuration example
@@ -421,6 +428,9 @@ modules:
               ```text
               chart labels: host=!fileserver.example.com *
               ```
+          - error: 'The host''s node is Stale and the `wmi_host_last_collected_secs` alert is critical'
+            cause: The poller has missed three collections in a row from the host. The host is down or unreachable, or it rejects the login. The job logs the reason with every failed collection, as one of the errors above.
+            fix: Fix the cause the job logs. With the next successful collection the node turns live again and the alert clears; the alert's recovery notification follows 5 minutes later.
           - error: '`group` WMI query failed: WinRM returned a WS-Management fault'
             when: '`transport: winrm`'
             cause: The listener accepted the login but refused the query, most often because the account lacks permissions on the `root\cimv2` WMI namespace.

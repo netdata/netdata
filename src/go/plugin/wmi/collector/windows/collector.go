@@ -103,7 +103,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := c.initPinger(); err != nil {
 		return err
 	}
-	c.vnode = newVirtualNode(c.Host)
+	c.vnode = newVirtualNode(c.Host, nodeStaleAfter(c.UpdateEvery, c.Timeout.Duration()))
 	return nil
 }
 
