@@ -20,7 +20,7 @@ const (
 		"PercentIdleTime FROM Win32_PerfRawData_Counters_ProcessorInformation"
 	queryMemory  = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
 	queryNetwork = "SELECT Name, BytesReceivedPersec, BytesSentPersec FROM Win32_PerfRawData_Tcpip_NetworkInterface"
-	queryDisk    = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber FROM Win32_LogicalDisk " +
+	queryDisk    = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
 		"WHERE DriveType = 3"
 )
 

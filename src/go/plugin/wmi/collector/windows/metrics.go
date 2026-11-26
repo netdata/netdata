@@ -12,13 +12,15 @@ const (
 	mountPointLabel    = "mount_point"
 	driveTypeLabel     = "drive_type"
 	fileSystemLabel    = "filesystem"
+	readWriteModeLabel = "rw_mode"
 	serialNumberLabel  = "serial_number"
 
 	// The Network Interface counter set lists the interfaces the native agent
 	// calls real; it calls the extra Network Adapter instances virtual.
 	realInterface = "real"
-	// The disk query reads fixed drives only.
-	fixedDrive = "fixed"
+	// The disk query reads fixed drives only and leaves out read-only ones.
+	fixedDrive    = "fixed"
+	readWriteMode = "rw"
 )
 
 type collectorMetrics struct {
@@ -90,7 +92,7 @@ func (m collectorMetrics) write(snapshot observations) {
 }
 
 func (d diskSpace) labels() []metrix.Label {
-	labels := []metrix.Label{
+	return []metrix.Label{
 		{
 			Key:   mountPointLabel,
 			Value: d.mountPoint,
@@ -103,14 +105,15 @@ func (d diskSpace) labels() []metrix.Label {
 			Key:   fileSystemLabel,
 			Value: d.fileSystem,
 		},
-	}
-	if d.serialNumber != "" {
-		labels = append(labels, metrix.Label{
+		{
+			Key:   readWriteModeLabel,
+			Value: readWriteMode,
+		},
+		{
 			Key:   serialNumberLabel,
 			Value: d.serialNumber,
-		})
+		},
 	}
-	return labels
 }
 
 func observeShares(gauges [len(cpuModes)]metrix.SnapshotGauge, shares cpuShares, labels ...metrix.LabelSet) {

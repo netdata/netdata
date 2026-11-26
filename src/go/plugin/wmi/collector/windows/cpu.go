@@ -54,16 +54,14 @@ func (o *observations) readCPU(rows []map[string]any) bool {
 	type core struct {
 		node, index uint64
 		times       cpuTimes
+		valid       bool
 	}
 	var cores []core
 	for _, row := range rows {
-		times, ok := readCPUTimes(row)
-		if !ok {
-			continue
-		}
+		times, valid := readCPUTimes(row)
 		name, _ := row["name"].(string)
 		if name == "_Total" {
-			o.cpuTimes.total, o.cpuTimes.hasTotal = times, true
+			o.cpuTimes.total, o.cpuTimes.hasTotal = times, valid
 			continue
 		}
 		// Per-core instances are named "node,index"; "node,_Total" is a NUMA
@@ -76,19 +74,23 @@ func (o *observations) readCPU(rows []map[string]any) bool {
 				node:  node,
 				index: index,
 				times: times,
+				valid: valid,
 			})
 		}
 	}
 	// The native plugin numbers cores by asking the host for its NUMA layout,
 	// which WMI does not expose. Numbering them in node and index order gives
 	// the same labels when each node holds consecutive processors, as on
-	// single-node hosts.
+	// single-node hosts. A core with unreadable counters keeps its number, so
+	// the cores after it keep theirs.
 	slices.SortFunc(cores, func(a, b core) int {
 		return cmp.Or(cmp.Compare(a.node, b.node), cmp.Compare(a.index, b.index))
 	})
 	o.cpuTimes.cores = make(map[string]cpuTimes, len(cores))
 	for i, c := range cores {
-		o.cpuTimes.cores["cpu"+strconv.Itoa(i)] = c.times
+		if c.valid {
+			o.cpuTimes.cores["cpu"+strconv.Itoa(i)] = c.times
+		}
 	}
 	return !o.cpuTimes.empty()
 }

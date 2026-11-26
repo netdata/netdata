@@ -83,7 +83,7 @@ modules:
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
             - Traffic appears from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
-            - Network interface speed is not collected, so the stock alerts that compare traffic with it are not evaluated.
+            - Network interface speed is not collected, so the stock alerts that compare traffic with it have no value.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
           description: |
@@ -215,6 +215,8 @@ modules:
               default_value: true
               required: false
               group: Collection
+              detailed_description: |
+                As on the Netdata Agent running on Windows, each mode is its share of the time all modes accumulated in the interval. The privileged time Windows reports (`system`) already includes the interrupt (`irq`) and DPC (`dpc`) time, so those two also count within `system`.
             - name: collectors.memory
               description: "Collect free and used physical memory."
               default_value: true
@@ -389,7 +391,6 @@ modules:
       description: |
         - Charts belong to the Windows host's node, not to the poller.
         - CPU utilization and traffic are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
-        - As on the Netdata Agent running on Windows, each CPU mode is its share of the time all modes accumulated. The privileged time Windows reports (`system`) already includes the interrupt (`irq`) and DPC (`dpc`) time, so those two also appear within `system`.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
       availability: []
       scopes:
@@ -431,7 +432,7 @@ modules:
                 - name: dpc
                 - name: idle
         - name: network interface
-          description: A network interface as Windows performance counters list it, including virtual and tunnel adapters, once it has sent or received traffic.
+          description: A network interface as Windows performance counters list it, including virtual and tunnel adapters, that has sent or received traffic since its counters started.
           labels:
             - name: device
               description: Performance counter name of the interface, for example `Intel[R] PRO_1000 MT Network Connection`. Windows writes parentheses as square brackets and `#` or `/` as underscores.
@@ -446,7 +447,7 @@ modules:
                 - name: received
                 - name: sent
         - name: drive
-          description: A fixed drive with a drive letter.
+          description: A fixed drive with a drive letter that Windows does not report as read-only.
           labels:
             - name: mount_point
               description: Drive letter, for example `C:`.
@@ -454,8 +455,10 @@ modules:
               description: Always `fixed`, the only drive type the plugin reads.
             - name: filesystem
               description: File system of the drive, for example `NTFS`, or `unknown` when Windows reports none.
+            - name: rw_mode
+              description: Always `rw`, because read-only drives are not charted.
             - name: serial_number
-              description: Volume serial number in hexadecimal, for example `0x1A2B3C4D`.
+              description: Volume serial number in hexadecimal, for example `0x1A2B3C4D`, or `0x0` when Windows reports none.
           metrics:
             - name: disk.space
               description: Disk Space Usage

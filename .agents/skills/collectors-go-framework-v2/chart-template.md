@@ -181,8 +181,8 @@ a *leaf* is the innermost family that holds charts.
 
 ## Review Checklist
 
-- One spec-level `context_namespace`; every context starts with the collector's root; no explicit `id` equal to the
-  context with dots replaced by underscores; no restated default.
+- One spec-level `context_namespace` (none for an OS-host vnode under Shared Contexts); every context starts with the
+  collector's root; no explicit `id` equal to the context with dots replaced by underscores; no restated default.
 - Families read as operator navigation; sections carry the only priorities, if any.
 - Statesets use inferred dimensions unless order or naming needs explicit ones; state metrics carry a state suffix.
 - Labels attached at the source are the documented set; no stamped labels re-added.

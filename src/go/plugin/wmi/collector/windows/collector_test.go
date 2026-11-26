@@ -172,8 +172,8 @@ func TestCollector_Collect(t *testing.T) {
 	const (
 		ethernet  = `{device="Ethernet",interface_type="real"}`
 		ethernet1 = `{device="Ethernet#1",interface_type="real"}`
-		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",serial_number="0xBEF3E296"}`
-		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",serial_number="0xABCD"}`
+		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
+		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
 	)
 	assert.Equal(t, map[string]metrix.SampleValue{
 		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
@@ -427,6 +427,72 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				assert.Equal(t, tc.wantMetrics, metrics)
 			}
 			assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, session.queries)
+		})
+	}
+}
+
+func TestReadDisks(t *testing.T) {
+	for name, tc := range map[string]struct {
+		rows       queryResult
+		want       []diskSpace
+		wantUsable bool
+	}{
+		"labels as the native Windows Agent writes them": {
+			rows: fixtureRows(
+				map[string]any{
+					"DeviceID":           "C:",
+					"Size":               uint64(500),
+					"FreeSpace":          uint64(200),
+					"FileSystem":         "ReFS",
+					"VolumeSerialNumber": "00c0ffee",
+					"Access":             uint16(0),
+				},
+				map[string]any{"DeviceID": "D:", "Size": "100", "FreeSpace": "100"},
+			),
+			want: []diskSpace{
+				{
+					mountPoint:   "C:",
+					fileSystem:   "ReFS",
+					serialNumber: "0xC0FFEE",
+					avail: sample{
+						value: 200,
+						valid: true,
+					},
+					used: sample{
+						value: 300,
+						valid: true,
+					},
+				},
+				{
+					mountPoint:   "D:",
+					fileSystem:   "unknown",
+					serialNumber: "0x0",
+					avail: sample{
+						value: 100,
+						valid: true,
+					},
+					used: sample{
+						value: 0,
+						valid: true,
+					},
+				},
+			},
+			wantUsable: true,
+		},
+		"read-only drives are left out": {
+			rows: fixtureRows(
+				map[string]any{"DeviceID": "E:", "Size": uint64(100), "FreeSpace": uint64(0), "Access": "1"},
+			),
+			wantUsable: true,
+		},
+		"no drive reports free space": {
+			rows: fixtureRows(map[string]any{"DeviceID": "C:", "Size": uint64(100)}),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var o observations
+			assert.Equal(t, tc.wantUsable, o.readDisks(tc.rows.rows))
+			assert.Equal(t, tc.want, o.drives)
 		})
 	}
 }

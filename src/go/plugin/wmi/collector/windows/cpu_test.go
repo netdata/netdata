@@ -87,9 +87,10 @@ func TestReadCPU(t *testing.T) {
 				processorRow[uint64]("Processor 7", 1, 1, 1, 1, 1),
 				processorRow[uint64]("0,1", 1, 2, 3, 4, 5),
 			),
+			// The unreadable core keeps its number, so the next one keeps its own.
 			want: cpuSample{
 				cores: map[string]cpuTimes{
-					"cpu0": {1, 2, 3, 4, 5},
+					"cpu1": {1, 2, 3, 4, 5},
 				},
 			},
 			wantUsable: true,

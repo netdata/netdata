@@ -343,12 +343,14 @@ func TestCollector_PublishesNativeWindowsCharts(t *testing.T) {
 			"mount_point":   "C:",
 			"drive_type":    "fixed",
 			"filesystem":    "NTFS",
+			"rw_mode":       "rw",
 			"serial_number": "0xBEF3E296",
 		}),
 		instance("disk.space", map[string]string{
 			"mount_point":   "D:",
 			"drive_type":    "fixed",
 			"filesystem":    "unknown",
+			"rw_mode":       "rw",
 			"serial_number": "0xABCD",
 		}),
 	}, publishedCharts(t))

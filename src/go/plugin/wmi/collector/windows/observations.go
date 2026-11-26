@@ -40,6 +40,9 @@ type diskSpace struct {
 	used         sample
 }
 
+// Win32_LogicalDisk Access value of media that can only be read.
+const accessReadOnly = 1
+
 // readMemory converts Win32_OperatingSystem's KiB values to bytes. Free
 // physical memory is the memory available to processes, as the native Windows
 // Agent's free dimension.
@@ -82,7 +85,10 @@ func (o *observations) readNetwork(rows []map[string]any) bool {
 	return len(rows) == 0 || usable
 }
 
+// readDisks leaves out read-only drives, as the native Windows Agent does, so
+// a full read-only volume does not hold a disk space alert forever.
 func (o *observations) readDisks(rows []map[string]any) bool {
+	var usable bool
 	for _, row := range rows {
 		drive, _ := row["deviceid"].(string)
 		if strings.TrimSpace(drive) == "" {
@@ -90,17 +96,22 @@ func (o *observations) readDisks(rows []map[string]any) bool {
 		}
 		size := readUnsigned(row["size"])
 		free := readUnsigned(row["freespace"])
-		if free.valid {
-			o.drives = append(o.drives, diskSpace{
-				mountPoint:   drive,
-				fileSystem:   fileSystem(row),
-				serialNumber: volumeSerialNumber(row),
-				avail:        free,
-				used:         used(size, free),
-			})
+		if !free.valid {
+			continue
 		}
+		usable = true
+		if access := readUnsigned(row["access"]); access.valid && access.value == accessReadOnly {
+			continue
+		}
+		o.drives = append(o.drives, diskSpace{
+			mountPoint:   drive,
+			fileSystem:   fileSystem(row),
+			serialNumber: volumeSerialNumber(row),
+			avail:        free,
+			used:         used(size, free),
+		})
 	}
-	return len(rows) == 0 || len(o.drives) > 0
+	return len(rows) == 0 || usable
 }
 
 // fileSystem names an unformatted volume's file system "unknown", as the
@@ -113,13 +124,10 @@ func fileSystem(row map[string]any) string {
 }
 
 // volumeSerialNumber formats WMI's hexadecimal serial as the native Windows
-// Agent does: 0x and uppercase digits without leading zeros. It is empty when
-// WMI reports no serial.
+// Agent does: 0x and uppercase digits without leading zeros, and 0x0 when the
+// serial is unknown.
 func volumeSerialNumber(row map[string]any) string {
-	n, err := strconv.ParseUint(textProperty(row, "volumeserialnumber"), 16, 32)
-	if err != nil {
-		return ""
-	}
+	n, _ := strconv.ParseUint(textProperty(row, "volumeserialnumber"), 16, 32)
 	return "0x" + strings.ToUpper(strconv.FormatUint(n, 16))
 }
 
