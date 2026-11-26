@@ -1637,10 +1637,14 @@ static int replication_pipeline_execute_next(void) {
                         rtp.max_requests_ahead == 1,
                         true);
 
-                    // deferred to execution: do not keep the chart pointer
-                    // while the slot waits, it is looked up again then
-                    if(!rq->q)
+                    if(!rq->q) {
+                        // deferred to execution: keep the decision to start
+                        // streaming (the window may stop qualifying by then),
+                        // and do not keep the chart pointer while the slot
+                        // waits, it is looked up again then
+                        rq->start_streaming = true;
                         rq->st = NULL;
+                    }
                 }
             }
 
