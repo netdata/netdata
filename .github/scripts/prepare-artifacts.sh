@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+source_only=false
+if [[ ${1:-} == --pr-source-only ]]; then
+    source_only=true
+    shift
+fi
 artifacts="$(realpath "${1}")"
 signing_key="${2:-}"
 event_type="${3:-}"
@@ -116,6 +121,15 @@ version_compare() {
 
     return 0
 }
+
+# A source-only PR can exercise kickstart as soon as the distribution archive exists.
+if [[ ${source_only} == true ]]; then
+    mkdir latest
+    cd latest
+    copy_source_tarball latest
+    create_manifest
+    exit 0
+fi
 
 echo "Using ${artifacts} as source directory for artifacts"
 echo "::group::Files currently in ${artifacts}"

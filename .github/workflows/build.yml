@@ -57,6 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      early-source: ${{ github.event_name == 'pull_request' && steps.check-source-files.outputs.any_modified == 'true' && steps.check-build-files.outputs.any_modified != 'true' }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
       static-native: ${{ steps.check-static.outputs.static-native }}
     steps:
@@ -99,6 +100,8 @@ jobs:
             .github/data/distros.yml
             .github/workflows/build.yml
             .github/scripts/modules/release_versions.py
+            .github/scripts/pr-source-install.py
+            .github/scripts/prepare-artifacts.sh
             .github/scripts/prepare-release-base.sh
             packaging/release_info.py
             .github/scripts/build-static.sh
@@ -863,14 +866,47 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  pr-source-install:
+    name: Install PR Distribution Tarball
+    needs: [file-check, build-dist]
+    if: needs.file-check.outputs.early-source == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      identity: ${{ steps.install.outputs.identity }}
+    services:
+      apache:
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+      - name: Fetch distribution tarball
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-tarball
+          path: ${{ runner.temp }}/pr-source
+      - name: Prepare source archives and manifest
+        run: .github/scripts/prepare-artifacts.sh --pr-source-only "$RUNNER_TEMP/pr-source"
+      - name: Install and record the tested source
+        id: install
+        env:
+          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
+          APACHE: ${{ job.services.apache.id }}
+        run: python3 .github/scripts/pr-source-install.py install "$APACHE"
+
   artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
     if: >-
-      ${{ !failure() && !cancelled()
-          && needs.prepare-upload.result == 'success'
-          && needs.file-check.result == 'success' }}
+      ${{ !cancelled() && (github.event_name == 'pull_request' ||
+          (needs.prepare-upload.result == 'success' && needs.file-check.result == 'success')) }}
     name: Test Consolidated Artifacts (Source)
     runs-on: ubuntu-latest
     needs:
+      - pr-source-install
       - prepare-upload
       - file-check
     services:
@@ -881,6 +917,13 @@ jobs:
         volumes:
           - ${{ github.workspace }}:/usr/local/apache2/htdocs/
     steps:
+      - name: Require successful source inputs
+        if: >-
+          always() && (needs.file-check.result != 'success' || needs.prepare-upload.result != 'success' ||
+          (needs.file-check.outputs.early-source == 'true' && needs.pr-source-install.result != 'success'))
+        run: |
+          echo "::error::File selection, artifact preparation or the required early installation failed."
+          exit 1
       - name: Skip Check
         id: skip
         if: needs.file-check.outputs.run != 'true'
@@ -906,10 +949,17 @@ jobs:
           mv artifacts/* .
       - name: Verify that artifacts work with installer
         id: verify
-        if: needs.file-check.outputs.run == 'true'
+        if: needs.file-check.outputs.run == 'true' && needs.file-check.outputs.early-source != 'true'
         env:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
+      - name: Compare consolidated source with the installed archive
+        if: needs.file-check.outputs.early-source == 'true'
+        env:
+          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
+          APACHE: ${{ job.services.apache.id }}
+          TESTED_SOURCE: ${{ needs.pr-source-install.outputs.identity }}
+        run: python3 .github/scripts/pr-source-install.py verify "$APACHE"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
