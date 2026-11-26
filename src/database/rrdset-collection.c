@@ -159,10 +159,14 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
 #endif
     }
     else if(unlikely(!duration_since_last_update)) {
-        // no dt given by the plugin
-        duration_since_last_update = dt_usec(&now, &st->last_collected_time);
+        // no dt given by the plugin: measure it from the chart's clock. A time that is not after the clock holds
+        // the clock (0), as below when the database is in the future; read as a distance, it would push the
+        // clock forward by as much as it is behind.
+        susec_t since_last_usec = dt_usec_signed(&now, &st->last_collected_time);
+        duration_since_last_update = (since_last_usec > 0) ? (usec_t)since_last_usec : 0;
 #ifdef NETDATA_INTERNAL_CHECKS
-        if(!discard_reason) discard_reason = "NO USEC GIVEN BY COLLECTOR";
+        if(!discard_reason)
+            discard_reason = (since_last_usec > 0) ? "NO USEC GIVEN BY COLLECTOR" : "COLLECTION TIME NOT AFTER THE CHART";
 #endif
     }
     else {
@@ -537,6 +541,36 @@ void rrdset_done(RRDSET *st) {
     rrdset_timed_done(st, now, /* pending_rrdset_next = */ st->counter_done != 0);
 }
 
+// A sample that carries its own collection time is a new observation only when that time is after the chart's last
+// collection time. Anything else is older than what the chart already holds: a frame delivered out of order, a
+// producer whose clock is behind the chart (a plugin restarted while the wall clock stepped back, the first sample
+// aligned forward to its slot), or a repeated time.
+static inline bool rrdset_sample_time_is_stale(RRDSET *st, struct timeval *sample_time) {
+    return st->last_collected_time.tv_sec && dt_usec_signed(sample_time, &st->last_collected_time) <= 0;
+}
+
+// Forgets the values set for a sample the chart does not accept, as if it had not been sent: each dimension keeps its
+// last collected value (the counter baseline) and its collection count.
+static void rrdset_discard_collected_values(RRDSET *st) {
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        if(!rrddim_check_updated(rd))
+            continue;
+
+        if(rrddim_is_float(rd))
+            rrddim_set_collected_float(rd, 0.0);
+        else
+            rrddim_set_collected_int(rd, 0);
+
+        // undo the count the SET added: a dimension never collected before must still have no baseline
+        if(rd->collector.counter)
+            rd->collector.counter--;
+
+        rrddim_clear_updated(rd);
+    }
+    rrddim_foreach_done(rd);
+}
+
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
 
@@ -546,8 +580,24 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     spinlock_lock(&st->data_collection_lock);
 
-    if (pending_rrdset_next)
+    if (pending_rrdset_next) {
+        // `now` is the sample's collection time: a sample not newer than the chart changes nothing, so the next
+        // newer one is placed at its own time and measured against the last accepted values
+        if(unlikely(rrdset_sample_time_is_stale(st, &now))) {
+            internal_error(true,
+                           "host '%s', chart '%s': ignored a sample collected %" PRId64 " usec before the chart's "
+                           "last collection time",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           (int64_t)-dt_usec_signed(&now, &st->last_collected_time));
+
+            rrdset_discard_collected_values(st);
+            spinlock_unlock(&st->data_collection_lock);
+            stream_send_rrdset_metrics_finished(&stream_buffer, st);
+            return;
+        }
+
         rrdset_timed_next(st, now, 0ULL);
+    }
 
     netdata_log_debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
 
