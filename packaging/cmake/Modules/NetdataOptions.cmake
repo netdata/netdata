@@ -71,6 +71,7 @@ option(ENABLE_ALARM_NOTIFY_GO "Build the experimental Go notifier for local deve
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
+option(ENABLE_UNITTESTS "Build the unit tests and test tools behind netdata -W into the agent" True)
 option(ENABLE_DASHBOARD "Enable local dashboard" True)
 mark_as_advanced(ENABLE_DASHBOARD)
 
