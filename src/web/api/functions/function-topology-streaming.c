@@ -4,6 +4,16 @@
 
 #define STREAMING_FUNCTION_UPDATE_EVERY 10
 
+// Doubles the capacity of a growable array. items and size are assigned and
+// evaluated more than once: pass side-effect-free lvalues.
+#define STREAMING_TOPOLOGY_RESERVE(items, used, size, initial) do {  \
+    if((used) == (size)) {                                           \
+        size_t new_size_ = (size) ? (size) * 2 : (initial);          \
+        (items) = reallocz((items), new_size_ * sizeof(*(items)));   \
+        (size) = new_size_;                                          \
+    }                                                                \
+} while(0)
+
 
 static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_size);
 static bool streaming_topology_uuid_guid(ND_UUID host_id, char *dst, size_t dst_size);
@@ -146,14 +156,10 @@ static void streaming_topology_descendants_append(
     if(!list)
         return;
 
-    if(list->used == list->size) {
-        size_t new_size = list->size ? list->size * 2 : 4;
-        list->items = reallocz(list->items, new_size * sizeof(*list->items));
-        list->size = new_size;
-    }
-
     if(!host || !host->machine_guid[0])
         return;
+
+    STREAMING_TOPOLOGY_RESERVE(list->items, list->used, list->size, 4);
 
     struct streaming_topology_descendant *item = &list->items[list->used++];
     snprintfz(item->host_machine_guid, sizeof(item->host_machine_guid), "%s", host->machine_guid);
@@ -487,12 +493,21 @@ static bool streaming_topology_v1_actor_index_get(STREAMING_TOPOLOGY_V1_PAYLOAD 
     return true;
 }
 
+static bool streaming_topology_v1_actor_index_for_uuid(
+    STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
+    ND_UUID host_id,
+    uint64_t *index) {
+    // a zero UUID has no actor
+    if(UUIDiszero(host_id))
+        return false;
+
+    char actor_id[256];
+    streaming_topology_actor_id_for_uuid(host_id, actor_id, sizeof(actor_id));
+    return streaming_topology_v1_actor_index_get(payload, actor_id, index);
+}
+
 static STREAMING_TOPOLOGY_V1_ACTOR *streaming_topology_v1_add_actor(STREAMING_TOPOLOGY_V1_PAYLOAD *payload, const char *actor_id) {
-    if(payload->actors_used == payload->actors_size) {
-        size_t new_size = payload->actors_size ? payload->actors_size * 2 : 16;
-        payload->actors = reallocz(payload->actors, new_size * sizeof(*payload->actors));
-        payload->actors_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->actors, payload->actors_used, payload->actors_size, 16);
 
     STREAMING_TOPOLOGY_V1_ACTOR *actor = &payload->actors[payload->actors_used];
     *actor = (STREAMING_TOPOLOGY_V1_ACTOR){ 0 };
@@ -503,11 +518,7 @@ static STREAMING_TOPOLOGY_V1_ACTOR *streaming_topology_v1_add_actor(STREAMING_TO
 }
 
 static STREAMING_TOPOLOGY_V1_LINK *streaming_topology_v1_add_link(STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->links_used == payload->links_size) {
-        size_t new_size = payload->links_size ? payload->links_size * 2 : 16;
-        payload->links = reallocz(payload->links, new_size * sizeof(*payload->links));
-        payload->links_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->links, payload->links_used, payload->links_size, 16);
 
     STREAMING_TOPOLOGY_V1_LINK *link = &payload->links[payload->links_used++];
     *link = (STREAMING_TOPOLOGY_V1_LINK){ 0 };
@@ -542,11 +553,7 @@ static void streaming_topology_v1_add_actor_label_ex(
     if(!payload || !key || !*key || !value || !*value)
         return;
 
-    if(payload->labels_used == payload->labels_size) {
-        size_t new_size = payload->labels_size ? payload->labels_size * 2 : 64;
-        payload->labels = reallocz(payload->labels, new_size * sizeof(*payload->labels));
-        payload->labels_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->labels, payload->labels_used, payload->labels_size, 64);
 
     STREAMING_TOPOLOGY_V1_ACTOR_LABEL *row = &payload->labels[payload->labels_used++];
     *row = (STREAMING_TOPOLOGY_V1_ACTOR_LABEL){ 0 };
@@ -638,11 +645,7 @@ static void streaming_topology_v1_collect_actor_labels(
 
 static STREAMING_TOPOLOGY_V1_STREAM_PATH_ROW *streaming_topology_v1_add_stream_path_row(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->stream_path_used == payload->stream_path_size) {
-        size_t new_size = payload->stream_path_size ? payload->stream_path_size * 2 : 32;
-        payload->stream_path_rows = reallocz(payload->stream_path_rows, new_size * sizeof(*payload->stream_path_rows));
-        payload->stream_path_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->stream_path_rows, payload->stream_path_used, payload->stream_path_size, 32);
 
     STREAMING_TOPOLOGY_V1_STREAM_PATH_ROW *row = &payload->stream_path_rows[payload->stream_path_used++];
     *row = (STREAMING_TOPOLOGY_V1_STREAM_PATH_ROW){ 0 };
@@ -651,11 +654,7 @@ static STREAMING_TOPOLOGY_V1_STREAM_PATH_ROW *streaming_topology_v1_add_stream_p
 
 static STREAMING_TOPOLOGY_V1_RETENTION_ROW *streaming_topology_v1_add_retention_row(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->retention_used == payload->retention_size) {
-        size_t new_size = payload->retention_size ? payload->retention_size * 2 : 16;
-        payload->retention_rows = reallocz(payload->retention_rows, new_size * sizeof(*payload->retention_rows));
-        payload->retention_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->retention_rows, payload->retention_used, payload->retention_size, 16);
 
     STREAMING_TOPOLOGY_V1_RETENTION_ROW *row = &payload->retention_rows[payload->retention_used++];
     *row = (STREAMING_TOPOLOGY_V1_RETENTION_ROW){ 0 };
@@ -664,11 +663,7 @@ static STREAMING_TOPOLOGY_V1_RETENTION_ROW *streaming_topology_v1_add_retention_
 
 static STREAMING_TOPOLOGY_V1_INBOUND_ROW *streaming_topology_v1_add_inbound_row(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->inbound_used == payload->inbound_size) {
-        size_t new_size = payload->inbound_size ? payload->inbound_size * 2 : 32;
-        payload->inbound_rows = reallocz(payload->inbound_rows, new_size * sizeof(*payload->inbound_rows));
-        payload->inbound_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->inbound_rows, payload->inbound_used, payload->inbound_size, 32);
 
     STREAMING_TOPOLOGY_V1_INBOUND_ROW *row = &payload->inbound_rows[payload->inbound_used++];
     *row = (STREAMING_TOPOLOGY_V1_INBOUND_ROW){ 0 };
@@ -677,11 +672,7 @@ static STREAMING_TOPOLOGY_V1_INBOUND_ROW *streaming_topology_v1_add_inbound_row(
 
 static STREAMING_TOPOLOGY_V1_OUTBOUND_ROW *streaming_topology_v1_add_outbound_row(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload) {
-    if(payload->outbound_used == payload->outbound_size) {
-        size_t new_size = payload->outbound_size ? payload->outbound_size * 2 : 32;
-        payload->outbound_rows = reallocz(payload->outbound_rows, new_size * sizeof(*payload->outbound_rows));
-        payload->outbound_size = new_size;
-    }
+    STREAMING_TOPOLOGY_RESERVE(payload->outbound_rows, payload->outbound_used, payload->outbound_size, 32);
 
     STREAMING_TOPOLOGY_V1_OUTBOUND_ROW *row = &payload->outbound_rows[payload->outbound_used++];
     *row = (STREAMING_TOPOLOGY_V1_OUTBOUND_ROW){ 0 };
@@ -760,36 +751,31 @@ static uint64_t streaming_topology_v1_time_ut(time_t timestamp) {
     return timestamp > 0 ? (uint64_t)timestamp * USEC_PER_SEC : 0;
 }
 
+static uint64_t streaming_topology_v1_first_nonzero_ut(time_t a, time_t b, time_t c) {
+    if(a)
+        return streaming_topology_v1_time_ut(a);
+
+    if(b)
+        return streaming_topology_v1_time_ut(b);
+
+    if(c)
+        return streaming_topology_v1_time_ut(c);
+
+    return streaming_topology_v1_time_ut(netdata_start_time);
+}
+
 static uint64_t streaming_topology_v1_best_since_ut(RRDHOST_STATUS *status) {
     if(!status)
         return 0;
 
-    if(status->ingest.since)
-        return streaming_topology_v1_time_ut(status->ingest.since);
-
-    if(status->stream.since)
-        return streaming_topology_v1_time_ut(status->stream.since);
-
-    if(status->db.first_time_s)
-        return streaming_topology_v1_time_ut(status->db.first_time_s);
-
-    return streaming_topology_v1_time_ut(netdata_start_time);
+    return streaming_topology_v1_first_nonzero_ut(status->ingest.since, status->stream.since, status->db.first_time_s);
 }
 
 static uint64_t streaming_topology_v1_best_first_time_ut(RRDHOST_STATUS *status) {
     if(!status)
         return 0;
 
-    if(status->db.first_time_s)
-        return streaming_topology_v1_time_ut(status->db.first_time_s);
-
-    if(status->ingest.since)
-        return streaming_topology_v1_time_ut(status->ingest.since);
-
-    if(status->stream.since)
-        return streaming_topology_v1_time_ut(status->stream.since);
-
-    return streaming_topology_v1_time_ut(netdata_start_time);
+    return streaming_topology_v1_first_nonzero_ut(status->db.first_time_s, status->ingest.since, status->stream.since);
 }
 
 static bool streaming_topology_v1_status_has_db_counts(RRDHOST_STATUS *status) {
@@ -1001,15 +987,6 @@ static bool streaming_topology_v1_actor_index_for_host(
     return streaming_topology_v1_actor_index_get(payload, actor_id, index);
 }
 
-static bool streaming_topology_v1_actor_index_for_uuid(
-    STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
-    ND_UUID host_id,
-    uint64_t *index) {
-    char actor_id[256];
-    streaming_topology_actor_id_for_uuid(host_id, actor_id, sizeof(actor_id));
-    return streaming_topology_v1_actor_index_get(payload, actor_id, index);
-}
-
 static void streaming_topology_v1_add_link_if_new(
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t src_actor,
@@ -1050,7 +1027,6 @@ struct streaming_topology_v1_synth_link_ctx {
     STREAMING_TOPOLOGY_V1_PAYLOAD *payload;
     bool has_prev;
     uint64_t prev_actor;
-    char prev_actor_id[256];
     char prev_hostname[256];
     time_t prev_since;
     time_t prev_first_time_t;
@@ -1072,17 +1048,8 @@ static bool streaming_topology_v1_collect_synth_link(
     uint32_t flags __maybe_unused) {
     struct streaming_topology_v1_synth_link_ctx *ctx = userdata;
 
-    char guid[UUID_STR_LEN];
-    if(!streaming_topology_uuid_guid(host_id, guid, sizeof(guid))) {
-        ctx->has_prev = false;
-        return true;
-    }
-
-    char cur_actor_id[256];
-    streaming_topology_actor_id_from_guid(guid, cur_actor_id, sizeof(cur_actor_id));
-
     uint64_t cur_actor;
-    if(!streaming_topology_v1_actor_index_get(ctx->payload, cur_actor_id, &cur_actor)) {
+    if(!streaming_topology_v1_actor_index_for_uuid(ctx->payload, host_id, &cur_actor)) {
         ctx->has_prev = false;
         return true;
     }
@@ -1102,7 +1069,6 @@ static bool streaming_topology_v1_collect_synth_link(
 
     ctx->has_prev = true;
     ctx->prev_actor = cur_actor;
-    streaming_topology_v1_strncpy(ctx->prev_actor_id, sizeof(ctx->prev_actor_id), cur_actor_id);
     streaming_topology_v1_strncpy(ctx->prev_hostname, sizeof(ctx->prev_hostname), string2str(hostname));
     ctx->prev_since = since;
     ctx->prev_first_time_t = first_time_t;
@@ -1213,19 +1179,14 @@ static bool streaming_topology_v1_collect_stream_path_row(
     row->actor = ctx->actor;
     row->path_actor = ctx->actor;
     row->path_index = index;
-    char path_actor_guid[UUID_STR_LEN];
-    if(streaming_topology_uuid_guid(host_id, path_actor_guid, sizeof(path_actor_guid))) {
-        char path_actor_id[256];
-        streaming_topology_actor_id_from_guid(path_actor_guid, path_actor_id, sizeof(path_actor_id));
-        streaming_topology_v1_actor_index_get(ctx->payload, path_actor_id, &row->path_actor);
-    }
+    streaming_topology_v1_actor_index_for_uuid(ctx->payload, host_id, &row->path_actor);
     streaming_topology_v1_strncpy(row->hostname, sizeof(row->hostname), string2str(hostname));
     streaming_topology_v1_uuid_str(host_id, row->host_id, sizeof(row->host_id));
     streaming_topology_v1_uuid_str(node_id, row->node_id, sizeof(row->node_id));
     streaming_topology_v1_uuid_str(claim_id, row->claim_id, sizeof(row->claim_id));
     row->hops = hops;
-    row->since_ut = since > 0 ? (uint64_t)since * USEC_PER_SEC : 0;
-    row->first_time_ut = first_time_t > 0 ? (uint64_t)first_time_t * USEC_PER_SEC : 0;
+    row->since_ut = streaming_topology_v1_time_ut(since);
+    row->first_time_ut = streaming_topology_v1_time_ut(first_time_t);
     row->start_time_ms = start_time_ms;
     row->shutdown_time_ms = shutdown_time_ms;
     row->capabilities = capabilities;
@@ -1367,12 +1328,9 @@ static void streaming_topology_v1_collect_actor_detail_rows(
                 row->has_source_actor = true;
                 row->source_actor = child_actor;
             }
-            else if(!UUIDiszero(descendant->source_uuid)) {
-                char source_actor_id[256];
-                streaming_topology_actor_id_for_uuid(descendant->source_uuid, source_actor_id, sizeof(source_actor_id));
+            else if(!UUIDiszero(descendant->source_uuid))
                 row->has_source_actor =
-                    streaming_topology_v1_actor_index_get(payload, source_actor_id, &row->source_actor);
-            }
+                    streaming_topology_v1_actor_index_for_uuid(payload, descendant->source_uuid, &row->source_actor);
         }
     }
 
@@ -1899,10 +1857,7 @@ static void streaming_topology_v1_emit_actor_search_label_keys(
             if(streaming_topology_v1_search_label_key_exists(keys, keys_used, label->key))
                 continue;
 
-            if(keys_used == keys_size) {
-                keys_size = keys_size ? keys_size * 2 : 16;
-                keys = reallocz(keys, keys_size * sizeof(*keys));
-            }
+            STREAMING_TOPOLOGY_RESERVE(keys, keys_used, keys_size, 16);
             keys[keys_used++] = label->key;
         }
     }

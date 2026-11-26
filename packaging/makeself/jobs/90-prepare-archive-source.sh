@@ -20,6 +20,7 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 run cp \
   packaging/makeself/post-installer.sh \
   packaging/makeself/install-or-update.sh \
+  packaging/installer/cleanup-dashboard.sh \
   packaging/installer/functions.sh \
   "${NETDATA_INSTALL_PATH}/system/"
 

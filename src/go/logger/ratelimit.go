@@ -137,14 +137,14 @@ func (l LimitedLogger) logArgs(level slog.Level, a ...any) {
 	if !l.l.canLog(level) || !l.allow() {
 		return
 	}
-	l.l.log(level, fmt.Sprint(a...))
+	l.l.log(level, fmt.Sprint(a...), a)
 }
 
 func (l LimitedLogger) logf(level slog.Level, format string, a ...any) {
 	if !l.l.canLog(level) || !l.allow() {
 		return
 	}
-	l.l.log(level, fmt.Sprintf(format, a...))
+	l.l.log(level, fmt.Sprintf(format, a...), a)
 }
 
 func (l LimitedLogger) allow() bool {

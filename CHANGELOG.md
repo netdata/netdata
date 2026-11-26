@@ -50,6 +50,16 @@
 - Test(dem): stabilize RUM URL redaction allocation test ([#24888](https://github.com/netdata/netdata/issues/24888))
 - Health: report silencers file read and parse errors ([#24918](https://github.com/netdata/netdata/issues/24918))
 - Network-viewer: fix the extra [unknown] container_name label in container mode ([#24909](https://github.com/netdata/netdata/issues/24909))
+- Regenerate integrations docs ([#24912](https://github.com/netdata/netdata/issues/24912))
+- Spawn(windows): manage spawned process trees with job objects ([#24914](https://github.com/netdata/netdata/issues/24914))
+- Pulse: count the metric registry in the dbengine memory total ([#24934](https://github.com/netdata/netdata/issues/24934))
+- Build(windows): stop building and shipping python.d ([#24915](https://github.com/netdata/netdata/issues/24915))
+- Web: return 400 for trailing-slash redirect loops ([#24911](https://github.com/netdata/netdata/issues/24911))
+- Exporting: build the graphite and OpenTSDB chart prefix once per chart ([#24910](https://github.com/netdata/netdata/issues/24910))
+- Refactor(go.d): migrate Docker collector to framework v2 ([#24875](https://github.com/netdata/netdata/issues/24875))
+- Build: add RECORD_BUILD_ENVIRONMENT to keep build paths out of the agent ([#24763](https://github.com/netdata/netdata/issues/24763))
+- Regenerate integrations docs ([#24943](https://github.com/netdata/netdata/issues/24943))
+- Fix(packaging): preserve curl diagnostics in kickstart warning summaries ([#24939](https://github.com/netdata/netdata/issues/24939))
 
 ## [2.13.0] - 2026-11-19
 

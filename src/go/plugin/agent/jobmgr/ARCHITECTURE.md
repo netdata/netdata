@@ -1073,11 +1073,15 @@ Once a configuration containing secret references has been applied to a collecto
 - **At the Job Manager boundary** — lifecycle failures are replaced with a generic redacted error before they are
   logged or published.
 - **Inside the collector's own logger** — messages and newly attached attributes are sanitized, so an internally
-  logged request error cannot bypass the runtime boundary.
+  logged request error cannot bypass the runtime boundary. Both layers use one policy (`redactResolvedLifecycleError`);
+  the logger reaches it through `jobruntime.LifecycleLogMessageSanitizer`.
 
-What survives redaction: cancellation, the collector's lifecycle error class, panic classification, and
-retained-ownership state.
-What does not: the raw collector cause.
+What survives redaction: the classifications `redactResolvedLifecycleError` re-applies (process control,
+cancellation and deadline, panic, activation dependency, resolver failure kind, lifecycle error class, retry deadline,
+construction and preparation failures, runtime startup failure, retained ownership), and the first `dyncfg.PublicError`
+message the collector attached to an error. A log line keeps the public message of its first argument that carries
+one, and each `With` attribute value keeps its own. The collector guarantees those messages are secret-free.
+What does not: the raw collector cause, and any text wrapped around a public message.
 
 ### Changing a store restarts its jobs
 

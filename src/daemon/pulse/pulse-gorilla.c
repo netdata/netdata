@@ -27,7 +27,7 @@ void pulse_gorilla_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t 
     __atomic_fetch_add(&gorilla_statistics.gorilla_tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
 }
 
-static inline void global_statistics_copy(struct gorilla_statistics *gs) {
+static inline void pulse_gorilla_copy(struct gorilla_statistics *gs) {
     gs->tier0_hot_gorilla_buffers     = __atomic_load_n(&gorilla_statistics.tier0_hot_gorilla_buffers, __ATOMIC_RELAXED);
     gs->gorilla_tier0_disk_actual_bytes = __atomic_load_n(&gorilla_statistics.gorilla_tier0_disk_actual_bytes, __ATOMIC_RELAXED);
     gs->gorilla_tier0_disk_optimal_bytes = __atomic_load_n(&gorilla_statistics.gorilla_tier0_disk_optimal_bytes, __ATOMIC_RELAXED);
@@ -41,7 +41,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
     gorilla_statistics.enabled = true;
 
     struct gorilla_statistics gs;
-    global_statistics_copy(&gs);
+    pulse_gorilla_copy(&gs);
 
     if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {

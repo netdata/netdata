@@ -146,6 +146,7 @@ int help(int exitcode) {
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
             "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
+#ifdef ENABLE_UNITTESTS
             "  -W sqlite-lease-test     Test that a slow SQLite connection does not block unrelated\n"
             "                           SQLite users and that teardown waits for running SQLite\n"
             "                           operations, and exit.\n\n"
@@ -159,6 +160,7 @@ int help(int exitcode) {
             "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
             "  -W prd-array-stress      Run PRD_ARRAY refcount stress test and exit.\n\n"
+#endif // ENABLE_UNITTESTS
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W buildinfo             Print the version, the configure options,\n"
@@ -287,6 +289,7 @@ bool netdata_random_session_id_generate(void);
 int windows_perflib_dump(const char *key, const char *filename);
 #endif
 
+#ifdef ENABLE_UNITTESTS
 int unittest_prepare_rrd(const char **user) {
     netdata_conf_section_global_run_as_user(user);
     netdata_conf_section_global();
@@ -344,6 +347,7 @@ static int health_config_unittest_with_dyncfg(void) {
     dyncfg_shutdown();
     return rc;
 }
+#endif // ENABLE_UNITTESTS
 
 static void fatal_status_file_save(void) {
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
@@ -453,7 +457,7 @@ int netdata_main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
-#ifdef ENABLE_DBENGINE
+#if defined(ENABLE_DBENGINE) && defined(ENABLE_UNITTESTS)
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 
@@ -482,6 +486,7 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
 
+#ifdef ENABLE_UNITTESTS
                         if(strcmp(optarg, "jsonctest") == 0) {
                             unittest_running = true;
                             if (json_c_parser_unittest()) return 1;
@@ -627,6 +632,7 @@ int netdata_main(int argc, char **argv) {
                             if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
+                            if (netdata_registry_unittest()) return 1;
 #endif
                             // MUST stay last: it runs the real sqlite_close_databases() and
                             // sqlite_library_shutdown(), after which no SQLite work is admitted
@@ -805,27 +811,13 @@ int netdata_main(int argc, char **argv) {
                         }
 #endif
 #ifdef OS_WINDOWS
-                        else if(strcmp(optarg, "perflibdump") == 0) {
-                            // -W perflibdump [key] [-perflibfile FILENAME]
-                            // without -perflibfile the dump goes to stdout
-                            const char *key = NULL;
-                            const char *filename = NULL;
-                            for(int a = optind; a < argc; a++) {
-                                if(strcmp(argv[a], "-perflibfile") == 0) {
-                                    if(a + 1 >= argc) {
-                                        fprintf(stderr, "Option -perflibfile requires a filename argument.\n");
-                                        return 1;
-                                    }
-                                    filename = argv[++a];
-                                }
-                                else
-                                    key = argv[a];
-                            }
-                            return windows_perflib_dump(key, filename);
-                        }
                         else if(strcmp(optarg, "perflibnamestest") == 0) {
                             unittest_running = true;
                             return perflibnamestest_main();
+                        }
+                        else if(strcmp(optarg, "registrytest") == 0) {
+                            unittest_running = true;
+                            return netdata_registry_unittest();
                         }
 #endif
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
@@ -966,7 +958,15 @@ int netdata_main(int argc, char **argv) {
 #endif
                         else if(strcmp(optarg, "mcpbatchtest") == 0)
                             return mcp_jsonrpc_batch_unittest();
-                        else if(strcmp(optarg, "simple-pattern") == 0) {
+                        else
+#else
+                        if(strcmp(optarg, "unittest") == 0) {
+                            fprintf(stderr, "The unit tests are not available, this agent was built with ENABLE_UNITTESTS turned off.\n");
+                            return 1;
+                        }
+                        else
+#endif // ENABLE_UNITTESTS
+                        if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
                                         " Checks if 'pattern' matches the given 'string'.\n"
@@ -1013,6 +1013,26 @@ int netdata_main(int argc, char **argv) {
                                 return 1;
                             }
                         }
+#ifdef OS_WINDOWS
+                        else if(strcmp(optarg, "perflibdump") == 0) {
+                            // -W perflibdump [key] [-perflibfile FILENAME]
+                            // without -perflibfile the dump goes to stdout
+                            const char *key = NULL;
+                            const char *filename = NULL;
+                            for(int a = optind; a < argc; a++) {
+                                if(strcmp(argv[a], "-perflibfile") == 0) {
+                                    if(a + 1 >= argc) {
+                                        fprintf(stderr, "Option -perflibfile requires a filename argument.\n");
+                                        return 1;
+                                    }
+                                    filename = argv[++a];
+                                }
+                                else
+                                    key = argv[a];
+                            }
+                            return windows_perflib_dump(key, filename);
+                        }
+#endif
                         else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
                             optarg += strlen(stacksize_string);
                             inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);

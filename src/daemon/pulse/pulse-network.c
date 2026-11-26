@@ -201,136 +201,63 @@ static inline void pulse_network_copy(struct network_statistics *gs) {
     gs->stream_bytes_sent = __atomic_load_n(&live_stats.stream_bytes_sent, __ATOMIC_RELAXED);
 }
 
+struct pulse_network_chart {
+    RRDSET *st;
+    RRDDIM *rd_in;
+    RRDDIM *rd_out;
+};
+
+static void pulse_network_bytes_chart(struct pulse_network_chart *c, const char *id, const char *endpoint, uint64_t received, uint64_t sent) {
+    if (unlikely(!c->st)) {
+        c->st = rrdset_create_localhost(
+            "netdata",
+            id,
+            NULL,
+            PULSE_NETWORK_CHART_FAMILY,
+            PULSE_NETWORK_CHART_CONTEXT,
+            PULSE_NETWORK_CHART_TITLE,
+            PULSE_NETWORK_CHART_UNITS,
+            "netdata",
+            "pulse",
+            PULSE_NETWORK_CHART_PRIORITY,
+            localhost->rrd_update_every,
+            RRDSET_TYPE_AREA);
+
+        rrdlabels_add(c->st->rrdlabels, "endpoint", endpoint, RRDLABEL_SRC_AUTO);
+
+        c->rd_in  = rrddim_add(c->st, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        c->rd_out = rrddim_add(c->st, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(c->st, c->rd_in, (collected_number)received);
+    rrddim_set_by_pointer(c->st, c->rd_out, (collected_number)sent);
+    rrdset_done(c->st);
+}
+
 void pulse_network_do(bool extended __maybe_unused) {
     static struct network_statistics gs;
     pulse_network_copy(&gs);
 
     if(gs.api_bytes_received || gs.api_bytes_sent) {
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_in = NULL,
-                      *rd_out = NULL;
-
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                "netdata"
-                , "network_api"
-                , NULL
-                , PULSE_NETWORK_CHART_FAMILY
-                , PULSE_NETWORK_CHART_CONTEXT
-                , PULSE_NETWORK_CHART_TITLE
-                , PULSE_NETWORK_CHART_UNITS
-                , "netdata"
-                , "pulse"
-                , PULSE_NETWORK_CHART_PRIORITY
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_AREA
-            );
-
-            rrdlabels_add(st_bytes->rrdlabels, "endpoint", "web-server", RRDLABEL_SRC_AUTO);
-            
-            rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.api_bytes_received);
-        rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.api_bytes_sent);
-        rrdset_done(st_bytes);
+        static struct pulse_network_chart api = { 0 };
+        pulse_network_bytes_chart(&api, "network_api", "web-server", gs.api_bytes_received, gs.api_bytes_sent);
     }
 
     if(gs.statsd_bytes_received || gs.statsd_bytes_sent) {
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_in = NULL,
-                      *rd_out = NULL;
-
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                "netdata"
-                , "network_statsd"
-                , NULL
-                , PULSE_NETWORK_CHART_FAMILY
-                , PULSE_NETWORK_CHART_CONTEXT
-                , PULSE_NETWORK_CHART_TITLE
-                , PULSE_NETWORK_CHART_UNITS
-                , "netdata"
-                , "pulse"
-                , PULSE_NETWORK_CHART_PRIORITY
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_AREA
-            );
-
-            rrdlabels_add(st_bytes->rrdlabels, "endpoint", "statsd", RRDLABEL_SRC_AUTO);
-
-            rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.statsd_bytes_received);
-        rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.statsd_bytes_sent);
-        rrdset_done(st_bytes);
+        static struct pulse_network_chart statsd = { 0 };
+        pulse_network_bytes_chart(&statsd, "network_statsd", "statsd", gs.statsd_bytes_received, gs.statsd_bytes_sent);
     }
 
     if(gs.stream_bytes_received || gs.stream_bytes_sent) {
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_in = NULL,
-                      *rd_out = NULL;
-
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                "netdata"
-                , "network_streaming"
-                , NULL
-                , PULSE_NETWORK_CHART_FAMILY
-                , PULSE_NETWORK_CHART_CONTEXT
-                , PULSE_NETWORK_CHART_TITLE
-                , PULSE_NETWORK_CHART_UNITS
-                , "netdata"
-                , "pulse"
-                , PULSE_NETWORK_CHART_PRIORITY
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_AREA
-            );
-
-            rrdlabels_add(st_bytes->rrdlabels, "endpoint", "streaming", RRDLABEL_SRC_AUTO);
-
-            rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.stream_bytes_received);
-        rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.stream_bytes_sent);
-        rrdset_done(st_bytes);
+        static struct pulse_network_chart streaming = { 0 };
+        pulse_network_bytes_chart(&streaming, "network_streaming", "streaming", gs.stream_bytes_received, gs.stream_bytes_sent);
     }
 
     if(aclk_online()) {
         struct mqtt_wss_stats t = aclk_statistics();
         if (t.bytes_rx || t.bytes_tx) {
-            static RRDSET *st_bytes = NULL;
-            static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-            if (unlikely(!st_bytes)) {
-                st_bytes = rrdset_create_localhost(
-                    "netdata",
-                    "network_aclk",
-                    NULL,
-                    PULSE_NETWORK_CHART_FAMILY,
-                    PULSE_NETWORK_CHART_CONTEXT,
-                    PULSE_NETWORK_CHART_TITLE,
-                    PULSE_NETWORK_CHART_UNITS,
-                    "netdata",
-                    "pulse",
-                    PULSE_NETWORK_CHART_PRIORITY,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_AREA);
-
-                rrdlabels_add(st_bytes->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
-
-                rd_in = rrddim_add(st_bytes, "in", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            }
-
-            rrddim_set_by_pointer(st_bytes, rd_in, (collected_number)t.bytes_rx);
-            rrddim_set_by_pointer(st_bytes, rd_out, (collected_number)t.bytes_tx);
-            rrdset_done(st_bytes);
+            static struct pulse_network_chart aclk = { 0 };
+            pulse_network_bytes_chart(&aclk, "network_aclk", "aclk", t.bytes_rx, t.bytes_tx);
         }
 
         pulse_aclk_time_heatmap();

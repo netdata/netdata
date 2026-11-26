@@ -132,6 +132,7 @@
 
 #cmakedefine ENABLE_ML
 #cmakedefine ENABLE_DBENGINE
+#cmakedefine ENABLE_UNITTESTS
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD
 #cmakedefine ENABLE_BROTLI

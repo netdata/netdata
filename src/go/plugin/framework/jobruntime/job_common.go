@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 )
 
@@ -99,13 +100,36 @@ func sanitizeLifecycleError(sanitize func(error) error, err error) (sanitized er
 	return sanitized
 }
 
-func lifecycleLogMessageSanitizer(sanitize func(error) error) func(string) string {
+// LifecycleLogMessageSanitizer derives the module-logger sanitizer of a job
+// from its lifecycle error sanitizer, so collector log lines follow the same
+// policy as its lifecycle errors. Each line reaches the lifecycle sanitizer as
+// an error. When an operand carries a dyncfg public message, that error is a
+// dyncfg.PublicError with the line text as its private cause; the lifecycle
+// sanitizer decides whether the public message survives.
+func LifecycleLogMessageSanitizer(sanitize func(error) error) logger.MessageSanitizer {
 	if sanitize == nil {
 		return nil
 	}
-	return func(message string) string {
-		return sanitizeLifecycleError(sanitize, errors.New(message)).Error()
+	return func(message string, operands []any) string {
+		line := errors.New(message)
+		if public, ok := publicOperandMessage(operands); ok {
+			line = dyncfg.NewPublicError(public, line)
+		}
+		return sanitizeLifecycleError(sanitize, line).Error()
 	}
+}
+
+// publicOperandMessage returns the public message of the first operand whose
+// error chain carries one.
+func publicOperandMessage(operands []any) (string, bool) {
+	for _, operand := range operands {
+		if err, ok := operand.(error); ok {
+			if public, ok := dyncfg.PublicMessage(err); ok {
+				return public, true
+			}
+		}
+	}
+	return "", false
 }
 
 func consumeAutoDetectTry(autoDetectTries *int) {

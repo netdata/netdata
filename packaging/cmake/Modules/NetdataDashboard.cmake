@@ -7,6 +7,9 @@ include_guard()
 
 include(NetdataUtil)
 
+get_filename_component(NETDATA_DASHBOARD_CLEANUP_SCRIPT
+                       "${CMAKE_CURRENT_LIST_DIR}/../../installer/cleanup-dashboard.sh" ABSOLUTE)
+
 # Work around upstream release hiccups that ship the v3 tree under a v2 name.
 function(handle_braindead_versioning_insanity prefix)
   if(IS_DIRECTORY "${prefix}/v2" AND NOT IS_DIRECTORY "${prefix}/v3")
@@ -22,16 +25,10 @@ function(handle_braindead_versioning_insanity prefix)
 endfunction()
 
 # Bundle the dashboard code for inclusion during install.
-#
-# The tarball's layout is not known ahead of time, so the install rules are
-# generated only after extraction, by scanning the tree into a CMakeLists.txt
-# that is then pulled in with add_subdirectory().
 function(bundle_dashboard)
-  include(ExternalProject)
-
   set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
   set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
-  set(dashboard_bin_dir "${CMAKE_BINARY_DIR}/dashboard-bin")
+  set(cleanup_script "${NETDATA_DASHBOARD_CLEANUP_SCRIPT}")
   message(STATUS "Preparing local agent dashboard code")
 
   message(STATUS "  Fetching ${DASHBOARD_URL}")
@@ -50,6 +47,9 @@ function(bundle_dashboard)
   endif()
 
   message(STATUS "  Extracting dashboard code")
+  # The extracted tree is both the install source and the reference for the
+  # stale-file cleanup, so a reused build directory must not keep an older release.
+  file(REMOVE_RECURSE "${dashboard_src_dir}")
   extract_gzipped_tarball(
     "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
     "${dashboard_src_dir}"
@@ -58,29 +58,52 @@ function(bundle_dashboard)
 
   handle_braindead_versioning_insanity("${dashboard_src_prefix}")
 
-  message(STATUS "  Generating CMakeLists.txt file for dashboard code")
-  set(rules "")
+  # An archive in an unexpected layout would otherwise install an empty or
+  # partial dashboard and report success.
+  if(NOT EXISTS "${dashboard_src_prefix}/v3/index.html")
+    message(FATAL_ERROR "Dashboard archive has no dist/agent/v3/index.html")
+  endif()
 
-  subdirlist(dash_dirs "${dashboard_src_prefix}")
+  # Archive timestamps can repeat across releases, and install(FILES) skips a
+  # changed file whose time matches the installed copy. Copy every bundled file.
+  install(CODE [[
+set(netdata_dashboard_install_always "$ENV{CMAKE_INSTALL_ALWAYS}")
+set(ENV{CMAKE_INSTALL_ALWAYS} 1)
+]] COMPONENT dashboard)
 
-  foreach(dir IN LISTS dash_dirs)
-    file(GLOB files
-         LIST_DIRECTORIES FALSE
-         RELATIVE "${dashboard_src_dir}"
-         "${dashboard_src_prefix}/${dir}/*")
+  # GLOB reads [, * and ? in the build path as patterns. Match them literally so
+  # the install rules cover exactly the tree the cleanup compares against.
+  string(REPLACE "[" "[[]" glob_prefix "${dashboard_src_prefix}")
+  string(REPLACE "*" "[*]" glob_prefix "${glob_prefix}")
+  string(REPLACE "?" "[?]" glob_prefix "${glob_prefix}")
+  file(GLOB_RECURSE files
+       LIST_DIRECTORIES FALSE
+       RELATIVE "${dashboard_src_prefix}"
+       "${glob_prefix}/*")
 
-    set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/${dir})\n")
+  foreach(file IN LISTS files)
+    get_filename_component(dir "${file}" DIRECTORY)
+    set(destination "${WEB_DEST}")
+    if(NOT dir STREQUAL "")
+      string(APPEND destination "/${dir}")
+    endif()
+    install(FILES "${dashboard_src_prefix}/${file}" COMPONENT dashboard DESTINATION "${destination}")
   endforeach()
 
-  file(GLOB files
-       LIST_DIRECTORIES FALSE
-       RELATIVE "${dashboard_src_dir}"
-       "${dashboard_src_prefix}/*")
+  # Restore the caller's setting for later components. On upgrades driven by
+  # netdata-installer.sh, remove installed v3 files that this release no longer ships.
+  string(CONFIGURE [==[
+set(ENV{CMAKE_INSTALL_ALWAYS} "${netdata_dashboard_install_always}")
+if("$ENV{NETDATA_INSTALLER_DASHBOARD_UPGRADE}" STREQUAL "1")
+  execute_process(COMMAND sh [=[@cleanup_script@]=] [=[@dashboard_src_prefix@/v3]=]
+                          "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/" [=[@WEB_DEST@]=]
+                  RESULT_VARIABLE netdata_dashboard_cleanup_status)
+  if(NOT netdata_dashboard_cleanup_status STREQUAL "0")
+    message(WARNING "Dashboard cleanup failed: ${netdata_dashboard_cleanup_status}. Continuing installation.")
+  endif()
+endif()
+]==] cleanup_code @ONLY)
+  install(CODE "${cleanup_code}" COMPONENT dashboard)
 
-  set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST})\n")
-
-  file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${rules}")
-  message(STATUS "  Generating CMakeLists.txt file for dashboard code -- Done")
-  add_subdirectory("${dashboard_src_dir}" "${dashboard_bin_dir}")
   message(STATUS "Preparing local agent dashboard code -- Done")
 endfunction()

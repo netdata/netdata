@@ -375,29 +375,27 @@ static int read_one_state(char *buf, const char *filename, int *fd) {
 
 static int read_cpuidle_states(const char *cpuidle_name_filename, const char *cpuidle_time_filename, struct per_core_cpuidle_chart *cpuidle_charts, size_t core) {
     char filename[FILENAME_MAX + 1];
-    static char next_state_filename[FILENAME_MAX + 1];
     struct stat stbuf;
     struct per_core_cpuidle_chart *cc = &cpuidle_charts[core];
     size_t state;
 
     if(unlikely(!cc->cpuidle_state_len || cc->rescan_cpu_states)) {
         int state_file_found = 1; // check at least one state
+        size_t old_state_len = cc->cpuidle_state_len;
 
         if(cc->cpuidle_state_len) {
             for(state = 0; state < cc->cpuidle_state_len; state++) {
                 freez(cc->cpuidle_state[state].name);
 
                 freez(cc->cpuidle_state[state].time_filename);
-                close(cc->cpuidle_state[state].time_fd);
+                if(cc->cpuidle_state[state].time_fd != -1)
+                    close(cc->cpuidle_state[state].time_fd);
                 cc->cpuidle_state[state].time_fd = -1;
             }
 
             freez(cc->cpuidle_state);
             cc->cpuidle_state = NULL;
             cc->cpuidle_state_len = 0;
-
-            cc->active_time_rd = NULL;
-            cc->st = NULL;
         }
 
         while(likely(state_file_found)) {
@@ -407,10 +405,13 @@ static int read_cpuidle_states(const char *cpuidle_name_filename, const char *cp
             else
                 state_file_found = 0;
         }
-        snprintfz(next_state_filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
 
-        if(likely(cc->cpuidle_state_len))
+        if(likely(cc->cpuidle_state_len)) {
             cc->cpuidle_state = callocz(cc->cpuidle_state_len, sizeof(struct cpuidle_state));
+            // a failed scan leaves states unfilled; they must not own fd 0
+            for(state = 0; state < cc->cpuidle_state_len; state++)
+                cc->cpuidle_state[state].time_fd = -1;
+        }
 
         for(state = 0; state < cc->cpuidle_state_len; state++) {
             char name_buf[50 + 1];
@@ -431,13 +432,25 @@ static int read_cpuidle_states(const char *cpuidle_name_filename, const char *cp
                 return 1;
             }
 
-            name_buf[r - 1] = '\0'; // erase extra character
-            cc->cpuidle_state[state].name = strdupz(trim(name_buf));
             close(fd);
+
+            name_buf[r - 1] = '\0'; // erase extra character
+            char *name = trim(name_buf);
+            if(unlikely(!name)) {
+                collector_error("Empty cpuidle state name in file '%s'", filename);
+                cc->rescan_cpu_states = 1;
+                return 1;
+            }
+            cc->cpuidle_state[state].name = strdupz(name);
 
             snprintfz(filename, FILENAME_MAX, cpuidle_time_filename, core, state);
             cc->cpuidle_state[state].time_filename = strdupz(filename);
-            cc->cpuidle_state[state].time_fd = -1;
+        }
+
+        // rebind the chart and its dimensions on the next successful collection
+        if(old_state_len || cc->cpuidle_state_len) {
+            cc->active_time_rd = NULL;
+            cc->st = NULL;
         }
 
         cc->rescan_cpu_states = 0;
@@ -467,7 +480,8 @@ static int read_cpuidle_states(const char *cpuidle_name_filename, const char *cp
     }
 
     // check if the number of states was increased
-    if(unlikely(stat(next_state_filename, &stbuf) == 0)) {
+    snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
+    if(unlikely(stat(filename, &stbuf) == 0)) {
         cc->rescan_cpu_states = 1;
         return 1;
     }
@@ -965,7 +979,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                 cpuidle_charts[core].last_active_time = cpuidle_charts[core].active_time;
 
                 int r = read_cpuidle_states(cpuidle_name_filename, cpuidle_time_filename, cpuidle_charts, core);
-                if(likely(r != -1 && (do_cpuidle == CONFIG_BOOLEAN_YES || r > 0))) {
+                // r == 0: a complete read; auto turns on at the first core with C-states
+                if(likely(r == 0 && (do_cpuidle == CONFIG_BOOLEAN_YES || cpuidle_charts[core].cpuidle_state_len > 0))) {
                     do_cpuidle = CONFIG_BOOLEAN_YES;
 
                     char cpuidle_chart_id[RRD_ID_LENGTH_MAX + 1];

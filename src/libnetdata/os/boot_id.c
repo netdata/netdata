@@ -7,10 +7,10 @@ static ND_UUID cached_boot_id = { 0 };
 static bool cached_boot_id_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
-#if defined(OS_LINUX)
-
 static ND_UUID get_boot_id(void) {
     ND_UUID boot_id = { 0 };
+
+#if defined(OS_LINUX)
     char buf[UUID_STR_LEN];
 
     char filename[FILENAME_MAX + 1];
@@ -22,6 +22,7 @@ static ND_UUID get_boot_id(void) {
         if (uuid_parse(trim(buf), boot_id.uuid) == 0)
             return boot_id;
     }
+#endif
 
     // Fallback to boottime-based ID
     time_t boottime = os_boottime();
@@ -32,22 +33,6 @@ static ND_UUID get_boot_id(void) {
 
     return boot_id;
 }
-
-#else // !OS_LINUX
-
-static ND_UUID get_boot_id(void) {
-    ND_UUID boot_id = { 0 };
-
-    time_t boottime = os_boottime();
-    if(boottime > 0) {
-        boot_id.parts.low64 = (uint64_t)boottime;
-        // parts.hig64 remains 0 to indicate this is a synthetic boot_id
-    }
-
-    return boot_id;
-}
-
-#endif // OS_LINUX
 
 ND_UUID os_boot_id(void) {
     if(__atomic_load_n(&cached_boot_id_available, __ATOMIC_ACQUIRE))

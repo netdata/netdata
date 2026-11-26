@@ -11,6 +11,7 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 var errResolvedLifecycleRedacted = errors.New(
@@ -29,11 +30,18 @@ func (err *redactedResolvedProcessControlError) Unwrap() error {
 	return err.cause
 }
 
+// redactResolvedLifecycleError replaces a lifecycle error of a job whose
+// configuration resolved secret references. Only classification and, when the
+// collector supplied one, the first dyncfg public message survive; the raw
+// error, including any text wrapped around the public message, is dropped.
 func redactResolvedLifecycleError(err error) error {
 	if err == nil {
 		return nil
 	}
 	safe := error(errResolvedLifecycleRedacted)
+	if public, ok := dyncfg.PublicMessage(err); ok {
+		safe = dyncfg.NewPublicError(public, errResolvedLifecycleRedacted)
+	}
 	if jobmgr.ContainsOnlyErrorLeaves(
 		err,
 		jobmgr.ErrProcessAttemptRetired,

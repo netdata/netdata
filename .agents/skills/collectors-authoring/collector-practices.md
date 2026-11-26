@@ -213,6 +213,10 @@ runtime. A transient partial condition may warrant a limited warning. Do not sup
 avoid logs, and never log raw credentials. The repeated per-PID logging failure class matters; a blanket ban on every
 per-cycle diagnostic does not express it correctly.
 
+Go jobs with secret references redact every collector log line and lifecycle error except text wrapped in
+`dyncfg.NewPublicError`; its content rules are in `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
+(secret-reference redaction).
+
 #### File-content diagnostics
 
 Contents of files selected through collector configuration, including DynCfg, MUST be treated as potentially

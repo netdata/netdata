@@ -517,9 +517,8 @@ cleanup() {
 deferred_warnings() {
   if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    # shellcheck disable=SC2059
-    printf >&2 "${NETDATA_WARNINGS}"
-    printf >&2 "\n\n"
+    # Installer scripts prefix each saved warning with a literal '\n  - '.
+    printf '%s\n\n' "${NETDATA_WARNINGS}" | awk '{ gsub(/\\n  - /, "\n  - "); print }' >&2
   fi
 }
 

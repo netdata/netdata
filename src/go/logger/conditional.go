@@ -68,14 +68,14 @@ func (c ConditionalLogger) Debugf(format string, a ...any) ElseBranch {
 
 func (c ConditionalLogger) logArgs(level slog.Level, a ...any) ElseBranch {
 	if c.cond && c.l.canLog(level) {
-		c.l.log(level, fmt.Sprint(a...))
+		c.l.log(level, fmt.Sprint(a...), a)
 	}
 	return c.next()
 }
 
 func (c ConditionalLogger) logf(level slog.Level, format string, a ...any) ElseBranch {
 	if c.cond && c.l.canLog(level) {
-		c.l.log(level, fmt.Sprintf(format, a...))
+		c.l.log(level, fmt.Sprintf(format, a...), a)
 	}
 	return c.next()
 }

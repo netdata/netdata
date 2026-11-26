@@ -71,6 +71,7 @@ option(ENABLE_ALARM_NOTIFY_GO "Build the experimental Go notifier for local deve
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
+option(ENABLE_UNITTESTS "Build the unit tests and test tools behind netdata -W into the agent" True)
 option(ENABLE_DASHBOARD "Enable local dashboard" True)
 mark_as_advanced(ENABLE_DASHBOARD)
 
@@ -79,6 +80,7 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
+option(ENABLE_PLUGIN_WMI "Enable the experimental remote Windows WMI plugin (wmi.plugin)" OFF)
 if(ENABLE_PLUGIN_IPMI AND NOT OS_LINUX)
   message(FATAL_ERROR "The Go IPMI plugin requires Linux")
 endif()

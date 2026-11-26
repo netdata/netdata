@@ -34,6 +34,7 @@ def cleanup(only_base_paths=None):
         "src/go/plugin/scripts.d/collector",
         "src/go/plugin/dem/collector",
         "src/go/plugin/ipmi/collector",
+        "src/go/plugin/wmi/collector",
         "src/go/plugin/ibm.d/modules",
         "src/crates/otel-plugin",
         "src/crates/netflow-plugin",
