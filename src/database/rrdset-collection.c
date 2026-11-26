@@ -619,6 +619,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
     if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED)) {
         spinlock_unlock(&st->data_collection_lock);
+        // release the sender's commit buffer: left in use, the next stream_send_metrics_init() on this thread fatal()s
+        stream_send_rrdset_metrics_finished(&stream_buffer, st);
         return;
     }
 
