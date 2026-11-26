@@ -304,15 +304,32 @@ modules:
           - error: 'auth must be ntlm'
             cause: The job omits `auth` or sets another value. The option has no default.
             fix: 'Add `auth: ntlm` to the job.'
+          - error: 'transport must be dcom or winrm'
+            cause: '`transport` has a value other than `dcom` or `winrm`.'
+            fix: 'Set `transport: winrm` for the WinRM HTTPS listener, or remove `transport` to use DCOM.'
           - error: 'tls_ca requires the winrm transport'
             cause: 'The job sets `tls_ca` without `transport: winrm`. DCOM does not use TLS.'
             fix: 'Add `transport: winrm`, or remove `tls_ca` to keep DCOM.'
+          - error: 'could not load tls_ca: could not read certificate `"/etc/netdata/ssl/windows-ca.pem"`: open `"/etc/netdata/ssl/windows-ca.pem"`: no such file or directory'
+            when: '`tls_ca` is set. Jobs that use secret references show only `could not load tls_ca`.'
+            cause: The file does not exist, or the `netdata` user cannot read it. The plugin reads it without its elevated privileges.
+            fix: Set `tls_ca` to the absolute path of the CA certificate on the poller, and make the file readable by the `netdata` user.
+          - error: 'could not load tls_ca: could not parse any PEM certificates `"/etc/netdata/ssl/windows-ca.pem"`'
+            when: '`tls_ca` is set. Jobs that use secret references show only `could not load tls_ca`.'
+            cause: The file holds no certificate in PEM format, for example a certificate exported in DER format.
+            fix: 'Convert the certificate to PEM, for example with `openssl x509 -inform der -in ca.cer -out ca.pem`, and point `tls_ca` at the result.'
           - error: 'host must be a Windows hostname or IP address without a URL or port'
             cause: '`host` is empty or contains a scheme, path, port or other characters that are not part of a hostname.'
             fix: Set `host` to the bare name or address, for example `fileserver.example.com` instead of `https://fileserver.example.com:5986`.
           - error: 'username is required'
             cause: '`username` is empty, or names a domain with nothing after the backslash.'
             fix: Set the full account name, such as `EXAMPLE\monitor` or `monitor@example.com`.
+          - error: 'password is required'
+            cause: '`password` is empty, or its secret reference resolved to an empty value.'
+            fix: Set the password, or give the referenced variable a value in the Netdata service environment.
+          - error: 'timeout must be positive'
+            cause: '`timeout` is zero or negative.'
+            fix: Remove `timeout` to use the default of 15 seconds, or set a positive number of seconds.
           - error: 'at least one collector group must be enabled'
             cause: Every group under `collectors` is set to `false`.
             fix: Enable at least one of `cpu`, `memory`, `network` or `disk`, or remove `collectors` to collect them all.
@@ -327,7 +344,7 @@ modules:
           - error: 'failed to open WMI session: read DCOM server version: ERROR_ACCESS_DENIED (0x00000005)'
             when: '`transport: dcom`'
             cause: The host rejected the login. The username or password is wrong, or the host does not accept NTLMv2.
-            fix: Check `username` and `password`, including the domain part of the username, and that the host's network security policy allows NTLMv2. Fix it promptly or disable the job, because every collection retries the login and counts toward account lockout.
+            fix: Check `username` and `password`, including the domain part of the username, and that the host's network security policy allows NTLMv2. The host's Security event log records each rejected login as event 4625 from the poller's address. Fix it promptly or disable the job, because every collection retries the login and counts toward account lockout.
           - error: 'failed to open WMI session: activate WMI: E_ACCESSDENIED (0x80070005)'
             when: '`transport: dcom`, with a non-administrator account'
             cause: The account may log in but is not allowed to start WMI remotely over DCOM.
@@ -342,7 +359,7 @@ modules:
           - error: 'failed to open WMI session: WinRM returned HTTP 401'
             when: '`transport: winrm`'
             cause: The listener rejected the login. The username or password is wrong, or the account may not use WinRM.
-            fix: Check `username` and `password`; every collection retries the login and counts toward account lockout. For a non-administrator account, add it to the host's local **Remote Management Users** group.
+            fix: Check `username` and `password`; the host's Security event log records each rejected login as event 4625 from the poller's address. Every collection retries the login and counts toward account lockout. For a non-administrator account, add it to the host's local **Remote Management Users** group.
           - error: 'failed to open WMI session: WinRM server certificate verification failed'
             when: '`transport: winrm`'
             cause: The poller does not trust the listener certificate, or the certificate does not match the configured `host`.

@@ -44,8 +44,10 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 	tests := map[string]struct {
 		options    map[string]any
 		newSession func(context.Context) (querySession, error)
-		wantErr    string
-		wantLog    []string
+		// collect runs a collection after the test, with the module's logger.
+		collect bool
+		wantErr string
+		wantLog []string
 	}{
 		"invalid option": {
 			options: map[string]any{"auth": "kerberos"},
@@ -90,6 +92,19 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 			}),
 			wantLog: []string{"CPU WMI query failed: WMI collection timed out", "memory WMI query failed"},
 		},
+		"failed inventory queries are logged": {
+			newSession: sessionWith(func() map[string]queryResult {
+				results := validQueryResults()
+				results[queryOSInfo] = queryResult{err: classified}
+				results[querySystemInfo] = queryResult{err: unclassified}
+				return results
+			}()),
+			collect: true,
+			wantLog: []string{
+				"operating system WMI inventory query failed: WMI collection timed out",
+				"computer system WMI inventory query failed",
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -98,9 +113,14 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 			if newSession == nil {
 				newSession = sessionWith(validQueryResults())
 			}
-			factory, moduleLog := referenceJobFactory(t, newSession)
+			factory, moduleLog, created := referenceJobFactory(t, newSession)
 
 			err := factory.Test(t.Context(), referenceJob(tc.options))
+			if tc.collect {
+				require.NoError(t, err)
+				// The tested module keeps the Job Manager's redacting logger.
+				_, err = collecttest.CollectScalarSeries(created())
+			}
 
 			if tc.wantErr == "" {
 				require.NoError(t, err)
@@ -112,7 +132,7 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 				assert.NotContains(t, err.Error(), resolvedMarker)
 				assert.NotContains(t, err.Error(), "50ms", "the timeout is a configuration value")
 				// The redactor replaced the collector's private causes.
-				collecttest.AssertErrorOmits(t, err, resolvedMarker)
+				assertErrorTreeOmits(t, err, resolvedMarker)
 			}
 			logged, err := os.ReadFile(moduleLog)
 			require.NoError(t, err)
@@ -125,13 +145,30 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 	}
 }
 
+// assertErrorTreeOmits checks every error in the tree, including joined ones.
+func assertErrorTreeOmits(t *testing.T, err error, marker string) {
+	t.Helper()
+	assert.NotContains(t, err.Error(), marker)
+	switch wrapped := err.(type) {
+	case interface{ Unwrap() error }:
+		if inner := wrapped.Unwrap(); inner != nil {
+			assertErrorTreeOmits(t, inner, marker)
+		}
+	case interface{ Unwrap() []error }:
+		for _, inner := range wrapped.Unwrap() {
+			assertErrorTreeOmits(t, inner, marker)
+		}
+	}
+}
+
 // referenceJobFactory builds the Agent's DynCfg test path for the module: the
 // shipped env resolver and the Job Manager's error and log redaction. It
-// returns the file that receives the module's log lines.
+// returns the file that receives the module's log lines and the last module
+// the factory created.
 func referenceJobFactory(
 	t *testing.T,
 	newSession func(context.Context) (querySession, error),
-) (*joboutput.ConfigModuleFactory, string) {
+) (*joboutput.ConfigModuleFactory, string, func() *Collector) {
 	t.Helper()
 	resolver, err := secretresolver.NewDefaultAtomicResolver()
 	require.NoError(t, err)
@@ -149,13 +186,14 @@ func referenceJobFactory(
 	os.Stderr = logFile
 	defer func() { os.Stderr = stderr }()
 
+	var last *Collector
 	factory, err := joboutput.NewConfigModuleFactory(joboutput.ConfigModuleFactoryConfig{
 		Modules: collectorapi.Registry{
 			"windows": collectorapi.Creator{
 				CreateV2: func() collectorapi.CollectorV2 {
-					c := New()
-					c.newSession = newSession
-					return c
+					last = New()
+					last.newSession = newSession
+					return last
 				},
 				Config: func() any { return &Config{} },
 			},
@@ -163,7 +201,7 @@ func referenceJobFactory(
 		Configs: configs,
 	})
 	require.NoError(t, err)
-	return factory, logFile.Name()
+	return factory, logFile.Name(), func() *Collector { return last }
 }
 
 func referenceJob(options map[string]any) confgroup.Config {
