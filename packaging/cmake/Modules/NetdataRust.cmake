@@ -84,6 +84,12 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     if(CMAKE_EXE_LINKER_FLAGS MATCHES "--fix-cortex-a53-843419")
         list(APPEND _nd_rust_link_flags "-Clink-arg=-Wl,--fix-cortex-a53-835769" "-Clink-arg=-Wl,--fix-cortex-a53-843419")
         list(APPEND _nd_rust_link_flags "-Cllvm-args=-align-all-functions=3")
+
+        # journal_reader_ffi is a static library the C toolchain links into systemd-journal.plugin, which already
+        # passes the erratum flags to the linker; it only needs the alignment.
+        if(ENABLE_NETDATA_JOURNAL_FILE_READER)
+            corrosion_add_target_rustflags(journal_reader_ffi "-Cllvm-args=-align-all-functions=3")
+        endif()
     endif()
 
     if(ENABLE_PLUGIN_OTEL)
