@@ -237,6 +237,7 @@ static ND_WMI disk_wmi_handle = { 0 };
 // Collection-loop state.
 static uint64_t disk_wmi_posted_seq = 0;  // the last probe posted to the worker
 static uint64_t disk_wmi_wanted_seq = 0;  // the highest probe a disk waits for
+static uint64_t disk_wmi_seen_seq = 0;    // the completed probe every disk could read during this pass
 static usec_t disk_wmi_start_retry_after_ut = 0;
 
 static void disk_wmi_worker(void *ptr __maybe_unused)
@@ -270,6 +271,10 @@ static void disk_wmi_worker(void *ptr __maybe_unused)
 
 static void disk_wmi_init(void)
 {
+    // A worker that did not stop at the last cleanup still owns this state.
+    if (disk_wmi.initialized)
+        return;
+
     netdata_mutex_init(&disk_wmi.mutex);
     netdata_cond_init(&disk_wmi.cond);
     disk_wmi.thread = NULL;
@@ -281,11 +286,23 @@ static void disk_wmi_init(void)
     memset(&disk_wmi_handle, 0, sizeof(disk_wmi_handle));
     disk_wmi_posted_seq = 0;
     disk_wmi_wanted_seq = 0;
+    disk_wmi_seen_seq = 0;
     disk_wmi_start_retry_after_ut = 0;
     disk_wmi.initialized = true;
 }
 
-// Once per collection pass: post the probe disks wait for, unless one is still in flight.
+// At the start of a collection pass: remember the completed probe, which every disk can read during the pass.
+static void disk_wmi_begin_pass(void)
+{
+    if (!disk_wmi.initialized)
+        return;
+
+    netdata_mutex_lock(&disk_wmi.mutex);
+    disk_wmi_seen_seq = disk_wmi.completed_seq;
+    netdata_mutex_unlock(&disk_wmi.mutex);
+}
+
+// At the end of a collection pass: post the probe disks wait for, unless one is still in flight.
 static void disk_wmi_post(usec_t now_ut)
 {
     if (!disk_wmi.initialized || disk_wmi_wanted_seq <= disk_wmi_posted_seq)
@@ -309,7 +326,8 @@ static void disk_wmi_post(usec_t now_ut)
     }
 
     netdata_mutex_lock(&disk_wmi.mutex);
-    if (disk_wmi.completed_seq == disk_wmi.requested_seq) {
+    // A probe that completed during this pass is not overwritten before a whole pass has read it.
+    if (disk_wmi.completed_seq == disk_wmi.requested_seq && disk_wmi.completed_seq == disk_wmi_seen_seq) {
         disk_wmi.requested_seq = disk_wmi_wanted_seq;
         disk_wmi_posted_seq = disk_wmi_wanted_seq;
         netdata_cond_signal(&disk_wmi.cond);
@@ -359,9 +377,10 @@ static bool disk_wmi_stop(void)
         netdata_mutex_unlock(&disk_wmi.mutex);
 
         // Aborts a ConnectServer() in flight; a query or enumeration in flight ends within its own limits.
+        // The cancellation and the wait share one deadline.
+        usec_t started_ut = now_monotonic_usec();
         nd_wmi_cancel(&disk_wmi_handle, DISK_WMI_SHUTDOWN_TIMEOUT_UT);
 
-        usec_t started_ut = now_monotonic_usec();
         while (!InterlockedCompareExchange(&disk_wmi.finished, 1, 1) &&
                now_monotonic_usec() - started_ut < DISK_WMI_SHUTDOWN_TIMEOUT_UT)
             Sleep(10);
@@ -3634,6 +3653,8 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
 {
     DICTIONARY *dict = physicalDisks;
 
+    disk_wmi_begin_pass();
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "PhysicalDisk");
     if (!pObjectType)
         return false;
@@ -3989,14 +4010,15 @@ void do_PerflibStorage_cleanup(void)
     if (!storage_initialized)
         return;
 
-    if (!disk_wmi_stop())
-        return;
-
     netdata_mutex_lock(&volume_space_mutex);
     volume_space_worker_stop = true;
     mount_points_worker_stop = true;
     netdata_cond_broadcast(&volume_space_cond);
     netdata_mutex_unlock(&volume_space_mutex);
+
+    // The disk metadata worker uses only its own state, which disk_wmi_stop() keeps when the worker does not exit,
+    // so the rest of the cleanup does not depend on it.
+    disk_wmi_stop();
 
     for (size_t i = 0; i < VOLUME_SPACE_WORKER_SLOT_COUNT; i++)
         if (volume_space_threads[i])
