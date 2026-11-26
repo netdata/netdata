@@ -9,19 +9,24 @@ on:
       - .github/workflows/kickstart-upload.yml
       - packaging/installer/kickstart.sh
   workflow_dispatch: null
-concurrency:
-  group: kickstart-upload
-  cancel-in-progress: true
 jobs:
   upload:
     name: Upload Kickstart Script
     runs-on: ubuntu-latest
     if: github.repository == 'netdata/netdata' && github.ref == 'refs/heads/master'
+    # Job-level so a skipped non-master dispatch cannot cancel a publishing run.
+    concurrency:
+      group: kickstart-upload
+      cancel-in-progress: true
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # A rerun keeps the original GITHUB_SHA; always publish the current master tip so a
+          # rerun of an older run cannot roll the public script back. All writes and the
+          # verify step below use this checkout.
+          ref: refs/heads/master
           fetch-depth: 1
       - name: SSH setup
         id: ssh-setup
@@ -40,9 +45,8 @@ jobs:
       - name: Install Rclone
         id: install-rclone
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
-        run: |
-          sudo apt-get update || exit 1
-          sudo apt-get install -y rclone || exit 1
+        # Pinned, checksum-verified rclone; the APT build fails its post-upload HEAD on versioned PUTs.
+        run: bash .github/scripts/install-rclone.sh
       - name: Upload to R2
         id: upload-r2
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
@@ -54,7 +58,9 @@ jobs:
           RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
           RCLONE_CONFIG_S3_REGION: "auto"
         run: |
-          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" --include '/kickstart.sh' packaging/installer/ s3:netdata-agent-repository/
+          rclone copyto --verbose --s3-no-check-bucket --checksum \
+            --header-upload "Cache-Control: no-transform" \
+            packaging/installer/kickstart.sh s3:netdata-agent-repository/kickstart.sh
       - name: Verify public kickstart SHA-256
         if: ${{ !cancelled() && steps.upload-r2.outcome == 'success' }}
         run: |
