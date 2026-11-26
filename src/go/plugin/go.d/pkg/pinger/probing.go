@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -18,18 +19,21 @@ type probeRunner interface {
 	probe(ctx context.Context, host string, cfg ProbeConfig) (*probing.Statistics, error)
 }
 
-// lookupIPFunc has the signature of (*net.Resolver).LookupIP.
-type lookupIPFunc func(ctx context.Context, network, host string) ([]net.IP, error)
+// ipResolver is the part of *net.Resolver the runner uses.
+type ipResolver interface {
+	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
 
 type defaultRunner struct {
 	log      *logger.Logger
-	lookupIP lookupIPFunc
+	resolver ipResolver
 }
 
 func newDefaultRunner(log *logger.Logger) *defaultRunner {
 	return &defaultRunner{
 		log:      log,
-		lookupIP: net.DefaultResolver.LookupIP,
+		resolver: net.DefaultResolver,
 	}
 }
 
@@ -92,20 +96,48 @@ func (r *defaultRunner) resolve(ctx context.Context, deadline time.Time, network
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
-	ips, err := r.lookupIP(ctx, network, host)
+	addrs, err := r.lookup(ctx, network, host)
 	if err != nil {
 		return nil, err
 	}
 
-	// LookupIP returns an error rather than an empty list.
-	ip := ips[0]
+	addr := addrs[0]
 	if network == "ip" {
-		for _, candidate := range ips {
-			if candidate.To4() != nil {
-				ip = candidate
-				break
-			}
+		if i := slices.IndexFunc(addrs, func(a net.IPAddr) bool { return a.IP.To4() != nil }); i >= 0 {
+			addr = addrs[i]
 		}
 	}
-	return &net.IPAddr{IP: ip}, nil
+	return &addr, nil
+}
+
+// lookup returns the addresses net.ResolveIPAddr chooses from, in the same
+// order; the resolver returns an error rather than an empty list. LookupIP
+// drops the zone of a link-local IPv6 address (from /etc/hosts or the system
+// resolver), so only "ip4" uses it, keeping its A-only query; "ip6" filters
+// LookupIPAddr, at the cost of an extra A query.
+func (r *defaultRunner) lookup(ctx context.Context, network, host string) ([]net.IPAddr, error) {
+	if network == "ip4" {
+		ips, err := r.resolver.LookupIP(ctx, network, host)
+		if err != nil {
+			return nil, err
+		}
+		addrs := make([]net.IPAddr, 0, len(ips))
+		for _, ip := range ips {
+			addrs = append(addrs, net.IPAddr{IP: ip})
+		}
+		return addrs, nil
+	}
+
+	addrs, err := r.resolver.LookupIPAddr(ctx, host)
+	if err != nil || network == "ip" {
+		return addrs, err
+	}
+
+	addrs = slices.DeleteFunc(addrs, func(a net.IPAddr) bool {
+		return len(a.IP) != net.IPv6len || a.IP.To4() != nil
+	})
+	if len(addrs) == 0 {
+		return nil, &net.AddrError{Err: "no suitable address found", Addr: host}
+	}
+	return addrs, nil
 }
