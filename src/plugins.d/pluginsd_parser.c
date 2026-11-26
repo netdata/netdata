@@ -793,6 +793,11 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
     if (unlikely(!rd))
         return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_DIMENSION, "failed to create dimension");
 
+    // these options are part of the chart definition sent upstream
+    const RRDDIM_OPTIONS streamed_options =
+        RRDDIM_OPTION_VALUE_FLOAT | RRDDIM_OPTION_HIDDEN | RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS;
+    RRDDIM_OPTIONS old_streamed_options = rd->collector.options & streamed_options;
+
     int unhide_dimension = 1;
 
     rrddim_option_clear(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
@@ -841,6 +846,11 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
         rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
+
+    // a changed option must resend the chart definition, or the parent keeps the old one
+    // (with the old type it decodes the values sent for this dimension wrongly)
+    if ((rd->collector.options & streamed_options) != old_streamed_options)
+        rrddim_metadata_updated(rd);
 
     pluginsd_rrddim_put_to_slot(parser, st, rd, slot, obsolete);
 
