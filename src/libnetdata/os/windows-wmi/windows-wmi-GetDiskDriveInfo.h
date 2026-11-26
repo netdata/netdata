@@ -13,7 +13,10 @@ typedef struct {
     char DeviceID[256];
 } DiskDriveInfoWMI;
 
-size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size);
+// Connects the caller-owned handle (reusing an open connection), queries Win32_DiskDrive and keeps the connection
+// for the next call. After a failure the handle is disconnected, so the next call reconnects. ConnectServer() can
+// block for minutes: call this only from a thread that may wait that long (see nd_wmi_connect()).
+size_t GetDiskDriveInfo(ND_WMI *wmi, DiskDriveInfoWMI *diskInfoArray, size_t array_size);
 
 #endif
 

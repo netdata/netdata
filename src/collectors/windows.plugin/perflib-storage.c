@@ -41,6 +41,13 @@ struct physical_disk {
     usec_t last_collected;
     bool collected_metadata;
 
+    // model and device_id come from the WMI worker (see disk_wmi)
+    bool wmi_pending;         // not resolved yet
+    bool charts_ready;        // charts may be created: resolved, or the wait for it expired
+    uint64_t wmi_seq;         // the probe this disk waits for; 0 = none requested
+    usec_t first_seen_ut;
+    usec_t wmi_retry_after_ut;
+
     STRING *device;
     STRING *mount_point;
     STRING *model;
@@ -157,6 +164,11 @@ static void physical_disk_cleanup(struct physical_disk *d)
     d->device_id = NULL;
 
     d->collected_metadata = false;
+    d->wmi_pending = false;
+    d->charts_ready = false;
+    d->wmi_seq = 0;
+    d->first_seen_ut = 0;
+    d->wmi_retry_after_ut = 0;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_io.st_io);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_ops.st_ops);
@@ -195,6 +207,183 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 #define MOUNT_POINTS_WORKER_SLOT_COUNT (MOUNT_POINTS_WORKER_COUNT * 2)
 #define ND_MOUNT_PATH_MAX 1024
 #define MOUNT_POINTS_QUERY_TIMEOUT_UT (10 * USEC_PER_SEC)
+
+// Win32_DiskDrive metadata (model, device_id) comes from WMI, and ConnectServer() can block for minutes. A worker
+// thread owns the WMI connection and runs the probe; the collection loop only posts requests and reads results.
+#define MAX_WMI_DRIVES 100
+// How long a new disk's charts wait for its metadata, so that they normally start with their labels.
+#define DISK_WMI_WAIT_UT (10 * USEC_PER_SEC)
+#define DISK_WMI_RETRY_EVERY_UT (60 * USEC_PER_SEC)
+#define DISK_WMI_SHUTDOWN_TIMEOUT_UT (5 * USEC_PER_SEC)
+
+static struct {
+    netdata_mutex_t mutex;
+    netdata_cond_t cond;
+    bool initialized;
+    ND_THREAD *thread;
+    volatile LONG finished;
+
+    // protected by the mutex
+    bool stop;
+    uint64_t requested_seq;
+    uint64_t completed_seq;
+    size_t count;
+    DiskDriveInfoWMI rows[MAX_WMI_DRIVES];
+} disk_wmi;
+
+// Used only by the worker thread; cleanup may cancel a ConnectServer() in flight on it.
+static ND_WMI disk_wmi_handle = { 0 };
+
+// Collection-loop state.
+static uint64_t disk_wmi_posted_seq = 0;  // the last probe posted to the worker
+static uint64_t disk_wmi_wanted_seq = 0;  // the highest probe a disk waits for
+static usec_t disk_wmi_start_retry_after_ut = 0;
+
+static void disk_wmi_worker(void *ptr __maybe_unused)
+{
+    static DiskDriveInfoWMI rows[MAX_WMI_DRIVES];
+
+    netdata_mutex_lock(&disk_wmi.mutex);
+    while (true) {
+        while (!disk_wmi.stop && disk_wmi.completed_seq == disk_wmi.requested_seq)
+            netdata_cond_wait(&disk_wmi.cond, &disk_wmi.mutex);
+
+        if (disk_wmi.stop)
+            break;
+
+        uint64_t seq = disk_wmi.requested_seq;
+        netdata_mutex_unlock(&disk_wmi.mutex);
+
+        size_t count = GetDiskDriveInfo(&disk_wmi_handle, rows, _countof(rows));
+
+        netdata_mutex_lock(&disk_wmi.mutex);
+        memcpy(disk_wmi.rows, rows, count * sizeof(*rows));
+        disk_wmi.count = count;
+        disk_wmi.completed_seq = seq;
+    }
+    netdata_mutex_unlock(&disk_wmi.mutex);
+
+    // The COM reference the connection holds belongs to this thread.
+    nd_wmi_disconnect(&disk_wmi_handle);
+    InterlockedExchange(&disk_wmi.finished, 1);
+}
+
+static void disk_wmi_init(void)
+{
+    netdata_mutex_init(&disk_wmi.mutex);
+    netdata_cond_init(&disk_wmi.cond);
+    disk_wmi.thread = NULL;
+    disk_wmi.finished = 0;
+    disk_wmi.stop = false;
+    disk_wmi.requested_seq = 0;
+    disk_wmi.completed_seq = 0;
+    disk_wmi.count = 0;
+    memset(&disk_wmi_handle, 0, sizeof(disk_wmi_handle));
+    disk_wmi_posted_seq = 0;
+    disk_wmi_wanted_seq = 0;
+    disk_wmi_start_retry_after_ut = 0;
+    disk_wmi.initialized = true;
+}
+
+// Once per collection pass: post the probe disks wait for, unless one is still in flight.
+static void disk_wmi_post(usec_t now_ut)
+{
+    if (!disk_wmi.initialized || disk_wmi_wanted_seq <= disk_wmi_posted_seq)
+        return;
+
+    if (!disk_wmi.thread) {
+        if (now_ut < disk_wmi_start_retry_after_ut)
+            return;
+
+        InterlockedExchange(&disk_wmi.finished, 0);
+        disk_wmi.thread = nd_thread_create(
+            "WIN[PerflibStorage wmi]",
+            NETDATA_THREAD_OPTION_MANUAL_JOIN | NETDATA_THREAD_OPTION_NO_RETRY,
+            disk_wmi_worker,
+            NULL);
+        if (!disk_wmi.thread) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start the PerflibStorage disk metadata worker; will retry");
+            disk_wmi_start_retry_after_ut = now_ut + DISK_WMI_RETRY_EVERY_UT;
+            return;
+        }
+    }
+
+    netdata_mutex_lock(&disk_wmi.mutex);
+    if (disk_wmi.completed_seq == disk_wmi.requested_seq) {
+        disk_wmi.requested_seq = disk_wmi_wanted_seq;
+        disk_wmi_posted_seq = disk_wmi_wanted_seq;
+        netdata_cond_signal(&disk_wmi.cond);
+    }
+    netdata_mutex_unlock(&disk_wmi.mutex);
+}
+
+typedef enum {
+    DISK_WMI_PENDING,
+    DISK_WMI_FOUND,
+    DISK_WMI_MISSING,
+} DISK_WMI_LOOKUP;
+
+static DISK_WMI_LOOKUP disk_wmi_lookup(uint64_t seq, int index, DiskDriveInfoWMI *out)
+{
+    DISK_WMI_LOOKUP rc = DISK_WMI_PENDING;
+
+    netdata_mutex_lock(&disk_wmi.mutex);
+    if (disk_wmi.completed_seq >= seq) {
+        rc = DISK_WMI_MISSING;
+        for (size_t k = 0; k < disk_wmi.count; k++) {
+            if (disk_wmi.rows[k].Index != index)
+                continue;
+
+            if (disk_wmi.rows[k].Model[0] || disk_wmi.rows[k].DeviceID[0]) {
+                *out = disk_wmi.rows[k];
+                rc = DISK_WMI_FOUND;
+            }
+            break;
+        }
+    }
+    netdata_mutex_unlock(&disk_wmi.mutex);
+
+    return rc;
+}
+
+// Stops the worker; false when it did not exit in time (its state is then left intact).
+static bool disk_wmi_stop(void)
+{
+    if (!disk_wmi.initialized)
+        return true;
+
+    if (disk_wmi.thread) {
+        netdata_mutex_lock(&disk_wmi.mutex);
+        disk_wmi.stop = true;
+        netdata_cond_signal(&disk_wmi.cond);
+        netdata_mutex_unlock(&disk_wmi.mutex);
+
+        // Aborts a ConnectServer() in flight; a query or enumeration in flight ends within its own limits.
+        nd_wmi_cancel(&disk_wmi_handle, DISK_WMI_SHUTDOWN_TIMEOUT_UT);
+
+        usec_t started_ut = now_monotonic_usec();
+        while (!InterlockedCompareExchange(&disk_wmi.finished, 1, 1) &&
+               now_monotonic_usec() - started_ut < DISK_WMI_SHUTDOWN_TIMEOUT_UT)
+            Sleep(10);
+
+        if (!InterlockedCompareExchange(&disk_wmi.finished, 1, 1)) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "PerflibStorage disk metadata worker did not stop within %llu seconds; leaving its state intact",
+                (unsigned long long)(DISK_WMI_SHUTDOWN_TIMEOUT_UT / USEC_PER_SEC));
+            return false;
+        }
+
+        nd_thread_join(disk_wmi.thread);
+        disk_wmi.thread = NULL;
+    }
+
+    netdata_cond_destroy(&disk_wmi.cond);
+    netdata_mutex_destroy(&disk_wmi.mutex);
+    disk_wmi.initialized = false;
+    return true;
+}
 
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
 static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL, *mountPointVolumeIds = NULL;
@@ -405,6 +594,8 @@ static void initialize(void)
     volume_space_last_timeout_log_ut = 0;
     volume_space_pool_warning_active = false;
     mountPointsDiscoveryWarningActive = false;
+
+    disk_wmi_init();
 
     netdata_mutex_init(&volume_space_mutex);
     volume_space_mutex_initialized = true;
@@ -3216,6 +3407,8 @@ static int logical_disk_metadata_unittest_run(void)
     return errors;
 }
 
+static int physical_disk_wmi_unittest_run(void);
+
 int perflib_storage_unittest(void)
 {
     int errors = 0;
@@ -3229,6 +3422,7 @@ int perflib_storage_unittest(void)
     errors += mount_points_query_failure_unittest_run();
     errors += mount_points_excluded_carry_unittest_run();
     errors += mount_points_unittest_run();
+    errors += physical_disk_wmi_unittest_run();
 
     if (errors)
         fprintf(stderr, "perflib storage unittest: %d ERROR(S)\n", errors);
@@ -3253,6 +3447,161 @@ static void physical_disk_labels(RRDSET *st, void *data)
 
     if (d->device_id)
         rrdlabels_add(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
+}
+
+// For metadata that arrived after the disk's charts were created. A label added after a chart's first
+// rrdset_done() reaches parents and alerts only when the chart is marked updated, as GetFSRMQuota.c does.
+static void physical_disk_chart_add_wmi_labels(RRDSET *st, struct physical_disk *d)
+{
+    if (!st)
+        return;
+
+    bool changed = false;
+    if (d->model)
+        changed |= rrdlabels_add_changed(st->rrdlabels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
+    if (d->device_id)
+        changed |= rrdlabels_add_changed(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
+
+    if (!changed)
+        return;
+
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+    rrdset_metadata_updated(st);
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+}
+
+static void physical_disk_add_wmi_labels(struct physical_disk *d)
+{
+    RRDSET *charts[] = {
+        d->disk_io.st_io,
+        d->disk_ops.st_ops,
+        d->disk_util.st_util,
+        d->disk_busy.st_busy,
+        d->disk_iotime.st_iotime,
+        d->disk_qops.st_qops,
+        d->disk_await.st_await,
+        d->disk_svctm.st_svctm,
+        d->disk_avgsz.st_avgsz,
+        d->st_split,
+    };
+
+    for (size_t i = 0; i < _countof(charts); i++)
+        physical_disk_chart_add_wmi_labels(charts[i], d);
+}
+
+static void physical_disk_wmi_update(struct physical_disk *d, int device_index, usec_t now_ut)
+{
+    if (!d->wmi_seq) {
+        if (now_ut < d->wmi_retry_after_ut)
+            return;
+
+        // A probe already in flight may have run before this disk appeared: wait for the next one.
+        d->wmi_seq = disk_wmi_posted_seq + 1;
+        if (disk_wmi_wanted_seq < d->wmi_seq)
+            disk_wmi_wanted_seq = d->wmi_seq;
+    }
+
+    DiskDriveInfoWMI info;
+    switch (disk_wmi_lookup(d->wmi_seq, device_index, &info)) {
+        case DISK_WMI_PENDING:
+            if (now_ut - d->first_seen_ut >= DISK_WMI_WAIT_UT)
+                d->charts_ready = true;
+            break;
+
+        case DISK_WMI_MISSING:
+            d->wmi_seq = 0;
+            d->wmi_retry_after_ut = now_ut + DISK_WMI_RETRY_EVERY_UT;
+            d->charts_ready = true;
+            break;
+
+        case DISK_WMI_FOUND:
+            string_freez(d->model);
+            d->model = string_strdupz(info.Model);
+            string_freez(d->device_id);
+            d->device_id = string_strdupz(info.DeviceID);
+            d->wmi_pending = false;
+
+            // Charts created before the metadata arrived get the labels now.
+            if (d->charts_ready)
+                physical_disk_add_wmi_labels(d);
+
+            d->charts_ready = true;
+            break;
+    }
+}
+
+// Drives the metadata state of physical disks against hand-made probe results; no worker thread, no charts.
+static int physical_disk_wmi_unittest_run(void)
+{
+    int errors = 0;
+    usec_t t = 1000 * USEC_PER_SEC;
+
+    disk_wmi_init();
+
+    struct physical_disk d0 = { .wmi_pending = true, .first_seen_ut = t };
+    physical_disk_wmi_update(&d0, 0, t);
+    errors += mount_points_unittest_expect("a new disk asks for a probe", d0.wmi_seq == 1 && disk_wmi_wanted_seq == 1);
+    errors += mount_points_unittest_expect("a new disk's charts wait for its metadata", !d0.charts_ready);
+
+    // probe 1 is posted; a disk that appears while it runs must wait for probe 2
+    disk_wmi_posted_seq = 1;
+    disk_wmi.requested_seq = 1;
+    struct physical_disk d1 = { .wmi_pending = true, .first_seen_ut = t };
+    physical_disk_wmi_update(&d1, 1, t);
+    errors += mount_points_unittest_expect("a disk seen during a probe waits for the next one",
+                                           d1.wmi_seq == 2 && disk_wmi_wanted_seq == 2);
+
+    disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 0, .Model = "model-0", .DeviceID = "id-0" };
+    disk_wmi.rows[1] = (DiskDriveInfoWMI){ .Index = 1, .Model = "model-1", .DeviceID = "id-1" };
+    disk_wmi.count = 2;
+    disk_wmi.completed_seq = 1;
+
+    physical_disk_wmi_update(&d0, 0, t + USEC_PER_SEC);
+    errors += mount_points_unittest_expect("a probe result labels the disk",
+                                           !d0.wmi_pending && d0.charts_ready &&
+                                           strcmp(string2str(d0.model), "model-0") == 0 &&
+                                           strcmp(string2str(d0.device_id), "id-0") == 0);
+
+    physical_disk_wmi_update(&d1, 1, t + USEC_PER_SEC);
+    errors += mount_points_unittest_expect("an earlier probe does not label a later disk",
+                                           d1.wmi_pending && !d1.model && !d1.charts_ready);
+
+    physical_disk_wmi_update(&d1, 1, t + DISK_WMI_WAIT_UT);
+    errors += mount_points_unittest_expect("the charts stop waiting after the wait limit",
+                                           d1.charts_ready && d1.wmi_pending);
+
+    // probe 2 completes without disk 1
+    disk_wmi_posted_seq = 2;
+    disk_wmi.requested_seq = 2;
+    disk_wmi.count = 1;
+    disk_wmi.completed_seq = 2;
+    usec_t t2 = t + 2 * DISK_WMI_WAIT_UT;
+    physical_disk_wmi_update(&d1, 1, t2);
+    errors += mount_points_unittest_expect("a disk missing from a probe is retried later",
+                                           d1.wmi_pending && d1.wmi_seq == 0 &&
+                                           d1.wmi_retry_after_ut == t2 + DISK_WMI_RETRY_EVERY_UT);
+
+    physical_disk_wmi_update(&d1, 1, t2 + USEC_PER_SEC);
+    errors += mount_points_unittest_expect("no retry before the retry time", d1.wmi_seq == 0);
+
+    physical_disk_wmi_update(&d1, 1, t2 + DISK_WMI_RETRY_EVERY_UT);
+    errors += mount_points_unittest_expect("the retry asks for a new probe", d1.wmi_seq == 3);
+
+    // probe 3 returns the disk with neither value
+    disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 1 };
+    disk_wmi.count = 1;
+    disk_wmi.completed_seq = 3;
+    physical_disk_wmi_update(&d1, 1, t2 + DISK_WMI_RETRY_EVERY_UT + USEC_PER_SEC);
+    errors += mount_points_unittest_expect("a row without model and device id is a miss",
+                                           d1.wmi_pending && d1.wmi_seq == 0 && !d1.model);
+
+    string_freez(d0.model);
+    string_freez(d0.device_id);
+    disk_wmi_stop();
+
+    return errors;
 }
 
 static bool str_is_numeric(const char *s)
@@ -3281,14 +3630,9 @@ static inline uint64_t perflib_idle_time_percent(COUNTER_DATA *d)
     return 0;
 }
 
-#define MAX_WMI_DRIVES 100
-static DiskDriveInfoWMI infos[MAX_WMI_DRIVES];
-
 static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
 {
     DICTIONARY *dict = physicalDisks;
-    size_t infoCount = 0;
-    bool infos_loaded = false;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "PhysicalDisk");
     if (!pObjectType)
@@ -3332,27 +3676,22 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         d->last_collected = now_ut;
 
         if (!d->collected_metadata) {
-            if (!is_system && device_index != -1) {
-                if (!infos_loaded) {
-                    infoCount = GetDiskDriveInfo(infos, _countof(infos));
-                    infos_loaded = true;
-                }
-
-                for (size_t k = 0; k < infoCount; k++) {
-                    if (infos[k].Index != device_index)
-                        continue;
-
-                    d->model = string_strdupz(infos[k].Model);
-                    d->device_id = string_strdupz(infos[k].DeviceID);
-
-                    break;
-                }
-            }
-
             d->device = string_strdupz(device);
             d->mount_point = string_strdupz(mount_point);
             d->collected_metadata = true;
+
+            // Only disks named by their number can be matched to a Win32_DiskDrive row.
+            d->wmi_pending = !is_system && device_index != -1;
+            d->charts_ready = !d->wmi_pending;
+            d->first_seen_ut = now_ut;
         }
+
+        if (d->wmi_pending)
+            physical_disk_wmi_update(d, device_index, now_ut);
+
+        // A new disk's charts wait briefly for its metadata, so that they start with their labels.
+        if (!is_system && !d->charts_ready)
+            continue;
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadBytesPerSec) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWriteBytesPerSec)) {
@@ -3505,6 +3844,8 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         }
     }
 
+    disk_wmi_post(now_ut);
+
     // cleanup - delete callback will handle resource cleanup
     {
         struct physical_disk *d;
@@ -3646,6 +3987,9 @@ static bool perflib_storage_join_workers(
 void do_PerflibStorage_cleanup(void)
 {
     if (!storage_initialized)
+        return;
+
+    if (!disk_wmi_stop())
         return;
 
     netdata_mutex_lock(&volume_space_mutex);

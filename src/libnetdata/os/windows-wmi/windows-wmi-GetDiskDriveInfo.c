@@ -8,13 +8,10 @@
 // Total time allowed for enumerating Win32_DiskDrive, across all Next() calls.
 #define WMI_DISKDRIVE_ENUM_TIMEOUT_MS 5000
 
-size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
-    // The connection lives only for this call: it is rare (first sight of a disk), and the COM reference it takes
-    // must be released on this thread.
-    ND_WMI wmi = { 0 };
+size_t GetDiskDriveInfo(ND_WMI *wmi, DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     const char *failed_step = NULL;
 
-    HRESULT hr = nd_wmi_connect(&wmi, L"ROOT\\CIMV2", &failed_step);
+    HRESULT hr = nd_wmi_connect(wmi, L"ROOT\\CIMV2", &failed_step);
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetDiskDriveInfo() %s. Error code = 0x%X",
                failed_step ? failed_step : "WMI connect failed", hr);
@@ -22,21 +19,23 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     }
 
     IEnumWbemClassObject *pEnumerator = NULL;
-    hr = nd_wmi_exec_query(wmi.pSvc, L"SELECT Index, Model, DeviceID FROM Win32_DiskDrive", &pEnumerator);
+    hr = nd_wmi_exec_query(wmi->pSvc, L"SELECT Index, Model, DeviceID FROM Win32_DiskDrive", &pEnumerator);
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetDiskDriveInfo() WMI query failed. Error code = 0x%X", hr);
-        nd_wmi_disconnect(&wmi);
+        nd_wmi_disconnect(wmi);
         return 0;
     }
 
     usec_t deadline_ut = now_monotonic_usec() + WMI_DISKDRIVE_ENUM_TIMEOUT_MS * USEC_PER_MS;
     size_t index = 0;
+    bool failed = false;
     while (index < array_size) {
         usec_t now_ut = now_monotonic_usec();
         if (now_ut >= deadline_ut) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "GetDiskDriveInfo() WMI enumeration timed out after %d ms; using %zu disk(s)",
                    WMI_DISKDRIVE_ENUM_TIMEOUT_MS, index);
+            failed = true;
             break;
         }
         long remaining_ms = (long)((deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
@@ -47,6 +46,7 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         if (FAILED(hr)) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "GetDiskDriveInfo() WMI enumeration failed. Error code = 0x%X; using %zu disk(s)", hr, index);
+            failed = true;
             break;
         }
         if (0 == uReturn || !pclsObj) {
@@ -73,7 +73,11 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     }
 
     pEnumerator->lpVtbl->Release(pEnumerator);
-    nd_wmi_disconnect(&wmi);
+
+    // A broken connection is not reused: the next call reconnects.
+    if (failed)
+        nd_wmi_disconnect(wmi);
+
     return index;
 }
 
