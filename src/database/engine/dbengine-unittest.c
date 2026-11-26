@@ -1123,8 +1123,10 @@ static bool dbengine_crc_test_flip_byte(const char *path, uint64_t offset) {
 
     uint8_t byte;
     bool ok = pread(fd, &byte, 1, (off_t)offset) == 1;
-    byte ^= 0xFF;
-    ok = ok && pwrite(fd, &byte, 1, (off_t)offset) == 1;
+    if(ok) {
+        byte ^= 0xFF;
+        ok = pwrite(fd, &byte, 1, (off_t)offset) == 1;
+    }
     close(fd);
     return ok;
 }
@@ -1176,9 +1178,17 @@ static size_t test_dbengine_corrupt_extent_is_not_cached(RRDHOST *host) {
     uint64_t offset = BLOCK_TO_OFFSET(block) + xio->bytes - sizeof(struct rrdeng_df_extent_trailer) - 1;
     pgc_page_release(open_cache, open_page);
 
-    // drop the clean page from the main cache (unless already evicted), so that the query reads the extent
-    PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_EXACT);
-    if(page && !pgc_page_to_clean_evict_or_release(main_cache, page)) {
+    // drop the clean page from the main cache (unless already evicted), so that the query reads the extent; a
+    // background flusher drops its reference to the page just after the open cache entry appears, so retry
+    bool evicted = false;
+    for(size_t i = 0; i < 100 && !evicted; i++) {
+        if(i)
+            sleep_usec(10 * USEC_PER_MS);
+
+        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_EXACT);
+        evicted = !page || pgc_page_to_clean_evict_or_release(main_cache, page);
+    }
+    if(!evicted) {
         fprintf(stderr, " >>> DBENGINE: corrupt-extent page could not be evicted from the main cache\n");
         return 1;
     }
