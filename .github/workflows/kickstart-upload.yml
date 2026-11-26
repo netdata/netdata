@@ -49,7 +49,7 @@ jobs:
         run: bash .github/scripts/install-rclone.sh
       - name: Upload to R2
         id: upload-r2
-        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install-rclone.outcome == 'success' }}
         env:
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
