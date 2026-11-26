@@ -13,6 +13,7 @@ long netdata_registry_get_string_from_open_key(char *out, unsigned int length, v
 bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, char *subKey, char *name);
 
 bool netdata_registry_key_exists(void *hKey, const char *subKey);
+int netdata_registry_unittest(void);
 
 bool EnableWindowsPrivilege(const char *privilegeName);
 

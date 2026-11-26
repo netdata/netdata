@@ -632,6 +632,7 @@ int netdata_main(int argc, char **argv) {
                             if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
+                            if (netdata_registry_unittest()) return 1;
 #endif
                             // MUST stay last: it runs the real sqlite_close_databases() and
                             // sqlite_library_shutdown(), after which no SQLite work is admitted
@@ -813,6 +814,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "perflibnamestest") == 0) {
                             unittest_running = true;
                             return perflibnamestest_main();
+                        }
+                        else if(strcmp(optarg, "registrytest") == 0) {
+                            unittest_running = true;
+                            return netdata_registry_unittest();
                         }
 #endif
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
