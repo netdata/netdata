@@ -405,6 +405,7 @@ prepare_cmake_options() {
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
   enable_feature PLUGIN_SCRIPTS "${ENABLE_SCRIPTS:-0}"
   enable_feature PLUGIN_STATSD "${ENABLE_STATSD:-0}"
+  enable_feature PLUGIN_WMI "${ENABLE_WMI:-0}"
   enable_feature PLUGIN_IPMI "${ENABLE_IPMI:-${IS_LINUX}}"
   enable_feature PLUGIN_DEM "${ENABLE_DEM:-${IS_LINUX}}"
 

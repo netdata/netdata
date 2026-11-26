@@ -1,0 +1,238 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package wmiquery
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/oiweiwei/go-msrpc/ssp/ntlm"
+	"github.com/r4sd/go-wsman/wsman"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestWinRMQuery(t *testing.T) {
+	const (
+		query = "SELECT InterfaceIndex, IPAddress FROM Win32_NetworkAdapterConfiguration WHERE Caption = 'Ethernet'"
+		env   = `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:n="http://schemas.xmlsoap.org/ws/2004/09/enumeration"><s:Body>`
+		end   = "</s:Body></s:Envelope>"
+	)
+	responses := []string{
+		"<n:EnumerateResponse><n:EnumerationContext>one</n:EnumerationContext></n:EnumerateResponse>",
+		"<n:PullResponse><n:EnumerationContext>two&amp;next</n:EnumerationContext><n:Items><Nic><InterfaceIndex>5</InterfaceIndex><IPAddress>192.0.2.1</IPAddress></Nic></n:Items></n:PullResponse>",
+		"<n:PullResponse><n:EndOfSequence/><n:Items><Nic><InterfaceIndex>9</InterfaceIndex><IPAddress>192.0.2.2</IPAddress><IPAddress>2001:db8::2</IPAddress></Nic></n:Items></n:PullResponse>",
+	}
+	var calls int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.Header.Get("Authorization"))
+		assert.Equal(t, "/wsman", r.URL.Path)
+		data, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Contains(t, string(data), cimv2Resource)
+		switch calls {
+		case 0:
+			assert.Contains(t, string(data), query)
+			assert.Contains(t, string(data), "/WQL")
+		case 1:
+			assert.Contains(t, string(data), ">one</n:EnumerationContext>")
+		case 2:
+			assert.Contains(t, string(data), ">two&amp;next</n:EnumerationContext>")
+		default:
+			t.Error("unexpected additional request")
+			http.Error(w, "", 400)
+			return
+		}
+		payload := responses[calls]
+		calls++
+		fmt.Fprint(w, env+payload+end)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	client := newWinRMSession(server.URL+"/wsman", "reader", "synthetic", &tls.Config{
+		RootCAs: ca,
+	})
+	defer client.Close()
+	rows, err := client.Query(t.Context(), query)
+	require.NoError(t, err)
+	assert.Equal(t, []map[string]any{
+		{"interfaceindex": "5", "ipaddress": []string{"192.0.2.1"}},
+		{"interfaceindex": "9", "ipaddress": []string{"192.0.2.2", "2001:db8::2"}},
+	}, rows)
+	assert.Equal(t, 3, calls)
+}
+
+func TestWinRMTransportFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		status  int
+		trust   bool
+		message string
+	}{
+		{"refuse Basic authentication", 401, true, "HTTP 401"},
+		{"refuse redirected credentials", 307, true, "HTTP 307"},
+		{"reject untrusted listener", 200, false, "certificate verification failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Empty(t, r.Header.Get("Authorization"))
+				assert.Equal(t, "/wsman", r.URL.Path)
+				w.Header().Set("WWW-Authenticate", `Basic realm="test"`)
+				w.Header().Set("Location", "/other")
+				w.WriteHeader(tc.status)
+				fmt.Fprint(w, "sensitive-test-response")
+			}))
+			defer server.Close()
+			ca := x509.NewCertPool()
+			if tc.trust {
+				ca.AddCert(server.Certificate())
+			}
+			client := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+				RootCAs: ca,
+			})
+			defer client.Close()
+			_, err := client.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+			require.Error(t, err)
+			assert.Contains(t, SafeMessage(err), tc.message)
+			assert.NotContains(t, SafeMessage(err), "sensitive-test-response")
+		})
+	}
+}
+
+func TestWinRMDiskAssociation(t *testing.T) {
+	// A projected reference is returned as an endpoint reference by Windows.
+	const response = `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:n="http://schemas.xmlsoap.org/ws/2004/09/enumeration" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><s:Body><n:PullResponse><n:Items><w:XmlFragment>
+	<Dependent xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing"><a:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address><a:ReferenceParameters><w:ResourceURI>http://schemas.microsoft.com/wbem/wsman/1/wmi/root/cimv2/Win32_LogicalDisk</w:ResourceURI><w:SelectorSet><w:Selector Name="DeviceID">D:</w:Selector></w:SelectorSet></a:ReferenceParameters></Dependent>
+	<EndingAddress>65535</EndingAddress><StartingAddress>32768</StartingAddress>
+	</w:XmlFragment></n:Items><n:EndOfSequence/></n:PullResponse></s:Body></s:Envelope>`
+	page, err := wsman.ParsePullResponse([]byte(response))
+	require.NoError(t, err)
+	require.Len(t, page.Items, 1)
+	assert.Equal(
+		t,
+		map[string]any{
+			"dependent":       `Win32_LogicalDisk.DeviceID="D:"`,
+			"startingaddress": "32768",
+			"endingaddress":   "65535",
+		},
+		winRMRow(page.Items[0]),
+	)
+}
+
+func TestWinRMNTLMChallengeWithBody(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			w.Header().Set("WWW-Authenticate", "NTLM")
+			http.Error(w, "authenticate", http.StatusUnauthorized)
+			return
+		}
+		assert.True(t, strings.HasPrefix(r.Header.Get("Authorization"), "NTLM "))
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	client := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+		RootCAs: ca,
+	})
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	_, err := client.Query(ctx, "SELECT Name FROM Win32_ComputerSystem")
+	require.Error(t, err)
+	assert.Contains(t, SafeMessage(err), "HTTP 403")
+}
+
+func TestWinRMSessionStopsAfterRejectedLogin(t *testing.T) {
+	challenge := base64.StdEncoding.EncodeToString(testChallenge(
+		t,
+		ntlm.NegotiateSign|ntlm.NegotiateSeal|ntlm.Negotiate128|ntlm.NegotiateExtendedSessionSecurity|ntlm.NegotiateTargetInfo,
+	))
+	var logins int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, _ := base64.StdEncoding.DecodeString(strings.TrimPrefix(r.Header.Get("Authorization"), "NTLM "))
+		switch {
+		case len(token) > 8 && token[8] == 1: // negotiate
+			w.Header().Set("WWW-Authenticate", "NTLM "+challenge)
+		case len(token) > 8 && token[8] == 3: // authenticate: reject the credentials
+			logins++
+			w.Header().Set("WWW-Authenticate", "NTLM")
+		default:
+			w.Header().Set("WWW-Authenticate", "NTLM")
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	session := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+		RootCAs: ca,
+	})
+	defer session.Close()
+
+	for range 3 {
+		_, err := session.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+		require.Error(t, err)
+		assert.True(t, SessionFailed(err))
+		assert.Contains(t, SafeMessage(err), "HTTP 401")
+	}
+	assert.Equal(t, 1, logins, "a rejected login must not be retried within the session")
+}
+
+func TestWinRMRefusedConnection(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	address := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	session := newWinRMSession("https://"+address+"/wsman", "reader", "fixture-secret", &tls.Config{})
+	defer session.Close()
+	_, err = session.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+	require.Error(t, err)
+	assert.True(t, SessionFailed(err))
+	assert.Equal(t, "WinRM request failed: connection refused", SafeMessage(err))
+}
+
+func TestWinRMQueryFailuresKeepTheSession(t *testing.T) {
+	const fault = `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><s:Fault>` +
+		`<s:Code><s:Value>s:Sender</s:Value></s:Code><s:Reason><s:Text xml:lang="en-US">sensitive-test-response</s:Text></s:Reason>` +
+		`</s:Fault></s:Body></s:Envelope>`
+	var requests int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, fault)
+	}))
+	defer server.Close()
+	ca := x509.NewCertPool()
+	ca.AddCert(server.Certificate())
+	session := newWinRMSession(server.URL+"/wsman", "reader", "fixture-secret", &tls.Config{
+		RootCAs: ca,
+	})
+	defer session.Close()
+
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := session.Query(canceled, "SELECT Name FROM Win32_ComputerSystem")
+	require.ErrorIs(t, err, context.Canceled)
+	assert.False(t, SessionFailed(err))
+
+	for range 2 {
+		_, err := session.Query(t.Context(), "SELECT Name FROM Win32_ComputerSystem")
+		require.Error(t, err)
+		assert.False(t, SessionFailed(err))
+		assert.Equal(t, "WinRM returned a WS-Management fault", SafeMessage(err))
+	}
+	assert.Equal(t, 2, requests, "a fault or a canceled query must not stop later queries")
+}

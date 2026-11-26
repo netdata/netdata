@@ -205,23 +205,26 @@ class IPMIPermissionTests(unittest.TestCase):
         begin = source.index('DONOTSTART=0')
         end = source.index('\ndone', source.index('while [ -n "${1}" ]; do', begin)) + len('\ndone')
         parser = 'uname() { echo Linux; }\n' + source[begin:end]
-        flags = ('ENABLE_GO', 'ENABLE_IBM', 'ENABLE_SCRIPTS', 'ENABLE_STATSD', 'ENABLE_IPMI', 'ENABLE_DEM')
+        flags = ('ENABLE_GO', 'ENABLE_IBM', 'ENABLE_SCRIPTS', 'ENABLE_STATSD', 'ENABLE_IPMI', 'ENABLE_DEM', 'ENABLE_WMI')
         output = '\nprintf "%s\\n" ' + ' '.join('"$' + flag + '"' for flag in flags)
-        for options, expected in (
-                (('--disable-go',), ['0'] * 6),
+        for options, enabled in (
+                ((), {'ENABLE_GO', 'ENABLE_SCRIPTS', 'ENABLE_IPMI', 'ENABLE_DEM'}),
+                (('--disable-go',), set()),
                 (('--enable-plugin-ibm', '--enable-plugin-scripts', '--enable-plugin-statsd',
-                  '--enable-plugin-ipmi', '--enable-plugin-dem', '--disable-go'), ['0'] * 6),
-                (('--enable-plugin-ipmi', '--disable-go'), ['0'] * 6),
-                (('--disable-go', '--enable-plugin-ipmi'), ['0', '0', '0', '0', '1', '0']),
-                (('--disable-go', '--enable-plugin-scripts'), ['0', '0', '1', '0', '0', '0']),
+                  '--enable-plugin-ipmi', '--enable-plugin-dem', '--enable-plugin-wmi', '--disable-go'), set()),
+                (('--enable-plugin-ipmi', '--disable-go'), set()),
+                (('--disable-go', '--enable-plugin-ipmi'), {'ENABLE_IPMI'}),
+                (('--disable-go', '--enable-plugin-scripts'), {'ENABLE_SCRIPTS'}),
+                (('--disable-go', '--enable-plugin-wmi'), {'ENABLE_WMI'}),
+                (('--disable-go', '--enable-plugin-wmi', '--disable-plugin-wmi'), set()),
                 (('--disable-go', '--enable-plugin-go', '--enable-plugin-ibm', '--enable-plugin-scripts',
-                  '--enable-plugin-statsd', '--enable-plugin-ipmi', '--enable-plugin-dem'), ['1'] * 6),
-                (('--disable-plugin-go',), ['0', '0', '1', '0', '1', '1'])):
+                  '--enable-plugin-statsd', '--enable-plugin-ipmi', '--enable-plugin-dem', '--enable-plugin-wmi'), set(flags)),
+                (('--disable-plugin-go',), {'ENABLE_SCRIPTS', 'ENABLE_IPMI', 'ENABLE_DEM'})):
             with self.subTest(options=options):
                 result = subprocess.run(['bash', '-c', parser + output, 'installer-fixture', *options],
                                         capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout.splitlines(), expected)
+                self.assertEqual(result.stdout.splitlines(), ['1' if flag in enabled else '0' for flag in flags])
         begin = source.index('NEED_GO_TOOLCHAIN=0')
         end = source.index('# If we\'re installing the IBM plugin', begin)
         script = parser + '\n' + source[begin:end] + '\nprintf "%s\\n" "$NEED_GO_TOOLCHAIN"\n'

@@ -1,0 +1,419 @@
+plugin_name: wmi.plugin
+modules:
+  - meta:
+      id: collector-wmi.plugin-windows
+      plugin_name: wmi.plugin
+      module_name: windows
+      monitored_instance:
+        name: Windows (WMI)
+        link: https://learn.microsoft.com/en-us/windows/win32/wmisdk/wmi-start-page
+        icon_filename: windows.svg
+        categories:
+          - data-collection.operating-systems
+      keywords:
+        - windows
+        - windows server
+        - wmi
+        - windows management instrumentation
+        - wql
+        - dcom
+        - winrm
+        - agentless
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor CPU, memory, network traffic and disk space on Windows hosts remotely over WMI, without installing anything on them.
+
+          A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
+
+          - total CPU utilization;
+          - used and available physical memory;
+          - received and sent traffic per network interface;
+          - used and free space per fixed drive;
+          - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address.
+        method_description: |
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group, and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+
+          It authenticates as the configured Windows account with NTLMv2 and uses one of two transports:
+
+          | Transport | Ports on the Windows host | Protection |
+          |---|---|---|
+          | DCOM (default) | TCP 135 (RPC endpoint mapper) and the dynamic RPC port of the WMI service | NTLMv2 with RPC packet privacy (encrypted) |
+          | WinRM | TCP 5986 (HTTPS listener) | TLS; the poller verifies the listener certificate |
+
+          These are the WMI classes it reads, for audit and access reviews:
+
+          | Data | WMI classes |
+          |---|---|
+          | CPU | `Win32_PerfRawData_PerfOS_Processor` |
+          | Memory | `Win32_OperatingSystem` |
+          | Network | `Win32_PerfRawData_Tcpip_NetworkInterface` |
+          | Disk | `Win32_LogicalDisk` |
+          | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
+      supported_platforms:
+        include: [Linux, Windows]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The Windows account needs remote read access to WMI on each monitored host. Members of the host's local Administrators group have it. For a dedicated non-administrator account, grant:
+
+          | Permission | Needed when |
+          |---|---|
+          | **Enable Account** and **Remote Enable** on the `root\cimv2` WMI namespace | Always |
+          | Membership in the local **Distributed COM Users** group | `transport: dcom` |
+          | Membership in the local **Remote Management Users** group | `transport: winrm` |
+          | Membership in the local **Performance Monitor Users** group | The CPU or network group is enabled |
+
+          The plugin only reads: do not grant **Execute Methods**, write or full-control permissions. See [Securing a remote WMI connection](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
+      default_behavior:
+        auto_detection:
+          description: The plugin does not discover Windows hosts. The stock configuration has no jobs, so it contacts no host until you add one.
+        limits:
+          description: |
+            - Authentication is NTLMv2 only. Hosts or domains that block NTLM and accept only Kerberos cannot be monitored.
+            - Every collection logs in again. With a wrong or expired password, each collection adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
+            - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
+            - CPU is the total across all processors, without a per-core breakdown.
+            - Traffic appears from the second collection after a job starts, because a rate needs two readings.
+            - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
+            - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
+        performance_impact:
+          description: |
+            The poller's own cost is small: a few short-lived connections per job per collection.
+
+            On each Windows host, every collection costs up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`). DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+    setup:
+      prerequisites:
+        list:
+          - title: Build the plugin from source
+            description: |
+              Netdata packages do not include this experimental plugin yet. On the poller, build and install Netdata from source with the plugin enabled:
+
+              ```bash
+              ./netdata-installer.sh --enable-plugin-wmi
+              ```
+
+              CMake builds use `-DENABLE_PLUGIN_WMI=ON`. Check that `wmi.plugin` is in the Netdata plugins directory, usually `/usr/libexec/netdata/plugins.d/`.
+          - title: Allow the poller through the Windows firewall
+            description: |
+              On each Windows host, allow inbound connections from the poller for the transport you use. In PowerShell as Administrator, replace `192.0.2.10` with the poller's address.
+
+              For DCOM, enable the built-in WMI rules and limit them to the poller:
+
+              ```powershell
+              Enable-NetFirewallRule -DisplayGroup "Windows Management Instrumentation (WMI)"
+              Set-NetFirewallRule -DisplayGroup "Windows Management Instrumentation (WMI)" -RemoteAddress 192.0.2.10
+              ```
+
+              For WinRM, allow the HTTPS listener port:
+
+              ```powershell
+              New-NetFirewallRule -DisplayName "WinRM HTTPS from Netdata" -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress 192.0.2.10 -Action Allow
+              ```
+
+              Network firewalls between the poller and the host need the same ports. DCOM's WMI port is dynamic, by default in the TCP range 49152-65535.
+          - title: Create a WinRM HTTPS listener
+            description: |
+              WinRM only. The host needs a server authentication certificate whose subject or subject alternative name matches the `host` you configure, in the computer's Personal certificate store. Then create the listener in PowerShell as Administrator:
+
+              ```powershell
+              winrm quickconfig -transport:https
+              ```
+
+              If a private CA issued the certificate, copy the CA certificate in PEM format to the poller and set `tls_ca` to its path. See [Configure WinRM for HTTPS](https://learn.microsoft.com/en-us/troubleshoot/windows-client/system-management-components/configure-winrm-for-https).
+          - title: Grant the monitoring account access to WMI
+            description: |
+              Skip this step for an account in the host's local Administrators group. Otherwise, grant the permissions listed under Overview:
+
+              1. Add the account to the local groups, for example for DCOM:
+
+                 ```powershell
+                 Add-LocalGroupMember -Group "Distributed COM Users" -Member 'EXAMPLE\monitor'
+                 Add-LocalGroupMember -Group "Performance Monitor Users" -Member 'EXAMPLE\monitor'
+                 ```
+
+                 For WinRM, use the group `Remote Management Users` instead of `Distributed COM Users`.
+              2. Run `wmimgmt.msc`, open the properties of **WMI Control**, and on the **Security** tab select `Root\CIMV2`. Click **Security**, add the account, and allow **Enable Account** and **Remote Enable**.
+
+              A local account other than the built-in Administrator gets a filtered token for remote connections even when it is an administrator (remote UAC), so treat it as a non-administrator account and grant the permissions above.
+      configuration:
+        file:
+          name: wmi/windows.conf
+          description: Define one job per Windows host.
+        options:
+          description: Each job monitors one Windows host. Set `update_every` or `autodetection_retry` at the top of the file to apply them to every job.
+          folding:
+            title: Options
+            enabled: false
+          list:
+            - name: host
+              description: "Hostname or IP address of the Windows host."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: transport
+              description: "Protocol that carries the WMI queries. DCOM uses TCP 135 and a dynamic RPC port; WinRM uses HTTPS on TCP 5986."
+              default_value: dcom
+              required: false
+              group: Connection
+            - name: tls_ca
+              description: "Path on the poller to the PEM file of the CA that issued the WinRM listener certificate. Leave empty to use the system trust store."
+              default_value: ''
+              required: false
+              group: Connection
+            - name: auth
+              description: "Authentication protocol for the Windows account. NTLMv2 is the only supported protocol."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: username
+              description: "Windows account that reads WMI on the host, as `DOMAIN\\user`, `user@domain` or a local account name."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: password
+              description: "Password of the Windows account."
+              default_value: ''
+              required: true
+              group: Connection
+              detailed_description: |
+                Keep the password out of the configuration file with a secret reference, for example `${env:WMI_PASSWORD}` with the variable set in the Netdata service environment. See [secrets management](/src/collectors/SECRETS.md).
+            - name: update_every
+              description: "Data collection interval, in seconds."
+              default_value: 30
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
+              default_value: 0
+              required: false
+              group: Collection
+            - name: timeout
+              description: "Time limit for one collection, including the connection and every enabled query, in seconds."
+              default_value: 15
+              required: false
+              group: Collection
+            - name: collectors
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection. Keep at least one group enabled."
+              default_value: ''
+              required: false
+              group: Collection
+            - name: collectors.cpu
+              description: "Collect total processor utilization."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.memory
+              description: "Collect used and available physical memory."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.network
+              description: "Collect received and sent traffic per network interface."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.disk
+              description: "Collect used and free space per fixed drive."
+              default_value: true
+              required: false
+              group: Collection
+            - name: vnode
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
+              default_value: ''
+              required: false
+              group: Virtual Node
+              detailed_description: |
+                Leave `vnode` empty and the job creates a node for the Windows host. Its identity comes from `host`: renaming the Windows computer keeps the node and its history, while changing `host` creates a new node. The node is named after the Windows computer name, carries `host` in the `address` label, and gets these labels from WMI, refreshed every five minutes. A label is left out when Windows does not report its value unambiguously.
+
+                | Labels | Meaning |
+                |---|---|
+                | `_os_name`, `_os_version`, `_os_marketing_version`, `_os_edition`, `_kernel_version` | Windows product, edition, version and build |
+                | `_hw_sys_vendor`, `_hw_product_name`, `_virtualization`, `_virt_detection`, `_hw_product_type` | Manufacturer, model, and the platform of a recognized virtual machine |
+                | `_system_cores`, `_architecture`, `_system_cpu_model`, `_system_cpu_freq` | Logical processors, architecture, processor model and clock in Hz |
+                | `_system_ram_total` | Sum of the installed memory modules, in bytes |
+                | `_system_disk_space` | Total partition size of the fixed drives, in bytes; requires the disk group |
+                | `_net_default_iface`, `_net_default_iface_ip`, `_net_default_iface_detection` | Interface and IPv4 address of the default route |
+
+                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information.
+        examples:
+          folding:
+            title: Configuration example
+            enabled: false
+          list:
+            - name: Basic
+              description: Monitor one Windows host over DCOM. The password comes from the `WMI_PASSWORD` environment variable of the Netdata service.
+              config: |
+                jobs:
+                  - name: fileserver
+                    host: fileserver.example.com
+                    auth: ntlm
+                    username: 'EXAMPLE\monitor'
+                    password: '${env:WMI_PASSWORD}'
+            - name: WinRM over HTTPS with a private CA
+              description: Use the host's WinRM HTTPS listener instead of DCOM, trusting the CA that issued its certificate.
+              config: |
+                jobs:
+                  - name: fileserver
+                    host: fileserver.example.com
+                    transport: winrm
+                    tls_ca: /etc/netdata/ssl/windows-ca.pem
+                    auth: ntlm
+                    username: 'EXAMPLE\monitor'
+                    password: '${env:WMI_PASSWORD}'
+            - name: CPU and memory only
+              description: Skip the network and disk queries.
+              config: |
+                jobs:
+                  - name: fileserver
+                    host: fileserver.example.com
+                    auth: ntlm
+                    username: 'EXAMPLE\monitor'
+                    password: '${env:WMI_PASSWORD}'
+                    collectors:
+                      network: false
+                      disk: false
+            - name: Multi-instance
+              description: Monitor several Windows hosts with one account. Each job creates its own node.
+              config: |
+                jobs:
+                  - name: fileserver
+                    host: fileserver.example.com
+                    auth: ntlm
+                    username: 'EXAMPLE\monitor'
+                    password: '${env:WMI_PASSWORD}'
+
+                  - name: sqlserver
+                    host: sql01.example.com
+                    auth: ntlm
+                    username: 'EXAMPLE\monitor'
+                    password: '${env:WMI_PASSWORD}'
+    troubleshooting:
+      errors:
+        list:
+          - error: 'job output: collector lifecycle failed; resolved configuration details redacted'
+            when: The job's password, or another option, is a secret reference such as `${env:WMI_PASSWORD}`.
+            cause: The job failed to start. The Agent hides the reason for jobs that use secret references, because error text can contain resolved values.
+            fix: |
+              Find the reason on the Windows host or with the other entries below. A rejected login appears in the host's Security event log as event 4625 from the poller's address.
+
+              :::caution
+              To see the plugin's own message, you can temporarily replace the secret reference with the password itself, read the log, and restore the reference. The password is then stored in the configuration file in plain text until you restore it.
+              :::
+          - error: 'auth must be ntlm'
+            cause: The job omits `auth` or sets another value. The option has no default.
+            fix: 'Add `auth: ntlm` to the job.'
+          - error: 'tls_ca requires the winrm transport'
+            cause: 'The job sets `tls_ca` without `transport: winrm`. DCOM does not use TLS.'
+            fix: 'Add `transport: winrm`, or remove `tls_ca` to keep DCOM.'
+          - error: 'host must be a Windows hostname or IP address without a URL or port'
+            cause: '`host` is empty or contains a scheme, path, port or other characters that are not part of a hostname.'
+            fix: Set `host` to the bare name or address, for example `fileserver.example.com` instead of `https://fileserver.example.com:5986`.
+          - error: 'username is required'
+            cause: '`username` is empty, or names a domain with nothing after the backslash.'
+            fix: Set the full account name, such as `EXAMPLE\monitor` or `monitor@example.com`.
+          - error: 'at least one collector group must be enabled'
+            cause: Every group under `collectors` is set to `false`.
+            fix: Enable at least one of `cpu`, `memory`, `network` or `disk`, or remove `collectors` to collect them all.
+          - error: 'failed to open WMI session: open DCOM object resolver interface: connection refused'
+            when: '`transport: dcom`'
+            cause: Nothing accepts connections on TCP 135 at the configured `host`, or a firewall rejects them.
+            fix: Enable the Windows Management Instrumentation (WMI) firewall rules for the poller, as described under Prerequisites, and check that `host` points at the Windows host.
+          - error: 'failed to open WMI session: open DCOM object resolver interface: could not resolve the WMI host'
+            when: '`transport: dcom`'
+            cause: The poller cannot resolve the configured `host` name.
+            fix: Use a name the poller resolves, such as the host's fully qualified domain name, or its IP address.
+          - error: 'failed to open WMI session: read DCOM server version: ERROR_ACCESS_DENIED (0x00000005)'
+            when: '`transport: dcom`'
+            cause: The host rejected the login. The username or password is wrong, or the host does not accept NTLMv2.
+            fix: Check `username` and `password`, including the domain part of the username, and that the host's network security policy allows NTLMv2. Fix it promptly or disable the job, because every collection retries the login and counts toward account lockout.
+          - error: 'failed to open WMI session: activate WMI: E_ACCESSDENIED (0x80070005)'
+            when: '`transport: dcom`, with a non-administrator account'
+            cause: The account may log in but is not allowed to start WMI remotely over DCOM.
+            fix: Add the account to the host's local **Distributed COM Users** group.
+          - error: 'failed to open WMI session: open WMI root/cimv2 namespace: StatusAccessDenied (0x80041003)'
+            when: '`transport: dcom`, with a non-administrator account'
+            cause: The account lacks the **Enable Account** or **Remote Enable** permission on the `root\cimv2` WMI namespace.
+            fix: Grant both permissions in `wmimgmt.msc`, as described under Prerequisites.
+          - error: 'WMI collection did not finish within the `duration` timeout: context deadline exceeded'
+            cause: The host did not answer in time. With DCOM, the usual cause is a firewall that allows TCP 135 but blocks the WMI service's dynamic RPC port, or a `host` that is not reachable at all.
+            fix: Allow the poller through to the WMI service, as described under Prerequisites. If the host is reachable but slow, raise `timeout`.
+          - error: 'failed to open WMI session: WinRM returned HTTP 401'
+            when: '`transport: winrm`'
+            cause: The listener rejected the login. The username or password is wrong, or the account may not use WinRM.
+            fix: Check `username` and `password`; every collection retries the login and counts toward account lockout. For a non-administrator account, add it to the host's local **Remote Management Users** group.
+          - error: 'failed to open WMI session: WinRM server certificate verification failed'
+            when: '`transport: winrm`'
+            cause: The poller does not trust the listener certificate, or the certificate does not match the configured `host`.
+            fix: Set `tls_ca` to the PEM file of the CA that issued the listener certificate, and set `host` to a name in the certificate.
+          - error: 'failed to open WMI session: WinRM request failed: connection refused'
+            when: '`transport: winrm`'
+            cause: Nothing accepts connections on TCP 5986 at the configured `host`, or a firewall rejects them.
+            fix: Create the HTTPS listener and allow TCP 5986 from the poller, as described under Prerequisites.
+          - error: 'failed to open WMI session: WinRM request failed: could not resolve the WMI host'
+            when: '`transport: winrm`'
+            cause: The poller cannot resolve the configured `host` name.
+            fix: Use a name the poller resolves and that matches the listener certificate, such as the host's fully qualified domain name.
+          - error: '`group` WMI query failed: WinRM returned a WS-Management fault'
+            when: '`transport: winrm`'
+            cause: The listener accepted the login but refused the query, most often because the account lacks permissions on the `root\cimv2` WMI namespace.
+            fix: Grant **Enable Account** and **Remote Enable** on `root\cimv2` in `wmimgmt.msc`, as described under Prerequisites.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        - Charts belong to the Windows host's node, not to the poller.
+        - CPU utilization and traffic are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
+        - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
+      availability: []
+      scopes:
+        - name: global
+          description: The monitored Windows host.
+          labels: []
+          metrics:
+            - name: wmi.cpu_utilization
+              description: CPU Utilization
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: wmi.memory_usage
+              description: Physical Memory Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+        - name: network interface
+          description: A network interface as Windows performance counters list it, including virtual and tunnel adapters.
+          labels:
+            - name: interface
+              description: Performance counter name of the interface, for example `Intel[R] PRO_1000 MT Network Connection`. Windows writes parentheses as square brackets and `#` or `/` as underscores.
+          metrics:
+            - name: wmi.network_traffic
+              description: Network Interface Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: drive
+          description: A fixed drive with a drive letter.
+          labels:
+            - name: drive
+              description: Drive letter, for example `C:`.
+          metrics:
+            - name: wmi.disk_space
+              description: Fixed Disk Space
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free

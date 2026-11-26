@@ -1,0 +1,215 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Windows (WMI) collector configuration.",
+    "type": "object",
+    "properties": {
+      "host": {
+        "title": "Host",
+        "description": "Hostname or IP address of the Windows host.",
+        "type": "string",
+        "minLength": 1
+      },
+      "transport": {
+        "title": "Transport",
+        "description": "Protocol that carries the WMI queries. DCOM uses TCP 135 and a dynamic RPC port; WinRM uses HTTPS on TCP 5986.",
+        "type": "string",
+        "enum": [
+          "dcom",
+          "winrm"
+        ],
+        "default": "dcom"
+      },
+      "auth": {
+        "title": "Authentication",
+        "description": "Authentication protocol for the Windows account. NTLMv2 is the only supported protocol.",
+        "type": "string",
+        "enum": [
+          "ntlm"
+        ]
+      },
+      "username": {
+        "title": "Username",
+        "description": "Windows account that reads WMI on the host, as `DOMAIN\\user`, `user@domain` or a local account name.",
+        "type": "string",
+        "minLength": 1
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password of the Windows account.",
+        "type": "string",
+        "minLength": 1
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 30
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Time limit for one collection, including the connection and every enabled query, in seconds.",
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 15
+      },
+      "collectors": {
+        "title": "Metric groups",
+        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection. Keep at least one group enabled.",
+        "type": "object",
+        "properties": {
+          "cpu": {
+            "title": "CPU",
+            "description": "Collect total processor utilization.",
+            "type": "boolean",
+            "default": true
+          },
+          "memory": {
+            "title": "Memory",
+            "description": "Collect used and available physical memory.",
+            "type": "boolean",
+            "default": true
+          },
+          "network": {
+            "title": "Network",
+            "description": "Collect received and sent traffic per network interface.",
+            "type": "boolean",
+            "default": true
+          },
+          "disk": {
+            "title": "Disk",
+            "description": "Collect used and free space per fixed drive.",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "host",
+      "auth",
+      "username",
+      "password"
+    ],
+    "dependencies": {
+      "transport": {
+        "oneOf": [
+          {
+            "properties": {
+              "transport": {
+                "const": "dcom"
+              }
+            }
+          },
+          {
+            "properties": {
+              "transport": {
+                "const": "winrm"
+              },
+              "tls_ca": {
+                "title": "TLS CA file",
+                "description": "Path on the poller to the PEM file of the CA that issued the WinRM listener certificate. Leave empty to use the system trust store.",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:order": [
+      "host",
+      "transport",
+      "tls_ca",
+      "auth",
+      "username",
+      "password",
+      "update_every",
+      "autodetection_retry",
+      "timeout",
+      "collectors",
+      "vnode"
+    ],
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Connection",
+          "fields": [
+            "host",
+            "transport",
+            "tls_ca",
+            "auth",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "timeout",
+            "collectors"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
+    },
+    "host": {
+      "ui:placeholder": "windows.example.com",
+      "ui:help": "The value identifies the job's virtual node, so changing it later creates a new node. With WinRM, it must match a name in the listener certificate."
+    },
+    "transport": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true,
+        "enumNames": [
+          "DCOM",
+          "WinRM (HTTPS)"
+        ]
+      },
+      "ui:help": "DCOM needs no extra Windows service: enable the built-in Windows Management Instrumentation (WMI) firewall rules. The RPC traffic is encrypted.\n\nWinRM needs an HTTPS listener with a certificate the poller trusts. It uses one fixed port, which is easier to allow through firewalls between networks."
+    },
+    "tls_ca": {
+      "ui:placeholder": "/etc/netdata/ssl/windows-ca.pem"
+    },
+    "auth": {
+      "ui:options": {
+        "enumNames": [
+          "NTLMv2"
+        ]
+      }
+    },
+    "username": {
+      "ui:placeholder": "EXAMPLE\\monitor"
+    },
+    "password": {
+      "ui:widget": "password",
+      "ui:placeholder": "${env:WMI_PASSWORD}"
+    },
+    "vnode": {
+      "ui:placeholder": "windows-server",
+      "ui:help": "Leave empty and the job creates a virtual node for the Windows host, named after its computer name. To use a virtual node you manage instead, define it in `vnodes.conf` first, then enter its name here."
+    }
+  }
+}
