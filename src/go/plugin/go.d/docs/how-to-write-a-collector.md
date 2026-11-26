@@ -162,8 +162,8 @@ discovery continue using `Init()` and `Check()`; they never call `Test()`.
 has run. Return an error when the operation fails or cannot be performed; a Test error does not fall back to Check.
 Collectors retain the existing lifecycle error policy. Without secret references, error text is returned as-is, so
 `Test()` MUST return response-safe errors and MUST NOT include credentials or sensitive endpoint/configuration values.
-`dyncfg.NewPublicError` can separate a static public explanation from a private cause. With secret references, the
-framework replaces error text with a generic redacted message, including `NewPublicError` explanations.
+`dyncfg.NewPublicError` can separate a public explanation from a private cause. With secret references, the framework
+replaces error text with a generic redacted message except a public explanation (see secret-reference redaction below).
 `dyncfg.ErrTestUnsupported` still fails the test, but that redaction does not preserve its sentinel identity.
 
 Implementations MUST NOT log submitted or resolved credentials; reference-bearing configurations also receive
@@ -211,6 +211,23 @@ automatic activation is admitted. Manual `test` and rejected `update` still retu
 
 This startup annotation does not schedule retries or delay ordinary `Collect` calls. A running collector remains
 responsible for its own provider wait between collections.
+
+Secret-reference redaction: when a job's configuration resolved secret references (`${env:...}`, `${file:...}`,
+`${cmd:...}`, secret stores), the framework replaces its `Init`, `Check`, `Collect`, `Test` and `Run` error text, and
+every line of the collector's logger, with a generic redacted message. To keep a diagnostic visible, wrap text the
+collector guarantees to be secret-free in `dyncfg.NewPublicError(message, cause)`:
+
+- The message MUST be code-authored. It MAY include protocol status or error codes and the code-defined names of those
+  codes. It MUST NOT include any configuration value (any option, including hosts, URLs, user names and paths, may be a
+  reference), principal or account names, server-supplied or backend text, raw library errors or response bodies. The
+  `PublicError` type in `src/go/plugin/framework/dyncfg/public_error.go` owns this contract.
+- Errors keep only the first public message in the returned error tree; wrapping text and the private cause are
+  dropped. Classification (`PermanentError`, `TemporaryError`, `WithRetryNotBefore`, context errors) is preserved.
+- A log message keeps only the public message of its first argument that carries one, as in
+  `c.Limit(key, n, d).Warning(err)`; format text and other arguments are dropped. Each attribute value added with
+  `With` keeps only its own public message. Messages and values without one stay redacted.
+- `PublicError.Error()` returns only the message for every job, so the private cause is not shown even without
+  secret references. Panics are never public.
 
 Several source configs can share a module/job name. Before any candidate reaches readiness, an enabled source-owned
 job tries eligible alternatives at the highest owning source tier, including alternatives in other files. Each gets

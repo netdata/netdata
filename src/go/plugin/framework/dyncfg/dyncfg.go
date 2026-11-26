@@ -56,10 +56,10 @@ const (
 // Implementations must honor ctx and release resources acquired by the test.
 // They must return failures for caller-specific error handling instead of logging raw
 // user configuration, credentials, or endpoint material. NewPublicError may
-// attach a static, code-authored explanation that is safe to render publicly.
+// attach a code-authored explanation that is safe to render publicly.
 // Collectors must return response-safe error text: without secret references,
 // their lifecycle errors are returned as-is. With secret references, collector
-// sanitization replaces error text, including NewPublicError explanations, and
+// sanitization replaces error text except a NewPublicError explanation, and
 // does not preserve ErrTestUnsupported identity. Either case remains a failure.
 // Test may return ErrTestUnsupported when a valid configured instance cannot
 // safely perform an operational test.

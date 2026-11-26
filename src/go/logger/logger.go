@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"slices"
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
@@ -43,77 +44,83 @@ type Logger struct {
 	muted            atomic.Bool
 	sl               *slog.Logger
 	rl               *rateLimiter
-	messageSanitizer func(string) string
+	messageSanitizer MessageSanitizer
 }
+
+// MessageSanitizer replaces a log message before it is written. The operands
+// are the values the message was formatted from: the call arguments, or the
+// value of an attribute. They let a sanitizer recognize typed values that the
+// formatted text no longer identifies.
+type MessageSanitizer func(message string, operands []any) string
 
 func (l *Logger) Error(a ...any) {
 	if !l.canLog(slog.LevelError) {
 		return
 	}
-	l.log(slog.LevelError, fmt.Sprint(a...))
+	l.log(slog.LevelError, fmt.Sprint(a...), a)
 }
 
 func (l *Logger) Warning(a ...any) {
 	if !l.canLog(slog.LevelWarn) {
 		return
 	}
-	l.log(slog.LevelWarn, fmt.Sprint(a...))
+	l.log(slog.LevelWarn, fmt.Sprint(a...), a)
 }
 
 func (l *Logger) Notice(a ...any) {
 	if !l.canLog(levelNotice) {
 		return
 	}
-	l.log(levelNotice, fmt.Sprint(a...))
+	l.log(levelNotice, fmt.Sprint(a...), a)
 }
 
 func (l *Logger) Info(a ...any) {
 	if !l.canLog(slog.LevelInfo) {
 		return
 	}
-	l.log(slog.LevelInfo, fmt.Sprint(a...))
+	l.log(slog.LevelInfo, fmt.Sprint(a...), a)
 }
 
 func (l *Logger) Debug(a ...any) {
 	if !l.canLog(slog.LevelDebug) {
 		return
 	}
-	l.log(slog.LevelDebug, fmt.Sprint(a...))
+	l.log(slog.LevelDebug, fmt.Sprint(a...), a)
 }
 
 func (l *Logger) Errorf(format string, a ...any) {
 	if !l.canLog(slog.LevelError) {
 		return
 	}
-	l.log(slog.LevelError, fmt.Sprintf(format, a...))
+	l.log(slog.LevelError, fmt.Sprintf(format, a...), a)
 }
 
 func (l *Logger) Warningf(format string, a ...any) {
 	if !l.canLog(slog.LevelWarn) {
 		return
 	}
-	l.log(slog.LevelWarn, fmt.Sprintf(format, a...))
+	l.log(slog.LevelWarn, fmt.Sprintf(format, a...), a)
 }
 
 func (l *Logger) Noticef(format string, a ...any) {
 	if !l.canLog(levelNotice) {
 		return
 	}
-	l.log(levelNotice, fmt.Sprintf(format, a...))
+	l.log(levelNotice, fmt.Sprintf(format, a...), a)
 }
 
 func (l *Logger) Infof(format string, a ...any) {
 	if !l.canLog(slog.LevelInfo) {
 		return
 	}
-	l.log(slog.LevelInfo, fmt.Sprintf(format, a...))
+	l.log(slog.LevelInfo, fmt.Sprintf(format, a...), a)
 }
 
 func (l *Logger) Debugf(format string, a ...any) {
 	if !l.canLog(slog.LevelDebug) {
 		return
 	}
-	l.log(slog.LevelDebug, fmt.Sprintf(format, a...))
+	l.log(slog.LevelDebug, fmt.Sprintf(format, a...), a)
 }
 
 func (l *Logger) Mute()   { l.mute(true) }
@@ -132,7 +139,7 @@ func (l *Logger) With(args ...any) *Logger {
 	return ll
 }
 
-func sanitizeLogAttributes(sanitize func(string) string, attributes []any) []any {
+func sanitizeLogAttributes(sanitize MessageSanitizer, attributes []any) []any {
 	if sanitize == nil || len(attributes) == 0 {
 		return attributes
 	}
@@ -140,21 +147,20 @@ func sanitizeLogAttributes(sanitize func(string) string, attributes []any) []any
 	for index := 0; index < len(attributes); index++ {
 		switch attribute := attributes[index].(type) {
 		case slog.Attr:
+			value := attribute.Value.Any()
 			sanitized = append(sanitized, slog.String(
 				"redacted_attribute",
-				sanitizeLogMessage(sanitize, fmt.Sprint(attribute.Value.Any())),
+				sanitizeLogMessage(sanitize, fmt.Sprint(value), []any{value}),
 			))
 		case string:
 			sanitized = append(sanitized, "redacted_attribute")
 			if index+1 < len(attributes) {
 				index++
-				sanitized = append(
-					sanitized,
-					sanitizeLogMessage(sanitize, fmt.Sprint(attributes[index])),
-				)
+				value := attributes[index]
+				sanitized = append(sanitized, sanitizeLogMessage(sanitize, fmt.Sprint(value), []any{value}))
 			}
 		default:
-			sanitized = append(sanitized, sanitizeLogMessage(sanitize, fmt.Sprint(attribute)))
+			sanitized = append(sanitized, sanitizeLogMessage(sanitize, fmt.Sprint(attribute), []any{attribute}))
 		}
 	}
 	return sanitized
@@ -162,7 +168,8 @@ func sanitizeLogAttributes(sanitize func(string) string, attributes []any) []any
 
 // WithMessageSanitizer returns a derived logger that sanitizes messages and
 // attributes added after this call. Existing attributes remain unchanged.
-func (l *Logger) WithMessageSanitizer(sanitize func(string) string) *Logger {
+// A panicking sanitizer or an empty result writes a generic redaction message.
+func (l *Logger) WithMessageSanitizer(sanitize MessageSanitizer) *Logger {
 	if l.isNil() {
 		l = New()
 	}
@@ -171,19 +178,19 @@ func (l *Logger) WithMessageSanitizer(sanitize func(string) string) *Logger {
 	return ll
 }
 
-func (l *Logger) log(level slog.Level, msg string) {
+func (l *Logger) log(level slog.Level, msg string, operands []any) {
 	if l.isNil() {
 		nilLogger.sl.Log(context.Background(), level, msg)
 		return
 	}
 
 	if !l.muted.Load() {
-		msg = sanitizeLogMessage(l.messageSanitizer, msg)
+		msg = sanitizeLogMessage(l.messageSanitizer, msg, operands)
 		l.sl.Log(context.Background(), level, msg)
 	}
 }
 
-func sanitizeLogMessage(sanitize func(string) string, message string) (sanitized string) {
+func sanitizeLogMessage(sanitize MessageSanitizer, message string, operands []any) (sanitized string) {
 	if sanitize == nil {
 		return message
 	}
@@ -191,7 +198,9 @@ func sanitizeLogMessage(sanitize func(string) string, message string) (sanitized
 	defer func() {
 		_ = recover()
 	}()
-	if result := sanitize(message); result != "" {
+	// Handing the sanitizer a copy keeps every caller's variadic argument slice
+	// off the heap; loggers without a sanitizer must not pay for this path.
+	if result := sanitize(message, slices.Clone(operands)); result != "" {
 		sanitized = result
 	}
 	return sanitized
