@@ -161,7 +161,7 @@ func writeUpsStatus(mx map[string]int64, ups upsUnit) {
 	}
 	mx[px+"other"] = 0
 
-	for st := range strings.SplitSeq(ups.vars[varUpsStatus], " ") {
+	for st := range strings.FieldsSeq(ups.vars[varUpsStatus]) {
 		if _, ok := upsStatuses[st]; ok {
 			mx[px+st] = 1
 		} else {
