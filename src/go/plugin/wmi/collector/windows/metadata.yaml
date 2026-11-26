@@ -96,6 +96,7 @@ modules:
             - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it; its node turns Stale and the `wmi_host_last_collected_secs` alert reports it instead.
             - A host that cannot be reached when its job starts gets no node and no host status alert until the job collects from it, twice for the alert. Set `autodetection_retry` so the job keeps trying.
             - Stopping or removing a job leaves its charts on the generated node, which then turns Stale. A job restarted after an edit does not remove the charts it no longer sends, such as those of a metric group you switched off: they stay on the node without new data.
+            - With `update_every` shorter than `timeout`, one unusually slow collection can raise `wmi_host_last_collected_secs` for a moment. Keep `update_every` at least as long as `timeout`, as the defaults (30 and 15 seconds) are.
             - After five failed collections in a row, the plugin waits longer between attempts, up to 10 minutes more than `update_every`. A host that comes back after a long outage can take that long to turn live again.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
@@ -431,7 +432,7 @@ modules:
               ```
           - error: 'The host''s node is Stale and the `wmi_host_last_collected_secs` alert is critical'
             cause: The poller has missed two to three collections in a row from the host. The host is down or unreachable, or it rejects the login. The job logs the reason with every failed collection, as one of the errors above.
-            fix: Fix the cause the job logs. With the next successful collection the node turns live again and the alert clears; the alert's recovery notification follows 5 minutes later.
+            fix: Fix the cause the job logs. With the next successful collection the node turns live again and the alert clears; the alert's recovery notification is delayed by at least 5 minutes.
           - error: '`group` WMI query failed: WinRM returned a WS-Management fault'
             when: '`transport: winrm`'
             cause: The listener accepted the login but refused the query, most often because the account lacks permissions on the `root\cimv2` WMI namespace.
