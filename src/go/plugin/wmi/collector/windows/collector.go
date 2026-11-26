@@ -49,7 +49,7 @@ type Collector struct {
 	metrics       collectorMetrics
 	vnode         *vnodes.VirtualNode
 	nextInventory time.Time
-	lastCPU       cpuTimes
+	lastCPU       cpuSample
 
 	winrmTLS   *tls.Config
 	newSession func(context.Context) (querySession, error)

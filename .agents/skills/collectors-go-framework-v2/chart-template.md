@@ -35,7 +35,8 @@ a *leaf* is the innermost family that holds charts.
   Only the spec-level value prefixes autogen contexts (`src/go/plugin/framework/charttpl/README.md`), so per-group
   copies of the root leave unmatched metrics outside the namespace, and a missing root lets a group named after
   another collector emit into that collector's contexts. Use a root other than the module name only when the
-  collector deliberately shares one with a sibling collector.
+  collector deliberately shares one with a sibling collector. A collector that reproduces an OS host's native contexts
+  (Shared Contexts) has no single root: it omits the spec-level value and sets one per group.
 - **Derived ids.** Omit chart `id`; chartengine derives it from the composed context with dots replaced by
   underscores (`src/go/plugin/framework/chartengine/compiler.go`). An existing collector whose
   ids differ from the derived value keeps them; V1-to-V2 migrations follow
@@ -137,6 +138,10 @@ a *leaf* is the innermost family that holds charts.
   `src/collectors/common-contexts/`) unless its data describes the host the Agent runs on. A job that polls a remote
   target (a BMC, a device, a cloud API) publishes under its own namespace; node placement is the vnode's job
   (`./go-v2-host-scope.md`). The one-namespace rule above makes this checkable in one line.
+- Exception: a collector whose generated vnode stands for a whole remote OS host MAY emit that OS's native contexts,
+  so the stock alerts and dashboard sections apply (`src/go/plugin/wmi/collector/windows/`). It MUST match the
+  native producer as the next bullet requires, test that against the native source, set the vnode's `_os` label, and
+  list its plugin's platform in `PLUGIN_PLATFORMS` (`integrations/health_alerts.py`).
 - Reusing a shared context requires the same units, dimension names and states and equivalent labels as the other
   producers: the agent merges title, family, units, type and priority of every instance of a context into one
   definition (`rrdcontext_merge_with` in `src/database/contexts/rrdcontext-context.c`), and the model requires
@@ -181,5 +186,5 @@ a *leaf* is the innermost family that holds charts.
 - Families read as operator navigation; sections carry the only priorities, if any.
 - Statesets use inferred dimensions unless order or naming needs explicit ones; state metrics carry a state suffix.
 - Labels attached at the source are the documented set; no stamped labels re-added.
-- No host-owned contexts from a remote-target collector.
+- No host-owned contexts from a remote-target collector, except an OS-host vnode under Shared Contexts.
 - Go tests validate and cross-check artifacts; none restates template or alert content.

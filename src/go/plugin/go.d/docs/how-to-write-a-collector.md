@@ -330,7 +330,8 @@ Native providers reuse their prepared pointer until content changes; see
 `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`. Every static template MUST define:
 
 - `version: v1`;
-- `context_namespace`;
+- `context_namespace`, unless the collector reproduces an OS host's native contexts (see the chart template topic
+  below);
 
 Templates SHOULD also group charts by operational area, use `instances.by_labels` for stable instance identity when
 charts are entity-scoped, and keep the default lifecycle unless a concrete reason exists to override it. Defaults,

@@ -43,7 +43,8 @@ PLATFORMS = ('linux', 'freebsd', 'macos', 'windows')
 
 # Plugins the build compiles for some platforms only: the daemon's built-in plugins per OS in
 # packaging/cmake/Modules/NetdataDaemon.cmake, the external ones in NetdataOptions.cmake (eBPF and the Go IPMI and
-# IBM plugins are Linux-only). A plugin not listed here runs on every platform.
+# IBM plugins are Linux-only). A plugin not listed here runs on every platform. wmi.plugin runs on the poller but
+# charts remote Windows hosts on nodes it labels `_os=windows`, so that is the platform its alerts see.
 PLUGIN_PLATFORMS = {
     'cgroups.plugin': ('linux',),
     'charts.d.plugin': ('linux', 'freebsd', 'macos'),
@@ -66,6 +67,7 @@ PLUGIN_PLATFORMS = {
     'tc.plugin': ('linux',),
     'timex.plugin': ('linux', 'freebsd', 'macos'),
     'windows.plugin': ('windows',),
+    'wmi.plugin': ('windows',),
     'xenstat.plugin': ('linux',),
 }
 
