@@ -93,39 +93,43 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_waste_evict_spins;
 };
 
-static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *ptrs, struct pgc_statistics *pgc_stats, struct pgc_statistics *pgc_stats_old __maybe_unused, const char *name, int priority) {
+// creates one chart of the "dbengine <name> cache" family:
+// id "dbengine_<name>_<id_suffix>", title "Netdata <name> <title_suffix>"
+static RRDSET *dbengine2_cache_chart_create(const char *name, const char *id_suffix, const char *context, const char *title_suffix, const char *units, int priority, RRDSET_TYPE type) {
+    char id[RRD_ID_LENGTH_MAX + 1];
+    snprintfz(id, sizeof(id), "dbengine_%s_%s", name, id_suffix);
+
+    char family[256];
+    snprintfz(family, sizeof(family), "dbengine %s cache", name);
+
+    char title[256];
+    snprintfz(title, sizeof(title), "Netdata %s %s", name, title_suffix);
+
+    return rrdset_create_localhost(
+        "netdata",
+        id,
+        NULL,
+        family,
+        context,
+        title,
+        units,
+        "netdata",
+        "pulse",
+        priority,
+        localhost->rrd_update_every,
+        type);
+}
+
+static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *ptrs, struct pgc_statistics *pgc_stats, struct pgc_statistics *pgc_stats_old, const char *name, int priority) {
 
     {
         if (unlikely(!ptrs->st_cache_hit_ratio)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_hit_ratio", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Hit Ratio", name);
-
-            ptrs->st_cache_hit_ratio = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "%",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+            ptrs->st_cache_hit_ratio = dbengine2_cache_chart_create(
+                name, "cache_hit_ratio", NULL, "Cache Hit Ratio", "%", priority, RRDSET_TYPE_LINE);
 
             ptrs->rd_hit_ratio_closest = rrddim_add(ptrs->st_cache_hit_ratio, "closest", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_hit_ratio_exact = rrddim_add(ptrs->st_cache_hit_ratio, "exact", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -145,28 +149,8 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_operations)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_operations", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Operations", name);
-
-            ptrs->st_operations = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "ops/s",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+            ptrs->st_operations = dbengine2_cache_chart_create(
+                name, "cache_operations", NULL, "Cache Operations", "ops/s", priority, RRDSET_TYPE_LINE);
 
             ptrs->rd_searches_closest   = rrddim_add(ptrs->st_operations, "search closest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_searches_exact     = rrddim_add(ptrs->st_operations, "search exact", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -178,9 +162,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_releases           = rrddim_add(ptrs->st_operations, "releases", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_acquires_for_deletion = rrddim_add(ptrs->st_operations, "del acquires", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -199,28 +180,8 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_memory", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Memory", name);
-
-            ptrs->st_pgc_memory = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "bytes",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_STACKED);
+            ptrs->st_pgc_memory = dbengine2_cache_chart_create(
+                name, "cache_memory", NULL, "Cache Memory", "bytes", priority, RRDSET_TYPE_STACKED);
 
             ptrs->rd_pgc_memory_free     = rrddim_add(ptrs->st_pgc_memory, "free",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_memory_hot      = rrddim_add(ptrs->st_pgc_memory, "hot",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -230,9 +191,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_memory_evicting = rrddim_add(ptrs->st_pgc_memory, "evicting", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_memory_flushing = rrddim_add(ptrs->st_pgc_memory, "flushing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -268,31 +226,14 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         }
 
         if (unlikely(!ptrs->queues[q].st_pgc_page_size_heatmap)) {
-            CLEAN_BUFFER *ctx = buffer_create(100, NULL);
-            buffer_sprintf(ctx, "netdata.dbengine_%s_page_sizes", name);
+            char ctx[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(ctx, sizeof(ctx), "netdata.dbengine_%s_page_sizes", name);
 
-            CLEAN_BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_%s_page_sizes", name, queue);
+            char id_suffix[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id_suffix, sizeof(id_suffix), "%s_page_sizes", queue);
 
-            CLEAN_BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            CLEAN_BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Nominal Page Sizes (without overheads)", name);
-
-            ptrs->queues[q].st_pgc_page_size_heatmap = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                buffer_tostring(ctx),
-                buffer_tostring(title),
-                "pages",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_HEATMAP);
+            ptrs->queues[q].st_pgc_page_size_heatmap = dbengine2_cache_chart_create(
+                name, id_suffix, ctx, "Nominal Page Sizes (without overheads)", "pages", priority, RRDSET_TYPE_HEATMAP);
 
             ptrs->queues[q].rd_pgc_page_size_x[0] = rrddim_add(ptrs->queues[q].st_pgc_page_size_heatmap, "empty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             for(size_t i = 1; i < _countof(ptrs->queues[q].rd_pgc_page_size_x) - 1 ;i++) {
@@ -317,28 +258,8 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_tm)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_target_memory", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Target Cache Memory", name);
-
-            ptrs->st_pgc_tm = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "bytes",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+            ptrs->st_pgc_tm = dbengine2_cache_chart_create(
+                name, "target_memory", NULL, "Target Cache Memory", "bytes", priority, RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_tm_current    = rrddim_add(ptrs->st_pgc_tm, "current",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_tm_wanted     = rrddim_add(ptrs->st_pgc_tm, "wanted",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -348,9 +269,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_tm_hot        = rrddim_add(ptrs->st_pgc_tm, "hot",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_tm_dirty      = rrddim_add(ptrs->st_pgc_tm, "dirty",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -367,37 +285,14 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_pages)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_pages", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Pages", name);
-
-            ptrs->st_pgc_pages = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "pages",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+            ptrs->st_pgc_pages = dbengine2_cache_chart_create(
+                name, "cache_pages", NULL, "Cache Pages", "pages", priority, RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_pages_clean   = rrddim_add(ptrs->st_pgc_pages, "clean", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_pages_hot     = rrddim_add(ptrs->st_pgc_pages, "hot", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_pages_dirty   = rrddim_add(ptrs->st_pgc_pages, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_pages_referenced = rrddim_add(ptrs->st_pgc_pages, "referenced", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -411,36 +306,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory_changes)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_memory_changes", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Memory Changes", name);
-
-            ptrs->st_pgc_memory_changes = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "bytes/s",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_AREA);
+            ptrs->st_pgc_memory_changes = dbengine2_cache_chart_create(
+                name, "cache_memory_changes", NULL, "Cache Memory Changes", "bytes/s", priority, RRDSET_TYPE_AREA);
 
             ptrs->rd_pgc_memory_new_clean         = rrddim_add(ptrs->st_pgc_memory_changes, "new clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_clean_evictions   = rrddim_add(ptrs->st_pgc_memory_changes, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_new_hot           = rrddim_add(ptrs->st_pgc_memory_changes, "new hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -453,35 +325,12 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory_migrations)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_memory_migrations", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Memory Migrations", name);
-
-            ptrs->st_pgc_memory_migrations = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "bytes/s",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_AREA);
+            ptrs->st_pgc_memory_migrations = dbengine2_cache_chart_create(
+                name, "cache_memory_migrations", NULL, "Cache Memory Migrations", "bytes/s", priority, RRDSET_TYPE_AREA);
 
             ptrs->rd_pgc_memory_dirty_to_clean    = rrddim_add(ptrs->st_pgc_memory_migrations, "dirty to clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_hot_to_dirty      = rrddim_add(ptrs->st_pgc_memory_migrations, "hot to dirty", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -493,36 +342,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory_events)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_events", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Events", name);
-
-            ptrs->st_pgc_memory_events = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "events/s",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_AREA);
+            ptrs->st_pgc_memory_events = dbengine2_cache_chart_create(
+                name, "cache_events", NULL, "Cache Events", "events/s", priority, RRDSET_TYPE_AREA);
 
             ptrs->rd_pgc_memory_evictions_aggressive = rrddim_add(ptrs->st_pgc_memory_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_evictions_critical   = rrddim_add(ptrs->st_pgc_memory_events, "evictions critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_flushes_critical     = rrddim_add(ptrs->st_pgc_memory_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -535,28 +361,8 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_waste)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_waste_events", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Waste Events", name);
-
-            ptrs->st_pgc_waste = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "events/s",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+            ptrs->st_pgc_waste = dbengine2_cache_chart_create(
+                name, "waste_events", NULL, "Waste Events", "events/s", priority, RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_waste_evict_relocated          = rrddim_add(ptrs->st_pgc_waste, "evict relocated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_waste_flushes_cancelled        = rrddim_add(ptrs->st_pgc_waste, "flushes cancelled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -568,9 +374,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_waste_flush_inline_on_add      = rrddim_add(ptrs->st_pgc_waste, "flush inline on add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_waste_flush_inline_on_release  = rrddim_add(ptrs->st_pgc_waste, "flush inline on rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -589,28 +392,8 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_workers)) {
-            BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_cache_workers", name);
-
-            BUFFER *family = buffer_create(100, NULL);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Cache Workers", name);
-
-            ptrs->st_pgc_workers = rrdset_create_localhost(
-                "netdata",
-                buffer_tostring(id),
-                NULL,
-                buffer_tostring(family),
-                NULL,
-                buffer_tostring(title),
-                "workers",
-                "netdata",
-                "pulse",
-                priority,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+            ptrs->st_pgc_workers = dbengine2_cache_chart_create(
+                name, "cache_workers", NULL, "Cache Workers", "workers", priority, RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_workers_searchers = rrddim_add(ptrs->st_pgc_workers, "searchers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_workers_adders    = rrddim_add(ptrs->st_pgc_workers, "adders",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -619,9 +402,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_workers_hot2dirty = rrddim_add(ptrs->st_pgc_workers, "hot2dirty",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             ptrs->rd_pgc_workers_jv2_flushers = rrddim_add(ptrs->st_pgc_workers, "jv2 flushers",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
             priority++;
         }
 
@@ -639,9 +419,9 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 void pulse_dbengine_do(bool extended) {
     static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {}, extent_cache_ptrs = {};
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
-    static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {}; (void)pgc_main_stats_old;
-    static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {}; (void)pgc_open_stats_old;
-    static struct pgc_statistics pgc_extent_stats = {}, pgc_extent_stats_old = {}; (void)pgc_extent_stats_old;
+    static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {};
+    static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {};
+    static struct pgc_statistics pgc_extent_stats = {}, pgc_extent_stats_old = {};
     static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
@@ -657,6 +437,9 @@ void pulse_dbengine_do(bool extended) {
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
+    // the total below includes the metrics registry, also when the extended charts are off
+    if(main_mrg)
+        mrg_get_statistics(main_mrg, &mrg_stats);
 
     struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
 
@@ -682,7 +465,6 @@ void pulse_dbengine_do(bool extended) {
     dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
     dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
     dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
-    mrg_get_statistics(main_mrg, &mrg_stats);
 
     int priority = 135000;
     {

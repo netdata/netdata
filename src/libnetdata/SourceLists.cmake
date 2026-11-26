@@ -249,14 +249,10 @@ set(LIBNETDATA_FILES
         os/windows-perflib/perflib-dump.c
         os/windows-pdh/windows-pdh.c
         os/windows-pdh/windows-pdh.h
-        os/system-maps/cached-uid-username.c
-        os/system-maps/cached-uid-username.h
+        os/system-maps/cached-uid-gid-names.c
+        os/system-maps/cached-uid-gid-names.h
         os/system-maps/cached-sid-username.c
         os/system-maps/cached-sid-username.h
-        os/system-maps/cached-gid-groupname.c
-        os/system-maps/cached-gid-groupname.h
-        os/system-maps/cache-host-users-and-groups.c
-        os/system-maps/cache-host-users-and-groups.h
         spawn_server/spawn_server_nofork.c
         spawn_server/spawn_server.h
         spawn_server/spawn_popen.c

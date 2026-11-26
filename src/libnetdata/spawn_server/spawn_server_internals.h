@@ -91,6 +91,7 @@ struct spawn_instance {
 
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
     HANDLE process_handle;
+    HANDLE job_handle;  // the child and all its descendants; killed on close until the child exits normally
     DWORD dwProcessId;
     LOG_FORWARDER_TOKEN stderr_log_token;
 #endif

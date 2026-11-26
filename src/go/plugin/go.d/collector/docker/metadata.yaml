@@ -17,30 +17,44 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords:
-        - container
+        - docker
+        - docker engine
+        - dockerd
+        - moby
+        - containers
+        - container health
+        - images
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Docker containers state, health status and more.
+          Monitor Docker Engine containers and images: container states and health, each container's status, and image usage and size.
+
+          - **Totals**: containers running, paused and exited, and containers per health check status.
+          - **Per container**: the state and health check status of each container, by name and image, with an optional chart of its writable layer size.
+          - **Images**: active and dangling images and the disk space all images take.
         method_description: |
-          It connects to the Docker instance via a TCP or UNIX socket and executes the following commands:
-          
-          - [System info](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemInfo), on every collection.
-          - [List images](https://docs.docker.com/engine/api/v1.43/#tag/Image/operation/ImageList), at most once every 5 minutes.
-          - [List containers](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerList), on every collection, once per container health status.
+          It connects to the Docker Engine API over a Unix socket or TCP and only reads; it never creates, starts, stops or removes anything. It makes these requests:
+
+          - [Ping](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemPing) (`HEAD /_ping`, then `GET /_ping` when needed), before the first request, to agree on the API version.
+          - [System info](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemInfo) (`GET /info`), on every collection.
+          - [List images](https://docs.docker.com/engine/api/v1.43/#tag/Image/operation/ImageList) (`GET /images/json`), at most once every 5 minutes.
+          - [List containers](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerList) (`GET /containers/json`), on every collection, once per container health status (four requests).
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: Requires netdata user to be in the docker group.
+        description: |
+          The `netdata` user needs access to the Docker socket (`/var/run/docker.sock`), which membership in the `docker` group grants. The collector only sends read requests, but the socket gives full control of the daemon. To restrict it, point `address` at a socket proxy that allows the ping, system info, image list and container list requests and nothing else.
       default_behavior:
         auto_detection:
           description: |
-            It discovers instances running on localhost by attempting to connect to a known Docker UNIX socket: `/var/run/docker.sock`.
+            The stock job connects to `unix:///var/run/docker.sock`. When the Agent's environment sets `DOCKER_HOST`, as the Netdata container image does, the job connects there instead.
         limits:
           description: |
-            The image list is refreshed about every 5 minutes, or on every collection when `update_every` is longer, so pulled and removed images can take that long to show. Whether an image is used by a container is updated on every collection.
+            - Image charts follow the image list, which is refreshed every 5 minutes (or on every collection when `update_every` is longer), so pulled and removed images can take that long to show. Whether an image is used by a container is updated on every collection.
+            - When a container is removed, its charts stop receiving values and are removed after 5 collections (50 seconds at the default `update_every`).
+            - The collector does not use TLS. A daemon that accepts TCP connections only with TLS (usually on port 2376) cannot be monitored over TCP; use its Unix socket or a socket proxy instead.
         performance_impact:
           description: |
             The collector itself uses little CPU; the cost falls on the Docker daemon, which does the work for each API request. On Docker Engine 29 and later with the containerd image store, listing images and containers costs `dockerd` and `containerd` CPU time that grows with the number of images and containers ([moby/moby#53077](https://github.com/moby/moby/issues/53077)).
@@ -48,7 +62,17 @@ modules:
             The defaults keep this low: data is collected every 10 seconds, and the image list is requested at most once every 5 minutes. Lowering `update_every` increases daemon CPU usage. Enabling `collect_container_size` may result in high CPU usage, depending on the Docker Engine version.
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Give the netdata user access to the Docker socket
+            description: |
+              Applies when the Agent runs on the Docker host. The Netdata installers and native packages add the `netdata` user to the `docker` group when that group exists at install time. If Docker was installed after Netdata, add the user and restart the Agent:
+
+              ```bash
+              sudo usermod -aG docker netdata
+              sudo systemctl restart netdata
+              ```
+
+              `sudo -u netdata docker info` succeeds once the access is in place. The Netdata container image needs no action: it joins the group of the mounted socket at startup.
       configuration:
         file:
           name: go.d/docker.conf
@@ -59,42 +83,40 @@ modules:
             title: Config options
             enabled: true
           list:
-            - name: update_every
-              description: Data collection interval (seconds).
-              default_value: 10
-              required: false
-              group: Collection
-            - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
-              default_value: 0
-              required: false
-              group: Collection
-
             - name: address
-              description: "Docker daemon address. For TCP sockets: `tcp://IP:PORT`."
+              description: "Docker daemon address: a Unix socket (`unix://` and a path) or a TCP endpoint (`tcp://` and a host and port)."
               default_value: unix:///var/run/docker.sock
               required: true
               group: Target
             - name: timeout
-              description: Request timeout (seconds).
+              description: Docker API request timeout, in seconds.
               default_value: 2
               required: false
               group: Target
-
             - name: container_selector
-              description: "Container selector. Defines which containers to monitor. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme)."
+              description: "Names of the containers that get their own charts, as a [simple pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). Leave empty to chart every container; the totals always count every container."
+              detailed_description: |
+                A container labeled `netdata.cloud/ignore=true` (or `yes`) gets no charts of its own, whatever the selector matches; the totals and image usage still count it.
               default_value: "*"
               required: false
-              group: Filters
-
+              group: Containers
             - name: collect_container_size
-              description: Collect container writable layer size metrics.
+              description: Adds a chart of each container's writable layer size. Docker computes the sizes on every collection, which can cost the daemon significant CPU and disk I/O.
               default_value: no
               required: false
-              group: Metrics Selection
-
+              group: Containers
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 10
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
+              default_value: 0
+              required: false
+              group: Collection
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
               group: Virtual Node
@@ -104,28 +126,65 @@ modules:
             title: Config
           list:
             - name: Basic
-              description: An example configuration.
+              description: A local Docker Engine on the default socket.
               folding:
                 enabled: false
               config: |
                 jobs:
                   - name: local
                     address: 'unix:///var/run/docker.sock'
-            - name: Multi-instance
-              description: |
-                > **Note**: When you define multiple jobs, their names must be unique.
-                
-                Collecting metrics from local and remote instances.
+            - name: Monitor selected containers
+              description: Gives every container except those whose names start with `test-` its own charts. The totals still count all containers.
               config: |
                 jobs:
                   - name: local
                     address: 'unix:///var/run/docker.sock'
-                
+                    container_selector: '!test-* *'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from a local daemon and a remote daemon listening on TCP.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'unix:///var/run/docker.sock'
+
                   - name: remote
                     address: 'tcp://203.0.113.10:2375'
     troubleshooting:
-      problems:
-        list: []
+      errors:
+        list:
+          - error: "getting system info: permission denied while trying to connect to the docker API at `address`"
+            cause: The `netdata` user cannot open the Docker socket. It is not in the `docker` group, or it was added after the Agent started.
+            fix: Add the `netdata` user to the `docker` group and restart the Agent, as described in Prerequisites.
+          - error: "getting system info: failed to connect to the docker API at `address`; check if the path is correct and if the daemon is running: dial unix `path`: connect: no such file or directory"
+            cause: No socket exists at `address`. Docker is not installed or not running, it uses another socket (rootless Docker listens on `unix:///run/user/1000/docker.sock` for user ID 1000), or a containerized Agent does not have the host socket mounted.
+            fix: Start Docker, or set `address` to the socket the daemon listens on. For a containerized Agent, mount the socket with `-v /var/run/docker.sock:/var/run/docker.sock:ro`.
+          - error: "getting system info: Cannot connect to the Docker daemon at `address`. Is the docker daemon running?"
+            cause: Nothing accepts connections at `address`. The socket file exists but the daemon is stopped, or a TCP endpoint refuses or does not answer the connection.
+            fix: Start Docker. For a TCP `address`, check that the daemon or socket proxy listens on that host and port and that a firewall does not block it.
+          - error: "`operation`: Get \"`url`\": context deadline exceeded"
+            cause: The Docker daemon did not answer within `timeout` (2 seconds by default). Listing containers and images takes longest, on hosts with many of them and with `collect_container_size` enabled.
+            fix: Raise `timeout`, for example to `5`. If `collect_container_size` is enabled and the sizes are not needed, disable it.
+          - error: "getting system info: Error response from daemon: Client sent an HTTP request to an HTTPS server."
+            cause: "`address` is a TCP endpoint that requires TLS, and the collector does not use TLS."
+            fix: Monitor the daemon through its Unix socket, with the Agent on the Docker host, or through a socket proxy that accepts plain connections.
+          - error: "`operation`: Error response from daemon: `<html><body><h1>403 Forbidden</h1>` Request forbidden by administrative rules. `</body></html>`"
+            when: The Agent reaches Docker through an HAProxy-based socket proxy, such as `tecnativa/docker-socket-proxy`.
+            cause: The proxy refuses one of the requests the collector makes. The [socket proxy example](/packaging/docker/README.md#with-docker-socket-proxy) in the Netdata Docker guide allows only container requests, which is enough for container name resolution but not for this collector.
+            fix: |
+              Allow the system info, image list and container list requests. With `tecnativa/docker-socket-proxy`, set these environment variables on the proxy (it allows ping by default):
+
+              ```text
+              CONTAINERS=1
+              IMAGES=1
+              INFO=1
+              ```
+          - error: "`operation`: Error response from daemon: client version `version` is too new. Maximum supported API version is `version`"
+            when: The Agent reaches Docker through a socket proxy.
+            cause: The proxy refuses the ping request, so the collector cannot agree on an API version with the daemon and uses its newest one, which the daemon does not support.
+            fix: Allow `HEAD` and `GET` requests to `/_ping` on the proxy. `tecnativa/docker-socket-proxy` allows them by default (`PING=1`).
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
@@ -203,7 +262,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: These metrics refer to the entire monitored application.
+          description: Totals for the Docker Engine the job connects to.
           labels: []
           metrics:
             - name: docker.containers_state
@@ -213,7 +272,7 @@ modules:
               dimensions:
                 - name: running
                 - name: paused
-                - name: stopped
+                - name: exited
             - name: docker.containers_health_status
               description: Total number of Docker containers in various health states
               unit: containers
@@ -238,12 +297,12 @@ modules:
               dimensions:
                 - name: size
         - name: container
-          description: Metrics related to containers. Each container provides its own set of the following metrics.
+          description: One container, by name, for containers the `container_selector` matches and that do not carry the `netdata.cloud/ignore` label. The writable layer size chart needs `collect_container_size`.
           labels:
             - name: container_name
-              description: The container's name
+              description: Container name, for example `nginx-proxy`.
             - name: image
-              description: The image name the container uses
+              description: Image the container was created from, for example `nginx:1.27`.
           metrics:
             - name: docker.container_state
               description: Docker container state
@@ -269,7 +328,7 @@ modules:
                 - name: no_healthcheck
             - name: docker.container_writeable_layer_size
               description: Docker container writable layer size
-              unit: size
+              unit: bytes
               chart_type: line
               dimensions:
-                - name: writeable_layer
+                - name: writable_layer

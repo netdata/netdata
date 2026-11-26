@@ -71,6 +71,7 @@ option(ENABLE_ALARM_NOTIFY_GO "Build the experimental Go notifier for local deve
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
+option(ENABLE_UNITTESTS "Build the unit tests and test tools behind netdata -W into the agent" True)
 option(ENABLE_DASHBOARD "Enable local dashboard" True)
 mark_as_advanced(ENABLE_DASHBOARD)
 
@@ -86,7 +87,7 @@ cmake_dependent_option(ENABLE_PLUGIN_IPMI "Enable the Go IPMI plugin (ipmi.plugi
 cmake_dependent_option(ENABLE_PLUGIN_DEM "Enable digital experience monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
-option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 
 option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_PLUGIN_CHARTS "Enable metric collectors written in Bash" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
@@ -135,6 +136,15 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
+
+# buildinfo shows the compiler and linker flags of the build, and the CMake
+# cache is installed next to the agent for the same purpose. Both name the
+# build tree and the sysroot (-I, -L, -ffile-prefix-map), so the installed
+# files differ between two builds of the same source in different locations.
+# Turn this off to keep them out of the installed files. That removes this
+# source of differences, it does not make a build reproducible on its own.
+option(RECORD_BUILD_ENVIRONMENT "Record the compiler flags and the CMake cache of the build in the installed agent" True)
+mark_as_advanced(RECORD_BUILD_ENVIRONMENT)
 
 # The user account the installed agent runs as; reaches the service templates,
 # edit-config and config.h. The last -D-only knob of the settable-but-declared-

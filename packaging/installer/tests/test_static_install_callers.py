@@ -34,6 +34,28 @@ class StaticCallerTests(unittest.TestCase):
         return subprocess.run(['sh', '-c', script], cwd=self.scratch, env=environment,
                               text=True, capture_output=True)
 
+    def test_kickstart_summarizes_failed_curl_probe(self):
+        curl = self.root / 'curl'
+        curl.write_text('#!/bin/sh\nexit 60\n')
+        curl.chmod(0o755)
+        prefix = 'https://example.invalid/static%20build'
+        env = {'PATH': f'{self.root}{os.pathsep}{os.environ["PATH"]}', 'TMPDIR': str(self.root),
+               'ROOTCMD': 'env', 'NETDATA_ARTIFACT_URL_PREFIX': prefix}
+        result = subprocess.run(
+            ['sh', str(INSTALLER / 'kickstart.sh'), '--disable-telemetry', '--no-cleanup', '--static-only',
+             '--prepare-offline-install-source', 'bundle'],
+            cwd=self.root, env=env, text=True, capture_output=True)
+
+        self.assertEqual(result.returncode, 1, result.stderr)
+        header = 'The following non-fatal warnings or errors were encountered:\n'
+        self.assertIn(header, result.stderr)
+        summary = result.stderr.split(header, 1)[1]
+        url = f'{prefix}/Manifest'
+        self.assertIn(f'\n  - Command "{curl} --write-out %{{http_code}} ', summary)
+        self.assertIn(f'{url}" failed with exit code 60.\n'
+                      f'  - TLS error while connecting to remote host when checking for remote file at {url}\n',
+                      summary)
+
     def archive(self, status=37, create_prefix=False):
         archive = self.root / 'fixture.run'
         body = '#!/bin/sh\n'
