@@ -102,18 +102,25 @@ from a small, sparse set of triggers — they do NOT fire on every metric
 write:
 
 - **Connect** — `stream_sender_on_ready_to_dispatch` at
-  `stream-sender.c:157` calls `stream_path_send_to_parent(localhost)` when
-  the sender becomes ready.
+  `stream-sender.c:181` calls `stream_path_send_to_parent(s->host)` when
+  the host's sender becomes ready.
 - **Retention boundary movement** — `rrdcontext_post_process_updates` at
-  `rrdcontext-worker.c:99-104` calls `stream_path_retention_updated(host)`
+  `rrdcontext-worker.c:109` calls `stream_path_retention_updated(host)`
   only when `host->retention.first_time_s` changes. This is sparse — once
   per DB rotation / archive event.
-- **node_id update** — `sqlite_metadata.c:288` (when persisted) and
-  `command-nodeid.c:163` (when receiving a NODE_ID command from a child)
-  call `stream_path_node_id_updated(host)`.
-- **Parent disconnect** — `stream-sender.c:171` calls
-  `stream_path_parent_disconnected(s->host)` when our upstream connection
-  drops. This truncates self's stored chain back to localhost.
+- **node_id update** — `sqlite_metadata.c:347` (when persisted) and
+  `command-nodeid.c:161` (when the sender receives a NODE_ID command from
+  its parent) call `stream_path_node_id_updated(host)`.
+- **Parent disconnect** — every running sender leaves the dispatcher
+  through `stream_sender_move_running_to_connector_or_remove_internal`,
+  which calls `stream_path_parent_disconnected(s->host)`
+  (`stream-sender.c:497`) whether the sender will reconnect or is being
+  removed. This truncates the host's stored chain after the localhost
+  entry and sends the truncated chain to the child, so a reconnection
+  to another parent starts from `[..., self]` and the old parent is not
+  carried over. `stream_sender_on_disconnect` (`stream-sender.c:207`)
+  truncates again when a sender waiting in the connector queue is
+  cancelled or removed.
 
 Storage convergence has lag. Right after a child connects, the parent's
 storage of the child's path is `[child]` only. After the next sparse trigger
