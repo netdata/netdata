@@ -3,6 +3,8 @@
 package jobruntime
 
 import (
+	"time"
+
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -14,8 +16,12 @@ type jobSelfMetrics struct {
 	name             string
 	labels           map[string]string
 	published        bool
-	durationUpdated  bool
-	emission         jobSelfMetricsEmission
+	// Run times of each chart's last delivered sample, zero before the first.
+	// The Agent places a sample by the interval it carries, so the interval
+	// spans every run since that sample: the duration chart skips failed runs,
+	// and any run whose output was rejected delivered nothing.
+	statusAt, durationAt time.Time
+	emission             jobSelfMetricsEmission
 }
 
 func newJobSelfMetrics(
@@ -51,9 +57,10 @@ func newJobSelfMetrics(
 	}
 }
 
+// prepare writes the run's samples; run is the time the run started.
 func (m *jobSelfMetrics) prepare(
 	api *netdataapi.API,
-	sinceLastRun int,
+	run time.Time,
 	elapsed int64,
 	success, redefine bool,
 ) *jobSelfMetricsEmission {
@@ -62,11 +69,7 @@ func (m *jobSelfMetrics) prepare(
 		m.createChart(api, m.status, "success", "failed")
 		m.createChart(api, m.duration, "duration")
 	}
-	statusInterval := sinceLastRun
-	if !m.published {
-		statusInterval = 0
-	}
-	api.BEGIN("netdata", m.status.ID, statusInterval)
+	api.BEGIN("netdata", m.status.ID, calcSinceLastRun(run, m.statusAt))
 	if success {
 		api.SET("success", 1)
 		api.SET("failed", 0)
@@ -76,17 +79,14 @@ func (m *jobSelfMetrics) prepare(
 	}
 	api.END()
 	if success {
-		durationInterval := sinceLastRun
-		if !m.durationUpdated {
-			durationInterval = 0
-		}
-		api.BEGIN("netdata", m.duration.ID, durationInterval)
+		api.BEGIN("netdata", m.duration.ID, calcSinceLastRun(run, m.durationAt))
 		api.SET("duration", elapsed)
 		api.END()
 	}
 	m.emission = jobSelfMetricsEmission{
-		metrics:         m,
-		durationUpdated: m.durationUpdated || success,
+		metrics: m,
+		run:     run,
+		success: success,
 	}
 	return &m.emission
 }
@@ -123,20 +123,25 @@ func (m *jobSelfMetrics) cleanup(api *netdataapi.API) {
 
 func (m *jobSelfMetrics) clear() {
 	m.published = false
-	m.durationUpdated = false
+	m.statusAt = time.Time{}
+	m.durationAt = time.Time{}
 	m.emission = jobSelfMetricsEmission{}
 }
 
 type jobSelfMetricsEmission struct {
-	metrics         *jobSelfMetrics
-	durationUpdated bool
-	settled         bool
+	metrics *jobSelfMetrics
+	run     time.Time
+	success bool
+	settled bool
 }
 
 func (e *jobSelfMetricsEmission) Commit() error {
 	if e != nil && !e.settled {
 		e.metrics.published = true
-		e.metrics.durationUpdated = e.durationUpdated
+		e.metrics.statusAt = e.run
+		if e.success {
+			e.metrics.durationAt = e.run
+		}
 		e.settled = true
 	}
 	return nil

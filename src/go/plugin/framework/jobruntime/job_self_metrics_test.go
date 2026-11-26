@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -325,6 +327,119 @@ func TestJobSelfMetricsVersionSemantics(t *testing.T) {
 			assertSelfChartsLocal(t, out.String())
 		})
 	}
+}
+
+// The Agent places a sample by the interval its BEGIN carries and trusts it up
+// to five update intervals, so each self chart's interval must span every run
+// since that chart's previous delivered sample. Otherwise its samples, and the
+// health variable $last_collected_t, fall behind after a failed or rejected run.
+func TestJobSelfMetricsSampleIntervals(t *testing.T) {
+	type run struct {
+		failed, rejected bool
+	}
+	// Runs are ten seconds apart. A failed run delivers status but no duration;
+	// a rejected run delivers nothing.
+	runs := []run{{}, {failed: true}, {failed: true}, {}, {rejected: true}, {}}
+	want := []map[string]string{
+		{"status": "", "duration": ""},
+		{"status": "10000000"},
+		{"status": "10000000"},
+		{"status": "10000000", "duration": "30000000"},
+		{},
+		{"status": "20000000", "duration": "20000000"},
+	}
+	for name, version := range map[string]int{"v1": 1, "v2": 2} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var out bytes.Buffer
+				var current run
+				output := writeFunc(func(payload []byte) (int, error) {
+					if current.rejected && bytes.Contains(payload, []byte("_data_collection_")) {
+						return 0, errors.New("self output rejected")
+					}
+					return out.Write(payload)
+				})
+				var runOnce func()
+				if version == 1 {
+					charts := collectorapi.Charts{&collectorapi.Chart{
+						ID:    "work",
+						Title: "Work",
+						Units: "units",
+						Dims:  collectorapi.Dims{{ID: "value"}},
+					}}
+					job := NewJob(JobConfig{
+						PluginName: "go.d",
+						ModuleName: "test",
+						Name:       "job",
+						FullName:   "test_job",
+						Module: &collectorapi.MockCollectorV1{
+							ChartsFunc: func() *collectorapi.Charts { return &charts },
+							CollectFunc: func(context.Context) map[string]int64 {
+								if current.failed {
+									return nil
+								}
+								return map[string]int64{"value": 7}
+							},
+						},
+						Out: output,
+					})
+					require.NoError(t, job.AutoDetectionManaged(context.Background()))
+					runOnce = job.runOnce
+				} else {
+					store := metrix.NewCollectorStore()
+					job := NewJobV2(JobV2Config{
+						PluginName: "go.d",
+						ModuleName: "test",
+						Name:       "job",
+						FullName:   "test_job",
+						Module: &mockModuleV2{
+							store:    store,
+							template: chartTemplateV2(),
+							collectFunc: func(context.Context) error {
+								if current.failed {
+									return errors.New("scrape failed")
+								}
+								store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(7)
+								return nil
+							},
+						},
+						Out: output,
+					})
+					require.NoError(t, job.AutoDetectionManaged(context.Background()))
+					runOnce = job.runOnce
+				}
+
+				var got []map[string]string
+				for i, r := range runs {
+					if i > 0 {
+						time.Sleep(10 * time.Second)
+					}
+					current = r
+					out.Reset()
+					runOnce()
+					got = append(got, selfChartIntervals(out.String()))
+				}
+				assert.Equal(t, want, got)
+			})
+		})
+	}
+}
+
+// selfChartIntervals maps each self chart's BEGIN in the output to its
+// interval in microseconds, "" when the BEGIN carries none.
+func selfChartIntervals(wire string) map[string]string {
+	intervals := make(map[string]string)
+	for line := range strings.SplitSeq(wire, "\n") {
+		rest, ok := strings.CutPrefix(line, "BEGIN 'netdata.")
+		if !ok || !strings.Contains(rest, "_data_collection_") {
+			continue
+		}
+		chart, interval, _ := strings.Cut(rest, "' ")
+		chart = strings.TrimSuffix(chart, "'")
+		chart = chart[strings.LastIndex(chart, "_")+1:]
+		intervals[chart] = interval
+	}
+	return intervals
 }
 
 func TestPrometheusJobCollectionSelfMetrics(t *testing.T) {
