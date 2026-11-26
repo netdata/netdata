@@ -114,7 +114,7 @@ modules:
 
               CMake builds use `-DENABLE_PLUGIN_WMI=ON`. Check that `wmi.plugin` is in the Netdata plugins directory, usually `/usr/libexec/netdata/plugins.d/`.
 
-              The installer also gives `wmi.plugin` the `CAP_NET_RAW` capability, which ping needs. Without the `setcap` tool, or inside a container, it cannot, and prints a warning; the plugin then collects without ping charts.
+              The installer also gives `wmi.plugin` the `CAP_NET_RAW` capability, which ping needs. When the `setcap` tool is missing, or the installer runs inside a container, it does not, and prints a warning; the plugin then collects without ping charts until you grant the capability (see the `ICMP ping disabled` error under Troubleshooting).
           - title: Allow the poller through the Windows firewall
             description: |
               On each Windows host, allow inbound connections from the poller for the transport you use. In PowerShell as Administrator, replace `192.0.2.10` with the poller's address.
@@ -398,7 +398,7 @@ modules:
             cause: The poller cannot resolve the configured `host` name.
             fix: Use a name the poller resolves and that matches the listener certificate, such as the host's fully qualified domain name.
           - error: 'ICMP ping disabled: the plugin may not open raw ICMP sockets, which on Linux requires the CAP_NET_RAW capability'
-            cause: '`wmi.plugin` lacks the `CAP_NET_RAW` capability on the poller, for example because the installer ran without the `setcap` tool or the Agent runs in a container. The job logs this once and keeps collecting WMI metrics without ping charts.'
+            cause: '`wmi.plugin` lacks the `CAP_NET_RAW` capability on the poller, for example because the installer ran without the `setcap` tool or inside a container, where it does not set capabilities. The job logs this once and keeps collecting WMI metrics without ping charts.'
             fix: |
               Grant the capability, then restart the Netdata service:
 
@@ -406,7 +406,7 @@ modules:
               sudo setcap cap_net_raw+ep /usr/libexec/netdata/plugins.d/wmi.plugin
               ```
 
-              In a container, add the `NET_RAW` capability to the container instead.
+              In a container, run the same command inside it only when the container keeps `cap_net_raw` in its capability bounding set (`capsh --print` lists it under `Bounding set`). A binary whose file capability the container does not allow fails to start, which would stop all WMI collection.
           - error: 'ICMP ping failed: could not resolve the host'
             cause: The poller could not resolve the configured `host` name when it pinged the host, while the WMI queries of that collection succeeded. The usual cause is an intermittent DNS failure.
             fix: Use a name the poller resolves reliably, such as the host's fully qualified domain name, or its IP address.

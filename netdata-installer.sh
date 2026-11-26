@@ -1161,7 +1161,7 @@ if [ "$(id -u)" -eq 0 ]; then
     # no setuid-root fallback: without the capability the plugin skips ping.
     if iscontainer || ! command -v setcap 1> /dev/null 2>&1 ||
       ! run setcap cap_net_raw+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/wmi.plugin"; then
-      warning "wmi.plugin did not get the CAP_NET_RAW capability, so it cannot ping the Windows hosts it monitors. Grant it with: setcap cap_net_raw+ep ${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/wmi.plugin"
+      warning "wmi.plugin did not get the CAP_NET_RAW capability, so it cannot ping the Windows hosts it monitors. See the 'ICMP ping disabled' error in the Windows (WMI) integration's troubleshooting to grant it."
     fi
   fi
 

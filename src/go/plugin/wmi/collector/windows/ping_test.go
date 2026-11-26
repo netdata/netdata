@@ -20,6 +20,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
@@ -315,4 +317,64 @@ func TestPingNotPermitted(t *testing.T) {
 			assert.Equal(t, tc.want, pingNotPermitted(tc.err))
 		})
 	}
+}
+
+// The ping charts share the go.d ping collector's contexts, and the Agent
+// merges every instance of a context into one definition, so each chart must
+// keep that collector's definition. Its chart template is the oracle.
+func TestPingChartsMatchPingCollector(t *testing.T) {
+	type dimension struct {
+		name       string
+		multiplier int
+		divisor    int
+		hidden     bool
+	}
+	type chart struct {
+		title      string
+		family     string
+		units      string
+		chartType  string
+		dimensions []dimension
+	}
+	compile := func(templateYAML []byte) map[string]chart {
+		t.Helper()
+		spec, err := charttpl.DecodeYAML(templateYAML)
+		require.NoError(t, err)
+		program, err := chartengine.Compile(spec, 1)
+		require.NoError(t, err)
+		charts := make(map[string]chart)
+		for _, compiled := range program.Charts() {
+			def := chart{
+				title:     compiled.Meta.Title,
+				family:    compiled.Meta.Family,
+				units:     compiled.Meta.Units,
+				chartType: string(compiled.Meta.Type),
+			}
+			for _, dim := range compiled.Dimensions {
+				def.dimensions = append(def.dimensions, dimension{
+					name:       dim.NameTemplate.Raw,
+					multiplier: dim.Multiplier,
+					divisor:    dim.Divisor,
+					hidden:     dim.Hidden,
+				})
+			}
+			charts[compiled.Meta.Context] = def
+		}
+		return charts
+	}
+	pingTemplate, err := os.ReadFile("../../../go.d/collector/ping/charts.yaml")
+	require.NoError(t, err)
+	oracle := compile(pingTemplate)
+
+	var shared int
+	for context, published := range compile([]byte(chartTemplateYAML)) {
+		if !strings.HasPrefix(context, "ping.") {
+			continue
+		}
+		shared++
+		want, ok := oracle[context]
+		require.True(t, ok, "%s is not a ping collector context", context)
+		assert.Equal(t, want, published, context)
+	}
+	assert.Positive(t, shared)
 }

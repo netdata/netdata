@@ -267,12 +267,14 @@ func publishedCharts(t *testing.T) []wireChart {
 }
 
 // TestCollector_PublishesSharedContexts compares the published charts with the
-// other producers' definitions of the same contexts, the oracles: the native
-// Windows Agent's src/collectors/windows.plugin/perflib-processor.c
-// (system.cpu, cpu.cpu), src/collectors/common-contexts/system-ram.h
-// (system.ram), src/collectors/windows.plugin/perflib-network.c (net.net) and
-// src/collectors/windows.plugin/perflib-storage.c (disk.space), and the go.d
-// ping collector's src/go/plugin/go.d/collector/ping/charts.yaml (ping.*).
+// other producers' definitions of the same contexts. The oracles of the native
+// contexts are the native Windows Agent's
+// src/collectors/windows.plugin/perflib-processor.c (system.cpu, cpu.cpu),
+// src/collectors/common-contexts/system-ram.h (system.ram),
+// src/collectors/windows.plugin/perflib-network.c (net.net) and
+// src/collectors/windows.plugin/perflib-storage.c (disk.space). The ping.*
+// entries are the wire form of the go.d ping collector's definitions, which
+// TestPingChartsMatchPingCollector compares with that collector's template.
 // Native CPU dimensions use the percent-of-total-delta algorithm, which this
 // collector computes itself, so they arrive as absolute percentages. Families
 // are display metadata and not compared.

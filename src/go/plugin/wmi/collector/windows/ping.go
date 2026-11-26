@@ -44,8 +44,9 @@ func (c *Collector) initPinger() error {
 	return nil
 }
 
-// pingTimeout bounds one probe by the collection interval, within 1-3 seconds
-// as the SNMP collector does, and never beyond the collection timeout.
+// pingTimeout bounds the echo requests and replies of one probe by the
+// collection interval, within 1-3 seconds as the SNMP collector does, and never
+// beyond the collection timeout. Resolving a host name is not covered.
 func (c *Collector) pingTimeout() time.Duration {
 	timeout := time.Duration(c.UpdateEvery) * time.Second
 	timeout = max(min(timeout, maxPingTimeout), minPingTimeout)
