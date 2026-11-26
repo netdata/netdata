@@ -3180,7 +3180,7 @@ modules:
                 - name: sent
             - name: ipv4.udplite_errors
               description: IPv4 UDPLite Errors
-              unit: "packets/s"
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: RcvbufErrors
