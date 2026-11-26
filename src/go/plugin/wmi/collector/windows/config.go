@@ -3,7 +3,6 @@
 package windows
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 const (
@@ -62,35 +62,37 @@ func defaultConfig() Config {
 }
 
 // validate normalizes host and transport and reports the first invalid option.
-// The query transports rely on it and do not validate their inputs again.
+// The query transports rely on it and do not validate their inputs again. Its
+// messages never quote a configured value, so they are all public.
 func (c *Config) validate() error {
 	c.Host = strings.TrimSpace(c.Host)
 	if !validHost(c.Host) {
-		return errors.New("host must be a Windows hostname or IP address without a URL or port")
+		return publicError("host must be a Windows hostname or IP address without a URL or port")
 	}
 	if err := c.Transport.Validate(); err != nil {
-		return fmt.Errorf("transport %w", err)
+		// The validation error quotes the configured value, so it stays private.
+		return dyncfg.NewPublicError("transport must be dcom or winrm", fmt.Errorf("transport %w", err))
 	}
 	c.Transport = c.Transport.Normalized()
 	if c.TLSCA != "" && c.Transport != transportWinRM {
-		return errors.New("tls_ca requires the winrm transport")
+		return publicError("tls_ca requires the winrm transport")
 	}
 	if c.Auth != authNTLM {
-		return errors.New("auth must be ntlm")
+		return publicError("auth must be ntlm")
 	}
 	if logonAccount(c.Username) == "" {
-		return errors.New("username is required")
+		return publicError("username is required")
 	}
 	if c.Password == "" {
-		return errors.New("password is required")
+		return publicError("password is required")
 	}
 	if c.Timeout <= 0 {
-		return errors.New("timeout must be positive")
+		return publicError("timeout must be positive")
 	}
 	groups := c.Collectors
 	if !groupEnabled(groups.CPU) && !groupEnabled(groups.Memory) && !groupEnabled(groups.Network) &&
 		!groupEnabled(groups.Disk) {
-		return errors.New("at least one collector group must be enabled")
+		return publicError("at least one collector group must be enabled")
 	}
 	return nil
 }

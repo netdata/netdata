@@ -348,7 +348,7 @@ func TestCollector_TimeoutNamesTheLimit(t *testing.T) {
 
 		err := c.Check(t.Context())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.EqualError(t, err, "WMI collection did not finish within the 15s timeout: context deadline exceeded")
+		assert.EqualError(t, err, "WMI collection did not finish within the timeout of 15s")
 		assert.Equal(t, []string{queryCPU}, session.queries)
 	})
 }

@@ -297,15 +297,10 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: 'job output: collector lifecycle failed; resolved configuration details redacted'
+          - error: 'secret resolver: provider failure: job output: collector lifecycle failed; resolved configuration details redacted'
             when: The job's password, or another option, is a secret reference such as `${env:WMI_PASSWORD}`.
-            cause: The job failed to start. The Agent hides the reason for jobs that use secret references, because error text can contain resolved values.
-            fix: |
-              Find the reason on the Windows host or with the other entries below. A rejected login appears in the host's Security event log as event 4625 from the poller's address.
-
-              :::caution
-              To see the plugin's own message, you can temporarily replace the secret reference with the password itself, read the log, and restore the reference. The password is then stored in the configuration file in plain text until you restore it.
-              :::
+            cause: The Agent could not resolve the reference, for example because the variable is not set in the Netdata service environment. The Agent hides the details because they can contain resolved values. The plugin's own messages, listed below, still appear for jobs that use secret references.
+            fix: Set the variable in the environment of the Netdata service, or correct the reference, as described in [secrets management](/src/collectors/SECRETS.md#troubleshooting).
           - error: 'auth must be ntlm'
             cause: The job omits `auth` or sets another value. The option has no default.
             fix: 'Add `auth: ntlm` to the job.'
@@ -341,7 +336,7 @@ modules:
             when: '`transport: dcom`, with a non-administrator account'
             cause: The account lacks the **Enable Account** or **Remote Enable** permission on the `root\cimv2` WMI namespace.
             fix: Grant both permissions in `wmimgmt.msc`, as described under Prerequisites.
-          - error: 'WMI collection did not finish within the `duration` timeout: context deadline exceeded'
+          - error: 'WMI collection did not finish within the timeout of `duration`'
             cause: The host did not answer in time. With DCOM, the usual cause is a firewall that allows TCP 135 but blocks the WMI service's dynamic RPC port, or a `host` that is not reachable at all.
             fix: Allow the poller through to the WMI service, as described under Prerequisites. If the host is reachable but slow, raise `timeout`.
           - error: 'failed to open WMI session: WinRM returned HTTP 401'
