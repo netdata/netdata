@@ -139,8 +139,18 @@ echo "RET=$?"
                 self.assertEqual(result.stdout, expected_stdout + '\n')
                 self.assertEqual(result.stderr, expected_stderr)
 
-    def test_failures_without_http_status_are_fatal(self):
+    def test_gnu_proxy_diagnostic_does_not_change_the_response_status(self):
+        log = ('  HTTP/1.1 503 Service Unavailable\n'
+               '  Proxy-Status: edge; error=http_protocol_error; details="upstream returned HTTP/1.1 404"\n')
+        result = self.result(8, log)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'RET=6\n')
+
+    def test_failures_without_a_terminal_http_error_are_fatal(self):
         cases = {
+            'BusyBox redirect then connection refused': (
+                1, "  HTTP/1.1 302 Found\n  Location: /next\nwget: can't connect: Connection refused\n"),
+            'BusyBox truncated body': (1, '  HTTP/1.1 200 OK\nwget: connection closed prematurely\n'),
             'BusyBox without status line': (1, BUSYBOX_LOG_NO_STATUS),
             'BusyBox empty log': (1, ''),
             'unknown GNU exit status': (2, GNU_LOG_404),
