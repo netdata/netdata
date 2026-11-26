@@ -8,7 +8,7 @@
 # Static aarch64 builds run on Cortex-A53 boards (Raspberry Pi 3, ODROID-C2, ...). There an ADRP at page offset
 # 0xff8/0xffc followed by a load or store can use an address one page off, so a function pointer is loaded from the
 # wrong place and the agent dies at startup. Neither the CI runners' ARM cores nor QEMU exhibit the erratum, so the
-# runtime checks of the static build cannot catch a missing workaround; this scan can.
+# runtime checks of the static build cannot catch an unpatched sequence; this scan can.
 #
 # The sequence rules are a port of lld's scanner (llvm/llvm-project lld/ELF/AArch64ErrataFix.cpp), which follows
 # the Cortex-A53 Software Developers Errata Notice (ARM-EPM-048406). ld.bfd, which links the static build, patches a
