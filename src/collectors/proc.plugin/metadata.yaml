@@ -3944,7 +3944,8 @@ modules:
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per proc4 call
+                - name: "null"
+                - name: compound
             - name: nfsd.proc4ops
               description: NFS v4 Server Operations
               unit: "operations/s"

@@ -65,78 +65,6 @@ struct nfsd_procs nfsd_proc3_values[] = {
         {  ""           , 0ULL, 0, NULL}
 };
 
-struct nfsd_procs nfsd_proc4_values[] = {
-        {  "null"            , 0ULL, 0, NULL}
-        , {"read"            , 0ULL, 0, NULL}
-        , {"write"           , 0ULL, 0, NULL}
-        , {"commit"          , 0ULL, 0, NULL}
-        , {"open"            , 0ULL, 0, NULL}
-        , {"open_conf"       , 0ULL, 0, NULL}
-        , {"open_noat"       , 0ULL, 0, NULL}
-        , {"open_dgrd"       , 0ULL, 0, NULL}
-        , {"close"           , 0ULL, 0, NULL}
-        , {"setattr"         , 0ULL, 0, NULL}
-        , {"fsinfo"          , 0ULL, 0, NULL}
-        , {"renew"           , 0ULL, 0, NULL}
-        , {"setclntid"       , 0ULL, 0, NULL}
-        , {"confirm"         , 0ULL, 0, NULL}
-        , {"lock"            , 0ULL, 0, NULL}
-        , {"lockt"           , 0ULL, 0, NULL}
-        , {"locku"           , 0ULL, 0, NULL}
-        , {"access"          , 0ULL, 0, NULL}
-        , {"getattr"         , 0ULL, 0, NULL}
-        , {"lookup"          , 0ULL, 0, NULL}
-        , {"lookup_root"     , 0ULL, 0, NULL}
-        , {"remove"          , 0ULL, 0, NULL}
-        , {"rename"          , 0ULL, 0, NULL}
-        , {"link"            , 0ULL, 0, NULL}
-        , {"symlink"         , 0ULL, 0, NULL}
-        , {"create"          , 0ULL, 0, NULL}
-        , {"pathconf"        , 0ULL, 0, NULL}
-        , {"statfs"          , 0ULL, 0, NULL}
-        , {"readlink"        , 0ULL, 0, NULL}
-        , {"readdir"         , 0ULL, 0, NULL}
-        , {"server_caps"     , 0ULL, 0, NULL}
-        , {"delegreturn"     , 0ULL, 0, NULL}
-        , {"getacl"          , 0ULL, 0, NULL}
-        , {"setacl"          , 0ULL, 0, NULL}
-        , {"fs_locations"    , 0ULL, 0, NULL}
-        , {"rel_lkowner"     , 0ULL, 0, NULL}
-        , {"secinfo"         , 0ULL, 0, NULL}
-        , {"fsid_present"    , 0ULL, 0, NULL}
-        ,
-
-        /* nfsv4.1 client ops */
-        {  "exchange_id"     , 0ULL, 0, NULL}
-        , {"create_session"  , 0ULL, 0, NULL}
-        , {"destroy_session" , 0ULL, 0, NULL}
-        , {"sequence"        , 0ULL, 0, NULL}
-        , {"get_lease_time"  , 0ULL, 0, NULL}
-        , {"reclaim_comp"    , 0ULL, 0, NULL}
-        , {"layoutget"       , 0ULL, 0, NULL}
-        , {"getdevinfo"      , 0ULL, 0, NULL}
-        , {"layoutcommit"    , 0ULL, 0, NULL}
-        , {"layoutreturn"    , 0ULL, 0, NULL}
-        , {"secinfo_no"      , 0ULL, 0, NULL}
-        , {"test_stateid"    , 0ULL, 0, NULL}
-        , {"free_stateid"    , 0ULL, 0, NULL}
-        , {"getdevicelist"   , 0ULL, 0, NULL}
-        , {"bind_conn_to_ses", 0ULL, 0, NULL}
-        , {"destroy_clientid", 0ULL, 0, NULL}
-        ,
-
-        /* nfsv4.2 client ops */
-        {  "seek"            , 0ULL, 0, NULL}
-        , {"allocate"        , 0ULL, 0, NULL}
-        , {"deallocate"      , 0ULL, 0, NULL}
-        , {"layoutstats"     , 0ULL, 0, NULL}
-        , {"clone"           , 0ULL, 0, NULL}
-        ,
-
-        /* termination */
-        {  ""                , 0ULL, 0, NULL}
-};
-
 struct nfsd_procs nfsd4_ops_values[] = {
         {  "unused_op0"          , 0ULL, 0, NULL}
         , {"unused_op1"          , 0ULL, 0, NULL}
@@ -273,6 +201,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     unsigned long long th_threads = 0;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
+    unsigned long long proc4_null = 0, proc4_compound = 0;
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
@@ -406,18 +335,17 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_proc3 = 2;
         }
         else if(do_proc4 == 1 && strcmp(type, "proc4") == 0) {
-            // the first number is the count of numbers present
-            // so we start for word 2
-
-            unsigned long long sum = 0;
-            unsigned int i, j;
-            for(i = 0, j = 2; j < words && nfsd_proc4_values[i].name[0] ; i++, j++) {
-                nfsd_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
-                nfsd_proc4_values[i].present = 1;
-                sum += nfsd_proc4_values[i].value;
+            // the server registers only two NFSv4 procedures, NULL and COMPOUND
+            // (the individual operations are in proc4ops); word 1 is their count
+            if(unlikely(words < 4)) {
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
+                continue;
             }
 
-            if(sum == 0ULL) {
+            proc4_null = str2ull(procfile_lineword(ff, l, 2), NULL);
+            proc4_compound = str2ull(procfile_lineword(ff, l, 3), NULL);
+
+            if(proc4_null + proc4_compound == 0ULL) {
                 if(!proc4_warning) {
                     collector_info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
@@ -698,6 +626,8 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
+        static RRDDIM *rd_null = NULL, *rd_compound = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     "nfsd"
@@ -713,16 +643,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
+
+            rd_null     = rrddim_add(st, "null", NULL,       1, 1, RRD_ALGORITHM_INCREMENTAL);
+            // COMPOUND keeps the id "read" it was published with, for continuity of existing data
+            rd_compound = rrddim_add(st, "read", "compound", 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        size_t i;
-        for(i = 0; nfsd_proc4_values[i].present ; i++) {
-            if(unlikely(!nfsd_proc4_values[i].rd))
-                nfsd_proc4_values[i].rd = rrddim_add(st, nfsd_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_set_by_pointer(st, nfsd_proc4_values[i].rd, nfsd_proc4_values[i].value);
-        }
-
+        rrddim_set_by_pointer(st, rd_null, proc4_null);
+        rrddim_set_by_pointer(st, rd_compound, proc4_compound);
         rrdset_done(st);
     }
 
