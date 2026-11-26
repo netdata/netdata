@@ -28,7 +28,7 @@ require (
 	github.com/aws/smithy-go v1.28.9
 	github.com/axiomhq/hyperloglog v0.3.0
 	github.com/blang/semver/v4 v4.0.0
-	github.com/bmatcuk/doublestar/v4 v4.10.4
+	github.com/bmatcuk/doublestar/v4 v4.10.7
 	github.com/bougou/go-ipmi v0.9.2
 	github.com/catonetworks/cato-go-sdk v1.2.0
 	github.com/cespare/xxhash/v2 v2.3.0
