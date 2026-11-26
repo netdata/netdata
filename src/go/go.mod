@@ -79,7 +79,7 @@ require (
 	github.com/tidwall/gjson v1.20.4
 	github.com/valyala/fastjson v1.6.10
 	github.com/vmware/govmomi v0.56.2
-	go.mongodb.org/mongo-driver/v2 v2.10.0
+	go.mongodb.org/mongo-driver/v2 v2.10.1
 	go.opentelemetry.io/proto/otlp v1.11.1
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.6.0
