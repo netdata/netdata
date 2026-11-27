@@ -95,6 +95,15 @@ func timeServiceRow() map[string]any {
 	}
 }
 
+// terminalServicesRow is the Terminal Services counter set's row as DCOM
+// decodes it: every counter is uint32. Every value is distinct.
+func terminalServicesRow() map[string]any {
+	return map[string]any{
+		"ActiveSessions":   uint32(4),
+		"InactiveSessions": uint32(7),
+	}
+}
+
 // smbServerRow is the Server counter set's row as DCOM decodes it: byte totals
 // as uint64, the other counters as uint32. Every value is distinct.
 func smbServerRow() map[string]any {
@@ -332,6 +341,14 @@ func withTimeServiceCounters(metrics map[string]metrix.SampleValue) map[string]m
 	return metrics
 }
 
+// withTerminalServicesCounters adds the metrics of terminalServicesRow to a
+// collection's metrics.
+func withTerminalServicesCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	metrics["terminal_services_active_sessions"] = 4
+	metrics["terminal_services_inactive_sessions"] = 7
+	return metrics
+}
+
 // withMemoryCounters adds the metrics of memoryCountersRow and of the paging
 // files and NUMA nodes of validQueryResults to a collection's metrics.
 func withMemoryCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
@@ -420,8 +437,9 @@ func validQueryResults() map[string]queryResult {
 				"StandbyListMBytes":         uint32(12260),
 			},
 		),
-		querySystem:      fixtureRows(systemRow()),
-		queryTimeService: fixtureRows(timeServiceRow()),
+		querySystem:           fixtureRows(systemRow()),
+		queryTerminalServices: fixtureRows(terminalServicesRow()),
+		queryTimeService:      fixtureRows(timeServiceRow()),
 		queryNetworkInterfaces: fixtureRows(
 			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
@@ -590,6 +608,8 @@ func TestCollector_Collect(t *testing.T) {
 		"ContextSwitchesPersec": "200",
 		"ProcessorQueueLength":  "0",
 	})
+	// WinRM text, a valid zero and a missing counter.
+	sessions[1].results[queryTerminalServices] = fixtureRows(map[string]any{"ActiveSessions": "0"})
 	// WinRM text, a valid zero, a malformed value and a missing counter.
 	sessions[1].results[queryTimeService] = fixtureRows(map[string]any{
 		"ComputedTimeOffset":       "0",
@@ -681,7 +701,7 @@ func TestCollector_Collect(t *testing.T) {
 	)
 	assert.Equal(
 		t,
-		withTimeServiceCounters(withSMBCounters(
+		withTerminalServicesCounters(withTimeServiceCounters(withSMBCounters(
 			withProtocolCounters(withDiskCounters(withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
 				"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
 				"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
@@ -706,7 +726,7 @@ func TestCollector_Collect(t *testing.T) {
 				"disk_used_bytes" + driveD:           4294967296,
 				"disk_avail_bytes" + driveD:          0,
 			})))),
-		)),
+		))),
 		first,
 	)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
@@ -739,6 +759,7 @@ func TestCollector_Collect(t *testing.T) {
 		"smb_server_sessions":                                                  0,
 		"smb_share_open_files" + shareC:                                        0,
 		"smb_share_sent_bytes" + shareC:                                        332500,
+		"terminal_services_active_sessions":                                    0,
 	}), second)
 
 	// The failed CPU query keeps the first sample, so the shares span both
@@ -776,6 +797,7 @@ func TestCollector_Collect(t *testing.T) {
 			queryPagingFiles,
 			queryNUMANodes,
 			querySystem,
+			queryTerminalServices,
 			queryTimeService,
 			queryNetworkInterfaces,
 			queryNetworkAdapters,
@@ -987,6 +1009,7 @@ func metricQueries(queries []string) []string {
 			queryPagingFiles,
 			queryNUMANodes,
 			querySystem,
+			queryTerminalServices,
 			queryTimeService,
 			queryNetworkInterfaces,
 			queryNetworkAdapters,
@@ -1066,6 +1089,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryPagingFiles:       lost,
 				queryNUMANodes:         lost,
 				querySystem:            lost,
+				queryTerminalServices:  lost,
 				queryTimeService:       lost,
 				queryNetworkInterfaces: lost,
 				queryTCPv4:             lost,
@@ -1092,6 +1116,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryPagingFiles:       lost,
 				queryNUMANodes:         lost,
 				querySystem:            lost,
+				queryTerminalServices:  lost,
 				queryTimeService:       lost,
 				queryNetworkInterfaces: lost,
 				queryTCPv4:             lost,
@@ -1131,6 +1156,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 					queryPagingFiles,
 					queryNUMANodes,
 					querySystem,
+					queryTerminalServices,
 					queryTimeService,
 					queryNetworkInterfaces,
 					queryTCPv4,

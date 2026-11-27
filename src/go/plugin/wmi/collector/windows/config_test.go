@@ -24,22 +24,22 @@ func TestCollector_GroupConfig(t *testing.T) {
 		wantQueries []string
 	}{
 		"omitted": {
-			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
+			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTerminalServices, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
 		},
 		"empty object": {
 			yamlGroups:  "collectors: {}\n",
 			jsonGroups:  `,"collectors":{}`,
-			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
+			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTerminalServices, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
 		},
 		"disable one group": {
 			yamlGroups:  "collectors: {cpu: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false}`,
-			wantQueries: []string{queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
+			wantQueries: []string{queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTerminalServices, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
 		},
 		"one group only": {
 			yamlGroups:  "collectors: {cpu: false, memory: false, system: true, network: false, disk: false, smb: false, time: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":true,"network":false,"disk":false,"smb":false,"time":false}`,
-			wantQueries: []string{querySystem},
+			wantQueries: []string{querySystem, queryTerminalServices},
 		},
 		"SMB only": {
 			yamlGroups:  "collectors: {cpu: false, memory: false, system: false, network: false, disk: false, smb: true, time: false}\n",

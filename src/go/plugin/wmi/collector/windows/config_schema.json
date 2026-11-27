@@ -63,7 +63,7 @@
       },
       "collectors": {
         "title": "Metric groups",
-        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six, and the disk and SMB groups two. Keep at least one group enabled.",
+        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six, and the system, disk and SMB groups two. Keep at least one group enabled.",
         "type": "object",
         "properties": {
           "cpu": {
@@ -80,7 +80,7 @@
           },
           "system": {
             "title": "System",
-            "description": "Collect the number of processes and threads, context switches, processor queue length, uptime and the host's clock offset.",
+            "description": "Collect the number of processes and threads, context switches, processor queue length, uptime, the host's clock offset and its Remote Desktop sessions.",
             "type": "boolean",
             "default": true
           },
