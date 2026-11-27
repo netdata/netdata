@@ -1113,8 +1113,9 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 				instance(context, map[string]string{"device": "Team Member", "interface_type": "virtual"}),
 			)
 		}
-		// The native agent labels each share with its instance name, slashes
-		// for backslashes too.
+		// The native agent labels each share with its instance name too; the
+		// plugin protocol sends its backslashes as slashes, and the Agent then
+		// stores the share labels of both as //_/C_ and //_/IPC_.
 		if strings.HasPrefix(context, "smb.") {
 			want = append(want,
 				instance(context, map[string]string{"share": "//*/C$"}),
@@ -1669,8 +1670,6 @@ func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
 	})
 }
 
-// parseSamples reads the collected values from plugin protocol output, by
-// chart ID and dimension name, or by $name for a chart variable.
 // TestCollector_SMBShareCountersFeedNativeDimensions checks that each SMB
 // Server Shares counter reaches the native chart dimension that reads it, per
 // share (src/collectors/windows.plugin/perflib-smb.c, smb_share_charts and
@@ -1692,7 +1691,7 @@ func TestCollector_SMBShareCountersFeedNativeDimensions(t *testing.T) {
 		if name == "_Total" {
 			continue
 		}
-		// The Agent stores backslashes in label values as slashes.
+		// The plugin protocol sends backslashes in label values as slashes.
 		share := strings.ReplaceAll(name, `\`, "/")
 		want[share] = make(map[nativeDimension]float64)
 		for property, dimension := range native {
@@ -1812,6 +1811,8 @@ func fixtureNumber(t *testing.T, value any) float64 {
 	return 0
 }
 
+// parseSamples reads the collected values from plugin protocol output, by
+// chart ID and dimension name, or by $name for a chart variable.
 func parseSamples(t *testing.T, output string) map[string]map[string]float64 {
 	t.Helper()
 	samples := make(map[string]map[string]float64)

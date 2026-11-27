@@ -1025,7 +1025,7 @@ modules:
           description: A share the host's SMB server serves, including the hidden administrative shares such as `C$`, `ADMIN$` and `IPC$`.
           labels:
             - name: share
-              description: Share as the Windows performance counters name it, for example `//*/C$`. Backslashes are shown as forward slashes.
+              description: Share as the Windows performance counters name it, with backslashes shown as forward slashes and `*` and `$` as underscores, for example `//_/C_` for the counter set's `\\*\C$`.
           metrics:
             - name: smb.server_shares_current_open_file_count
               description: Current open file count on the SMB share
