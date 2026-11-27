@@ -334,6 +334,98 @@ modules:
                 - name: dpc
   - meta:
       plugin_name: windows.plugin
+      module_name: GetSystemRAM
+      monitored_instance:
+        name: System Memory (Win)
+        link: "https://learn.microsoft.com/en-us/windows/win32/Memory/memory-management"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - memory
+        - ram
+        - commit charge
+        - commit limit
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors physical memory (RAM) and the commit charge on Windows systems.
+        method_description: |
+          It reads the memory status Windows reports through the `GlobalMemoryStatusEx` function.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetSystemRAM]"
+          description: "The Netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        - `system.ram`: `free` is the available memory (free and zeroed pages plus the standby cache), and `used` is the rest of the physical memory.
+        - `mem.swap`: the commit limit, which is RAM plus the paging files. `used` is the commit charge, and `free` the commit still available.
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire system."
+          labels: []
+          metrics:
+            - name: system.ram
+              description: System RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: mem.swap
+              description: System Swap
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibMemory
       monitored_instance:
         name: Memory Statistics (Win)
