@@ -3470,35 +3470,27 @@ int perflib_storage_unittest(void)
     return errors;
 }
 
-static void physical_disk_labels(RRDSET *st, void *data)
+static bool physical_disk_owns_wmi_label(const char *name, RRDLABEL_SRC source __maybe_unused, void *data __maybe_unused)
 {
-    struct physical_disk *d = data;
-
-    if (d->device)
-        rrdlabels_add(st->rrdlabels, "device", string2str(d->device), RRDLABEL_SRC_AUTO);
-
-    if (d->mount_point)
-        rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
-
-    if (d->model)
-        rrdlabels_add(st->rrdlabels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
-
-    if (d->device_id)
-        rrdlabels_add(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
+    return strcmp(name, "model") == 0 || strcmp(name, "device_id") == 0;
 }
 
-// For metadata that arrived after the disk's charts were created. A label added after a chart's first
-// rrdset_done() reaches parents and alerts only when the chart is marked updated, as GetFSRMQuota.c does.
-static void physical_disk_chart_add_wmi_labels(RRDSET *st, struct physical_disk *d)
+// Sets model and device_id on the chart to exactly the disk's current values: a chart ID revived for a new disk
+// still carries the previous disk's labels. A label changed after a chart's first rrdset_done() reaches parents and
+// alerts only when the chart is marked updated, as GetFSRMQuota.c does.
+static void physical_disk_chart_set_wmi_labels(RRDSET *st, struct physical_disk *d)
 {
     if (!st)
         return;
 
-    bool changed = false;
+    RRDLABELS *labels = rrdlabels_create();
     if (d->model)
-        changed |= rrdlabels_add_changed(st->rrdlabels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(labels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
     if (d->device_id)
-        changed |= rrdlabels_add_changed(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(labels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
+
+    bool changed = rrdlabels_replace_subset(st->rrdlabels, labels, physical_disk_owns_wmi_label, NULL);
+    rrdlabels_destroy(labels);
 
     if (!changed)
         return;
@@ -3510,7 +3502,20 @@ static void physical_disk_chart_add_wmi_labels(RRDSET *st, struct physical_disk 
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 }
 
-static void physical_disk_add_wmi_labels(struct physical_disk *d)
+static void physical_disk_labels(RRDSET *st, void *data)
+{
+    struct physical_disk *d = data;
+
+    if (d->device)
+        rrdlabels_add(st->rrdlabels, "device", string2str(d->device), RRDLABEL_SRC_AUTO);
+
+    if (d->mount_point)
+        rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
+
+    physical_disk_chart_set_wmi_labels(st, d);
+}
+
+static void physical_disk_set_wmi_labels(struct physical_disk *d)
 {
     RRDSET *charts[] = {
         d->disk_io.st_io,
@@ -3526,7 +3531,7 @@ static void physical_disk_add_wmi_labels(struct physical_disk *d)
     };
 
     for (size_t i = 0; i < _countof(charts); i++)
-        physical_disk_chart_add_wmi_labels(charts[i], d);
+        physical_disk_chart_set_wmi_labels(charts[i], d);
 }
 
 static void physical_disk_wmi_found(struct physical_disk *d, const DiskDriveInfoWMI *info)
@@ -3539,7 +3544,7 @@ static void physical_disk_wmi_found(struct physical_disk *d, const DiskDriveInfo
 
     // Charts created before the metadata arrived get the labels now.
     if (d->charts_ready)
-        physical_disk_add_wmi_labels(d);
+        physical_disk_set_wmi_labels(d);
 
     d->charts_ready = true;
 }
@@ -3560,8 +3565,10 @@ static void physical_disk_wmi_update(struct physical_disk *d, int device_index, 
         if (now_ut < d->wmi_retry_after_ut)
             return;
 
-        // A probe already in flight may have run before this disk appeared: wait for the next one.
-        d->wmi_seq = disk_wmi_posted_seq + 1;
+        // A probe posted after this disk's last result covers the disk; any other probe may have run before the disk
+        // appeared, so wait for the next one.
+        d->wmi_seq = (d->wmi_checked_seq && disk_wmi_posted_seq > d->wmi_checked_seq) ?
+            disk_wmi_posted_seq : disk_wmi_posted_seq + 1;
         if (disk_wmi_wanted_seq < d->wmi_seq)
             disk_wmi_wanted_seq = d->wmi_seq;
     }
@@ -3671,6 +3678,15 @@ static int physical_disk_wmi_unittest_run(void)
     physical_disk_wmi_update(&d1, 1, waiting);
     errors += mount_points_unittest_expect("a waiting disk asks for no probe",
                                            d1.wmi_pending && d1.wmi_seq == 0 && disk_wmi_wanted_seq == wanted);
+
+    // at its retry time, a probe already posted after the disk's last result serves it
+    struct physical_disk d3 = d1;
+    disk_wmi_posted_seq = disk_wmi.completed_seq + 1;
+    disk_wmi.requested_seq = disk_wmi_posted_seq;
+    physical_disk_wmi_update(&d3, 1, d3.wmi_retry_after_ut);
+    errors += mount_points_unittest_expect("a retry uses a probe already in flight", d3.wmi_seq == disk_wmi_posted_seq);
+    disk_wmi_posted_seq = disk_wmi.completed_seq;
+    disk_wmi.requested_seq = disk_wmi.completed_seq;
 
     // a newer result, asked for by another disk, labels the waiting disk before its retry time
     disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 1, .Model = "model-1b", .DeviceID = "id-1b" };
