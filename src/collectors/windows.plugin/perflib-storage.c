@@ -47,6 +47,7 @@ struct physical_disk {
     uint64_t wmi_seq;         // the probe this disk waits for; 0 = none requested
     usec_t first_seen_ut;
     usec_t wmi_retry_after_ut;
+    usec_t wmi_retry_every_ut;  // doubles after each miss, up to DISK_WMI_RETRY_MAX_UT
 
     STRING *device;
     STRING *mount_point;
@@ -169,6 +170,7 @@ static void physical_disk_cleanup(struct physical_disk *d)
     d->wmi_seq = 0;
     d->first_seen_ut = 0;
     d->wmi_retry_after_ut = 0;
+    d->wmi_retry_every_ut = 0;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_io.st_io);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_ops.st_ops);
@@ -213,7 +215,9 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 #define MAX_WMI_DRIVES 100
 // How long a new disk's charts wait for its metadata, so that they normally start with their labels.
 #define DISK_WMI_WAIT_UT (10 * USEC_PER_SEC)
-#define DISK_WMI_RETRY_EVERY_UT (60 * USEC_PER_SEC)
+// A disk missing from a probe is retried after 1 minute, then after twice as long each time, up to 1 hour.
+#define DISK_WMI_RETRY_MIN_UT (60 * USEC_PER_SEC)
+#define DISK_WMI_RETRY_MAX_UT (3600 * USEC_PER_SEC)
 #define DISK_WMI_SHUTDOWN_TIMEOUT_UT (5 * USEC_PER_SEC)
 
 static struct {
@@ -244,6 +248,9 @@ static void disk_wmi_worker(void *ptr __maybe_unused)
 {
     static DiskDriveInfoWMI rows[MAX_WMI_DRIVES];
 
+    // While WMI keeps failing, only the first failure is logged as an error.
+    bool failing = false;
+
     netdata_mutex_lock(&disk_wmi.mutex);
     while (true) {
         while (!disk_wmi.stop && disk_wmi.completed_seq == disk_wmi.requested_seq)
@@ -255,7 +262,14 @@ static void disk_wmi_worker(void *ptr __maybe_unused)
         uint64_t seq = disk_wmi.requested_seq;
         netdata_mutex_unlock(&disk_wmi.mutex);
 
-        size_t count = GetDiskDriveInfo(&disk_wmi_handle, rows, _countof(rows));
+        bool failed;
+        size_t count =
+            GetDiskDriveInfo(&disk_wmi_handle, rows, _countof(rows), failing ? NDLP_DEBUG : NDLP_ERR, &failed);
+        if (failing && !failed) {
+            errno_clear();
+            nd_log(NDLS_COLLECTORS, NDLP_INFO, "GetDiskDriveInfo() WMI probe succeeded again");
+        }
+        failing = failed;
 
         netdata_mutex_lock(&disk_wmi.mutex);
         memcpy(disk_wmi.rows, rows, count * sizeof(*rows));
@@ -320,7 +334,7 @@ static void disk_wmi_post(usec_t now_ut)
             NULL);
         if (!disk_wmi.thread) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start the PerflibStorage disk metadata worker; will retry");
-            disk_wmi_start_retry_after_ut = now_ut + DISK_WMI_RETRY_EVERY_UT;
+            disk_wmi_start_retry_after_ut = now_ut + DISK_WMI_RETRY_MIN_UT;
             return;
         }
     }
@@ -3531,7 +3545,9 @@ static void physical_disk_wmi_update(struct physical_disk *d, int device_index, 
 
         case DISK_WMI_MISSING:
             d->wmi_seq = 0;
-            d->wmi_retry_after_ut = now_ut + DISK_WMI_RETRY_EVERY_UT;
+            d->wmi_retry_every_ut = d->wmi_retry_every_ut ?
+                MIN(d->wmi_retry_every_ut * 2, DISK_WMI_RETRY_MAX_UT) : DISK_WMI_RETRY_MIN_UT;
+            d->wmi_retry_after_ut = now_ut + d->wmi_retry_every_ut;
             d->charts_ready = true;
             break;
 
@@ -3600,24 +3616,51 @@ static int physical_disk_wmi_unittest_run(void)
     physical_disk_wmi_update(&d1, 1, t2);
     errors += mount_points_unittest_expect("a disk missing from a probe is retried later",
                                            d1.wmi_pending && d1.wmi_seq == 0 &&
-                                           d1.wmi_retry_after_ut == t2 + DISK_WMI_RETRY_EVERY_UT);
+                                           d1.wmi_retry_after_ut == t2 + DISK_WMI_RETRY_MIN_UT);
 
     physical_disk_wmi_update(&d1, 1, t2 + USEC_PER_SEC);
     errors += mount_points_unittest_expect("no retry before the retry time", d1.wmi_seq == 0);
 
-    physical_disk_wmi_update(&d1, 1, t2 + DISK_WMI_RETRY_EVERY_UT);
+    physical_disk_wmi_update(&d1, 1, t2 + DISK_WMI_RETRY_MIN_UT);
     errors += mount_points_unittest_expect("the retry asks for a new probe", d1.wmi_seq == 3);
 
     // probe 3 returns the disk with neither value
     disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 1 };
     disk_wmi.count = 1;
     disk_wmi.completed_seq = 3;
-    physical_disk_wmi_update(&d1, 1, t2 + DISK_WMI_RETRY_EVERY_UT + USEC_PER_SEC);
+    usec_t t3 = t2 + DISK_WMI_RETRY_MIN_UT + USEC_PER_SEC;
+    physical_disk_wmi_update(&d1, 1, t3);
     errors += mount_points_unittest_expect("a row without model and device id is a miss",
                                            d1.wmi_pending && d1.wmi_seq == 0 && !d1.model);
+    errors += mount_points_unittest_expect("the second miss waits twice as long",
+                                           d1.wmi_retry_after_ut == t3 + 2 * DISK_WMI_RETRY_MIN_UT);
+
+    // keep missing: the wait stops growing at the maximum
+    for (int i = 0; i < 16; i++) {
+        usec_t now = d1.wmi_retry_after_ut;
+        physical_disk_wmi_update(&d1, 1, now);
+        disk_wmi_posted_seq = d1.wmi_seq;
+        disk_wmi.requested_seq = d1.wmi_seq;
+        disk_wmi.completed_seq = d1.wmi_seq;
+        physical_disk_wmi_update(&d1, 1, now + USEC_PER_SEC);
+    }
+    errors += mount_points_unittest_expect("the retry wait is capped", d1.wmi_retry_every_ut == DISK_WMI_RETRY_MAX_UT);
+
+    // a later result with the disk labels it
+    usec_t t4 = d1.wmi_retry_after_ut;
+    physical_disk_wmi_update(&d1, 1, t4);
+    disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 1, .Model = "model-1", .DeviceID = "id-1" };
+    disk_wmi_posted_seq = d1.wmi_seq;
+    disk_wmi.requested_seq = d1.wmi_seq;
+    disk_wmi.completed_seq = d1.wmi_seq;
+    physical_disk_wmi_update(&d1, 1, t4 + USEC_PER_SEC);
+    errors += mount_points_unittest_expect("a disk found after retries is labelled",
+                                           !d1.wmi_pending && strcmp(string2str(d1.model), "model-1") == 0);
 
     string_freez(d0.model);
     string_freez(d0.device_id);
+    string_freez(d1.model);
+    string_freez(d1.device_id);
     disk_wmi_stop();
 
     return errors;
