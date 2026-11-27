@@ -83,6 +83,7 @@
 #define ALWAYS_INLINE_HOT_FLATTEN inline __attribute__((hot, always_inline, flatten))
 #define NOT_INLINE_HOT __attribute__((hot))
 #define NEVER_INLINE __attribute__((noinline))
+#define NEVER_INLINE_COLD __attribute__((noinline, cold))
 #else
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #define ALWAYS_INLINE_ONLY
@@ -91,6 +92,7 @@
 #define ALWAYS_INLINE_HOT_FLATTEN inline
 #define NOT_INLINE_HOT
 #define NEVER_INLINE
+#define NEVER_INLINE_COLD
 #endif
 
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
