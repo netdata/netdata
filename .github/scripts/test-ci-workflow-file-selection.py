@@ -143,7 +143,38 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
             ([], "ordinary"),
         ):
             with self.subTest(paths=paths):
-                self.assertEqual(select(paths), expected)
+                self.assertEqual(select(("M", path) for path in paths), expected)
+
+    def test_package_scope_for_removed_packaging_readme(self) -> None:
+        tool = Path("src/crates/otel-streams/src/ws.rs")
+        selector = ROOT / ".github/scripts/pr-package-scope.py"
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            def git(*args):
+                return subprocess.check_output(
+                    ["git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
+                     *args], cwd=repo, text=True,
+                ).strip()
+            git("init", "-q")
+            (repo / tool).parent.mkdir(parents=True)
+            (repo / tool).write_text("// initial\n")
+            (repo / "README.md").write_text("initial\n")
+            git("add", "--", str(tool), "README.md")
+            git("commit", "-qm", "base")
+            base = git("rev-parse", "HEAD")
+            (repo / tool).write_text("// changed\n")
+            (repo / "README.md").unlink()
+            git("add", "--", str(tool), "README.md")
+            git("commit", "-qm", "remove package resource")
+            def selected():
+                return subprocess.check_output(
+                    ["python3", str(selector), base, "HEAD"], text=True, cwd=repo,
+                ).strip()
+            self.assertEqual(selected(), "ordinary")
+            (repo / "README.md").symlink_to("missing-resource")
+            git("add", "--", "README.md")
+            git("commit", "-qm", "change package resource type")
+            self.assertEqual(selected(), "ordinary")
 
     def test_codeql_go_and_rust_source_selection(self) -> None:
         workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")

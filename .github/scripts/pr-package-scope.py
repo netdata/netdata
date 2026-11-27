@@ -15,11 +15,12 @@ OTEL_CRATES = {
 }
 
 
-def source_scope(path):
+def source_scope(status, path):
     if path == "README.md" or (
         path.endswith(".md") and path.startswith(("docs/", "src/crates/", "packaging/"))
     ):
-        return None
+        # Removed or replaced documentation may be a required packaging resource.
+        return None if status == "M" else "ordinary"
     if path.startswith("src/crates/netflow-plugin/") and path.endswith(".rs"):
         return "netflow"
     if path.startswith("src/crates/") and path.endswith(".rs"):
@@ -32,8 +33,9 @@ def source_scope(path):
     return "ordinary"
 
 
-def package_scope(paths):
-    scopes = {scope for path in paths if (scope := source_scope(path)) is not None}
+def package_scope(changes):
+    scopes = {source_scope(status, path) for status, path in changes}
+    scopes.discard(None)
     if scopes == {"tool"}:
         return "skip"
     if scopes == {"netflow"} or scopes == {"otel"}:
@@ -45,7 +47,8 @@ if __name__ == "__main__":
     base, head = sys.argv[1:]
     # Keep both sides of renames, type changes and submodule pointer changes.
     changed = subprocess.check_output([
-        "git", "diff", "--no-renames", "--ignore-submodules=none", "--name-only",
+        "git", "diff", "--no-renames", "--ignore-submodules=none", "--name-status",
         "-z", f"{base}...{head}", "--",
     ])
-    print(package_scope(os.fsdecode(p) for p in changed.split(b"\0") if p))
+    fields = iter(os.fsdecode(changed).split("\0")[:-1])
+    print(package_scope(zip(fields, fields, strict=True)))
