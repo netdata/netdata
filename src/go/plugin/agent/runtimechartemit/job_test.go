@@ -211,7 +211,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 					},
 				})
 
-				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil, nil)
+				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil)
 				job.runOnce(1)
 				state := job.components["component"]
 				require.NotNil(t, state)
