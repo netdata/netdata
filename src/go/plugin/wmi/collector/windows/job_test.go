@@ -452,8 +452,13 @@ func publishedCharts(t *testing.T) []wireChart {
 // src/collectors/common-contexts/system-processes.h (system.processes,
 // system.threads, system.ctxt, system.processor_queue_length),
 // src/collectors/windows.plugin/GetSystemUptime.c (system.uptime),
-// src/collectors/windows.plugin/perflib-network.c (system.net and the net.*
-// interface charts) and
+// src/collectors/windows.plugin/perflib-network.c (system.net, the net.*
+// interface charts and the tcppackets and udppackets charts),
+// src/collectors/proc.plugin/proc_net_netstat.c (ip.tcpsock, ip.tcpopens,
+// ip.tcphandshake, ip.tcperrors and the udperrors charts, the TCP and UDP
+// counters the native agent does not chart; only the dimensions Windows counts,
+// and titles of the charts for both IP versions without the Linux "IPv4", as
+// native ip.tcppackets has) and
 // src/collectors/windows.plugin/perflib-storage.c (disk.space) with
 // src/collectors/common-contexts/system-io.h and disk-*.h (system.io and the
 // physical disk charts; the native disk.split dimension is named discards).
@@ -490,6 +495,10 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			{name: "reads", algorithm: algorithm, multiplier: 1, divisor: divisor},
 			{name: "writes", algorithm: algorithm, multiplier: -1, divisor: divisor},
 		}
+	}
+	receivedSent := []wireDimension{
+		{name: "received", algorithm: "incremental", multiplier: 1, divisor: 1},
+		{name: "sent", algorithm: "incremental", multiplier: -1, divisor: 1},
 	}
 	// unscaled lists dimensions without a multiplier or divisor.
 	unscaled := func(algorithm string, names ...string) []wireDimension {
@@ -880,6 +889,85 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			chartType:  "line",
 			dimensions: single("discards", "incremental", 1),
 		},
+		"ip.tcppackets": {
+			family:     "tcp",
+			title:      "TCP Packets",
+			units:      "packets/s",
+			chartType:  "area",
+			dimensions: receivedSent,
+		},
+		"ipv4.tcppackets": {
+			family:     "tcp",
+			title:      "IPv4 TCP Packets",
+			units:      "packets/s",
+			chartType:  "area",
+			dimensions: receivedSent,
+		},
+		"ipv6.tcppackets": {
+			family:     "tcp6",
+			title:      "IPv6 TCP Packets",
+			units:      "packets/s",
+			chartType:  "area",
+			dimensions: receivedSent,
+		},
+		"ipv4.udppackets": {
+			family:     "udp",
+			title:      "IPv4 UDP Packets",
+			units:      "packets/s",
+			chartType:  "area",
+			dimensions: receivedSent,
+		},
+		"ipv6.udppackets": {
+			family:     "udp6",
+			title:      "IPv6 UDP Packets",
+			units:      "packets/s",
+			chartType:  "area",
+			dimensions: receivedSent,
+		},
+		"ip.tcpsock": {
+			family:     "tcp",
+			title:      "TCP Connections",
+			units:      "active connections",
+			chartType:  "line",
+			dimensions: single("connections", "absolute", 1),
+		},
+		"ip.tcpopens": {
+			family:     "tcp",
+			title:      "TCP Opens",
+			units:      "connections/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "active", "passive"),
+		},
+		"ip.tcphandshake": {
+			family:     "tcp",
+			title:      "TCP Handshake Issues",
+			units:      "events/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "EstabResets", "AttemptFails"),
+		},
+		"ip.tcperrors": {
+			family:    "tcp",
+			title:     "TCP Errors",
+			units:     "packets/s",
+			chartType: "line",
+			dimensions: []wireDimension{
+				{name: "RetransSegs", algorithm: "incremental", multiplier: -1, divisor: 1},
+			},
+		},
+		"ipv4.udperrors": {
+			family:     "udp",
+			title:      "IPv4 UDP Errors",
+			units:      "events/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "InErrors", "NoPorts"),
+		},
+		"ipv6.udperrors": {
+			family:     "udp6",
+			title:      "IPv6 UDP Errors",
+			units:      "events/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "InErrors", "NoPorts"),
+		},
 		"ping.host_rtt": {
 			family:    "latency",
 			title:     "Ping round-trip time",
@@ -959,6 +1047,10 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("ping.host_packet_loss", map[string]string{"host": "windows.example.com"}),
 	}
 	for context := range native {
+		if strings.HasPrefix(context, "ip.") || strings.HasPrefix(context, "ipv4.") ||
+			strings.HasPrefix(context, "ipv6.") {
+			want = append(want, instance(context, map[string]string{}))
+		}
 		if strings.HasPrefix(context, "mem.") && context != "mem.pagefile_usage" &&
 			context != "mem.numa_node_mem_usage" {
 			want = append(want, instance(context, map[string]string{}))
@@ -1039,6 +1131,106 @@ func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
 				for dimension, value := range samples[id] {
 					got[device][nativeDimension{chart.context, dimension}] = value
 				}
+			}
+		}
+		assert.Equal(t, want, got)
+	})
+}
+
+// TestCollector_ProtocolCountersFeedNativeDimensions checks that each TCP and
+// UDP counter reaches the dimension that reads the same counter: the native
+// Windows Agent's (src/collectors/windows.plugin/perflib-network.c) for the
+// segments and datagrams per IP version, and for the segments of both versions
+// summed (tcp46), and the Linux Agent's
+// (src/collectors/proc.plugin/proc_net_netstat.c) for the MIB-II counters the
+// native agent does not chart: TCP for both versions summed, as Linux counts
+// TCP, and UDP per version.
+func TestCollector_ProtocolCountersFeedNativeDimensions(t *testing.T) {
+	tcp := map[string]nativeDimension{
+		"SegmentsReceivedPersec":      {"ip.tcppackets", "received"},
+		"SegmentsSentPersec":          {"ip.tcppackets", "sent"},
+		"ConnectionsEstablished":      {"ip.tcpsock", "connections"},
+		"ConnectionsActive":           {"ip.tcpopens", "active"},
+		"ConnectionsPassive":          {"ip.tcpopens", "passive"},
+		"ConnectionsReset":            {"ip.tcphandshake", "EstabResets"},
+		"ConnectionFailures":          {"ip.tcphandshake", "AttemptFails"},
+		"SegmentsRetransmittedPersec": {"ip.tcperrors", "RetransSegs"},
+	}
+	perVersion := map[string]map[string]nativeDimension{
+		queryTCPv4: {
+			"SegmentsReceivedPersec": {"ipv4.tcppackets", "received"},
+			"SegmentsSentPersec":     {"ipv4.tcppackets", "sent"},
+		},
+		queryTCPv6: {
+			"SegmentsReceivedPersec": {"ipv6.tcppackets", "received"},
+			"SegmentsSentPersec":     {"ipv6.tcppackets", "sent"},
+		},
+		queryUDPv4: {
+			"DatagramsReceivedPersec": {"ipv4.udppackets", "received"},
+			"DatagramsSentPersec":     {"ipv4.udppackets", "sent"},
+			"DatagramsReceivedErrors": {"ipv4.udperrors", "InErrors"},
+			"DatagramsNoPortPersec":   {"ipv4.udperrors", "NoPorts"},
+		},
+		queryUDPv6: {
+			"DatagramsReceivedPersec": {"ipv6.udppackets", "received"},
+			"DatagramsSentPersec":     {"ipv6.udppackets", "sent"},
+			"DatagramsReceivedErrors": {"ipv6.udperrors", "InErrors"},
+			"DatagramsNoPortPersec":   {"ipv6.udperrors", "NoPorts"},
+		},
+	}
+	// Each counter of each version has its own value, so a counter or version
+	// that reaches the wrong dimension changes the result.
+	results := validQueryResults()
+	rows := make(map[string]map[string]any)
+	next := uint32(1000)
+	for query, dimensions := range perVersion {
+		row := make(map[string]any)
+		properties := slices.Collect(maps.Keys(dimensions))
+		if query == queryTCPv4 || query == queryTCPv6 {
+			properties = slices.Collect(maps.Keys(tcp))
+		}
+		slices.Sort(properties)
+		for _, property := range properties {
+			row[property] = next
+			next += 1000
+		}
+		rows[query] = row
+		results[query] = fixtureRows(row)
+	}
+	want := make(map[nativeDimension]float64)
+	for query, dimensions := range perVersion {
+		for property, dimension := range dimensions {
+			want[dimension] = float64(rows[query][property].(uint32))
+		}
+	}
+	for property, dimension := range tcp {
+		want[dimension] = float64(rows[queryTCPv4][property].(uint32) + rows[queryTCPv6][property].(uint32))
+	}
+
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: results,
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		output := collect(c.UpdateEvery)
+		samples := parseSamples(t, output)
+
+		got := make(map[nativeDimension]float64)
+		for id, chart := range parseCharts(t, output) {
+			if !strings.HasPrefix(chart.context, "ip.") && !strings.HasPrefix(chart.context, "ipv4.") &&
+				!strings.HasPrefix(chart.context, "ipv6.") {
+				continue
+			}
+			for dimension, value := range samples[id] {
+				got[nativeDimension{chart.context, dimension}] = value
 			}
 		}
 		assert.Equal(t, want, got)

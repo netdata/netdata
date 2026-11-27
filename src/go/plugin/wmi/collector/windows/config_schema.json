@@ -63,7 +63,7 @@
       },
       "collectors": {
         "title": "Metric groups",
-        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four and the network and disk groups two. Keep at least one group enabled.",
+        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six and the disk group two. Keep at least one group enabled.",
         "type": "object",
         "properties": {
           "cpu": {
@@ -86,7 +86,7 @@
           },
           "network": {
             "title": "Network",
-            "description": "Collect traffic, packets, errors, drops, speed and output queue length per network interface, and the host's total traffic.",
+            "description": "Collect traffic, packets, errors, drops, speed and output queue length per network interface, the host's total traffic, and TCP and UDP packets, connections and errors.",
             "type": "boolean",
             "default": true
           },

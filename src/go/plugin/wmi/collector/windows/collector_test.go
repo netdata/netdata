@@ -188,6 +188,37 @@ func withDiskCounters(metrics map[string]metrix.SampleValue) map[string]metrix.S
 	return metrics
 }
 
+// withProtocolCounters adds the TCP and UDP metrics of validQueryResults to a
+// collection's metrics: TCP segments per IP version, every TCP counter for
+// both versions summed, and every UDP counter per version.
+func withProtocolCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	for metric, value := range map[string]metrix.SampleValue{
+		"ipv4_tcp_segments_received":     1130775,
+		"ipv4_tcp_segments_sent":         1406820,
+		"ipv6_tcp_segments_received":     1572,
+		"ipv6_tcp_segments_sent":         1599,
+		"tcp_segments_received":          1130775 + 1572,
+		"tcp_segments_sent":              1406820 + 1599,
+		"tcp_established_connections":    6,
+		"tcp_active_opens":               5194 + 76,
+		"tcp_passive_opens":              3548 + 49,
+		"tcp_established_resets":         168,
+		"tcp_failed_connection_attempts": 208 + 74,
+		"tcp_retransmitted_segments":     6689 + 32,
+		"ipv4_udp_datagrams_received":    187524,
+		"ipv4_udp_datagrams_sent":        203100,
+		"ipv4_udp_receive_errors":        0,
+		"ipv4_udp_no_port_datagrams":     86178,
+		"ipv6_udp_datagrams_received":    1745,
+		"ipv6_udp_datagrams_sent":        1411,
+		"ipv6_udp_receive_errors":        0,
+		"ipv6_udp_no_port_datagrams":     822,
+	} {
+		metrics[metric] = value
+	}
+	return metrics
+}
+
 // withMemoryCounters adds the metrics of memoryCountersRow and of the paging
 // files and NUMA nodes of validQueryResults to a collection's metrics.
 func withMemoryCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
@@ -282,6 +313,40 @@ func validQueryResults() map[string]queryResult {
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
 			map[string]any{"Name": "isatap.example.com", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "0"},
 		),
+		// The TCP and UDP counter sets have one row per IP version; WinRM
+		// reports the numbers as text.
+		queryTCPv4: fixtureRows(map[string]any{
+			"SegmentsReceivedPersec":      uint32(1130775),
+			"SegmentsSentPersec":          uint32(1406820),
+			"ConnectionsEstablished":      uint32(6),
+			"ConnectionsActive":           uint32(5194),
+			"ConnectionsPassive":          uint32(3548),
+			"ConnectionsReset":            uint32(168),
+			"ConnectionFailures":          uint32(208),
+			"SegmentsRetransmittedPersec": uint32(6689),
+		}),
+		queryTCPv6: fixtureRows(map[string]any{
+			"SegmentsReceivedPersec":      uint32(1572),
+			"SegmentsSentPersec":          uint32(1599),
+			"ConnectionsEstablished":      uint32(0),
+			"ConnectionsActive":           uint32(76),
+			"ConnectionsPassive":          uint32(49),
+			"ConnectionsReset":            uint32(0),
+			"ConnectionFailures":          uint32(74),
+			"SegmentsRetransmittedPersec": uint32(32),
+		}),
+		queryUDPv4: fixtureRows(map[string]any{
+			"DatagramsReceivedPersec": uint32(187524),
+			"DatagramsSentPersec":     uint32(203100),
+			"DatagramsReceivedErrors": uint32(0),
+			"DatagramsNoPortPersec":   uint32(86178),
+		}),
+		queryUDPv6: fixtureRows(map[string]any{
+			"DatagramsReceivedPersec": "1745",
+			"DatagramsSentPersec":     "1411",
+			"DatagramsReceivedErrors": "0",
+			"DatagramsNoPortPersec":   "822",
+		}),
 		// The Network Adapter counter set lists the interfaces again, under the
 		// same names, plus adapters without a TCP/IP binding.
 		queryNetworkAdapters: fixtureRows(
@@ -397,6 +462,20 @@ func TestCollector_Collect(t *testing.T) {
 		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "250", "BytesSentPersec": "malformed"},
 		map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "80"},
 	)
+	// Without the IPv6 counters there are no sums for both versions; a reply
+	// that is not one row leaves the UDPv4 charts without values.
+	sessions[1].results[queryTCPv4] = fixtureRows(map[string]any{
+		"SegmentsReceivedPersec": "1130900",
+		"SegmentsSentPersec":     "malformed",
+		"ConnectionsEstablished": "0",
+	})
+	sessions[1].results[queryTCPv6] = queryResult{
+		err: errors.New("invalid class"),
+	}
+	sessions[1].results[queryUDPv4] = fixtureRows(
+		map[string]any{"DatagramsReceivedPersec": uint32(1)},
+		map[string]any{"DatagramsReceivedPersec": uint32(2)},
+	)
 	// Each processor's share of the time all its modes accumulated since the
 	// first sample; WinRM reports the numbers as text.
 	sessions[2].results[queryCPU] = fixtureRows(
@@ -443,29 +522,33 @@ func TestCollector_Collect(t *testing.T) {
 		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
 		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
 	)
-	assert.Equal(t, withDiskCounters(withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
-		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
-		"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
-		"memory_swap_used_bytes":             3 * 1024 * 1024 * 1024,
-		"memory_swap_free_bytes":             9 * 1024 * 1024 * 1024,
-		"system_processes":                   69,
-		"system_threads":                     951,
-		"system_context_switches":            4294967000,
-		"system_processor_queue_length":      3,
-		"system_uptime_milliseconds":         86401234,
-		"network_received_bytes" + ethernet:  190,
-		"network_received_bytes" + ethernet1: 0,
-		"network_sent_bytes" + ethernet:      30,
-		"network_sent_bytes" + ethernet1:     70,
-		"network_received_bytes" + member:    400,
-		"network_sent_bytes" + member:        5,
-		"network_total_received_bytes":       190,
-		"network_total_sent_bytes":           100,
-		"disk_used_bytes" + driveC:           80000000000,
-		"disk_avail_bytes" + driveC:          420000000000,
-		"disk_used_bytes" + driveD:           4294967296,
-		"disk_avail_bytes" + driveD:          0,
-	}))), first)
+	assert.Equal(
+		t,
+		withProtocolCounters(withDiskCounters(withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
+			"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
+			"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
+			"memory_swap_used_bytes":             3 * 1024 * 1024 * 1024,
+			"memory_swap_free_bytes":             9 * 1024 * 1024 * 1024,
+			"system_processes":                   69,
+			"system_threads":                     951,
+			"system_context_switches":            4294967000,
+			"system_processor_queue_length":      3,
+			"system_uptime_milliseconds":         86401234,
+			"network_received_bytes" + ethernet:  190,
+			"network_received_bytes" + ethernet1: 0,
+			"network_sent_bytes" + ethernet:      30,
+			"network_sent_bytes" + ethernet1:     70,
+			"network_received_bytes" + member:    400,
+			"network_sent_bytes" + member:        5,
+			"network_total_received_bytes":       190,
+			"network_total_sent_bytes":           100,
+			"disk_used_bytes" + driveC:           80000000000,
+			"disk_avail_bytes" + driveC:          420000000000,
+			"disk_used_bytes" + driveD:           4294967296,
+			"disk_avail_bytes" + driveD:          0,
+		})))),
+		first,
+	)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 	second, err := collecttest.CollectScalarSeries(c)
@@ -484,8 +567,13 @@ func TestCollector_Collect(t *testing.T) {
 		"network_total_received_bytes":          250,
 		`network_received_bytes{device="Ethernet#1",interface_type="virtual"}`: 0,
 		`network_sent_bytes{device="Ethernet#1",interface_type="virtual"}`:     80,
-		"disk_used_bytes" + driveC:  0,
-		"disk_avail_bytes" + driveC: 300,
+		"ipv4_tcp_segments_received":                                           1130900,
+		"ipv6_udp_datagrams_received":                                          1745,
+		"ipv6_udp_datagrams_sent":                                              1411,
+		"ipv6_udp_receive_errors":                                              0,
+		"ipv6_udp_no_port_datagrams":                                           822,
+		"disk_used_bytes" + driveC:                                             0,
+		"disk_avail_bytes" + driveC:                                            300,
 	}), second)
 
 	// The failed CPU query keeps the first sample, so the shares span both
@@ -525,6 +613,10 @@ func TestCollector_Collect(t *testing.T) {
 			querySystem,
 			queryNetworkInterfaces,
 			queryNetworkAdapters,
+			queryTCPv4,
+			queryTCPv6,
+			queryUDPv4,
+			queryUDPv6,
 			queryDisk,
 			queryPhysicalDisks,
 		}
@@ -550,7 +642,7 @@ func TestCollector_NetworkAdapterQuery(t *testing.T) {
 			adapters: queryResult{
 				err: errors.New("invalid class"),
 			},
-			wantQueries: []string{queryNetworkInterfaces, queryNetworkAdapters},
+			wantQueries: []string{queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6},
 			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
 				`network_received_bytes{device="Ethernet",interface_type="real"}`: 190,
 				`network_sent_bytes{device="Ethernet",interface_type="real"}`:     30,
@@ -562,7 +654,7 @@ func TestCollector_NetworkAdapterQuery(t *testing.T) {
 		"an empty interface list leaves the adapters out": {
 			interfaces:  fixtureRows(),
 			adapters:    fixtureRows(ethernet),
-			wantQueries: []string{queryNetworkInterfaces},
+			wantQueries: []string{queryNetworkInterfaces, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6},
 			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{}),
 		},
 	} {
@@ -713,6 +805,10 @@ func metricQueries(queries []string) []string {
 			querySystem,
 			queryNetworkInterfaces,
 			queryNetworkAdapters,
+			queryTCPv4,
+			queryTCPv6,
+			queryUDPv4,
+			queryUDPv6,
 			queryDisk,
 			queryPhysicalDisks,
 			queryDiskDrives:
@@ -784,6 +880,10 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryNUMANodes:         lost,
 				querySystem:            lost,
 				queryNetworkInterfaces: lost,
+				queryTCPv4:             lost,
+				queryTCPv6:             lost,
+				queryUDPv4:             lost,
+				queryUDPv6:             lost,
 				queryDisk:              lost,
 				queryPhysicalDisks:     lost,
 			},
@@ -803,6 +903,10 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryNUMANodes:         lost,
 				querySystem:            lost,
 				queryNetworkInterfaces: lost,
+				queryTCPv4:             lost,
+				queryTCPv6:             lost,
+				queryUDPv4:             lost,
+				queryUDPv6:             lost,
 				queryDisk:              lost,
 				queryPhysicalDisks:     lost,
 			},
@@ -835,6 +939,10 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 					queryNUMANodes,
 					querySystem,
 					queryNetworkInterfaces,
+					queryTCPv4,
+					queryTCPv6,
+					queryUDPv4,
+					queryUDPv6,
 					queryDisk,
 					queryPhysicalDisks,
 				},
