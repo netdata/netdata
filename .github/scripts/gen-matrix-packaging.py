@@ -6,16 +6,13 @@ import sys
 from ruamel.yaml import YAML
 
 ALWAYS_RUN_ARCHES = ["amd64", "x86_64", 'i386', 'armhf', 'aarch64', 'arm64']
-SHORT_RUN = sys.argv[1]
+mode = sys.argv[1]
 yaml = YAML(typ='safe')
 entries = list()
-run_limited = False
+run_limited = mode != "netflow" and bool(int(mode))
 
 with open('.github/data/distros.yml') as f:
     data = yaml.load(f)
-
-if bool(int(SHORT_RUN)):
-    run_limited = True
 
 for i, v in enumerate(data['include']):
     if 'packages' in data['include'][i]:
@@ -36,5 +33,11 @@ for i, v in enumerate(data['include']):
                 })
 
 entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
+if mode == "netflow":
+    representatives = {}
+    for entry in entries:
+        representatives.setdefault((entry['format'], entry['arch']), entry)
+    entries = list(representatives.values())
+
 matrix = json.dumps({'include': entries}, sort_keys=True)
 print(matrix)

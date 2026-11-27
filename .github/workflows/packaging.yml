@@ -62,6 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      netflow-only: ${{ steps.netflow-scope.outputs.only_modified }}
     steps:
       - name: Checkout
         id: checkout
@@ -112,6 +113,19 @@ jobs:
             src/crates/**/*.md
             src/go/tools/topology-ip-intel-downloader/README.md
             src/go/tools/topology-ip-intel-downloader/stock/README.md
+      - name: Check whether the PR changes only NetFlow source and documentation
+        id: netflow-scope
+        if: github.event_name == 'pull_request' && steps.check-files.outputs.any_modified == 'true'
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
+        with:
+          since_last_remote_commit: false
+          output_renamed_files_as_deleted_and_added: true
+          files: |
+            src/crates/netflow-plugin/**/*.rs
+            README.md
+            docs/**/*.md
+            src/crates/**/*.md
+            packaging/**/*.md
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -149,13 +163,18 @@ jobs:
           sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
+        env:
+          NETFLOW_ONLY: ${{ needs.file-check.outputs.netflow-only }}
         run: |
+          mode=0
           if [ "${{ github.event_name }}" = "pull_request" ] && \
              [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
-            matrix="$(.github/scripts/gen-matrix-packaging.py 1)"
-          else
-            matrix="$(.github/scripts/gen-matrix-packaging.py 0)"
+            mode=1
+            if [ "${NETFLOW_ONLY}" = true ]; then
+              mode=netflow
+            fi
           fi
+          matrix="$(.github/scripts/gen-matrix-packaging.py "${mode}")"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
