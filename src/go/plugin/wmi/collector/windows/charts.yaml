@@ -368,6 +368,9 @@ groups:
       - context: clock_offset
         title: Clock Offset From the Collecting Agent
         units: milliseconds
+        # A slow System query leaves a gap: the host's clock is still there.
+        lifecycle:
+          expire_after_cycles: 0
         dimensions:
           - selector: system_clock_offset_microseconds
             name: offset

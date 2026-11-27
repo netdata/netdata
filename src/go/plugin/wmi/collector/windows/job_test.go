@@ -1406,15 +1406,32 @@ func (querySessionFunc) Close() {}
 
 // TestCollector_JobV2ClockOffset checks the host's clock offset through the V2
 // job path. The host reads its clock in the middle of each System query, so the
-// published offset is exactly how far the host's clock is ahead of the
-// poller's: in microseconds on the wire, charted in milliseconds. A query that
-// took longer than a second publishes no offset.
+// chart shows exactly how far the host's clock is ahead of the poller's, in
+// milliseconds. A query that took longer than a second leaves a gap; a run of
+// such queries longer than the default chart expiry and the metric store's
+// retention keeps the chart, which shows the offset again with the next fast
+// query.
 func TestCollector_JobV2ClockOffset(t *testing.T) {
 	// fileTime is a FILETIME: 100 ns ticks since 1601-01-01 UTC, 11644473600
 	// seconds before the Unix epoch.
 	fileTime := func(clock time.Time) uint64 {
 		return uint64(clock.UnixNano()/100) + 11644473600*10000000
 	}
+	type collection struct {
+		queryTime time.Duration
+		hostAhead time.Duration
+		// wantMilliseconds is the charted offset, when the collection has one.
+		wantMilliseconds []float64
+	}
+	collections := []collection{
+		{queryTime: 300 * time.Millisecond, hostAhead: 2500 * time.Millisecond, wantMilliseconds: []float64{2500}},
+		{queryTime: time.Second, hostAhead: -750 * time.Millisecond, wantMilliseconds: []float64{-750}},
+	}
+	for range 21 {
+		collections = append(collections, collection{queryTime: time.Second + time.Microsecond, hostAhead: time.Minute})
+	}
+	collections = append(collections, collection{hostAhead: 1234567 * time.Microsecond, wantMilliseconds: []float64{1234.567}})
+
 	synctest.Test(t, func(t *testing.T) {
 		c := configuredCollector()
 		c.Vnode = "fixture"
@@ -1440,36 +1457,27 @@ func TestCollector_JobV2ClockOffset(t *testing.T) {
 		})
 
 		var chartID string
-		for clock, tc := range []struct {
-			queryTime  time.Duration
-			hostAhead  time.Duration
-			wantOffset []float64
-		}{
-			{queryTime: 300 * time.Millisecond, hostAhead: 2500 * time.Millisecond, wantOffset: []float64{2500000}},
-			{queryTime: time.Second, hostAhead: -750 * time.Millisecond, wantOffset: []float64{-750000}},
-			{queryTime: time.Second + time.Microsecond, hostAhead: 90 * time.Second},
-			{queryTime: 0, hostAhead: 1234567 * time.Microsecond, wantOffset: []float64{1234567}},
-		} {
+		var dimension wireDimension
+		for i, tc := range collections {
 			queryTime, hostAhead = tc.queryTime, tc.hostAhead
-			output := collect((clock + 1) * c.UpdateEvery)
+			output := collect((i + 1) * c.UpdateEvery)
 			for id, chart := range parseCharts(t, output) {
-				if chart.context == "wmi.clock_offset" {
-					assert.Equal(t, "milliseconds", chart.units)
-					assert.Equal(t, []wireDimension{{
-						name:       "offset",
-						algorithm:  "absolute",
-						multiplier: 1,
-						divisor:    1000,
-					}}, chart.dimensions)
-					chartID = id
+				// An obsolete chart is sent again without its dimension.
+				if chart.context == "wmi.clock_offset" && len(chart.dimensions) == 1 {
+					chartID, dimension = id, chart.dimensions[0]
 				}
 			}
 			require.NotEmpty(t, chartID, "the clock offset chart is defined with the first collection")
-			var gotOffset []float64
-			if value, ok := parseSamples(t, output)[chartID]["offset"]; ok {
-				gotOffset = append(gotOffset, value)
+			for line := range strings.Lines(output) {
+				obsolete := strings.HasPrefix(line, "CHART '"+chartID+"'") && strings.Contains(line, "obsolete")
+				assert.False(t, obsolete, "collection %d: %s", i+1, line)
 			}
-			assert.Equal(t, tc.wantOffset, gotOffset, "collection %d", clock+1)
+			var gotMilliseconds []float64
+			if value, ok := parseSamples(t, output)[chartID][dimension.name]; ok {
+				shown := value * float64(dimension.multiplier) / float64(dimension.divisor)
+				gotMilliseconds = append(gotMilliseconds, shown)
+			}
+			assert.Equal(t, tc.wantMilliseconds, gotMilliseconds, "collection %d", i+1)
 			time.Sleep(time.Duration(c.UpdateEvery) * time.Second)
 		}
 	})
