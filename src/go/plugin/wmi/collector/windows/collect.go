@@ -91,6 +91,10 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			query: queryNetworkAdapters,
 			read:  snapshot.readNetworkAdapters,
 		},
+		{name: "TCPv4", enabled: groupEnabled(c.Collectors.Network), query: queryTCPv4, read: snapshot.readTCP(ipv4)},
+		{name: "TCPv6", enabled: groupEnabled(c.Collectors.Network), query: queryTCPv6, read: snapshot.readTCP(ipv6)},
+		{name: "UDPv4", enabled: groupEnabled(c.Collectors.Network), query: queryUDPv4, read: snapshot.readUDP(ipv4)},
+		{name: "UDPv6", enabled: groupEnabled(c.Collectors.Network), query: queryUDPv6, read: snapshot.readUDP(ipv6)},
 		{
 			name:    "disk",
 			enabled: groupEnabled(c.Collectors.Disk),

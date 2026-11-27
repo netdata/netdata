@@ -28,6 +28,8 @@ type observations struct {
 	netTotalReceived   sample
 	netTotalSent       sample
 	physicalInterfaces map[string]bool
+	tcp                [ipVersions][len(tcpCounters)]sample
+	udp                [ipVersions][len(udpCounters)]sample
 	drives             []diskSpace
 	physicalDisks      []physicalDisk
 	// physicalDisksRead marks a usable PhysicalDisk reply.

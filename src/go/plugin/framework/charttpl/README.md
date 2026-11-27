@@ -588,7 +588,7 @@ charts:
 
 | Field             | Type          | Required | Default                | Description                                                                  |
 |-------------------|---------------|----------|------------------------|------------------------------------------------------------------------------|
-| `id`              | string        | no       | derived from `context` | Base chart ID. If omitted, derived by replacing `.` with `_` in `context`.   |
+| `id`              | string        | no       | derived from `context` | Base chart ID. If omitted, the resulting context ([section 2](#2-context_namespace)) with `.` replaced by `_`, for example `mysql_queries`. |
 | `title`           | string        | **yes**  |                        | Chart title shown in the dashboard.                                          |
 | `family`          | string        | no       |                        | Optional chart-level family leaf, appended to the group family.              |
 | `context`         | string        | **yes**  |                        | Chart context leaf. Combined with context namespaces.                        |
