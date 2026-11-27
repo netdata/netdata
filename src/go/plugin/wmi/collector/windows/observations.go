@@ -21,6 +21,7 @@ type observations struct {
 	memoryCounters [len(memoryCounters)]sample
 	pageFaults     pageFaults
 	pagingFiles    []pagingFile
+	numaNodes      []numaNode
 	system         systemCounters
 	interfaces     []networkInterface
 	// netTotalReceived and netTotalSent sum the byte totals of the Network

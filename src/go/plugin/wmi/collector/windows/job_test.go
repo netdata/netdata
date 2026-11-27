@@ -275,6 +275,7 @@ type wireDimension struct {
 
 type wireChart struct {
 	context    string
+	family     string
 	title      string
 	units      string
 	chartType  string
@@ -312,7 +313,8 @@ func parseCharts(t *testing.T, output string) map[string]*wireChart {
 				}
 				charts[fields[1]] = current
 			}
-			current.title, current.units, current.context, current.chartType = fields[3], fields[4], fields[6], fields[7]
+			current.title, current.units, current.family = fields[3], fields[4], fields[5]
+			current.context, current.chartType = fields[6], fields[7]
 		case "DIMENSION":
 			// DIMENSION id name algorithm multiplier divisor options
 			require.NotNil(t, current, line)
@@ -395,6 +397,7 @@ func publishedCharts(t *testing.T) []wireChart {
 // src/collectors/common-contexts/mem-available.h and mem-pgfaults.h (the other
 // mem.* charts; the swap I/O multiplier is the page size, 4096 on Windows),
 // src/collectors/windows.plugin/perflib-pagefile.c (mem.pagefile_usage),
+// src/collectors/windows.plugin/perflib-numa.c (mem.numa_node_mem_usage),
 // src/collectors/windows.plugin/perflib-processes.c with
 // src/collectors/common-contexts/system-processes.h (system.processes,
 // system.threads, system.ctxt, system.processor_queue_length),
@@ -405,8 +408,9 @@ func publishedCharts(t *testing.T) []wireChart {
 // entries are the wire form of the go.d ping collector's definitions, which
 // TestPingChartsMatchPingCollector compares with that collector's template.
 // Native CPU dimensions use the percent-of-total-delta algorithm, which this
-// collector computes itself, so they arrive as absolute percentages. Families
-// are display metadata and not compared.
+// collector computes itself, so they arrive as absolute percentages. Native
+// net.* and disk.space charts take their family from the interface or drive
+// name, which a chart template cannot, so their families are not compared.
 func TestCollector_PublishesSharedContexts(t *testing.T) {
 	modes := []wireDimension{
 		{name: "irq", algorithm: "absolute", multiplier: 1, divisor: 1},
@@ -441,18 +445,21 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 	}
 	native := map[string]wireChart{
 		"system.cpu": {
+			family:     "cpu",
 			title:      "Total CPU Utilization",
 			units:      "percentage",
 			chartType:  "stacked",
 			dimensions: modes,
 		},
 		"cpu.cpu": {
+			family:     "utilization",
 			title:      "Core Utilization",
 			units:      "percentage",
 			chartType:  "stacked",
 			dimensions: modes,
 		},
 		"system.ram": {
+			family:    "ram",
 			title:     "System RAM",
 			units:     "MiB",
 			chartType: "stacked",
@@ -462,12 +469,14 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"mem.available": {
+			family:     "overview",
 			title:      "Available RAM for applications",
 			units:      "MiB",
 			chartType:  "area",
 			dimensions: single("avail", "absolute", 1048576),
 		},
 		"mem.swap": {
+			family:    "swap",
 			title:     "System Swap",
 			units:     "MiB",
 			chartType: "stacked",
@@ -477,6 +486,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"mem.swap_iops": {
+			family:    "swap",
 			title:     "Swap Operations",
 			units:     "operations/s",
 			chartType: "stacked",
@@ -486,6 +496,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"mem.swapio": {
+			family:    "swap",
 			title:     "Swap I/O",
 			units:     "KiB/s",
 			chartType: "area",
@@ -495,60 +506,70 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"mem.committed": {
+			family:     "mem",
 			title:      "Committed Memory",
 			units:      "bytes",
 			chartType:  "line",
 			dimensions: unscaled("absolute", "committed", "limit"),
 		},
 		"mem.system_cache": {
+			family:     "mem",
 			title:      "System Cache Memory",
 			units:      "bytes",
 			chartType:  "line",
 			dimensions: unscaled("absolute", "cache", "peak", "resident"),
 		},
 		"mem.page_lists": {
+			family:     "mem",
 			title:      "Memory Page Lists",
 			units:      "bytes",
 			chartType:  "stacked",
 			dimensions: unscaled("absolute", "free", "modified", "standby_core", "standby_normal", "standby_reserve"),
 		},
 		"mem.system_pool_size": {
+			family:     "mem",
 			title:      "System Memory Pool",
 			units:      "bytes",
 			chartType:  "stacked",
 			dimensions: unscaled("absolute", "paged", "non-paged"),
 		},
 		"mem.system_pool_paged": {
+			family:     "mem",
 			title:      "Paged System Memory Pool",
 			units:      "bytes",
 			chartType:  "line",
 			dimensions: unscaled("absolute", "resident"),
 		},
 		"mem.system_pool_allocs": {
+			family:     "mem",
 			title:      "System Pool Allocations",
 			units:      "allocations/s",
 			chartType:  "line",
 			dimensions: unscaled("incremental", "paged", "non-paged"),
 		},
 		"mem.system_page_table_entries": {
+			family:     "mem",
 			title:      "Unused page table entries.",
 			units:      "pages",
 			chartType:  "line",
 			dimensions: unscaled("absolute", "free"),
 		},
 		"mem.system_code": {
+			family:     "mem",
 			title:      "System Code Memory",
 			units:      "bytes",
 			chartType:  "line",
 			dimensions: unscaled("absolute", "resident", "total"),
 		},
 		"mem.system_drivers": {
+			family:     "mem",
 			title:      "System Driver Memory",
 			units:      "bytes",
 			chartType:  "line",
 			dimensions: unscaled("absolute", "resident", "total"),
 		},
 		"mem.pgfaults": {
+			family:    "page faults",
 			title:     "Memory Page Faults",
 			units:     "faults/s",
 			chartType: "line",
@@ -558,54 +579,73 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"mem.page_faults_breakdown": {
+			family:     "page faults",
 			title:      "Memory Page Fault Breakdown",
 			units:      "faults/s",
 			chartType:  "line",
 			dimensions: unscaled("incremental", "cache", "demand_zero", "transition", "write_copies"),
 		},
 		"mem.transition_repurposed": {
+			family:     "page faults",
 			title:      "Transition Pages Repurposed",
 			units:      "pages/s",
 			chartType:  "line",
 			dimensions: unscaled("incremental", "repurposed"),
 		},
 		"mem.pagefile_usage": {
+			family:     "pagefile",
 			title:      "Paging file usage",
 			units:      "bytes",
 			chartType:  "stacked",
 			dimensions: unscaled("absolute", "free", "used"),
 		},
+		"mem.numa_node_mem_usage": {
+			family:    "numa",
+			title:     "NUMA Node Memory Usage",
+			units:     "bytes",
+			chartType: "line",
+			dimensions: []wireDimension{
+				{name: "free", algorithm: "absolute", multiplier: 1048576, divisor: 1},
+				{name: "standby", algorithm: "absolute", multiplier: 1048576, divisor: 1},
+			},
+		},
 		"system.processes": {
+			family:     "processes",
 			title:      "System Processes",
 			units:      "processes",
 			chartType:  "line",
 			dimensions: single("running", "absolute", 1),
 		},
 		"system.threads": {
+			family:     "processes",
 			title:      "Threads",
 			units:      "threads",
 			chartType:  "line",
 			dimensions: single("threads", "absolute", 1),
 		},
 		"system.ctxt": {
+			family:     "processes",
 			title:      "CPU Context Switches",
 			units:      "context switches/s",
 			chartType:  "line",
 			dimensions: single("switches", "incremental", 1),
 		},
 		"system.processor_queue_length": {
+			family:     "system",
 			title:      "The number of threads in the processor queue.",
 			units:      "threads",
 			chartType:  "line",
 			dimensions: single("threads", "absolute", 1),
 		},
 		"system.uptime": {
+			family:     "uptime",
 			title:      "System Uptime",
 			units:      "seconds",
 			chartType:  "line",
 			dimensions: single("uptime", "absolute", 1000),
 		},
 		"system.net": {
+			family:     "network",
 			title:      "Physical Network Interfaces Aggregated Bandwidth",
 			units:      "kilobits/s",
 			chartType:  "area",
@@ -697,6 +737,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"ping.host_rtt": {
+			family:    "latency",
 			title:     "Ping round-trip time",
 			units:     "milliseconds",
 			chartType: "area",
@@ -707,6 +748,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"ping.host_std_dev_rtt": {
+			family:    "latency",
 			title:     "Ping round-trip time standard deviation",
 			units:     "milliseconds",
 			chartType: "line",
@@ -715,6 +757,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			},
 		},
 		"ping.host_packet_loss": {
+			family:    "packet loss",
 			title:     "Ping packet loss",
 			units:     "percentage",
 			chartType: "line",
@@ -732,8 +775,9 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 
 	// One chart per instance in the fixture. Ethernet and Ethernet#1 report
 	// only their byte totals; the interface without traffic has none, and the
-	// adapters that are also interfaces are charted once, as real. The Agent
-	// shows the backslashes of the native pagefile label as slashes.
+	// adapters that are also interfaces are charted once, as real. Label
+	// values carry slashes for backslashes, as the Agent stores the native
+	// pagefile label.
 	want := []wireChart{
 		instance("system.cpu", map[string]string{}),
 		instance("cpu.cpu", map[string]string{"cpu": "cpu0"}),
@@ -741,6 +785,8 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("system.ram", map[string]string{}),
 		instance("mem.pagefile_usage", map[string]string{"pagefile": "C:/pagefile.sys"}),
 		instance("mem.pagefile_usage", map[string]string{"pagefile": "D:/pagefile.sys"}),
+		instance("mem.numa_node_mem_usage", map[string]string{"node": "0"}),
+		instance("mem.numa_node_mem_usage", map[string]string{"node": "1"}),
 		instance("system.processes", map[string]string{}),
 		instance("system.threads", map[string]string{}),
 		instance("system.ctxt", map[string]string{}),
@@ -768,7 +814,8 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("ping.host_packet_loss", map[string]string{"host": "windows.example.com"}),
 	}
 	for context := range native {
-		if strings.HasPrefix(context, "mem.") && context != "mem.pagefile_usage" {
+		if strings.HasPrefix(context, "mem.") && context != "mem.pagefile_usage" &&
+			context != "mem.numa_node_mem_usage" {
 			want = append(want, instance(context, map[string]string{}))
 		}
 		if strings.HasPrefix(context, "net.") {
@@ -778,7 +825,13 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			)
 		}
 	}
-	assert.ElementsMatch(t, want, publishedCharts(t))
+	published := publishedCharts(t)
+	for i, chart := range published {
+		if strings.HasPrefix(chart.context, "net.") || chart.context == "disk.space" {
+			published[i].family = ""
+		}
+	}
+	assert.ElementsMatch(t, want, published)
 }
 
 // TestCollector_InterfaceCountersFeedNativeDimensions checks that each WMI
@@ -882,8 +935,9 @@ func TestCollector_SystemCountersFeedNativeDimensions(t *testing.T) {
 // reaches the native chart dimension that reads it: the Memory counters as
 // src/collectors/windows.plugin/perflib-memory.c reads them (minor page faults
 // are all faults less Pages/sec), the commit limit and available commit as
-// GetSystemRAM.c charts the swap, and each paging file's pages, in 4 KiB pages,
-// as perflib-pagefile.c charts them.
+// GetSystemRAM.c charts the swap, each paging file's pages, in 4 KiB pages,
+// as perflib-pagefile.c charts them, and each NUMA node's MiB as
+// perflib-numa.c sends them.
 func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
 	native := map[string]nativeDimension{
 		"AvailableBytes":                  {"mem.available", "avail"},
@@ -932,7 +986,7 @@ func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
 		return 0
 	}
 
-	// Values by the native pagefile label, empty for the host's charts.
+	// Values by the native pagefile or node label, empty for the host's charts.
 	want := map[string]map[nativeDimension]float64{"": {}}
 	counters := memoryCountersRow()
 	for property, dimension := range native {
@@ -959,6 +1013,17 @@ func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
 		}
 	}
 
+	for _, row := range results[queryNUMANodes].rows {
+		node := row["name"].(string)
+		if node == "_Total" {
+			continue
+		}
+		want[node] = map[nativeDimension]float64{
+			{"mem.numa_node_mem_usage", "free"}:    number(row["freeandzeropagelistmbytes"]),
+			{"mem.numa_node_mem_usage", "standby"}: number(row["standbylistmbytes"]),
+		}
+	}
+
 	synctest.Test(t, func(t *testing.T) {
 		c := configuredCollector()
 		c.Vnode = "fixture"
@@ -980,12 +1045,12 @@ func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
 			if !strings.HasPrefix(chart.context, "mem.") {
 				continue
 			}
-			pagefile := chart.labels["pagefile"]
-			if got[pagefile] == nil {
-				got[pagefile] = make(map[nativeDimension]float64)
+			instance := chart.labels["pagefile"] + chart.labels["node"]
+			if got[instance] == nil {
+				got[instance] = make(map[nativeDimension]float64)
 			}
 			for dimension, value := range samples[id] {
-				got[pagefile][nativeDimension{chart.context, dimension}] = value
+				got[instance][nativeDimension{chart.context, dimension}] = value
 			}
 		}
 		assert.Equal(t, want, got)

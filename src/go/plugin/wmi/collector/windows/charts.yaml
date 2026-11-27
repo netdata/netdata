@@ -297,6 +297,24 @@ groups:
             name: free
           - selector: pagefile_used_bytes
             name: used
+  - family: numa
+    context_namespace: mem
+    metrics: [numa_node_free_and_zero_mebibytes, numa_node_standby_mebibytes]
+    charts:
+      - context: numa_node_mem_usage
+        title: NUMA Node Memory Usage
+        units: bytes
+        instances:
+          by_labels: [node]
+        dimensions:
+          - selector: numa_node_free_and_zero_mebibytes
+            name: free
+            options:
+              multiplier: 1048576
+          - selector: numa_node_standby_mebibytes
+            name: standby
+            options:
+              multiplier: 1048576
   - family: processes
     context_namespace: system
     metrics: [system_processes, system_threads, system_context_switches]

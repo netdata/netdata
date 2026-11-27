@@ -18,6 +18,7 @@ const (
 	readWriteModeLabel = "rw_mode"
 	serialNumberLabel  = "serial_number"
 	pagefileLabel      = "pagefile"
+	numaNodeLabel      = "node"
 	// The go.d ping collector's label: the target as configured.
 	hostLabel = "host"
 
@@ -41,6 +42,8 @@ type collectorMetrics struct {
 	pageFaultsMajor  metrix.SnapshotCounter
 	pagefileFree     metrix.SnapshotGauge
 	pagefileUsed     metrix.SnapshotGauge
+	numaFree         metrix.SnapshotGauge
+	numaStandby      metrix.SnapshotGauge
 	processes        metrix.SnapshotGauge
 	threads          metrix.SnapshotGauge
 	contextSwitches  metrix.SnapshotCounter
@@ -71,6 +74,8 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		pageFaultsMajor:  m.Counter("memory_page_faults_major"),
 		pagefileFree:     m.Gauge("pagefile_free_bytes"),
 		pagefileUsed:     m.Gauge("pagefile_used_bytes"),
+		numaFree:         m.Gauge("numa_node_free_and_zero_mebibytes"),
+		numaStandby:      m.Gauge("numa_node_standby_mebibytes"),
 		processes:        m.Gauge("system_processes"),
 		threads:          m.Gauge("system_threads"),
 		contextSwitches:  m.Counter("system_context_switches"),
@@ -128,8 +133,8 @@ func (i counterInstrument) observe(s sample, labels ...metrix.LabelSet) {
 }
 
 // write records the valid samples. Label sets are built per poll, so a
-// processor, paging file, interface or drive that disappears stops being
-// observed. Raw totals are counters: Netdata computes their rate over each
+// processor, paging file, NUMA node, interface or drive that disappears stops
+// being observed. Raw totals are counters: Netdata computes their rate over each
 // collection interval.
 func (m collectorMetrics) write(snapshot observations) {
 	if snapshot.cpu.hasTotal {
@@ -158,6 +163,14 @@ func (m collectorMetrics) write(snapshot observations) {
 		})
 		observe(m.pagefileFree, file.free, labels)
 		observe(m.pagefileUsed, file.used, labels)
+	}
+	for _, node := range snapshot.numaNodes {
+		labels := m.meter.LabelSet(metrix.Label{
+			Key:   numaNodeLabel,
+			Value: node.name,
+		})
+		observe(m.numaFree, node.free, labels)
+		observe(m.numaStandby, node.standby, labels)
 	}
 	observe(m.processes, snapshot.system.processes)
 	observe(m.threads, snapshot.system.threads)

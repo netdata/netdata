@@ -68,6 +68,12 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			query:   queryPagingFiles,
 			read:    snapshot.readPagingFiles,
 		},
+		{
+			name:    "NUMA node",
+			enabled: groupEnabled(c.Collectors.Memory),
+			query:   queryNUMANodes,
+			read:    snapshot.readNUMANodes,
+		},
 		{name: "system", enabled: groupEnabled(c.Collectors.System), query: querySystem, read: snapshot.readSystem},
 		{
 			name:    "network",

@@ -32,7 +32,7 @@ modules:
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
           - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
-          - physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, and the usage of each paging file;
+          - physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node;
           - the number of processes and threads, context switches, processor queue length and uptime;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - available and used space per fixed drive;
@@ -42,7 +42,7 @@ modules:
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (three for the memory group, two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -60,7 +60,7 @@ modules:
           | Data | WMI classes |
           |---|---|
           | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
-          | Memory | `Win32_OperatingSystem`, `Win32_PerfRawData_PerfOS_Memory`, `Win32_PerfRawData_PerfOS_PagingFile` |
+          | Memory | `Win32_OperatingSystem`, `Win32_PerfRawData_PerfOS_Memory`, `Win32_PerfRawData_PerfOS_PagingFile`, `Win32_PerfRawData_PerfOS_NUMANodeMemory` |
           | System | `Win32_PerfRawData_PerfOS_System` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter` |
           | Disk | `Win32_LogicalDisk` |
@@ -107,7 +107,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to eight WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to nine WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -230,7 +230,7 @@ modules:
               required: false
               group: Collection
             - name: collectors
-              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group three and the network group two. Keep at least one group enabled."
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four and the network group two. Keep at least one group enabled."
               default_value: ''
               required: false
               group: Collection
@@ -242,7 +242,7 @@ modules:
               detailed_description: |
                 As on the Netdata Agent running on Windows, each mode is its share of the time all modes accumulated in the interval. The privileged time Windows reports (`system`) already includes the interrupt (`irq`) and DPC (`dpc`) time, so those two also count within `system`.
             - name: collectors.memory
-              description: "Collect physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, and the usage of each paging file."
+              description: "Collect physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node."
               default_value: true
               required: false
               group: Collection
@@ -642,6 +642,19 @@ modules:
               dimensions:
                 - name: free
                 - name: used
+        - name: NUMA node
+          description: A NUMA node of the host, a group of processors and the memory attached to them. Most virtual machines and single-socket servers have one.
+          labels:
+            - name: node
+              description: Number of the NUMA node, for example `0`.
+          metrics:
+            - name: mem.numa_node_mem_usage
+              description: NUMA Node Memory Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: free
+                - name: standby
         - name: logical processor
           description: A logical processor of the host.
           labels:

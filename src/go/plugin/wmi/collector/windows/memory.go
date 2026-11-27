@@ -75,6 +75,11 @@ var queryMemoryCounters = func() string {
 // pages, the raw fraction the native Windows Agent reads.
 const queryPagingFiles = "SELECT Name, PercentUsage, PercentUsage_Base FROM Win32_PerfRawData_PerfOS_PagingFile"
 
+// queryNUMANodes reads each NUMA node's free and standby memory, in MiB, as
+// the native Windows Agent does.
+const queryNUMANodes = "SELECT Name, FreeAndZeroPageListMBytes, StandbyListMBytes " +
+	"FROM Win32_PerfRawData_PerfOS_NUMANodeMemory"
+
 // pageSize is the memory page size of every Windows architecture (x86, x64,
 // ARM64). The native Windows Agent uses the local page size for the same
 // counters.
@@ -94,6 +99,13 @@ type pagingFile struct {
 	path string
 	used sample
 	free sample
+}
+
+// numaNode holds a NUMA node's memory in MiB.
+type numaNode struct {
+	name    string
+	free    sample
+	standby sample
 }
 
 // readMemory converts Win32_OperatingSystem's KiB values to bytes. Free
@@ -175,6 +187,28 @@ func (o *observations) readPagingFiles(rows []map[string]any) bool {
 		})
 	}
 	return files == 0 || len(o.pagingFiles) > 0
+}
+
+// readNUMANodes keeps the nodes that report a value. The counter set's _Total
+// is not a node.
+func (o *observations) readNUMANodes(rows []map[string]any) bool {
+	var nodes int
+	for _, row := range rows {
+		name, _ := row["name"].(string)
+		if name == "" || strings.EqualFold(name, "_Total") {
+			continue
+		}
+		nodes++
+		node := numaNode{
+			name:    name,
+			free:    readUnsigned(row["freeandzeropagelistmbytes"]),
+			standby: readUnsigned(row["standbylistmbytes"]),
+		}
+		if node.free.valid || node.standby.valid {
+			o.numaNodes = append(o.numaNodes, node)
+		}
+	}
+	return nodes == 0 || len(o.numaNodes) > 0
 }
 
 func (o *observations) hasPagingFile(path string) bool {

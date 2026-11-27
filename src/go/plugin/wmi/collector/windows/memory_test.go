@@ -142,6 +142,46 @@ func TestReadMemoryCounters(t *testing.T) {
 	}
 }
 
+func TestReadNUMANodes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		rows       queryResult
+		want       []numaNode
+		wantUsable bool
+	}{
+		"nodes; the total is not a node": {
+			rows: fixtureRows(
+				map[string]any{"Name": "0", "FreeAndZeroPageListMBytes": uint32(4304), "StandbyListMBytes": uint32(0)},
+				map[string]any{"Name": "1", "FreeAndZeroPageListMBytes": "malformed", "StandbyListMBytes": "6598"},
+				map[string]any{"Name": "_Total", "FreeAndZeroPageListMBytes": uint32(4304), "StandbyListMBytes": uint32(6598)},
+			),
+			want: []numaNode{
+				{
+					name:    "0",
+					free:    validSample(4304),
+					standby: validSample(0),
+				},
+				{
+					name:    "1",
+					standby: validSample(6598),
+				},
+			},
+			wantUsable: true,
+		},
+		"no node reports a value": {
+			rows: fixtureRows(map[string]any{"Name": "0"}, map[string]any{"FreeAndZeroPageListMBytes": uint32(1)}),
+		},
+		"a host without NUMA nodes": {
+			wantUsable: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var o observations
+			assert.Equal(t, tc.wantUsable, o.readNUMANodes(tc.rows.rows))
+			assert.Equal(t, tc.want, o.numaNodes)
+		})
+	}
+}
+
 func TestReadPagingFiles(t *testing.T) {
 	pagingFileRow := func(name string, used, size any) map[string]any {
 		return map[string]any{"Name": name, "PercentUsage": used, "PercentUsage_Base": size}
