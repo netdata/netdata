@@ -280,6 +280,8 @@ type wireChart struct {
 	chartType  string
 	labels     map[string]string
 	dimensions []wireDimension
+	// variables are the chart variables the definition declares.
+	variables []string
 }
 
 var protocolField = regexp.MustCompile(`'([^']*)'|(\S+)`)
@@ -337,6 +339,15 @@ func parseCharts(t *testing.T, output string) map[string]*wireChart {
 			if !strings.HasPrefix(fields[1], "_") {
 				current.labels[fields[1]] = fields[2]
 			}
+		case "VARIABLE":
+			// VARIABLE CHART name = value; a definition declares each one once.
+			require.Len(t, fields, 5, line)
+			if current != nil && !slices.Contains(current.variables, fields[2]) {
+				current.variables = append(current.variables, fields[2])
+			}
+		case "BEGIN":
+			// Updates follow; a VARIABLE line there carries a value.
+			current = nil
 		}
 	}
 	return charts
@@ -438,6 +449,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			units:      "kilobits/s",
 			chartType:  "area",
 			dimensions: bandwidth,
+			variables:  []string{"nic_speed_max"},
 		},
 		"net.packets": {
 			title:     "Packets",
@@ -611,16 +623,19 @@ func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
 		charts := parseCharts(t, output)
 		samples := parseSamples(t, output)
 
-		want := make(map[string]map[nativeDimension]int64)
-		got := make(map[string]map[nativeDimension]int64)
+		want := make(map[string]map[nativeDimension]float64)
+		got := make(map[string]map[nativeDimension]float64)
 		for device, base := range map[string]uint64{"Uplink": 1000, "Team Member": 2000} {
-			want[device] = make(map[nativeDimension]int64)
-			for property, value := range nativeInterfaceRow(device, base) {
+			want[device] = make(map[nativeDimension]float64)
+			row := nativeInterfaceRow(device, base)
+			for property, value := range row {
 				if property != "Name" {
-					want[device][nativeInterfaceCounters[property]] = int64(value.(uint64))
+					want[device][nativeInterfaceCounters[property]] = float64(value.(uint64))
 				}
 			}
-			got[device] = make(map[nativeDimension]int64)
+			// The native agent sets net.net's nic_speed_max to the speed in kilobits/s.
+			want[device][nativeDimension{"net.net", "$nic_speed_max"}] = float64(row["CurrentBandwidth"].(uint64)) / 1000
+			got[device] = make(map[nativeDimension]float64)
 			for id, chart := range charts {
 				if chart.labels["device"] != device {
 					continue
@@ -635,11 +650,11 @@ func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
 }
 
 // parseSamples reads the collected values from plugin protocol output, by
-// chart ID and dimension name.
-func parseSamples(t *testing.T, output string) map[string]map[string]int64 {
+// chart ID and dimension name, or by $name for a chart variable.
+func parseSamples(t *testing.T, output string) map[string]map[string]float64 {
 	t.Helper()
-	samples := make(map[string]map[string]int64)
-	var current map[string]int64
+	samples := make(map[string]map[string]float64)
+	var current map[string]float64
 	for line := range strings.Lines(output) {
 		var fields []string
 		for _, match := range protocolField.FindAllStringSubmatch(line, -1) {
@@ -647,12 +662,18 @@ func parseSamples(t *testing.T, output string) map[string]map[string]int64 {
 		}
 		switch {
 		case len(fields) >= 2 && fields[0] == "BEGIN":
-			current = make(map[string]int64)
+			current = make(map[string]float64)
 			samples[fields[1]] = current
+		case len(fields) >= 1 && fields[0] == "END":
+			current = nil
 		case len(fields) == 4 && fields[0] == "SET" && current != nil:
 			value, err := strconv.ParseInt(fields[3], 10, 64)
 			require.NoError(t, err, line)
-			current[fields[1]] = value
+			current[fields[1]] = float64(value)
+		case len(fields) == 5 && fields[0] == "VARIABLE" && current != nil:
+			value, err := strconv.ParseFloat(fields[4], 64)
+			require.NoError(t, err, line)
+			current["$"+fields[2]] = value
 		}
 	}
 	return samples

@@ -101,6 +101,7 @@ groups:
       - network_received_packets
       - network_sent_packets
       - network_speed_bits_per_second
+      - network_speed_kilobits_per_second
       - network_inbound_errors
       - network_outbound_errors
       - network_inbound_discards
@@ -131,6 +132,11 @@ groups:
             options:
               multiplier: -8
               divisor: 1000
+        # The stock interface_speed and traffic overflow alerts read the speed
+        # in kilobits/s from this variable.
+        variables:
+          - name: nic_speed_max
+            selector: network_speed_kilobits_per_second
       - context: packets
         title: Packets
         units: packets/s

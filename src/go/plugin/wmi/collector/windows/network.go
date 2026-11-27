@@ -15,18 +15,19 @@ type interfaceCounter struct {
 }
 
 // The byte totals decide whether an interface is charted and feed the
-// aggregate bandwidth.
+// aggregate bandwidth; the current bandwidth also feeds the speed variable.
 const (
 	bytesReceived = iota
 	bytesSent
+	currentBandwidth
 )
 
 var interfaceCounters = [...]interfaceCounter{
-	bytesReceived: {property: "BytesReceivedPersec", metric: "network_received_bytes", total: true},
-	bytesSent:     {property: "BytesSentPersec", metric: "network_sent_bytes", total: true},
+	bytesReceived:    {property: "BytesReceivedPersec", metric: "network_received_bytes", total: true},
+	bytesSent:        {property: "BytesSentPersec", metric: "network_sent_bytes", total: true},
+	currentBandwidth: {property: "CurrentBandwidth", metric: "network_speed_bits_per_second"},
 	{property: "PacketsReceivedPersec", metric: "network_received_packets", total: true},
 	{property: "PacketsSentPersec", metric: "network_sent_packets", total: true},
-	{property: "CurrentBandwidth", metric: "network_speed_bits_per_second"},
 	{property: "PacketsReceivedErrors", metric: "network_inbound_errors", total: true},
 	{property: "PacketsOutboundErrors", metric: "network_outbound_errors", total: true},
 	{property: "PacketsReceivedDiscarded", metric: "network_inbound_discards", total: true},

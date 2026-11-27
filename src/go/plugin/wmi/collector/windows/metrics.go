@@ -33,7 +33,8 @@ type collectorMetrics struct {
 	cpuCore          [len(cpuModes)]metrix.SnapshotGauge
 	memoryFree       metrix.SnapshotGauge
 	memoryUsed       metrix.SnapshotGauge
-	netNIC           [len(interfaceCounters)]interfaceInstrument
+	netInterface     [len(interfaceCounters)]interfaceInstrument
+	netSpeedKbps     metrix.SnapshotGauge
 	netTotalReceived metrix.SnapshotCounter
 	netTotalSent     metrix.SnapshotCounter
 	diskAvail        metrix.SnapshotGauge
@@ -67,11 +68,13 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	}
 	for i, counter := range interfaceCounters {
 		if counter.total {
-			metrics.netNIC[i].total = m.Counter(counter.metric)
+			metrics.netInterface[i].total = m.Counter(counter.metric)
 		} else {
-			metrics.netNIC[i].gauge = m.Gauge(counter.metric)
+			metrics.netInterface[i].gauge = m.Gauge(counter.metric)
 		}
 	}
+	// Chart variables are sent unscaled, so the speed variable has its own gauge.
+	metrics.netSpeedKbps = m.Gauge("network_speed_kilobits_per_second", metrix.WithFloat(true))
 	return metrics
 }
 
@@ -125,7 +128,10 @@ func (m collectorMetrics) write(snapshot observations) {
 			},
 		)
 		for i, s := range nic.values {
-			m.netNIC[i].observe(s, labels)
+			m.netInterface[i].observe(s, labels)
+		}
+		if speed := nic.values[currentBandwidth]; speed.valid {
+			m.netSpeedKbps.Observe(float64(speed.value)/1000, labels)
 		}
 	}
 	for _, drive := range snapshot.drives {

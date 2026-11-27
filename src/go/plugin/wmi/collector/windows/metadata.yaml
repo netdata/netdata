@@ -92,7 +92,6 @@ modules:
             - Rates, such as traffic, packets and errors, appear from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
             - Some stock packet alerts expect the one-second collection of the Netdata Agent running on Windows. At the default `update_every` of 30, `10s_received_packets_storm` cannot reach its thresholds; `net_interface_inbound_packets` and `net_interface_outbound_packets` add up per-second rates, so they show the packets divided by `update_every`; and the drop-ratio alerts evaluate only interfaces that average more than about 500 received or 50 sent packets per second, and report 0 below that.
-            - The stock alerts that compare traffic with the interface speed (`interface_speed`, `1m_received_traffic_overflow` and `1m_sent_traffic_overflow`) have no value. They read the speed from a chart variable that the plugin does not publish; the speed itself is on the Interface Speed chart.
             - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
             - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it; its node turns Stale and the `wmi_host_last_collected_secs` alert reports it instead.
             - A host that cannot be reached when its job starts gets no node and no host status alert until the job collects from it, twice for the alert. Set `autodetection_retry` so the job keeps trying.
@@ -105,10 +104,6 @@ modules:
             The poller's own cost is small: a few short-lived connections per job per collection.
 
             On each Windows host, every collection costs up to five WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
-    excluded_alerts:
-      - interface_speed
-      - 1m_received_traffic_overflow
-      - 1m_sent_traffic_overflow
     setup:
       prerequisites:
         list:
