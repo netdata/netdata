@@ -108,23 +108,24 @@ at that time and computes the interval since the chart's previous sample from th
 their collection time whatever happened in between: failed runs, charts a run did not observe, rejected host scopes,
 scrapes slower than the update interval, chart redefinitions.
 
-- Times MUST strictly increase per chart: the Agent ignores a sample whose time is not after the chart's last collection
-  time (and when its own clock is behind the chart too, restarts the chart's counter rates at the next sample it
-  accepts). Known exception: two engine charts whose IDs sanitize to one wire chart both send the run's time (the Agent
-  ignores the second). All jobs of a plugin process and its runtime charts take their times
-  from one `netdataapi.SampleClock`, created by the agent and passed through `JobConfig.SampleClock`/
-  `JobV2Config.SampleClock`, which never issues a time at or before an earlier one (microsecond resolution), across job
-  restarts and wall-clock steps back. A job without one gets its own clock.
+- A chart's times increase while the wall clock does: a job's runs are sequential, and a recreated job's first run
+  comes at least one tick after the old job's last.
+- Times are never adjusted. The Agent ignores a sample whose time is not after the chart's last collection time: after
+  a wall-clock step back it drops the stale samples and, since its own clock is behind the chart too, restarts the
+  chart's counter rates at the next sample it accepts (one empty point, not one point carrying the growth of the step).
+- Known equal times, where the Agent keeps the first sample: two engine charts whose IDs sanitize to one wire chart
+  both send the run's time; a runtime component finalized right after a tick can get the tick's time on a coarse wall
+  clock (Windows).
 - The time is the run start, taken after the tick: a whole second plus scheduling delay, never truncated to whole
   seconds (a time exactly on the update grid makes the Agent turn one missed sample into a gap). Each run renders its
-  `END` line once (`netdataapi.SampleTime`); `chartemit` rejects a plan with chart updates and no time.
+  `END` line once (`netdataapi.NewSampleTime`); `chartemit` rejects a plan with chart updates and no time.
 - Health: a chart's `$last_collected_t` is the run start of its last sample (on a chart's first sample, and after an
   Agent reset, the `update_every` boundary it aligns to); per-dimension `_last_collected_t` stays the Agent's receipt
   time. Streaming v1 children forward intervals (now derived from collection times), so a v1 parent still re-anchors to
   its own receipt time on a chart's first sample, after redefinitions and after gaps over five update intervals.
 
 Regression coverage: `job_sample_time_test.go` (V2 failed cycle, unobserved chart, rejected scope, slow scrape with a
-dropped tick; V1 failed run, empty sample, `SkipGaps`, dropped vnode frame, rejected write; one clock across jobs) and
+dropped tick; V1 failed run, empty sample, `SkipGaps`, dropped vnode frame, rejected write) and
 `TestJobSelfMetricsSampleTimes`.
 
 ## First-sample storage

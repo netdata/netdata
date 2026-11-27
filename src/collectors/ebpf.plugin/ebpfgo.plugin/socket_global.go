@@ -197,7 +197,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 	}
 
-	collectAndPublish(pluginSampleClock.Next(time.Now()))
+	collectAndPublish(netdataapi.NewSampleTime(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -209,6 +209,6 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		case <-ticker.C:
 		}
 
-		collectAndPublish(pluginSampleClock.Next(time.Now()))
+		collectAndPublish(netdataapi.NewSampleTime(time.Now()))
 	}
 }

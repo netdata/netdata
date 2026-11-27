@@ -88,8 +88,7 @@ func TestWriteFDGlobalPublishesRawCounters(t *testing.T) {
 	snapshot := libbpfloader.FDSnapshot{OpenCall: 1000, OpenErr: 7, CloseCall: 900, CloseErr: 3}
 
 	var buf bytes.Buffer
-	var clock netdataapi.SampleClock
-	writeFDGlobal(netdataapi.New(&buf), snapshot, clock.Next(time.Unix(1700000000, 250000000)), true)
+	writeFDGlobal(netdataapi.New(&buf), snapshot, netdataapi.NewSampleTime(time.Unix(1700000000, 250000000)), true)
 	got := buf.String()
 
 	for _, want := range []string{

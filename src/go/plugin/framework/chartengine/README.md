@@ -126,6 +126,8 @@ between scopes; mutable route caches and lifecycle state remain scope-owned.
 ## End-to-End Example (Single Flow)
 
 ```go
+runStart := time.Now() // the collection time of this run's samples
+
 // 1) Collector writes metrics.
 store := metrix.NewCollectorStore()
 meter := store.Write().SnapshotMeter("app")
@@ -164,15 +166,14 @@ attempt, err := engine.PreparePlan(store.Read(metrix.ReadRaw(), metrix.ReadFlatt
 plan := attempt.Plan()
 defer attempt.Abort()
 
-// Every chart update ends with its collection time; take it from one
-// netdataapi.SampleClock per plugin process (see jobruntime "Chart Sample Times").
+// Every chart update ends with its collection time (see jobruntime "Chart Sample Times").
 err = chartemit.ApplyPlan(api, plan, chartemit.EmitEnv{
 	TypeID:      "plugin.job",
 	UpdateEvery: 1,
 	Plugin:      "example",
 	Module:      "example",
 	JobName:     "example",
-	CollectedAt: clock.Next(time.Now()),
+	CollectedAt: netdataapi.NewSampleTime(runStart),
 })
 // handle err
 err = attempt.Commit()

@@ -50,9 +50,6 @@ type JobV2Config struct {
 	StoreFirst              bool
 	RuntimeService          runtimecomp.Service
 	LifecycleErrorSanitizer func(error) error
-	// SampleClock times chart samples; share one per plugin process (see
-	// netdataapi.SampleClock). Nil gives the job a clock of its own.
-	SampleClock *netdataapi.SampleClock
 }
 
 func NewJobV2(cfg JobV2Config) *JobV2 {
@@ -63,10 +60,6 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	publisher := cfg.Publication
 	if publisher == nil {
 		publisher = hostoutput.New()
-	}
-	clock := cfg.SampleClock
-	if clock == nil {
-		clock = &netdataapi.SampleClock{}
 	}
 
 	j := &JobV2{
@@ -93,7 +86,6 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		vnodeMetadataRevision:   cfg.VnodeMetadataRevision,
 		vnodeLookup:             cfg.VnodeLookup,
 		publication:             publisher,
-		sampleClock:             clock,
 		runtimeService:          cfg.RuntimeService,
 		lifecycleErrorSanitizer: cfg.LifecycleErrorSanitizer,
 	}
@@ -153,7 +145,6 @@ type JobV2 struct {
 
 	retries     atomic.Int64
 	selfMetrics jobSelfMetrics
-	sampleClock *netdataapi.SampleClock
 
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
@@ -561,7 +552,7 @@ func (j *JobV2) runOnce() {
 	j.refreshVnodeSnapshot()
 
 	curTime := time.Now()
-	sample := j.sampleClock.Next(curTime)
+	sample := netdataapi.NewSampleTime(curTime)
 	prepared, ok := j.collectAndEmit(sample)
 	elapsed := int64(durationTo(time.Since(curTime), time.Millisecond))
 	if ok && !j.panicked.Load() {

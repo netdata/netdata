@@ -61,7 +61,7 @@ func TestRuntimeMetricsJobQuarantineComponent(t *testing.T) {
 				reg := newComponentRegistry()
 				reg.upsert(newQuarantineTestSpec("component"))
 				out := &gatedWriter{started: make(chan struct{}), release: make(chan struct{})}
-				job := newRuntimeMetricsJob(out, reg, nil, nil)
+				job := newRuntimeMetricsJob(out, reg, nil)
 
 				tickDone := make(chan struct{})
 				go func() {
@@ -112,7 +112,7 @@ func TestRuntimeMetricsJobQuarantineComponent(t *testing.T) {
 				reg := newComponentRegistry()
 				reg.upsert(newQuarantineTestSpec("component"))
 				out := &gatedWriter{started: make(chan struct{}), release: make(chan struct{})}
-				job := newRuntimeMetricsJob(out, reg, nil, nil)
+				job := newRuntimeMetricsJob(out, reg, nil)
 
 				tickDone := make(chan struct{})
 				go func() {
@@ -156,7 +156,7 @@ func TestRuntimeMetricsJobQuarantineComponent(t *testing.T) {
 				reg := newComponentRegistry()
 				reg.upsert(newQuarantineTestSpec("component"))
 				out := &safeBuffer{}
-				job := newRuntimeMetricsJob(out, reg, nil, nil)
+				job := newRuntimeMetricsJob(out, reg, nil)
 
 				job.runOnce(1)
 				require.Contains(t, out.String(), "component_load", "component must emit before quarantine")
@@ -176,7 +176,7 @@ func TestRuntimeMetricsJobQuarantineComponent(t *testing.T) {
 				reg := newComponentRegistry()
 				reg.upsert(newQuarantineTestSpec("component"))
 				out := &safeBuffer{}
-				job := newRuntimeMetricsJob(out, reg, nil, nil)
+				job := newRuntimeMetricsJob(out, reg, nil)
 
 				job.runOnce(1)
 				job.quarantineComponent("component")
@@ -202,7 +202,7 @@ func TestServiceQuarantineComponent(t *testing.T) {
 	}{
 		"barrier waits out an in-progress tick even during service Stop": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				store := metrix.NewRuntimeStore()
 				store.Write().StatefulMeter("component").Gauge("load").Set(5)
 				require.NoError(t, svc.RegisterComponent(ComponentConfig{
@@ -255,7 +255,7 @@ func TestServiceQuarantineComponent(t *testing.T) {
 		},
 		"quarantine on a never-started service removes the registration": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				store := metrix.NewRuntimeStore()
 				require.NoError(t, svc.RegisterComponent(ComponentConfig{
 					Name:         "component",
@@ -270,7 +270,7 @@ func TestServiceQuarantineComponent(t *testing.T) {
 		},
 		"quarantine normalizes the component name like the other entry points": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				store := metrix.NewRuntimeStore()
 				require.NoError(t, svc.RegisterComponent(ComponentConfig{
 					Name:         "component",
@@ -296,7 +296,7 @@ func TestServiceFinalizeComponent(t *testing.T) {
 	}{
 		"emits current store and removes emitter state": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.SetTickEvery(time.Hour)
 				store := metrix.NewRuntimeStore()
 				store.Write().StatefulMeter("component").Gauge("load").Set(7)
@@ -327,7 +327,7 @@ func TestServiceFinalizeComponent(t *testing.T) {
 		},
 		"waits out an in-progress tick before final emission": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.SetTickEvery(time.Hour)
 				store := metrix.NewRuntimeStore()
 				store.Write().StatefulMeter("component").Gauge("load").Set(7)

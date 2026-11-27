@@ -309,7 +309,7 @@ func runDCStatGlobalCollector(
 		publishSharedStore()
 	}
 
-	collectAndPublish(pluginSampleClock.Next(time.Now()))
+	collectAndPublish(netdataapi.NewSampleTime(time.Now()))
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -321,6 +321,6 @@ func runDCStatGlobalCollector(
 		case <-ticker.C:
 		}
 
-		collectAndPublish(pluginSampleClock.Next(time.Now()))
+		collectAndPublish(netdataapi.NewSampleTime(time.Now()))
 	}
 }

@@ -4,37 +4,8 @@ package netdataapi
 
 import (
 	"strconv"
-	"sync/atomic"
 	"time"
 )
-
-// SampleClock issues the collection times of chart samples.
-//
-// With `END <seconds> <microseconds> 1` (ENDTimed) the Agent places a sample at
-// its time and derives the interval since the chart's previous sample from the
-// two times; it ignores a sample whose time is not after the chart's last
-// collection time. The clock never issues a time at or before one it issued, at
-// microsecond resolution, so a single clock per plugin process keeps the times of
-// every chart increasing across jobs, job restarts and wall-clock steps back. The
-// zero value is ready to use; it is safe for concurrent use.
-type SampleClock struct {
-	last atomic.Int64 // unix microseconds of the latest issued time
-}
-
-// Next returns the sample time for t, moved just past the latest issued time when
-// t is not after it.
-func (c *SampleClock) Next(t time.Time) SampleTime {
-	us := t.UnixMicro()
-	for {
-		prev := c.last.Load()
-		if us <= prev {
-			us = prev + 1
-		}
-		if c.last.CompareAndSwap(prev, us) {
-			return newSampleTime(us)
-		}
-	}
-}
 
 // endTimedLen bounds `END <seconds> <microseconds> 1\n\n` for any int64 time.
 const endTimedLen = 40
@@ -48,15 +19,24 @@ type SampleTime struct {
 	end  [endTimedLen]byte
 }
 
-func newSampleTime(usec int64) SampleTime {
-	t := SampleTime{usec: usec}
-	b := append(t.end[:0], "END "...)
-	b = strconv.AppendInt(b, usec/1e6, 10)
+// NewSampleTime returns the sample time for a run that started at t, at
+// microsecond resolution.
+//
+// With `END <seconds> <microseconds> 1` (ENDTimed) the Agent places a sample at
+// its time and derives the interval since the chart's previous sample from the
+// two times; it ignores a sample whose time is not after the chart's last
+// collection time. The run start is therefore used as is: after a wall-clock step
+// back the Agent drops the stale samples and restarts the chart's counter rates,
+// instead of storing the growth of the step in one point.
+func NewSampleTime(t time.Time) SampleTime {
+	st := SampleTime{usec: t.UnixMicro()}
+	b := append(st.end[:0], "END "...)
+	b = strconv.AppendInt(b, st.usec/1e6, 10)
 	b = append(b, ' ')
-	b = strconv.AppendInt(b, usec%1e6, 10)
+	b = strconv.AppendInt(b, st.usec%1e6, 10)
 	b = append(b, " 1\n\n"...)
-	t.n = uint8(len(b))
-	return t
+	st.n = uint8(len(b))
+	return st
 }
 
 // IsZero reports whether t holds no time.

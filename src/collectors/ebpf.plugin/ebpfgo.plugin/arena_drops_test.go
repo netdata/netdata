@@ -13,8 +13,7 @@ func TestArenaDropsChartAndCumulativeValue(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
 	createArenaDropsChart(api, "dcstat", 1)
-	var clock netdataapi.SampleClock
-	publishArenaDrops(api, "dcstat", 42, clock.Next(time.Unix(1700000000, 250000000)))
+	publishArenaDrops(api, "dcstat", 42, netdataapi.NewSampleTime(time.Unix(1700000000, 250000000)))
 
 	output := buf.String()
 	for _, want := range []string{

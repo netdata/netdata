@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -44,7 +45,7 @@ func runtimeTemplateSet(t *testing.T, id string) *chartengine.TemplateSet {
 func collectNativeFrame(t *testing.T, job *JobV2) jobV2PreparedEmission {
 	t.Helper()
 	job.refreshVnodeSnapshot()
-	prepared, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
+	prepared, ok := job.collectAndEmit(netdataapi.NewSampleTime(time.Now()))
 	require.True(t, ok)
 	return prepared
 }
@@ -100,7 +101,7 @@ func TestJobV2NativeTriggeringCollectionAndInvalidCandidates(t *testing.T) {
 				}
 				return nil
 			}
-			_, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
+			_, ok := job.collectAndEmit(netdataapi.NewSampleTime(time.Now()))
 			assert.False(t, ok)
 			assert.Empty(t, out.String())
 			reader := store.Read(metrix.ReadRaw())

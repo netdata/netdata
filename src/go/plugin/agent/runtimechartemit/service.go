@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
@@ -29,27 +28,19 @@ type Service struct {
 	tickEvery  time.Duration
 
 	registry  *componentRegistry
-	clock     *netdataapi.SampleClock
 	job       *runtimeMetricsJob
 	producers map[string]runtimeProducer
 	tkStop    chan struct{}
 	tkDone    chan struct{}
 }
 
-// New returns the runtime metrics service. clock times its chart samples; share
-// the plugin process's clock (see netdataapi.SampleClock). Nil gives the service
-// a clock of its own.
-func New(log *logger.Logger, clock *netdataapi.SampleClock) *Service {
+func New(log *logger.Logger) *Service {
 	if log == nil {
 		log = logger.New().With(slog.String("component", "runtime metrics service"))
-	}
-	if clock == nil {
-		clock = &netdataapi.SampleClock{}
 	}
 	return &Service{
 		Logger:    log,
 		registry:  newComponentRegistry(),
-		clock:     clock,
 		producers: make(map[string]runtimeProducer),
 		tickEvery: time.Second,
 	}
@@ -93,7 +84,6 @@ func (s *Service) Start(pluginName string, out io.Writer) {
 		s.out,
 		s.registry,
 		s.Logger.With(slog.String("component", "runtime metrics job")),
-		s.clock,
 	)
 	job := s.job
 	stopCh := make(chan struct{})

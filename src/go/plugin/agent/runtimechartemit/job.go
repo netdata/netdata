@@ -84,23 +84,13 @@ type runtimeMetricsJob struct {
 	buf *bytes.Buffer
 	api *netdataapi.API
 
-	// clock times every chart sample, including finalization output.
-	clock       *netdataapi.SampleClock
 	components  map[string]*runtimeComponentState
 	skipTracker tickstate.SkipTracker
 }
 
-func newRuntimeMetricsJob(
-	out io.Writer,
-	reg *componentRegistry,
-	log *logger.Logger,
-	clock *netdataapi.SampleClock,
-) *runtimeMetricsJob {
+func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Logger) *runtimeMetricsJob {
 	if out == nil {
 		out = io.Discard
-	}
-	if clock == nil {
-		clock = &netdataapi.SampleClock{}
 	}
 	if log == nil {
 		log = logger.New().With(slog.String("component", "runtime-metrics-job"))
@@ -114,7 +104,6 @@ func newRuntimeMetricsJob(
 		tick:       make(chan int, 1),
 		buf:        &buf,
 		api:        netdataapi.New(&buf),
-		clock:      clock,
 		components: make(map[string]*runtimeComponentState),
 	}
 }
@@ -181,7 +170,7 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 
 	specs := j.registry.snapshot()
 	seen := make(map[string]struct{}, len(specs))
-	sample := j.clock.Next(time.Now())
+	sample := netdataapi.NewSampleTime(time.Now())
 	var commit runtimeTickCommit
 
 	for _, spec := range specs {
@@ -263,7 +252,7 @@ func (j *runtimeMetricsJob) finalizeComponent(name string) {
 	if spec == nil {
 		return
 	}
-	step, buf, ok := j.prepareComponentStep(*spec, j.clock.Next(time.Now()))
+	step, buf, ok := j.prepareComponentStep(*spec, netdataapi.NewSampleTime(time.Now()))
 	if !ok {
 		return
 	}

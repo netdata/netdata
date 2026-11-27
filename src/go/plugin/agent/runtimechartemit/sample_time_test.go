@@ -52,7 +52,7 @@ func TestRuntimeChartSampleTimes(t *testing.T) {
 			})
 		}
 		var out safeBuffer
-		job := newRuntimeMetricsJob(&out, reg, nil, nil)
+		job := newRuntimeMetricsJob(&out, reg, nil)
 
 		var got, want []map[string]string
 		for i, tc := range ticks {

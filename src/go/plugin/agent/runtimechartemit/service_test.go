@@ -21,7 +21,7 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 	}{
 		"registration applies defaults and stores normalized emit env": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.pluginName = "go.d"
 				store := metrix.NewRuntimeStore()
 
@@ -46,7 +46,7 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 		},
 		"registration allows empty template when autogen is enabled": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.pluginName = "go.d"
 				store := metrix.NewRuntimeStore()
 
@@ -66,7 +66,7 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 		},
 		"registration and snapshots own nested autogen rules": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.pluginName = "go.d"
 				deny := []string{"private_*"}
 				counterRaw := []string{"internal_*_total"}
@@ -102,7 +102,7 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 		},
 		"registration rejects empty template when autogen is disabled": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.pluginName = "go.d"
 				store := metrix.NewRuntimeStore()
 
@@ -147,7 +147,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				})
 
 				var out bytes.Buffer
-				job := newRuntimeMetricsJob(&out, reg, nil, nil)
+				job := newRuntimeMetricsJob(&out, reg, nil)
 
 				job.runOnce(1)
 				assert.Equal(t, 0, out.Len())
@@ -180,7 +180,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				})
 
 				var out bytes.Buffer
-				job := newRuntimeMetricsJob(&out, reg, nil, nil)
+				job := newRuntimeMetricsJob(&out, reg, nil)
 				job.runOnce(1)
 
 				result := out.String()
@@ -209,7 +209,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				})
 
 				var out bytes.Buffer
-				job := newRuntimeMetricsJob(&out, reg, nil, nil)
+				job := newRuntimeMetricsJob(&out, reg, nil)
 				job.runOnce(1)
 				require.Contains(t, out.String(), "BEGIN")
 
@@ -239,7 +239,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				})
 
 				var out bytes.Buffer
-				job := newRuntimeMetricsJob(&out, reg, nil, nil)
+				job := newRuntimeMetricsJob(&out, reg, nil)
 				job.runOnce(1)
 				require.Contains(t, out.String(), "CHART 'netdata.go.d.internal.component.component_load'")
 
@@ -263,7 +263,7 @@ func TestRuntimeProducerRegistrationScenarios(t *testing.T) {
 	}{
 		"register producer validates input and unregisters cleanly": {
 			run: func(t *testing.T) {
-				svc := New(nil, nil)
+				svc := New(nil)
 				svc.Start("go.d", &bytes.Buffer{})
 				defer svc.Stop()
 

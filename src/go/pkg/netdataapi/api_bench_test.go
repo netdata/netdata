@@ -14,8 +14,7 @@ import (
 func BenchmarkAPIValueUpdate(b *testing.B) {
 	var buf bytes.Buffer
 	api := New(&buf)
-	var clock SampleClock
-	sample := clock.Next(time.Unix(1700000000, 250000000))
+	sample := NewSampleTime(time.Unix(1700000000, 250000000))
 	b.ReportAllocs()
 	for b.Loop() {
 		buf.Reset()

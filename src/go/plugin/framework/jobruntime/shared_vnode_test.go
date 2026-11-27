@@ -208,7 +208,7 @@ func TestBufferedScopeUsesCurrentAuthority(t *testing.T) {
 			)
 			require.NoError(t, job.AutoDetectionManaged(context.Background()))
 			defer job.Cleanup()
-			prepared, ok := job.collectAndEmit(job.sampleClock.Next(time.Now()))
+			prepared, ok := job.collectAndEmit(netdataapi.NewSampleTime(time.Now()))
 			require.True(t, ok)
 			configured, err := hostoutput.NewDefinition(
 				netdataapi.HostInfo{
