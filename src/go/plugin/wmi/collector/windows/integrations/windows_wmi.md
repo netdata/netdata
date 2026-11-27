@@ -27,7 +27,7 @@ Monitor CPU, memory, processes, network interfaces and disk space on Windows hos
 A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
 - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
-- free and used physical memory;
+- physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node;
 - the number of processes and threads, context switches, processor queue length and uptime;
 - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
 - available and used space per fixed drive;
@@ -38,7 +38,7 @@ A Netdata Agent on another machine reads each host's built-in Windows Management
 The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
 
 
-`wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+`wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
 While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -56,7 +56,7 @@ These are the WMI classes it reads, for audit and access reviews:
 | Data | WMI classes |
 |---|---|
 | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
-| Memory | `Win32_OperatingSystem` |
+| Memory | `Win32_OperatingSystem`, `Win32_PerfRawData_PerfOS_Memory`, `Win32_PerfRawData_PerfOS_PagingFile`, `Win32_PerfRawData_PerfOS_NUMANodeMemory` |
 | System | `Win32_PerfRawData_PerfOS_System` |
 | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter` |
 | Disk | `Win32_LogicalDisk` |
@@ -77,7 +77,7 @@ The Windows account needs remote read access to WMI on each monitored host. Memb
 | **Enable Account** and **Remote Enable** on the `root\cimv2` WMI namespace | Always |
 | Membership in the local **Distributed COM Users** group | `transport: dcom` |
 | Membership in the local **Remote Management Users** group | `transport: winrm` |
-| Membership in the local **Performance Monitor Users** group | The CPU, system or network group is enabled |
+| Membership in the local **Performance Monitor Users** group | The CPU, memory, system or network group is enabled |
 
 The plugin only reads: do not grant **Execute Methods**, write or full-control permissions. See [Securing a remote WMI connection](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
 
@@ -113,7 +113,7 @@ The plugin does not discover Windows hosts. The stock configuration has no jobs,
 
 The poller's own cost is small: a few short-lived connections per job per collection.
 
-On each Windows host, every collection costs up to six WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+On each Windows host, every collection costs up to nine WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
 
 
 ## Setup
@@ -210,9 +210,9 @@ Each job monitors one Windows host. Set `update_every` or `autodetection_retry` 
 | **Collection** | update_every | Data collection interval, in seconds. | 30 | no |
 |  | autodetection_retry | How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries. | 0 | no |
 |  | timeout | Time limit for one collection, including the connection and every enabled query, in seconds. | 15 | no |
-|  | collectors | Metric groups to collect. Each enabled group runs one WMI query per collection, the network group two. Keep at least one group enabled. |  | no |
+|  | collectors | Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four and the network group two. Keep at least one group enabled. |  | no |
 |  | [collectors.cpu](#option-collection-collectors-cpu) | Collect processor utilization by mode, in total and per logical processor. | yes | no |
-|  | collectors.memory | Collect free and used physical memory. | yes | no |
+|  | collectors.memory | Collect physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node. | yes | no |
 |  | collectors.system | Collect the number of processes and threads, context switches, processor queue length and uptime. | yes | no |
 |  | collectors.network | Collect traffic, packets, errors, drops, speed and output queue length per network interface, and the host's total traffic. | yes | no |
 |  | collectors.disk | Collect available and used space per fixed drive. | yes | no |
@@ -368,8 +368,10 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 - Charts belong to the Windows host's node, not to the poller.
-- CPU utilization and the per-second rates, such as traffic, packets and errors, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
-- Processes, threads and the processor queue length are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
+- CPU utilization and the per-second rates, such as traffic, packets, errors, paging and page faults, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
+- Memory sizes, processes, threads and the processor queue length are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
+- As on the Netdata Agent running on Windows, `mem.swap` and `mem.committed` show the commit charge against the commit limit, which counts physical memory and all paging files; `mem.pagefile_usage` shows how full each paging file is.
+- As on the Netdata Agent running on Windows, `mem.system_pool_allocs` shows how fast the number of outstanding pool allocations grows, and 0 while it shrinks.
 - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
 - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
 
@@ -387,12 +389,62 @@ Metrics:
 |:------|:------------|:----------|:----|
 | system.cpu | Total CPU Utilization | irq, user, system, dpc, idle | percentage |
 | system.ram | System RAM | free, used | MiB |
+| mem.available | Available RAM for applications | avail | MiB |
+| mem.swap | System Swap | free, used | MiB |
+| mem.swap_iops | Swap Operations | read, write | operations/s |
+| mem.swapio | Swap I/O | in, out | KiB/s |
+| mem.committed | Committed Memory | committed, limit | bytes |
+| mem.system_cache | System Cache Memory | cache, peak, resident | bytes |
+| mem.page_lists | Memory Page Lists | free, modified, standby_core, standby_normal, standby_reserve | bytes |
+| mem.system_pool_size | System Memory Pool | paged, non-paged | bytes |
+| mem.system_pool_paged | Paged System Memory Pool | resident | bytes |
+| mem.system_pool_allocs | System Pool Allocations | paged, non-paged | allocations/s |
+| mem.system_page_table_entries | Unused page table entries. | free | pages |
+| mem.system_code | System Code Memory | resident, total | bytes |
+| mem.system_drivers | System Driver Memory | resident, total | bytes |
+| mem.pgfaults | Memory Page Faults | minor, major | faults/s |
+| mem.page_faults_breakdown | Memory Page Fault Breakdown | cache, demand_zero, transition, write_copies | faults/s |
+| mem.transition_repurposed | Transition Pages Repurposed | repurposed | pages/s |
 | system.processes | System Processes | running | processes |
 | system.threads | Threads | threads | threads |
 | system.ctxt | CPU Context Switches | switches | context switches/s |
 | system.processor_queue_length | The number of threads in the processor queue. | threads | threads |
 | system.uptime | System Uptime | uptime | seconds |
 | system.net | Physical Network Interfaces Aggregated Bandwidth | received, sent | kilobits/s |
+
+
+### Per paging file
+
+A paging file of the host. Windows creates one, `C:\pagefile.sys`, by default.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| pagefile | Path of the paging file, for example `C:/pagefile.sys`. Backslashes are shown as forward slashes. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.pagefile_usage | Paging file usage | free, used | bytes |
+
+
+### Per NUMA node
+
+A NUMA node of the host, a group of processors and the memory attached to them. Most virtual machines and single-socket servers have one.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| node | Number of the NUMA node, for example `0`. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.numa_node_mem_usage | NUMA Node Memory Usage | free, standby | bytes |
 
 
 ### Per logical processor
