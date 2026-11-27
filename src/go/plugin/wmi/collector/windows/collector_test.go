@@ -963,6 +963,18 @@ func TestChartTemplateAndMetadata(t *testing.T) {
 	ping, err := os.ReadFile("../../../../../health/health.d/ping.conf")
 	require.NoError(t, err)
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, ping, chartTemplateYAML)
+	// WMI's own alerts on the host's charts. The clock offset alert converts
+	// the chart's milliseconds to seconds, so the documentation check covers
+	// the time sync alert only.
+	alerts, err := os.ReadFile("../../../../../health/health.d/wmi.plugin.conf")
+	require.NoError(t, err)
+	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, alerts, chartTemplateYAML, collecttest.HealthAlertsCheck{
+		ContextPrefix: "wmi.",
+	})
+	collecttest.AssertHealthAlertsMatchMetadataWith(t, alerts, metadata, collecttest.HealthAlertsCheck{
+		ContextPrefix: "wmi.clock_sync_",
+		ChartTemplate: chartTemplateYAML,
+	})
 }
 
 func metricQueries(queries []string) []string {

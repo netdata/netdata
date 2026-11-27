@@ -21,7 +21,7 @@ func TestReadTimeService(t *testing.T) {
 		wantValues [len(timeServiceCounters)]sample
 		wantUsable bool
 	}{
-		// A host without a responding time source still reports its counters.
+		// A source count of zero is a reported value, not a gap.
 		"WinRM text, a valid zero and a malformed value": {
 			rows: fixtureRows(map[string]any{
 				"ComputedTimeOffset":       "59",
@@ -56,8 +56,14 @@ func TestReadTimeService(t *testing.T) {
 // Service counter reaches one chart dimension, in that chart's units. The
 // oracle is Microsoft's documentation of the counter set: the computed offset
 // and the NTP round trip are in microseconds, the source count is a number of
-// time sources.
+// time sources. The offset fills the Linux Agent's context for the same
+// measurement, where src/collectors/timex.plugin/plugin_timex.c charts the
+// kernel's computed offset to its reference clock; the other two counters have
+// no other producer.
 func TestCollector_TimeServiceCountersReachCharts(t *testing.T) {
+	sharedDimensions := map[string]nativeDimension{
+		"ComputedTimeOffset": {"system.clock_sync_offset", "offset"},
+	}
 	counterUnits := map[string]string{
 		"ComputedTimeOffset":       "microseconds",
 		"NTPRoundtripDelay":        "microseconds",
@@ -103,6 +109,9 @@ func TestCollector_TimeServiceCountersReachCharts(t *testing.T) {
 				property, ok := properties[value]
 				require.True(t, ok, "%s sends %v, no Windows Time Service counter's value", where, value)
 				reached[property] = append(reached[property], where)
+				if shared, ok := sharedDimensions[property]; ok {
+					assert.Equal(t, shared, nativeDimension{chart.context, dimension.name}, property)
+				}
 
 				scale, ok := chartPerCounterUnit[[2]string{counterUnits[property], chart.units}]
 				require.True(t, ok, "%s: %s in %s", where, counterUnits[property], chart.units)

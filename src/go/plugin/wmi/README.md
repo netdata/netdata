@@ -47,3 +47,12 @@ classes on the host before concluding that one is missing:
 ```powershell
 Get-CimClass -ClassName Win32_PerfRawData_* | Where-Object CimClassName -Match 'SMB' | Select-Object CimClassName
 ```
+
+The class definition also tells how to read each counter: its `CounterType` qualifier separates point values
+(`PERF_COUNTER_RAWCOUNT`, 65536, and `PERF_COUNTER_LARGE_RAWCOUNT`, 65792) from counts that Netdata charts as rates
+(such as `PERF_COUNTER_BULK_COUNT`, 272696576):
+
+```powershell
+(Get-CimClass -ClassName Win32_PerfRawData_MicrosoftWindowsW32TimePerf_WindowsTimeService).CimClassProperties |
+    Select-Object Name, CimType, @{ Name = 'CounterType'; Expression = { $_.Qualifiers['CounterType'].Value } }
+```

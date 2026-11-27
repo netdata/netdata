@@ -454,7 +454,9 @@ func publishedCharts(t *testing.T) []wireChart {
 // src/collectors/windows.plugin/GetSystemUptime.c (system.uptime),
 // src/collectors/timex.plugin/plugin_timex.c (system.clock_sync_offset, which
 // the native agent does not chart; timex sends microseconds with a divisor of
-// 1000, as WMI sends the Windows Time service's computed offset),
+// 1000, as WMI sends the Windows Time service's computed offset, or
+// nanoseconds with a divisor of 1000000 when the kernel reports nanoseconds:
+// milliseconds either way),
 // src/collectors/windows.plugin/perflib-network.c (system.net, the net.*
 // interface charts and the tcppackets and udppackets charts),
 // src/collectors/proc.plugin/proc_net_netstat.c (ip.tcpsock, ip.tcpopens,
