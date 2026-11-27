@@ -5,6 +5,7 @@ package windows
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -68,6 +69,20 @@ func processorRow[T uint64 | string](name string, interrupt, user, privileged, d
 	}
 }
 
+// systemRow is a System counter set instance as DCOM decodes it. The host
+// booted 86401.2345678 seconds before the sample; times are 100 ns ticks.
+func systemRow() map[string]any {
+	return map[string]any{
+		"Processes":             uint32(69),
+		"Threads":               uint32(951),
+		"ContextSwitchesPersec": uint32(4294967000),
+		"ProcessorQueueLength":  uint32(3),
+		"SystemUpTime":          uint64(133000000000000000),
+		"Timestamp_Object":      uint64(133000864012345678),
+		"Frequency_Object":      uint64(10000000),
+	}
+}
+
 func validQueryResults() map[string]queryResult {
 	return map[string]queryResult{
 		// Instances come in no particular order; "1,0" is the first processor
@@ -83,6 +98,7 @@ func validQueryResults() map[string]queryResult {
 			"TotalVisibleMemorySize": "8388608",
 			"FreePhysicalMemory":     uint64(2097152),
 		}),
+		querySystem: fixtureRows(systemRow()),
 		queryNetworkInterfaces: fixtureRows(
 			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
@@ -95,7 +111,11 @@ func validQueryResults() map[string]queryResult {
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
 			map[string]any{"Name": "isatap.example.com", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "0"},
 			map[string]any{"Name": "Team Member", "BytesReceivedPersec": uint64(400), "BytesSentPersec": uint64(5)},
-			map[string]any{"Name": "Teredo Tunneling Pseudo-Interface", "BytesReceivedPersec": "0", "BytesSentPersec": "0"},
+			map[string]any{
+				"Name":                "Teredo Tunneling Pseudo-Interface",
+				"BytesReceivedPersec": "0",
+				"BytesSentPersec":     "0",
+			},
 		),
 		queryDisk: fixtureRows(
 			map[string]any{
@@ -152,6 +172,13 @@ func TestCollector_Collect(t *testing.T) {
 		err: errors.New("fixture-secret"),
 	}
 	sessions[1].results[queryMemory] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
+	// WinRM text, a 32-bit counter that wrapped, a valid zero and no uptime.
+	sessions[1].results[querySystem] = fixtureRows(map[string]any{
+		"Processes":             "70",
+		"Threads":               "malformed",
+		"ContextSwitchesPersec": "200",
+		"ProcessorQueueLength":  "0",
+	})
 	sessions[1].results[queryNetworkInterfaces] = fixtureRows(
 		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "250", "BytesSentPersec": "malformed"},
 		map[string]any{"Name": "_Total", "BytesReceivedPersec": uint32(30)},
@@ -208,6 +235,11 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
 		"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
+		"system_processes":                   69,
+		"system_threads":                     951,
+		"system_context_switches":            4294967000,
+		"system_processor_queue_length":      3,
+		"system_uptime_milliseconds":         86401234,
 		"network_received_bytes" + ethernet:  190,
 		"network_received_bytes" + ethernet1: 0,
 		"network_sent_bytes" + ethernet:      30,
@@ -227,6 +259,9 @@ func TestCollector_Collect(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_free_bytes":                 0,
+		"system_processes":                  70,
+		"system_context_switches":           200,
+		"system_processor_queue_length":     0,
 		"network_received_bytes" + ethernet: 250,
 		"network_total_received_bytes":      250,
 		`network_received_bytes{device="Ethernet#1",interface_type="virtual"}`: 0,
@@ -260,7 +295,11 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Equal(t, first, recovered)
 
 	for _, session := range sessions {
-		assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk}, metricQueries(session.queries))
+		assert.Equal(
+			t,
+			[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			metricQueries(session.queries),
+		)
 		assert.Equal(t, 1, session.closed)
 	}
 	c.Cleanup(t.Context())
@@ -299,6 +338,7 @@ func TestCollector_NetworkAdapterQuery(t *testing.T) {
 			c := configuredCollector()
 			c.Collectors.CPU = new(false)
 			c.Collectors.Memory = new(false)
+			c.Collectors.System = new(false)
 			c.Collectors.Disk = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
@@ -336,6 +376,7 @@ func TestCollector_CheckFailure(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := configuredCollector()
+			c.Collectors.System = new(false)
 			c.Collectors.Network = new(false)
 			c.Collectors.Disk = new(false)
 			session := &fakeSession{
@@ -422,7 +463,7 @@ func metricQueries(queries []string) []string {
 	var metrics []string
 	for _, query := range queries {
 		switch query {
-		case queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk:
+		case queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk:
 			metrics = append(metrics, query)
 		}
 	}
@@ -486,6 +527,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 			results: map[string]queryResult{
 				queryCPU:               validQueryResults()[queryCPU],
 				queryMemory:            validQueryResults()[queryMemory],
+				querySystem:            lost,
 				queryNetworkInterfaces: lost,
 				queryDisk:              lost,
 			},
@@ -498,6 +540,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 			results: map[string]queryResult{
 				queryCPU:               {err: errors.New("WS-Management fault")},
 				queryMemory:            lost,
+				querySystem:            lost,
 				queryNetworkInterfaces: lost,
 				queryDisk:              lost,
 			},
@@ -520,7 +563,11 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				assert.Equal(t, tc.wantMetrics, metrics)
 			}
 			// A lost interface query leaves no interface list, so the adapter query is skipped.
-			assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryDisk}, session.queries)
+			assert.Equal(
+				t,
+				[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryDisk},
+				session.queries,
+			)
 		})
 	}
 }
@@ -587,6 +634,75 @@ func TestReadDisks(t *testing.T) {
 			var o observations
 			assert.Equal(t, tc.wantUsable, o.readDisks(tc.rows.rows))
 			assert.Equal(t, tc.want, o.drives)
+		})
+	}
+}
+
+func TestReadSystem(t *testing.T) {
+	valid := func(v uint64) sample {
+		return sample{
+			value: v,
+			valid: true,
+		}
+	}
+	for name, tc := range map[string]struct {
+		rows       queryResult
+		want       systemCounters
+		wantUsable bool
+	}{
+		"WinRM text": {
+			rows: fixtureRows(map[string]any{
+				"Processes":             "138",
+				"Threads":               "1328",
+				"ContextSwitchesPersec": "746215952",
+				"ProcessorQueueLength":  "2",
+				"SystemUpTime":          "133000000000000000",
+				"Timestamp_Object":      "133000000000050000",
+				"Frequency_Object":      "10000000",
+			}),
+			want: systemCounters{
+				processes:       valid(138),
+				threads:         valid(1328),
+				contextSwitches: valid(746215952),
+				processorQueue:  valid(2),
+				uptime:          valid(5),
+			},
+			wantUsable: true,
+		},
+		"a boot time after the sample leaves uptime out": {
+			rows: fixtureRows(map[string]any{
+				"Processes":        uint32(69),
+				"SystemUpTime":     uint64(133000000000000001),
+				"Timestamp_Object": uint64(133000000000000000),
+				"Frequency_Object": uint64(10000000),
+			}),
+			want: systemCounters{
+				processes: valid(69),
+			},
+			wantUsable: true,
+		},
+		"a zero frequency leaves uptime out": {
+			rows: fixtureRows(map[string]any{
+				"SystemUpTime":     uint64(0),
+				"Timestamp_Object": uint64(10000000),
+				"Frequency_Object": uint64(0),
+			}),
+		},
+		"an uptime beyond the millisecond range is left out": {
+			rows: fixtureRows(map[string]any{
+				"SystemUpTime":     uint64(0),
+				"Timestamp_Object": uint64(math.MaxUint64),
+				"Frequency_Object": uint64(1),
+			}),
+		},
+		"more than one instance": {
+			rows: fixtureRows(systemRow(), systemRow()),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var o observations
+			assert.Equal(t, tc.wantUsable, o.readSystem(tc.rows.rows))
+			assert.Equal(t, tc.want, o.system)
 		})
 	}
 }

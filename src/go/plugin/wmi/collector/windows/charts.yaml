@@ -74,6 +74,50 @@ groups:
             name: used
             options:
               divisor: 1048576
+  - family: processes
+    context_namespace: system
+    metrics: [system_processes, system_threads, system_context_switches]
+    charts:
+      - context: processes
+        title: System Processes
+        units: processes
+        dimensions:
+          - selector: system_processes
+            name: running
+      - context: threads
+        title: Threads
+        units: threads
+        dimensions:
+          - selector: system_threads
+            name: threads
+      - context: ctxt
+        title: CPU Context Switches
+        units: context switches/s
+        dimensions:
+          - selector: system_context_switches
+            name: switches
+  - family: system
+    context_namespace: system
+    metrics: [system_processor_queue_length]
+    charts:
+      - context: processor_queue_length
+        title: The number of threads in the processor queue.
+        units: threads
+        dimensions:
+          - selector: system_processor_queue_length
+            name: threads
+  - family: uptime
+    context_namespace: system
+    metrics: [system_uptime_milliseconds]
+    charts:
+      - context: uptime
+        title: System Uptime
+        units: seconds
+        dimensions:
+          - selector: system_uptime_milliseconds
+            name: uptime
+            options:
+              divisor: 1000
   - family: network
     context_namespace: system
     metrics: [network_total_received_bytes, network_total_sent_bytes]

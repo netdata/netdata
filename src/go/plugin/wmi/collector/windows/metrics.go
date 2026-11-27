@@ -33,6 +33,11 @@ type collectorMetrics struct {
 	cpuCore          [len(cpuModes)]metrix.SnapshotGauge
 	memoryFree       metrix.SnapshotGauge
 	memoryUsed       metrix.SnapshotGauge
+	processes        metrix.SnapshotGauge
+	threads          metrix.SnapshotGauge
+	contextSwitches  metrix.SnapshotCounter
+	processorQueue   metrix.SnapshotGauge
+	uptime           metrix.SnapshotGauge
 	netInterface     [len(interfaceCounters)]interfaceInstrument
 	netSpeedKbps     metrix.SnapshotGauge
 	netTotalReceived metrix.SnapshotCounter
@@ -52,6 +57,11 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		meter:            m,
 		memoryFree:       m.Gauge("memory_free_bytes"),
 		memoryUsed:       m.Gauge("memory_used_bytes"),
+		processes:        m.Gauge("system_processes"),
+		threads:          m.Gauge("system_threads"),
+		contextSwitches:  m.Counter("system_context_switches"),
+		processorQueue:   m.Gauge("system_processor_queue_length"),
+		uptime:           m.Gauge("system_uptime_milliseconds"),
 		netTotalReceived: m.Counter("network_total_received_bytes"),
 		netTotalSent:     m.Counter("network_total_sent_bytes"),
 		diskAvail:        m.Gauge("disk_avail_bytes"),
@@ -110,6 +120,11 @@ func (m collectorMetrics) write(snapshot observations) {
 	}
 	observe(m.memoryFree, snapshot.memoryFree)
 	observe(m.memoryUsed, snapshot.memoryUsed)
+	observe(m.processes, snapshot.system.processes)
+	observe(m.threads, snapshot.system.threads)
+	observeTotal(m.contextSwitches, snapshot.system.contextSwitches)
+	observe(m.processorQueue, snapshot.system.processorQueue)
+	observe(m.uptime, snapshot.system.uptime)
 	observeTotal(m.netTotalReceived, snapshot.netTotalReceived)
 	observeTotal(m.netTotalSent, snapshot.netTotalSent)
 	for _, nic := range snapshot.interfaces {
