@@ -117,6 +117,18 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			query:   queryPhysicalDisks,
 			read:    snapshot.readPhysicalDisks,
 		},
+		{
+			name:    "SMB server",
+			enabled: groupEnabled(c.Collectors.SMB),
+			query:   querySMBServer,
+			read:    snapshot.readSMBServer,
+		},
+		{
+			name:    "SMB share",
+			enabled: groupEnabled(c.Collectors.SMB),
+			query:   querySMBShares,
+			read:    snapshot.readSMBShares,
+		},
 	}
 
 	// reached: a query got an answer from the host. sessionLost: the session

@@ -217,6 +217,7 @@ func TestCollector_Ping(t *testing.T) {
 			c.Collectors.System = new(false)
 			c.Collectors.Network = new(false)
 			c.Collectors.Disk = new(false)
+			c.Collectors.SMB = new(false)
 			ping := &fakePinger{
 				sample: tc.sample,
 				err:    tc.err,

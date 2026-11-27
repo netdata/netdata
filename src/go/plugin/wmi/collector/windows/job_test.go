@@ -461,7 +461,10 @@ func publishedCharts(t *testing.T) []wireChart {
 // native ip.tcppackets has) and
 // src/collectors/windows.plugin/perflib-storage.c (disk.space) with
 // src/collectors/common-contexts/system-io.h and disk-*.h (system.io and the
-// physical disk charts; the native disk.split dimension is named discards).
+// physical disk charts; the native disk.split dimension is named discards) and
+// src/collectors/windows.plugin/perflib-smb.c (the smb.server_shares_* charts;
+// a counts dimension is incremental, the open files and tree connects absolute,
+// as perflib_rrddim_add derives them from the counter types).
 // Native average times are sent in microseconds with a divisor of 1000, as
 // common_disk_await and common_disk_svctm do. The ping.*
 // entries are the wire form of the go.d ping collector's definitions, which
@@ -968,6 +971,55 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			chartType:  "line",
 			dimensions: unscaled("incremental", "InErrors", "NoPorts"),
 		},
+		"smb.server_shares_current_open_file_count": {
+			family:     "shares",
+			title:      "Current open file count on the SMB share",
+			units:      "files",
+			chartType:  "line",
+			dimensions: single("open", "absolute", 1),
+		},
+		"smb.server_shares_write_requests": {
+			family:     "shares",
+			title:      "Write requests on the SMB share",
+			units:      "requests/s",
+			chartType:  "line",
+			dimensions: single("writes", "incremental", 1),
+		},
+		"smb.server_shares_read_requests": {
+			family:     "shares",
+			title:      "Read requests on the SMB share",
+			units:      "requests/s",
+			chartType:  "line",
+			dimensions: single("reads", "incremental", 1),
+		},
+		"smb.server_shares_metadata_requests": {
+			family:     "shares",
+			title:      "Metadata requests on the SMB share",
+			units:      "requests/s",
+			chartType:  "line",
+			dimensions: single("metadata", "incremental", 1),
+		},
+		"smb.server_shares_files_opened": {
+			family:     "shares",
+			title:      "Files opened on the SMB share",
+			units:      "files/s",
+			chartType:  "line",
+			dimensions: single("opened", "incremental", 1),
+		},
+		"smb.server_shares_tree_connects": {
+			family:     "shares",
+			title:      "Tree connects on the SMB share",
+			units:      "connections",
+			chartType:  "line",
+			dimensions: single("connects", "absolute", 1),
+		},
+		"smb.server_shares_traffic": {
+			family:     "shares",
+			title:      "Traffic on the SMB share",
+			units:      "bytes/s",
+			chartType:  "area",
+			dimensions: receivedSent,
+		},
 		"ping.host_rtt": {
 			family:    "latency",
 			title:     "Ping round-trip time",
@@ -1059,6 +1111,15 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			want = append(want,
 				instance(context, map[string]string{"device": "Uplink", "interface_type": "real"}),
 				instance(context, map[string]string{"device": "Team Member", "interface_type": "virtual"}),
+			)
+		}
+		// The native agent labels each share with its instance name too; the
+		// plugin protocol sends its backslashes as slashes, and the Agent then
+		// stores the share labels of both as //_/C_ and //_/IPC_.
+		if strings.HasPrefix(context, "smb.") {
+			want = append(want,
+				instance(context, map[string]string{"share": "//*/C$"}),
+				instance(context, map[string]string{"share": "//*/IPC$"}),
 			)
 		}
 		// The native agent labels the device ID with slashes for backslashes
@@ -1607,6 +1668,147 @@ func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
 		}
 		assert.Equal(t, want, got)
 	})
+}
+
+// TestCollector_SMBShareCountersFeedNativeDimensions checks that each SMB
+// Server Shares counter reaches the native chart dimension that reads it, per
+// share (src/collectors/windows.plugin/perflib-smb.c, smb_share_charts and
+// smb_share_traffic_chart).
+func TestCollector_SMBShareCountersFeedNativeDimensions(t *testing.T) {
+	native := map[string]nativeDimension{
+		"CurrentOpenFileCount":   {"smb.server_shares_current_open_file_count", "open"},
+		"WriteRequestsPersec":    {"smb.server_shares_write_requests", "writes"},
+		"ReadRequestsPersec":     {"smb.server_shares_read_requests", "reads"},
+		"MetadataRequestsPersec": {"smb.server_shares_metadata_requests", "metadata"},
+		"FilesOpenedPersec":      {"smb.server_shares_files_opened", "opened"},
+		"TreeConnectCount":       {"smb.server_shares_tree_connects", "connects"},
+		"ReceivedBytesPersec":    {"smb.server_shares_traffic", "received"},
+		"SentBytesPersec":        {"smb.server_shares_traffic", "sent"},
+	}
+	want := make(map[string]map[nativeDimension]float64)
+	for _, row := range validQueryResults()[querySMBShares].rows {
+		name := row["name"].(string)
+		if name == "_Total" {
+			continue
+		}
+		// The plugin protocol sends backslashes in label values as slashes.
+		share := strings.ReplaceAll(name, `\`, "/")
+		want[share] = make(map[nativeDimension]float64)
+		for property, dimension := range native {
+			want[share][dimension] = fixtureNumber(t, row[strings.ToLower(property)])
+		}
+	}
+
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		output := collect(c.UpdateEvery)
+		samples := parseSamples(t, output)
+
+		got := make(map[string]map[nativeDimension]float64)
+		for id, chart := range parseCharts(t, output) {
+			if !strings.HasPrefix(chart.context, "smb.") {
+				continue
+			}
+			share := chart.labels["share"]
+			if got[share] == nil {
+				got[share] = make(map[nativeDimension]float64)
+			}
+			for dimension, value := range samples[id] {
+				got[share][nativeDimension{chart.context, dimension}] = value
+			}
+		}
+		assert.Equal(t, want, got)
+	})
+}
+
+// TestCollector_SMBServerCountersReachCharts checks that each Server counter
+// reaches exactly one SMB server chart dimension, unscaled: as a rate for the
+// counts since the Server service started, and as is for the two point values,
+// which Microsoft describes as the number of sessions currently active and of
+// files currently open (Win32_PerfRawData_PerfNet_Server).
+func TestCollector_SMBServerCountersReachCharts(t *testing.T) {
+	pointValues := map[string]bool{
+		"ServerSessions": true,
+		"FilesOpen":      true,
+	}
+	// Every value of smbServerRow is distinct, so a value names its counter.
+	row := smbServerRow()
+	properties := make(map[float64]string, len(row))
+	for property, value := range row {
+		properties[fixtureNumber(t, value)] = property
+	}
+
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		output := collect(c.UpdateEvery)
+		samples := parseSamples(t, output)
+
+		reached := make(map[string][]string)
+		for id, chart := range parseCharts(t, output) {
+			if !strings.HasPrefix(chart.context, "wmi.smb_server_") {
+				continue
+			}
+			for _, dimension := range chart.dimensions {
+				where := chart.context + " " + dimension.name
+				value, ok := samples[id][dimension.name]
+				require.True(t, ok, "%s has no value", where)
+				property, ok := properties[value]
+				require.True(t, ok, "%s shows %v, no Server counter's value", where, value)
+				reached[property] = append(reached[property], where)
+
+				algorithm := "incremental"
+				if pointValues[property] {
+					algorithm = "absolute"
+				}
+				assert.Equal(t, algorithm, dimension.algorithm, where)
+				assert.Equal(t, 1, max(dimension.multiplier, -dimension.multiplier), where)
+				assert.Equal(t, 1, dimension.divisor, where)
+			}
+		}
+		for property := range row {
+			assert.Len(t, reached[property], 1, "%s reaches %v", property, reached[property])
+		}
+	})
+}
+
+// fixtureNumber reads a fixture's counter value as DCOM (unsigned integers) or
+// WinRM (decimal text) returns it.
+func fixtureNumber(t *testing.T, value any) float64 {
+	t.Helper()
+	switch v := value.(type) {
+	case uint32:
+		return float64(v)
+	case uint64:
+		return float64(v)
+	case string:
+		n, err := strconv.ParseUint(v, 10, 64)
+		require.NoError(t, err)
+		return float64(n)
+	}
+	require.Failf(t, "unexpected fixture value", "%T", value)
+	return 0
 }
 
 // parseSamples reads the collected values from plugin protocol output, by

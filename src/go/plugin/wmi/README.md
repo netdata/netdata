@@ -1,8 +1,9 @@
 # Remote Windows WMI plugin
 
 `wmi.plugin` monitors Windows hosts without installing anything on them. It runs on a Netdata Agent (the poller) and
-reads CPU, memory, process, uptime, clock offset, network, TCP, UDP and disk metrics from each configured host over WMI,
-using DCOM or WinRM HTTPS, and pings each host. Each host appears in Netdata as its own virtual node.
+reads CPU, memory, process, uptime, clock offset, network, TCP, UDP, disk and SMB file server metrics from each
+configured host over WMI, using DCOM or WinRM HTTPS, and pings each host. Each host appears in Netdata as its own
+virtual node.
 
 What it collects, how to prepare the Windows hosts, every option and the known errors are on the Windows (WMI)
 integration page, generated from [`collector/windows/metadata.yaml`](collector/windows/metadata.yaml).
@@ -33,3 +34,16 @@ such as `${env:WMI_PASSWORD}` resolve the same way:
 ```
 
 The debug output shows the job's checks and collections, and the charts it sends for the host's virtual node.
+
+## Find a counter set's WMI class
+
+A performance counter set's WMI class name cannot be guessed from the counter set's name. Classic counter sets are named
+after their service and object (`Win32_PerfRawData_PerfNet_Server` for the Server object), manifest-based ones after
+their provider: often `Counters` (`Win32_PerfRawData_Counters_SMBServerShares` for SMB Server Shares), but not always
+(`Win32_PerfRawData_MicrosoftWindowsW32TimePerf_WindowsTimeService` for Windows Time Service). A query for a name that
+does not exist fails with `StatusInvalidClass`, exactly as for a counter set the host does not have, so list the
+classes on the host before concluding that one is missing:
+
+```powershell
+Get-CimClass -ClassName Win32_PerfRawData_* | Where-Object CimClassName -Match 'SMB' | Select-Object CimClassName
+```

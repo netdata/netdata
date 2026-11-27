@@ -4,16 +4,6 @@ package windows
 
 import "strings"
 
-// interfaceCounter is a raw counter of the Network Interface and Network
-// Adapter counter sets that feeds one dimension of the native Windows Agent's
-// per-interface charts.
-type interfaceCounter struct {
-	property string
-	metric   string
-	// total marks a count since the counter started, whose rate Netdata charts.
-	total bool
-}
-
 // The byte totals decide whether an interface is charted and feed the
 // aggregate bandwidth; the current bandwidth also feeds the speed variable.
 const (
@@ -22,7 +12,10 @@ const (
 	currentBandwidth
 )
 
-var interfaceCounters = [...]interfaceCounter{
+// interfaceCounters are the raw counters of the Network Interface and Network
+// Adapter counter sets that feed the native Windows Agent's per-interface
+// charts.
+var interfaceCounters = [...]rawCounter{
 	bytesReceived:    {property: "BytesReceivedPersec", metric: "network_received_bytes", total: true},
 	bytesSent:        {property: "BytesSentPersec", metric: "network_sent_bytes", total: true},
 	currentBandwidth: {property: "CurrentBandwidth", metric: "network_speed_bits_per_second"},
@@ -42,17 +35,9 @@ var interfaceCounters = [...]interfaceCounter{
 }
 
 var (
-	queryNetworkInterfaces = interfaceQuery("Win32_PerfRawData_Tcpip_NetworkInterface")
-	queryNetworkAdapters   = interfaceQuery("Win32_PerfRawData_Tcpip_NetworkAdapter")
+	queryNetworkInterfaces = counterQuery("Win32_PerfRawData_Tcpip_NetworkInterface", interfaceCounters[:], "Name")
+	queryNetworkAdapters   = counterQuery("Win32_PerfRawData_Tcpip_NetworkAdapter", interfaceCounters[:], "Name")
 )
-
-func interfaceQuery(class string) string {
-	properties := []string{"Name"}
-	for _, counter := range interfaceCounters {
-		properties = append(properties, counter.property)
-	}
-	return "SELECT " + strings.Join(properties, ", ") + " FROM " + class
-}
 
 // networkInterface holds one interface's counter values. The native Windows
 // Agent calls the instances of the Network Interface counter set real and the
@@ -123,9 +108,7 @@ func readInterface(row map[string]any) (networkInterface, bool) {
 	nic := networkInterface{
 		device: name,
 	}
-	for i, counter := range interfaceCounters {
-		nic.values[i] = readUnsigned(row[strings.ToLower(counter.property)])
-	}
+	readCounters(row, interfaceCounters[:], nic.values[:])
 	return nic, true
 }
 

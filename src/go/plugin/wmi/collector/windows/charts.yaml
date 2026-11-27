@@ -2,7 +2,8 @@ version: v1
 # The native Windows Agent's contexts, dimensions and units, so the standard dashboard sections and the stock Windows
 # alerts apply to the host's node, and the go.d ping collector's contexts for the host's ping, so the stock ping alerts
 # apply too. TCP and UDP counters the native agent does not chart use the Linux Agent's contexts for the same counters.
-# The clock offset compares the host with the poller, which no other producer measures, so its context is WMI's own.
+# The clock offset compares the host with the poller, which no other producer measures, and the native agent does not
+# chart the Server counter set (the SMB file server as a whole), so their contexts are WMI's own.
 # The contexts have different roots, so the template has no spec-level namespace.
 groups:
   - family: cpu
@@ -817,6 +818,163 @@ groups:
             dimensions:
               - selector: disk_split_io
                 name: discards
+  # The SMB file server as a whole: the Server counter set.
+  - family: smb server
+    context_namespace: wmi
+    metrics:
+      - smb_server_received_bytes
+      - smb_server_sent_bytes
+      - smb_server_sessions
+      - smb_server_sessions_logged_off
+      - smb_server_sessions_timed_out
+      - smb_server_sessions_errored_out
+      - smb_server_sessions_forced_off
+      - smb_server_logons
+      - smb_server_logon_errors
+      - smb_server_access_permission_errors
+      - smb_server_granted_access_errors
+      - smb_server_open_files
+      - smb_server_files_opened
+      - smb_server_system_errors
+      - smb_server_work_item_shortages
+      - smb_server_blocking_requests_rejected
+      - smb_server_paged_pool_failures
+      - smb_server_nonpaged_pool_failures
+    charts:
+      - context: smb_server_traffic
+        title: SMB Server Traffic
+        units: bytes/s
+        type: area
+        dimensions:
+          - selector: smb_server_received_bytes
+            name: received
+          - selector: smb_server_sent_bytes
+            name: sent
+            options:
+              multiplier: -1
+      - context: smb_server_sessions
+        title: SMB Server Sessions
+        units: sessions
+        dimensions:
+          - selector: smb_server_sessions
+            name: active
+      - context: smb_server_sessions_ended
+        title: SMB Server Sessions Ended
+        units: sessions/s
+        dimensions:
+          - selector: smb_server_sessions_logged_off
+            name: logged_off
+          - selector: smb_server_sessions_timed_out
+            name: timed_out
+          - selector: smb_server_sessions_errored_out
+            name: errored_out
+          - selector: smb_server_sessions_forced_off
+            name: forced_off
+      - context: smb_server_logons
+        title: SMB Server Logons
+        units: logons/s
+        dimensions:
+          - selector: smb_server_logons
+            name: logons
+      - context: smb_server_access_errors
+        title: SMB Server Logon and Access Errors
+        units: errors/s
+        dimensions:
+          - selector: smb_server_logon_errors
+            name: logon
+          - selector: smb_server_access_permission_errors
+            name: access_permissions
+          - selector: smb_server_granted_access_errors
+            name: granted_access
+      - context: smb_server_open_files
+        title: SMB Server Open Files
+        units: files
+        dimensions:
+          - selector: smb_server_open_files
+            name: open
+      - context: smb_server_files_opened
+        title: SMB Server Files Opened
+        units: files/s
+        dimensions:
+          - selector: smb_server_files_opened
+            name: opened
+      - context: smb_server_resource_errors
+        title: SMB Server Internal Errors and Resource Shortages
+        units: events/s
+        dimensions:
+          - selector: smb_server_system_errors
+            name: system
+          - selector: smb_server_work_item_shortages
+            name: work_item_shortages
+          - selector: smb_server_blocking_requests_rejected
+            name: blocking_requests_rejected
+          - selector: smb_server_paged_pool_failures
+            name: paged_pool_failures
+          - selector: smb_server_nonpaged_pool_failures
+            name: nonpaged_pool_failures
+  # SMB shares, as the native agent charts the SMB Server Shares counter set.
+  - family: shares
+    context_namespace: smb
+    chart_defaults:
+      instances:
+        by_labels: [share]
+    metrics:
+      - smb_share_open_files
+      - smb_share_tree_connects
+      - smb_share_read_requests
+      - smb_share_write_requests
+      - smb_share_metadata_requests
+      - smb_share_files_opened
+      - smb_share_received_bytes
+      - smb_share_sent_bytes
+    charts:
+      - context: server_shares_current_open_file_count
+        title: Current open file count on the SMB share
+        units: files
+        dimensions:
+          - selector: smb_share_open_files
+            name: open
+      - context: server_shares_write_requests
+        title: Write requests on the SMB share
+        units: requests/s
+        dimensions:
+          - selector: smb_share_write_requests
+            name: writes
+      - context: server_shares_read_requests
+        title: Read requests on the SMB share
+        units: requests/s
+        dimensions:
+          - selector: smb_share_read_requests
+            name: reads
+      - context: server_shares_metadata_requests
+        title: Metadata requests on the SMB share
+        units: requests/s
+        dimensions:
+          - selector: smb_share_metadata_requests
+            name: metadata
+      - context: server_shares_files_opened
+        title: Files opened on the SMB share
+        units: files/s
+        dimensions:
+          - selector: smb_share_files_opened
+            name: opened
+      - context: server_shares_tree_connects
+        title: Tree connects on the SMB share
+        units: connections
+        dimensions:
+          - selector: smb_share_tree_connects
+            name: connects
+      - context: server_shares_traffic
+        title: Traffic on the SMB share
+        units: bytes/s
+        type: area
+        dimensions:
+          - selector: smb_share_received_bytes
+            name: received
+          - selector: smb_share_sent_bytes
+            name: sent
+            options:
+              multiplier: -1
   - family: latency
     context_namespace: ping
     metrics: [ping_rtt_min, ping_rtt_max, ping_rtt_avg, ping_rtt_std_dev]
