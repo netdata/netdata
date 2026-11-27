@@ -1,0 +1,76 @@
+# yamllint disable rule:line-length
+---
+- id: "notify-itoc360"
+  meta:
+    name: "itoc360"
+    link: "https://itoc360.com/"
+    categories:
+      - notify.agent
+    icon_filename: "itoc360.svg"
+  keywords:
+    - itoc360
+    - on-call
+    - incident management
+  overview:
+    notification_description: |
+      itoc360 is an alert management and on-call platform. It opens an alert when a Netdata alert transitions to WARNING or CRITICAL and automatically resolves it when the alert returns to CLEAR.
+      You can send notifications to itoc360 using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ""
+  setup:
+    prerequisites:
+      list:
+        - title: ""
+          description: |
+            - An itoc360 account with a Netdata alert source. In itoc360, go to **Management** > **Alert sources** > **Create source**, select **Netdata**, and copy the token of the new source. See the [itoc360 Netdata integration guide](https://docs.itoc360.com/integrations/inbound-integrations/infrastructure-monitoring/netdata-integration).
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: "health_alarm_notify.conf"
+      options:
+        description: "The following options can be defined for this notification"
+        folding:
+          title: "Config Options"
+          enabled: true
+        list:
+          - name: "SEND_ITOC360"
+            default_value: "YES"
+            description: "Set `SEND_ITOC360` to YES"
+            required: true
+          - name: "DEFAULT_RECIPIENT_ITOC360"
+            default_value: ""
+            description: "Set `DEFAULT_RECIPIENT_ITOC360` to the token of the itoc360 alert source you want the alert notifications to be sent to. You can define multiple tokens like this: `token_1` `token_2`."
+            required: true
+            detailed_description: |
+              All roles will default to this variable if left unconfigured.
+
+              You can send alerts of different roles to different itoc360 alert sources by setting per-role tokens in the following entries at the bottom of the same file:
+              ```text
+              role_recipients_itoc360[sysadmin]="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxa"
+              role_recipients_itoc360[domainadmin]="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxb"
+              role_recipients_itoc360[dba]="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxc"
+              role_recipients_itoc360[webmaster]="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxd"
+              role_recipients_itoc360[proxyadmin]="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxe"
+              role_recipients_itoc360[sitemgr]="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxf"
+              ```
+          - name: "ITOC360_URL"
+            default_value: "https://api.itoc360.app/functions/v1/events"
+            description: "The itoc360 events API endpoint. The token is appended as `?token=<token>`. Change it only if itoc360 instructs you to."
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ""
+        list:
+          - name: "Basic Configuration"
+            folding:
+              enabled: false
+            description: ""
+            config: |
+              #------------------------------------------------------------------------------
+              # itoc360 global notification options
+
+              SEND_ITOC360="YES"
+              DEFAULT_RECIPIENT_ITOC360="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  troubleshooting:
+    problems:
+      list: []

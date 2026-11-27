@@ -256,6 +256,7 @@ flock
 gotify
 hipchat
 irc
+itoc360
 kavenegar
 matrix
 messagebird
@@ -507,6 +508,9 @@ OPSGENIE_API_KEY=
 # signl4 configs
 SIGNL4_WEBHOOK_URL=
 
+# itoc360 configs
+ITOC360_URL=
+
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -532,6 +536,7 @@ fi
 
 OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
 TELEGRAM_API_URL=${TELEGRAM_API_URL:-"https://api.telegram.org"}
+ITOC360_URL=${ITOC360_URL:-"https://api.itoc360.app/functions/v1/events"}
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
@@ -787,6 +792,9 @@ fi
 # check signl4
 [ -z "${SIGNL4_WEBHOOK_URL}" ] && SEND_SIGNL4="NO"
 
+# check itoc360
+[ -z "${DEFAULT_RECIPIENT_ITOC360}" ] && SEND_ITOC360="NO"
+
 # -----------------------------------------------------------------------------
 # check the availability of targets
 
@@ -819,7 +827,8 @@ check_supported_targets() {
     [ "${SEND_GOTIFY}" = "YES" ] ||
     [ "${SEND_NTFY}" = "YES" ] ||
     [ "${SEND_ILERT}" = "YES" ] ||
-    [ "${SEND_SIGNL4}" = "YES" ]; then
+    [ "${SEND_SIGNL4}" = "YES" ] ||
+    [ "${SEND_ITOC360}" = "YES" ]; then
     # if we need curl, check for the curl command
     if [ -z "${curl}" ]; then
       curl="$(command -v curl 2>/dev/null)"
@@ -852,6 +861,7 @@ check_supported_targets() {
       SEND_NTFY="NO"
       SEND_ILERT="NO"
       SEND_SIGNL4="NO"
+      SEND_ITOC360="NO"
     fi
   fi
 
@@ -1010,7 +1020,8 @@ for method in "${SEND_EMAIL}" \
   "${SEND_GOTIFY}" \
   "${SEND_NTFY}" \
   "${SEND_ILERT}" \
-  "${SEND_SIGNL4}" ; do
+  "${SEND_SIGNL4}" \
+  "${SEND_ITOC360}" ; do
 
   if [ "${method}" == "YES" ]; then
     proceed=1
@@ -1075,6 +1086,34 @@ urlencode() {
   done
 
   REPLY="${encoded}"
+  echo "${REPLY}"
+}
+
+# -----------------------------------------------------------------------------
+# function to escape a string for use inside a JSON string literal
+
+json_escape() {
+  local string="${1}" code hex c u
+
+  string="${string//\\/\\\\}"
+  string="${string//\"/\\\"}"
+  string="${string//$'\b'/\\b}"
+  string="${string//$'\f'/\\f}"
+  string="${string//$'\n'/\\n}"
+  string="${string//$'\r'/\\r}"
+  string="${string//$'\t'/\\t}"
+
+  # any remaining control characters (U+0001 - U+001F)
+  if [[ ${string} == *[$'\x01'-$'\x1f']* ]]; then
+    for ((code = 1; code < 32; code++)); do
+      printf -v hex '%02x' "${code}"
+      printf -v c '%b' "\\x${hex}"
+      printf -v u '\\u%04x' "${code}"
+      string="${string//"${c}"/"${u}"}"
+    done
+  fi
+
+  REPLY="${string}"
   echo "${REPLY}"
 }
 
@@ -2618,6 +2657,72 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# itoc360 sender
+
+send_itoc360() {
+  local recipients="${1}" httpcode sent=0 token url_token payload="" i
+  [ "${SEND_ITOC360}" != "YES" ] && return 1
+  [ -z "${recipients}" ] && return 1
+
+  # field name / value pairs, all sent as JSON strings.
+  # "family" is part of the itoc360 event format, but the Agent no longer
+  # passes chart families to this script, so it is always empty.
+  local fields=(
+    "name" "${name}"
+    "chart" "${chart}"
+    "family" ""
+    "status" "${status}"
+    "old_status" "${old_status}"
+    "value" "${value}"
+    "old_value" "${old_value}"
+    "src" "${src}"
+    "duration" "${duration}"
+    "non_clear_duration" "${non_clear_duration}"
+    "units" "${units}"
+    "info" "${info}"
+    "when" "${when}"
+    "host" "${host}"
+    "unique_id" "${unique_id}"
+    "alarm_id" "${alarm_id}"
+    "event_id" "${event_id}"
+    "calc_expression" "${calc_expression}"
+    "total_warnings" "${total_warnings}"
+    "total_critical" "${total_critical}"
+    "classification" "${classification}"
+    "component" "${component}"
+    "type" "${type}"
+    "severity" "${severity}"
+    "value_string" "${value_string}"
+    "old_value_string" "${old_value_string}"
+    "image_url" "${image}"
+    "goto_url" "${goto_url}"
+  )
+
+  for ((i = 0; i < ${#fields[@]}; i += 2)); do
+    json_escape "${fields[i + 1]}" >/dev/null
+    payload+="${payload:+,}\"${fields[i]}\":\"${REPLY}\""
+  done
+  payload="{${payload}}"
+
+  for token in ${recipients}; do
+    urlencode "${token}" >/dev/null
+    url_token="${REPLY}"
+
+    httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${ITOC360_URL}?token=${url_token}")
+    if [ "${httpcode}" = "200" ] || [ "${httpcode}" = "201" ] || [ "${httpcode}" = "204" ]; then
+      info "sent itoc360 event for ${notification_description}"
+      sent=$((sent + 1))
+    else
+      error "failed to send itoc360 event for ${notification_description}, with HTTP response status code ${httpcode}."
+    fi
+  done
+
+  [ ${sent} -gt 0 ] && return 0
+
+  return 1
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -3810,6 +3915,11 @@ send_signl4
 SENT_SIGNL4=$?
 
 # -----------------------------------------------------------------------------
+# send messages to itoc360
+send_itoc360 "${to_itoc360}"
+SENT_ITOC360=$?
+
+# -----------------------------------------------------------------------------
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
@@ -3841,7 +3951,8 @@ for state in "${SENT_EMAIL}" \
   "${SENT_GOTIFY}" \
   "${SENT_NTFY}" \
   "${SENT_ILERT}" \
-  "${SENT_SIGNL4}"; do
+  "${SENT_SIGNL4}" \
+  "${SENT_ITOC360}"; do
   if [ "${state}" -eq 0 ]; then
     # we sent something
     exit 0
