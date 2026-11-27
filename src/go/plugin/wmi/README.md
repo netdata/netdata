@@ -34,3 +34,16 @@ such as `${env:WMI_PASSWORD}` resolve the same way:
 ```
 
 The debug output shows the job's checks and collections, and the charts it sends for the host's virtual node.
+
+## Find a counter set's WMI class
+
+A performance counter set's WMI class name cannot be guessed from the counter set's name. Classic counter sets are named
+after their service and object (`Win32_PerfRawData_PerfNet_Server` for the Server object), manifest-based ones after
+their provider: often `Counters` (`Win32_PerfRawData_Counters_SMBServerShares` for SMB Server Shares), but not always
+(`Win32_PerfRawData_MicrosoftWindowsW32TimePerf_WindowsTimeService` for Windows Time Service). A query for a name that
+does not exist fails with `StatusInvalidClass`, exactly as for a counter set the host does not have, so list the
+classes on the host before concluding that one is missing:
+
+```powershell
+Get-CimClass -ClassName Win32_PerfRawData_* | Where-Object CimClassName -Match 'SMB' | Select-Object CimClassName
+```
