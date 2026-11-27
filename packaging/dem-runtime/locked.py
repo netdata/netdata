@@ -103,6 +103,10 @@ def download_to(url, temporary, max_bytes):
             if max_bytes is not None and received > max_bytes:
                 raise ValueError('download exceeds locked byte count: ' + temporary.name)
             output.write(chunk)
+        # Sized HTTPResponse reads can return EOF with Content-Length bytes outstanding.
+        remaining = getattr(response, 'length', None)
+        if remaining:
+            raise IncompleteRead(b'', remaining)
 
 
 def download(record, directory):

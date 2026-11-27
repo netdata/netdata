@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from http.client import HTTPResponse
 import io
 import json
 from pathlib import Path
@@ -8,7 +9,7 @@ import ssl
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
 
 import locked
@@ -103,7 +104,9 @@ class LockedInputTests(unittest.TestCase):
 
     def test_permanent_download_failure_is_not_retried(self):
         record = {'url': 'https://example.invalid/archive', 'sha256': hashlib.sha256(b'good').hexdigest()}
-        cases = [(HTTPError(record['url'], 404, 'missing', {}, None), HTTPError),
+        missing = HTTPError(record['url'], 404, 'missing', {}, None)
+        self.addCleanup(missing.close)
+        cases = [(missing, HTTPError),
                  (URLError(ssl.SSLCertVerificationError('invalid certificate')), URLError),
                  (self.response(b'corrupted'), ValueError)]
         for result, error in cases:
@@ -113,6 +116,20 @@ class LockedInputTests(unittest.TestCase):
                     locked.download(record, Path(directory))
                 sleep.assert_not_called()
                 self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_premature_eof_in_fixed_length_response_retries(self):
+        data = b'complete archive'
+        record = {'url': 'https://example.invalid/archive', 'sha256': hashlib.sha256(data).hexdigest()}
+        sock = Mock()
+        sock.makefile.return_value = io.BytesIO(b'HTTP/1.1 200 OK\r\nContent-Length: 16\r\n\r\npartial')
+        response = HTTPResponse(sock)
+        response.url = record['url']
+        response.begin()
+        with tempfile.TemporaryDirectory() as directory, patch('time.sleep') as sleep, \
+                patch.object(locked.HTTPS_OPENER, 'open', side_effect=[response, self.response(data)]):
+            path = locked.download(record, Path(directory))
+            self.assertEqual(path.read_bytes(), data)
+            sleep.assert_called_once_with(1)
 
     def test_content_address_url_retains_explicit_archive_name(self):
         data = b'exact snapshot file'

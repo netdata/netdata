@@ -205,9 +205,9 @@ the verified inventory.
 Companion CI caches the patchelf source tarball under its pinned SHA-256 across
 runs. Source assembly checks the digest on a cache hit. On a cache miss, the
 locked downloader makes up to three attempts for transient connection failures,
-timeouts and retryable HTTP responses, waiting one and then two seconds between
-attempts. Each attempt restarts the transfer. Integrity failures stop the build
-immediately.
+timeouts, interrupted HTTP bodies and retryable HTTP responses. It waits one
+and then two seconds between attempts and restarts each transfer. A complete
+response with the wrong digest fails immediately.
 
 Agent-integration tests in the recipe require the matching full Agent checkout:
 they exercise core package metadata and maintainer scripts outside the runtime
