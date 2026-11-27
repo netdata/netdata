@@ -10,7 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 import urllib.request
 
 import build
@@ -90,10 +90,12 @@ class DeliveryTests(unittest.TestCase):
         record = {'name': 'input', 'url': 'https://example.invalid/input',
                   'sha256': hashlib.sha256(b'x').hexdigest(), 'bytes': 1}
         with tempfile.TemporaryDirectory() as directory, \
+                patch('time.sleep') as sleep, \
                 patch('urllib.request.OpenerDirector.open', side_effect=TimeoutError('stalled')) as opened:
             with self.assertRaises(TimeoutError):
                 locked.download(record, Path(directory))
-            self.assertGreater(opened.call_args.kwargs.get('timeout', 0), 0)
+            self.assertEqual(opened.call_args_list, [call(record['url'], timeout=60)] * 3)
+            self.assertEqual(sleep.call_args_list, [call(1), call(2)])
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_oversized_download_stops_before_consuming_body(self):

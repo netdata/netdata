@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from http.client import HTTPResponse
 import io
 import json
 from pathlib import Path
+import ssl
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from urllib.error import HTTPError, URLError
 
 import locked
 import sources
@@ -77,6 +80,56 @@ class LockedInputTests(unittest.TestCase):
             self.assertEqual(paths, [root / 'shared.deb'] * 2)
             self.assertEqual(paths[0].read_bytes(), data)
             self.assertEqual(sorted(p.name for p in root.iterdir()), ['shared.deb'])
+
+    def test_partial_timeout_then_server_error_restarts_verified_download(self):
+        data = b'complete archive'
+        record = {'url': 'https://example.invalid/archive', 'sha256': hashlib.sha256(data).hexdigest()}
+
+        class StalledResponse(io.BytesIO):
+            url = record['url']
+
+            def read(self, size=-1):
+                if self.tell():
+                    raise TimeoutError('stalled while reading')
+                return super().read(size)
+
+        unavailable = HTTPError(record['url'], 503, 'unavailable', {}, io.BytesIO())
+        responses = [StalledResponse(b'partial'), unavailable, self.response(data)]
+        with tempfile.TemporaryDirectory() as directory, patch('time.sleep') as sleep, \
+                patch.object(locked.HTTPS_OPENER, 'open', side_effect=responses):
+            root = Path(directory)
+            self.assertEqual(locked.download(record, root).read_bytes(), data)
+            self.assertEqual(list(root.iterdir()), [root / 'archive'])
+            self.assertEqual(sleep.call_count, 2)
+
+    def test_permanent_download_failure_is_not_retried(self):
+        record = {'url': 'https://example.invalid/archive', 'sha256': hashlib.sha256(b'good').hexdigest()}
+        missing = HTTPError(record['url'], 404, 'missing', {}, None)
+        self.addCleanup(missing.close)
+        cases = [(missing, HTTPError),
+                 (URLError(ssl.SSLCertVerificationError('invalid certificate')), URLError),
+                 (self.response(b'corrupted'), ValueError)]
+        for result, error in cases:
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as directory, \
+                    patch('time.sleep') as sleep, patch.object(locked.HTTPS_OPENER, 'open', side_effect=[result]):
+                with self.assertRaises(error):
+                    locked.download(record, Path(directory))
+                sleep.assert_not_called()
+                self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_premature_eof_in_fixed_length_response_retries(self):
+        data = b'complete archive'
+        record = {'url': 'https://example.invalid/archive', 'sha256': hashlib.sha256(data).hexdigest()}
+        sock = Mock()
+        sock.makefile.return_value = io.BytesIO(b'HTTP/1.1 200 OK\r\nContent-Length: 16\r\n\r\npartial')
+        response = HTTPResponse(sock)
+        response.url = record['url']
+        response.begin()
+        with tempfile.TemporaryDirectory() as directory, patch('time.sleep') as sleep, \
+                patch.object(locked.HTTPS_OPENER, 'open', side_effect=[response, self.response(data)]):
+            path = locked.download(record, Path(directory))
+            self.assertEqual(path.read_bytes(), data)
+            sleep.assert_called_once_with(1)
 
     def test_content_address_url_retains_explicit_archive_name(self):
         data = b'exact snapshot file'

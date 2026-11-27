@@ -142,7 +142,7 @@ def elf_headers(path, machine):
         for item in headers:
             if item[2] + item[5] > size or (item[0] == 1 and item[5] > item[6]):
                 raise ValueError('ELF segment outside file: ' + str(path))
-        # patchelf >=0.18 corrupted this invariant on the pinned Node arm64 input.
+        # The loader needs the program headers to remain mapped after patching.
         for item in headers:
             if item[0] == 6 and not any(load[0] == 1 and
                                         load[3] <= item[3] and item[3] + item[6] <= load[3] + load[6]

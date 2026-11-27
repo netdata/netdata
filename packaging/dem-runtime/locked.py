@@ -1,15 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Small readers for the reviewed Debian input lock; no package resolution."""
 import hashlib
+from http.client import IncompleteRead
 from pathlib import Path
 import re
+import socket
+import sys
 import tempfile
+import time
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 import urllib.request
 
 from bundle import credential_free_https, display_argument, run
 
 
 DOWNLOAD_TIMEOUT_SECONDS = 60
+DOWNLOAD_ATTEMPTS = 3
 
 
 class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -76,10 +83,34 @@ def repository_url(path):
     return base + path
 
 
+def transient_download_error(error):
+    if isinstance(error, HTTPError):
+        return error.code in (408, 429, 500, 502, 503, 504)
+    if isinstance(error, URLError):
+        error = error.reason
+    if isinstance(error, socket.gaierror):
+        return error.errno == socket.EAI_AGAIN
+    return isinstance(error, (TimeoutError, ConnectionError, IncompleteRead))
+
+
+def download_to(url, temporary, max_bytes):
+    with HTTPS_OPENER.open(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response, temporary.open('wb') as output:
+        if urlsplit(response.url).scheme != 'https':
+            raise ValueError('download redirected outside HTTPS')
+        received = 0
+        for chunk in iter(lambda: response.read(1024 * 1024), b''):
+            received += len(chunk)
+            if max_bytes is not None and received > max_bytes:
+                raise ValueError('download exceeds locked byte count: ' + temporary.name)
+            output.write(chunk)
+        # Sized HTTPResponse reads can return EOF with Content-Length bytes outstanding.
+        remaining = getattr(response, 'length', None)
+        if remaining:
+            raise IncompleteRead(b'', remaining)
+
+
 def download(record, directory):
     """Hash-only acquisition, with an idempotent cache and atomic verified publication."""
-    import sys
-    from urllib.parse import urlsplit
     url = record['url']
     parsed = urlsplit(url)
     if not credential_free_https(url):
@@ -107,18 +138,21 @@ def download(record, directory):
     with tempfile.TemporaryDirectory(prefix='.download-', dir=directory) as scratch:
         temporary = Path(scratch) / name
         print('+ download ' + display_argument(url) + ' -> ' + display_argument(target), file=sys.stderr, flush=True)
-        with HTTPS_OPENER.open(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response, temporary.open('wb') as output:
-            if urlsplit(response.url).scheme != 'https':
-                raise ValueError('download redirected outside HTTPS')
-            received = 0
-            while True:
-                chunk = response.read(1024 * 1024)
-                if not chunk:
-                    break
-                received += len(chunk)
-                if 'bytes' in record and received > record['bytes']:
-                    raise ValueError('download exceeds locked byte count: ' + name)
-                output.write(chunk)
+        for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+            try:
+                download_to(url, temporary, record.get('bytes'))
+                break
+            except (OSError, IncompleteRead) as error:
+                if attempt == DOWNLOAD_ATTEMPTS or not transient_download_error(error):
+                    raise
+                reason = type(error).__name__
+                if isinstance(error, HTTPError):
+                    reason = f'HTTP {error.code}'
+                    error.close()
+                delay = 2 ** (attempt - 1)
+                print(f'{name}: {reason}, retrying in {delay}s (attempt {attempt + 1}/{DOWNLOAD_ATTEMPTS})',
+                      file=sys.stderr, flush=True)
+                time.sleep(delay)
         if not verify(temporary):
             raise ValueError('download hash/size mismatch: ' + name)
         temporary.replace(target)
