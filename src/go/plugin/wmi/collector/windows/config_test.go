@@ -24,17 +24,17 @@ func TestCollector_GroupConfig(t *testing.T) {
 		wantQueries []string
 	}{
 		"omitted": {
-			wantQueries: []string{queryCPU, queryMemory, queryNetwork, queryDisk},
+			wantQueries: []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 		},
 		"empty object": {
 			yamlGroups:  "collectors: {}\n",
 			jsonGroups:  `,"collectors":{}`,
-			wantQueries: []string{queryCPU, queryMemory, queryNetwork, queryDisk},
+			wantQueries: []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 		},
 		"disable one group": {
 			yamlGroups:  "collectors: {cpu: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false}`,
-			wantQueries: []string{queryMemory, queryNetwork, queryDisk},
+			wantQueries: []string{queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 		},
 		"one group only": {
 			yamlGroups:  "collectors: {cpu: false, memory: true, network: false, disk: false}\n",

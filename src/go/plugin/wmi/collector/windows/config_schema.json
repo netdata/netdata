@@ -80,7 +80,7 @@
           },
           "network": {
             "title": "Network",
-            "description": "Collect received and sent traffic per network interface.",
+            "description": "Collect traffic, packets, errors, drops, speed and output queue length per network interface, and the host's total traffic.",
             "type": "boolean",
             "default": true
           },

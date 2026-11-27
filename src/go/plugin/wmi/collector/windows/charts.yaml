@@ -74,16 +74,52 @@ groups:
             name: used
             options:
               divisor: 1048576
+  - family: network
+    context_namespace: system
+    metrics: [network_total_received_bytes, network_total_sent_bytes]
+    charts:
+      - context: net
+        title: Physical Network Interfaces Aggregated Bandwidth
+        units: kilobits/s
+        type: area
+        dimensions:
+          - selector: network_total_received_bytes
+            name: received
+            options:
+              multiplier: 8
+              divisor: 1000
+          - selector: network_total_sent_bytes
+            name: sent
+            options:
+              multiplier: -8
+              divisor: 1000
   - family: net
     context_namespace: net
-    metrics: [network_received_bytes, network_sent_bytes]
+    metrics:
+      - network_received_bytes
+      - network_sent_bytes
+      - network_received_packets
+      - network_sent_packets
+      - network_speed_bits_per_second
+      - network_inbound_errors
+      - network_outbound_errors
+      - network_inbound_discards
+      - network_outbound_discards
+      - network_output_queue_length
+      - network_rsc_connections
+      - network_rsc_coalesced_packets
+      - network_rsc_exceptions
+      - network_rsc_average_packet_size_bytes
+      - network_chimney_connections
+      - network_unknown_protocol_packets
+    chart_defaults:
+      instances:
+        by_labels: [device]
     charts:
       - context: net
         title: Bandwidth
         units: kilobits/s
         type: area
-        instances:
-          by_labels: [device]
         dimensions:
           - selector: network_received_bytes
             name: received
@@ -95,6 +131,86 @@ groups:
             options:
               multiplier: -8
               divisor: 1000
+      - context: packets
+        title: Packets
+        units: packets/s
+        dimensions:
+          - selector: network_received_packets
+            name: received
+          - selector: network_sent_packets
+            name: sent
+            options:
+              multiplier: -1
+      - context: speed
+        title: Interface Speed
+        units: kilobits/s
+        dimensions:
+          - selector: network_speed_bits_per_second
+            name: speed
+            options:
+              divisor: 1000
+      - context: errors
+        title: Interface Errors
+        units: errors/s
+        dimensions:
+          - selector: network_inbound_errors
+            name: inbound
+          - selector: network_outbound_errors
+            name: outbound
+            options:
+              multiplier: -1
+      - context: drops
+        title: Interface Drops
+        units: drops/s
+        dimensions:
+          - selector: network_inbound_discards
+            name: inbound
+          - selector: network_outbound_discards
+            name: outbound
+            options:
+              multiplier: -1
+      - context: queue_length
+        title: Interface Output Queue Length
+        units: packets
+        dimensions:
+          - selector: network_output_queue_length
+            name: length
+      - context: rsc_connections
+        title: Active TCP Connections Offloaded by RSC
+        units: connections
+        dimensions:
+          - selector: network_rsc_connections
+            name: connections
+      - context: rsc_packets
+        title: TCP RSC Coalesced Packets
+        units: packets/s
+        dimensions:
+          - selector: network_rsc_coalesced_packets
+            name: packets
+      - context: rsc_exceptions
+        title: TCP RSC Exceptions
+        units: exceptions/s
+        dimensions:
+          - selector: network_rsc_exceptions
+            name: exceptions
+      - context: rsc_average_packet_size
+        title: TCP RSC Average Packet Size
+        units: bytes
+        dimensions:
+          - selector: network_rsc_average_packet_size_bytes
+            name: average
+      - context: chimney_connections
+        title: Active TCP Connections Offloaded with Chimney
+        units: connections
+        dimensions:
+          - selector: network_chimney_connections
+            name: connections
+      - context: unknown_protocol_packets
+        title: Packets Received with Unknown Protocol
+        units: packets/s
+        dimensions:
+          - selector: network_unknown_protocol_packets
+            name: inbound
   - family: disk space
     context_namespace: disk
     metrics: [disk_avail_bytes, disk_used_bytes]

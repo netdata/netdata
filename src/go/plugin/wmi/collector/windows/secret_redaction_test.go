@@ -90,10 +90,11 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 		},
 		"failed groups are logged": {
 			newSession: sessionWith(map[string]queryResult{
-				queryCPU:     {err: classified},
-				queryMemory:  {err: unclassified},
-				queryNetwork: validQueryResults()[queryNetwork],
-				queryDisk:    validQueryResults()[queryDisk],
+				queryCPU:               {err: classified},
+				queryMemory:            {err: unclassified},
+				queryNetworkInterfaces: validQueryResults()[queryNetworkInterfaces],
+				queryNetworkAdapters:   validQueryResults()[queryNetworkAdapters],
+				queryDisk:              validQueryResults()[queryDisk],
 			}),
 			wantLog: []string{"CPU WMI query failed: WMI collection timed out", "memory WMI query failed"},
 		},

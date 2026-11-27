@@ -83,10 +83,19 @@ func validQueryResults() map[string]queryResult {
 			"TotalVisibleMemorySize": "8388608",
 			"FreePhysicalMemory":     uint64(2097152),
 		}),
-		queryNetwork: fixtureRows(
+		queryNetworkInterfaces: fixtureRows(
 			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
 			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
 			map[string]any{"Name": "isatap.example.com", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "0"},
+		),
+		// The Network Adapter counter set lists the interfaces again, under the
+		// same names, plus adapters without a TCP/IP binding.
+		queryNetworkAdapters: fixtureRows(
+			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
+			map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "70"},
+			map[string]any{"Name": "isatap.example.com", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "0"},
+			map[string]any{"Name": "Team Member", "BytesReceivedPersec": uint64(400), "BytesSentPersec": uint64(5)},
+			map[string]any{"Name": "Teredo Tunneling Pseudo-Interface", "BytesReceivedPersec": "0", "BytesSentPersec": "0"},
 		),
 		queryDisk: fixtureRows(
 			map[string]any{
@@ -143,10 +152,15 @@ func TestCollector_Collect(t *testing.T) {
 		err: errors.New("fixture-secret"),
 	}
 	sessions[1].results[queryMemory] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
-	sessions[1].results[queryNetwork] = fixtureRows(
+	sessions[1].results[queryNetworkInterfaces] = fixtureRows(
 		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "250", "BytesSentPersec": "malformed"},
 		map[string]any{"Name": "_Total", "BytesReceivedPersec": uint32(30)},
 		map[string]any{"BytesSentPersec": uint64(20)},
+	)
+	// Ethernet#1 is missing from this poll's interfaces, so its adapter is virtual.
+	sessions[1].results[queryNetworkAdapters] = fixtureRows(
+		map[string]any{"Name": "Ethernet", "BytesReceivedPersec": "250", "BytesSentPersec": "malformed"},
+		map[string]any{"Name": "Ethernet#1", "BytesReceivedPersec": uint64(0), "BytesSentPersec": "80"},
 	)
 	// Each processor's share of the time all its modes accumulated since the
 	// first sample; WinRM reports the numbers as text.
@@ -187,6 +201,7 @@ func TestCollector_Collect(t *testing.T) {
 	const (
 		ethernet  = `{device="Ethernet",interface_type="real"}`
 		ethernet1 = `{device="Ethernet#1",interface_type="real"}`
+		member    = `{device="Team Member",interface_type="virtual"}`
 		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
 		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
 	)
@@ -197,6 +212,10 @@ func TestCollector_Collect(t *testing.T) {
 		"network_received_bytes" + ethernet1: 0,
 		"network_sent_bytes" + ethernet:      30,
 		"network_sent_bytes" + ethernet1:     70,
+		"network_received_bytes" + member:    400,
+		"network_sent_bytes" + member:        5,
+		"network_total_received_bytes":       190,
+		"network_total_sent_bytes":           100,
 		"disk_used_bytes" + driveC:           80000000000,
 		"disk_avail_bytes" + driveC:          420000000000,
 		"disk_used_bytes" + driveD:           4294967296,
@@ -209,8 +228,11 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_free_bytes":                 0,
 		"network_received_bytes" + ethernet: 250,
-		"disk_used_bytes" + driveC:          0,
-		"disk_avail_bytes" + driveC:         300,
+		"network_total_received_bytes":      250,
+		`network_received_bytes{device="Ethernet#1",interface_type="virtual"}`: 0,
+		`network_sent_bytes{device="Ethernet#1",interface_type="virtual"}`:     80,
+		"disk_used_bytes" + driveC:  0,
+		"disk_avail_bytes" + driveC: 300,
 	}), second)
 
 	// The failed CPU query keeps the first sample, so the shares span both intervals.
@@ -238,7 +260,7 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Equal(t, first, recovered)
 
 	for _, session := range sessions {
-		assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, metricQueries(session.queries))
+		assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk}, metricQueries(session.queries))
 		assert.Equal(t, 1, session.closed)
 	}
 	c.Cleanup(t.Context())
@@ -349,7 +371,7 @@ func metricQueries(queries []string) []string {
 	var metrics []string
 	for _, query := range queries {
 		switch query {
-		case queryCPU, queryMemory, queryNetwork, queryDisk:
+		case queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk:
 			metrics = append(metrics, query)
 		}
 	}
@@ -411,10 +433,10 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 	}{
 		"after a successful group, keep its samples and skip the inventory": {
 			results: map[string]queryResult{
-				queryCPU:     validQueryResults()[queryCPU],
-				queryMemory:  validQueryResults()[queryMemory],
-				queryNetwork: lost,
-				queryDisk:    lost,
+				queryCPU:               validQueryResults()[queryCPU],
+				queryMemory:            validQueryResults()[queryMemory],
+				queryNetworkInterfaces: lost,
+				queryDisk:              lost,
 			},
 			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
 				"memory_used_bytes": 6 * 1024 * 1024 * 1024,
@@ -423,10 +445,10 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 		},
 		"after a refused query, report the query failures": {
 			results: map[string]queryResult{
-				queryCPU:     {err: errors.New("WS-Management fault")},
-				queryMemory:  lost,
-				queryNetwork: lost,
-				queryDisk:    lost,
+				queryCPU:               {err: errors.New("WS-Management fault")},
+				queryMemory:            lost,
+				queryNetworkInterfaces: lost,
+				queryDisk:              lost,
 			},
 			wantErr: "no enabled WMI query group succeeded",
 		},
@@ -446,7 +468,8 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tc.wantMetrics, metrics)
 			}
-			assert.Equal(t, []string{queryCPU, queryMemory, queryNetwork, queryDisk}, session.queries)
+			// A lost interface query leaves no interface list, so the adapter query is skipped.
+			assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryDisk}, session.queries)
 		})
 	}
 }

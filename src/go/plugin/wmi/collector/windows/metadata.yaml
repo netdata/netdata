@@ -27,13 +27,13 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor CPU, memory, network traffic and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them.
+          Monitor CPU, memory, network interfaces and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
           - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
           - free and used physical memory;
-          - received and sent traffic per network interface;
+          - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - available and used space per fixed drive;
           - round-trip time and packet loss of ICMP ping from the poller;
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
@@ -41,7 +41,7 @@ modules:
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group, and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -60,7 +60,7 @@ modules:
           |---|---|
           | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
           | Memory | `Win32_OperatingSystem` |
-          | Network | `Win32_PerfRawData_Tcpip_NetworkInterface` |
+          | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter` |
           | Disk | `Win32_LogicalDisk` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
       supported_platforms:
@@ -91,7 +91,7 @@ modules:
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
             - Traffic appears from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
-            - Network interface speed is not collected, so the stock alerts that compare traffic with it have no value.
+            - The stock alerts that compare traffic with the interface speed (`interface_speed`, `1m_received_traffic_overflow` and `1m_sent_traffic_overflow`) have no value. They read the speed from a chart variable that the plugin does not publish; the speed itself is on the Interface Speed chart.
             - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
             - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it; its node turns Stale and the `wmi_host_last_collected_secs` alert reports it instead.
             - A host that cannot be reached when its job starts gets no node and no host status alert until the job collects from it, twice for the alert. Set `autodetection_retry` so the job keeps trying.
@@ -103,7 +103,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to four WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to five WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     excluded_alerts:
       - interface_speed
       - 1m_received_traffic_overflow
@@ -247,7 +247,7 @@ modules:
               required: false
               group: Collection
             - name: collectors.network
-              description: "Collect received and sent traffic per network interface."
+              description: "Collect traffic, packets, errors, drops, speed and output queue length per network interface, and the host's total traffic."
               default_value: true
               required: false
               group: Collection
@@ -443,7 +443,7 @@ modules:
         enabled: false
       description: |
         - Charts belong to the Windows host's node, not to the poller.
-        - CPU utilization and traffic are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
+        - CPU utilization and the per-second rates, such as traffic, packets and errors, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
       availability: []
@@ -469,6 +469,13 @@ modules:
               dimensions:
                 - name: free
                 - name: used
+            - name: system.net
+              description: Physical Network Interfaces Aggregated Bandwidth
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
         - name: logical processor
           description: A logical processor of the host.
           labels:
@@ -486,12 +493,12 @@ modules:
                 - name: dpc
                 - name: idle
         - name: network interface
-          description: A network interface as Windows performance counters list it, including virtual and tunnel adapters, that has sent or received traffic since its counters started.
+          description: A network interface or adapter as Windows performance counters list it, including virtual and tunnel adapters, that has sent or received traffic since its counters started.
           labels:
             - name: device
               description: Performance counter name of the interface, for example `Intel[R] PRO_1000 MT Network Connection`. Windows writes parentheses as square brackets and `#` or `/` as underscores.
             - name: interface_type
-              description: Always `real`, the value the Netdata Agent on Windows gives the interfaces of this counter set.
+              description: '`real` for an interface of the Network Interface counters, `virtual` for an adapter that only the Network Adapter counters list, as the Netdata Agent on Windows labels them.'
           metrics:
             - name: net.net
               description: Bandwidth
@@ -500,6 +507,75 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
+            - name: net.packets
+              description: Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.speed
+              description: Interface Speed
+              unit: kilobits/s
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.errors
+              description: Interface Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: drops/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.queue_length
+              description: Interface Output Queue Length
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: length
+            - name: net.rsc_connections
+              description: Active TCP Connections Offloaded by RSC
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: net.rsc_packets
+              description: TCP RSC Coalesced Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: packets
+            - name: net.rsc_exceptions
+              description: TCP RSC Exceptions
+              unit: exceptions/s
+              chart_type: line
+              dimensions:
+                - name: exceptions
+            - name: net.rsc_average_packet_size
+              description: TCP RSC Average Packet Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: net.chimney_connections
+              description: Active TCP Connections Offloaded with Chimney
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: net.unknown_protocol_packets
+              description: Packets Received with Unknown Protocol
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: inbound
         - name: drive
           description: A fixed drive with a drive letter that Windows does not report as read-only.
           labels:
