@@ -6,6 +6,7 @@
 static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt);
 static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt);
 static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t dt);
+static void send_process_data_to_netdata(struct target *w, const char *type, usec_t dt);
 #endif
 
 static inline void send_BEGIN(const char *type, const char *name,const char *metric,  usec_t usec) {
@@ -155,6 +156,8 @@ void send_collected_data_to_netdata(struct target_family *f, usec_t dt) {
             send_dcstat_data_to_netdata(w, type, dt);
         if (apps_ebpf_fd_data_ready())
             send_fd_data_to_netdata(w, type, dt);
+        if (apps_ebpf_process_data_ready())
+            send_process_data_to_netdata(w, type, dt);
 #endif
 
         if (unlikely(!w->values[PDF_PROCESSES]))
@@ -477,6 +480,16 @@ static const struct apps_ebpf_chart apps_fd_charts[] = {
     { "ebpf_file_close_error", "Fails to close files.", "calls/s", "stacked", 20223, "calls", "incremental", NULL, true  },
 };
 
+/* Chart ids, contexts, family, dimensions, units, algorithms and priorities match
+ * the ones the C process module published.  Values are monotonic totals. */
+static const struct apps_ebpf_chart apps_process_charts[] = {
+    { "ebpf_process_start", "Process started.", "calls/s", "stacked", 20161, "calls", "incremental", NULL, false },
+    { "ebpf_thread_start", "Threads started.", "calls/s", "stacked", 20162, "calls", "incremental", NULL, false },
+    { "ebpf_task_exit", "Tasks starts exit process.", "calls/s", "stacked", 20163, "calls", "incremental", NULL, false },
+    { "ebpf_task_released", "Tasks released.", "calls/s", "stacked", 20164, "calls", "incremental", NULL, false },
+    { "ebpf_task_error", "Errors to create process or threads.", "calls/s", "stacked", 20165, "calls", "incremental", NULL, true },
+};
+
 static void send_cachestat_charts_to_netdata(struct target *w, const struct target_family *f, bool obsolete) {
     send_ebpf_charts_to_netdata(w, f, "page_cache",
                                 apps_cachestat_charts, _countof(apps_cachestat_charts), true, obsolete);
@@ -542,6 +555,32 @@ static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t d
 
     send_ebpf_data_to_netdata(w, type, dt, apps_fd_charts, values, _countof(values),
                               apps_ebpf_fd_errors_are_available());
+}
+
+/* On obsoletion the error chart is included only if this target announced it. */
+static void send_process_charts_to_netdata(struct target *w, const struct target_family *f, bool obsolete) {
+    bool with_errors = obsolete ? (w->charts & TARGET_CHARTS_EBPF_PROCESS_ERRORS) : apps_ebpf_process_errors_are_available();
+
+    send_ebpf_charts_to_netdata(w, f, "processes",
+                                apps_process_charts, _countof(apps_process_charts), with_errors, obsolete);
+
+    if (obsolete)
+        w->charts &= ~(TARGET_CHARTS_EBPF_PROCESS | TARGET_CHARTS_EBPF_PROCESS_ERRORS);
+    else {
+        w->charts |= TARGET_CHARTS_EBPF_PROCESS;
+        if (with_errors)
+            w->charts |= TARGET_CHARTS_EBPF_PROCESS_ERRORS;
+    }
+}
+
+static void send_process_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+    const kernel_uint_t values[] = {(kernel_uint_t)w->process.process_create,
+                                    (kernel_uint_t)w->process.thread_create,
+                                    (kernel_uint_t)w->process.task_exit,
+                                    (kernel_uint_t)w->process.task_close,
+                                    (kernel_uint_t)w->process.task_error};
+    send_ebpf_data_to_netdata(w, type, dt, apps_process_charts, values, _countof(values),
+                              apps_ebpf_process_errors_are_available());
 }
 #endif
 
@@ -654,6 +693,8 @@ void send_target_charts_obsolete(struct target *w, const struct target_family *f
         send_dcstat_charts_to_netdata(w, f, true);
     if(w->charts & TARGET_CHARTS_EBPF_FD)
         send_fd_charts_to_netdata(w, f, true);
+    if(w->charts & TARGET_CHARTS_EBPF_PROCESS)
+        send_process_charts_to_netdata(w, f, true);
 #endif
 
     w->exposed = false;
@@ -690,6 +731,8 @@ void send_charts_updates_to_netdata(struct target_family *f) {
                 send_dcstat_charts_to_netdata(w, f, false);
             if (apps_ebpf_fd_is_available())
                 send_fd_charts_to_netdata(w, f, false);
+            if (apps_ebpf_process_is_available())
+                send_process_charts_to_netdata(w, f, false);
         }
 #endif
     }
@@ -703,6 +746,8 @@ void send_charts_updates_to_netdata(struct target_family *f) {
         bool cachestat = apps_ebpf_cachestat_is_available();
         bool dcstat = apps_ebpf_dcstat_is_available();
         bool fd = apps_ebpf_fd_is_available();
+        bool process = apps_ebpf_process_is_available();
+        bool process_errors = process && apps_ebpf_process_errors_are_available();
 
         /* fd needs to know about its error charts too.  They are announced only
          * while the producer reports EBPFGO_SHM_FLAG_FD_ERRORS, and that bit can
@@ -722,6 +767,8 @@ void send_charts_updates_to_netdata(struct target_family *f) {
                 send_dcstat_charts_to_netdata(w, f, false);
             if (fd && (!(w->charts & TARGET_CHARTS_EBPF_FD) || (fd_errors && !(w->charts & TARGET_CHARTS_EBPF_FD_ERRORS))))
                 send_fd_charts_to_netdata(w, f, false);
+            if (process && (!(w->charts & TARGET_CHARTS_EBPF_PROCESS) || (process_errors && !(w->charts & TARGET_CHARTS_EBPF_PROCESS_ERRORS))))
+                send_process_charts_to_netdata(w, f, false);
         }
     }
 #endif

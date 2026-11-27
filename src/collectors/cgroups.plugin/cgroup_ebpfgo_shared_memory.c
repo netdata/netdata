@@ -16,7 +16,7 @@ static netdata_ebpfgo_shared_pid_memory_t cgroup_ebpfgo_shared_memory_ctx = {
  *
  * divisor is the dimension divisor: pass the publisher's interval to turn a
  * per-interval delta into a rate, or 1 for an absolute value. */
-void cgroup_ebpfgo_update_single_chart(
+void cgroup_ebpfgo_update_single_chart_named(
     struct cgroup *cg,
     RRDSET **chart_ptr,
     const char *chart_id,
@@ -24,6 +24,7 @@ void cgroup_ebpfgo_update_single_chart(
     const char *family,
     const char *context,
     const char *dimension,
+    const char *dimension_name,
     const char *units,
     int priority,
     collected_number divisor,
@@ -48,7 +49,7 @@ void cgroup_ebpfgo_update_single_chart(
             RRDSET_TYPE_LINE);
 
         rrdset_update_rrdlabels(chart, cg->chart_labels);
-        rrddim_add(chart, dimension, NULL, 1, divisor ? divisor : 1, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(chart, dimension, dimension_name, 1, divisor ? divisor : 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set(chart, dimension, value);

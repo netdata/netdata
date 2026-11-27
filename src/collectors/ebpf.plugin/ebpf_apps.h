@@ -34,7 +34,6 @@
 #define EBPF_CLEANUP_FACTOR 2
 
 enum ebpf_main_index {
-    EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SYNC_IDX,
     EBPF_MODULE_SWAP_IDX,
     EBPF_MODULE_VFS_IDX,
@@ -77,7 +76,6 @@ struct ebpf_target {
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_publish_shm_t shm;
-    ebpf_process_stat_t process;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
@@ -127,7 +125,6 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_swap_t *swap;
     netdata_publish_shm_t *shm;
     netdata_publish_vfs_t *vfs;
-    ebpf_publish_process_t *process;
 
 } ebpf_pid_data_t;
 
@@ -178,7 +175,6 @@ typedef struct ebpf_pid_stat {
     int sortlist; // higher numbers = top on the process tree
 
     // each process gets a unique number
-    ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
@@ -252,8 +248,6 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
 int get_pid_comm(pid_t pid, size_t n, char *dest);
 
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
-void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
@@ -264,7 +258,6 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
 // ARAL Sectiion
 void ebpf_aral_init(void);
-extern ebpf_process_stat_t *process_stat_vector;
 
 extern ARAL *ebpf_aral_vfs_pid;
 void ebpf_vfs_aral_init();

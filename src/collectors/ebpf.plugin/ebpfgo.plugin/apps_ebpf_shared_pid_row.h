@@ -13,7 +13,9 @@
 #define TASK_COMM_LEN 16
 #endif
 
-/* v6: fd_update_every_s added to ebpf_publish_fd_stat.  fd consumers publish
+/* v7: process_update_every_s added to ebpf_process_stat.  process consumers
+ *     normalize per-interval deltas to rates, like fd.
+ * v6: fd_update_every_s added to ebpf_publish_fd_stat.  fd consumers publish
  *     interval totals, so their divisor cannot be inferred from the shared
  *     segment owner.
  * v5: dcstat_update_every_s added to ebpf_publish_dcstat.  It is retained for
@@ -23,8 +25,8 @@
  *     at offset 24 (still 8-byte aligned for the uint64_t fields in ebpf_pid_stat).
  * v2: update_every_s replaced _pad; header grew from 8 to 16 bytes.
  * Version suffix ensures old consumers never map the new layout at the wrong offset. */
-#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v6"
-#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v6"
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v7"
+#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v7"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
  * immediately.  sizeof == 24 so entries start on an 8-byte boundary, which
@@ -51,6 +53,11 @@ struct ebpfgo_shm_header {
  * mode.  Consumers are separate processes and cannot see fd's config, so this bit
  * is what tells them whether the *_err fields may be charted. */
 #define EBPFGO_SHM_FLAG_FD_ERRORS 0x10u
+#define EBPFGO_SHM_FLAG_PROCESS   0x20u /* process per-PID fields are valid */
+/* Set alongside EBPFGO_SHM_FLAG_PROCESS when process runs with `ebpf load mode =
+ * return`: task_err is always counted, but the error charts exist only in
+ * `return` mode, as with EBPFGO_SHM_FLAG_FD_ERRORS. */
+#define EBPFGO_SHM_FLAG_PROCESS_ERRORS 0x40u
 
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;
@@ -105,6 +112,7 @@ struct ebpf_process_stat {
     uint32_t create_process;
     uint32_t create_thread;
     uint32_t task_err;
+    uint32_t process_update_every_s; /* process collection interval for these deltas */
 };
 
 struct ebpf_publish_shm {

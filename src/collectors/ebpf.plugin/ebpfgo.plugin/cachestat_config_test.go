@@ -11,7 +11,7 @@ func TestCachestatTargetResolutionFailureRemainsALoadFailure(t *testing.T) {
 	resolveOptionalCachestatTargets(&cfg, func() (CachestatTargets, error) {
 		return CachestatTargets{}, targetErr
 	})
-	if !cfg.Enabled || !anyProgramEnabled(cfg, DCStatLegacyConfig{}, FDLegacyConfig{}, SocketLegacyConfig{}, DNSLegacyConfig{}) {
+	if !cfg.Enabled || !anyProgramEnabled(cfg, DCStatLegacyConfig{}, FDLegacyConfig{}, SocketLegacyConfig{}, DNSLegacyConfig{}, ProcessLegacyConfig{}) {
 		t.Fatal("target lookup failure was mistaken for disabled configuration")
 	}
 	if !errors.Is(cfg.TargetResolutionErr, targetErr) {

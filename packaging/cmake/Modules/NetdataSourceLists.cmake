@@ -717,6 +717,9 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_fd.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_process.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_rate.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_rate.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h

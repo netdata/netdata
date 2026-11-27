@@ -38,7 +38,6 @@ set(EBPF_PLUGIN_FILES
         src/collectors/ebpf.plugin/ebpf_filesystem.h
         src/collectors/ebpf.plugin/ebpf_oomkill.c
         src/collectors/ebpf.plugin/ebpf_oomkill.h
-        src/collectors/ebpf.plugin/ebpf_process.c
         src/collectors/ebpf.plugin/ebpf_process.h
         src/collectors/ebpf.plugin/ebpf_shm.c
         src/collectors/ebpf.plugin/ebpf_shm.h

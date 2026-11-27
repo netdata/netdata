@@ -18,6 +18,8 @@ type FDRuntime struct{}
 
 type SocketRuntime struct{}
 
+type ProcessRuntime struct{}
+
 func OpenObject(path string) (*Object, error) {
 	return nil, ErrDisabled
 }
@@ -250,6 +252,47 @@ func (r *SocketRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
 
+// ProcessRuntimeSupportsCore mirrors the libbpf build's probe; without libbpf
+// there are no process CO-RE skeletons compiled in.
+func ProcessRuntimeSupportsCore() bool {
+	return false
+}
+
+func ProcessRuntimeOpenMode(path string, useCore bool, customBTFPath string) (*ProcessRuntime, error) {
+	_ = customBTFPath
+	return newDisabledRuntime[ProcessRuntime](path, useCore)
+}
+
+func (r *ProcessRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+	_, _ = pidTableSize, mapsPerCore
+	return ErrDisabled
+}
+
+func (r *ProcessRuntime) Load() error { return ErrDisabled }
+
+func (r *ProcessRuntime) Attach() error { return ErrDisabled }
+
+func (r *ProcessRuntime) UpdateController(appsEnabled bool, appsLevel int) error {
+	_, _ = appsEnabled, appsLevel
+	return ErrDisabled
+}
+
+func (r *ProcessRuntime) Snapshot(mapsPerCore bool) (ProcessSnapshot, error) {
+	_ = mapsPerCore
+	return ProcessSnapshot{}, ErrDisabled
+}
+
+func (r *ProcessRuntime) SnapshotApps(mapsPerCore bool) ([]ProcessAppSnapshot, error) {
+	_ = mapsPerCore
+	return nil, ErrDisabled
+}
+
+func (r *ProcessRuntime) DeletePids(pids []uint32) error { _ = pids; return ErrDisabled }
+
+func (r *ProcessRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
+}
+
 // DNSRuntime disabled stubs — mirrored from dns_libbpf.go (netdata_ebpf_libbpf build).
 
 type DNSRuntime struct{}
@@ -281,3 +324,4 @@ func (r *CachestatRuntime) ArenaDropped() uint64 { return 0 }
 func (r *DCStatRuntime) ArenaDropped() uint64    { return 0 }
 func (r *FDRuntime) ArenaDropped() uint64        { return 0 }
 func (r *SocketRuntime) ArenaDropped() uint64    { return 0 }
+func (r *ProcessRuntime) ArenaDropped() uint64   { return 0 }

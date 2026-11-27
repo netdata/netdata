@@ -450,8 +450,9 @@ REVIEWED_DESCRIPTION_TARGETS = {
     "debugfs.plugin-audit-Linux_Audit_Subsystem": (
         "Monitor Linux kernel audit status, backlog utilization, lost events, failure mode, and enabled state."
     ),
-    "ebpf.plugin-processes-eBPF_Processes": (
-        "Monitor Linux process and thread creation by tracing kernel task-creation functions with eBPF."
+    "ebpf-go.plugin-process-eBPF_Processes": (
+        "Monitor Linux process and thread creation, exit and release by tracing kernel task-lifecycle functions "
+        "with eBPF."
     ),
     "ebpf.plugin-swap-eBPF_SWAP": (
         "Monitor Linux swap reads and writes by tracing kernel swap I/O functions with eBPF."

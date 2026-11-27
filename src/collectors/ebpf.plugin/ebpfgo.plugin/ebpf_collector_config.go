@@ -15,8 +15,8 @@ type collectorCommonConfig struct {
 	ObjectFlavor   *string
 	LoadMethod     *LoadMethod
 	AppsLevel      *int
-	// ReturnMode receives `ebpf load mode`.  Only fd passes it: it is the only
-	// module whose charts differ between `entry` and `return`.
+	// ReturnMode receives `ebpf load mode`.  Only fd and process pass it: they
+	// are the only modules whose charts differ between `entry` and `return`.
 	ReturnMode *bool
 }
 

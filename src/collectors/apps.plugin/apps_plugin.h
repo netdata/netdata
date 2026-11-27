@@ -40,6 +40,14 @@ struct apps_ebpf_fd_totals {
     uint64_t open_err;
     uint64_t close_err;
 };
+
+struct apps_ebpf_process_totals {
+    uint64_t process_create;
+    uint64_t thread_create;
+    uint64_t task_exit;
+    uint64_t task_close;
+    uint64_t task_error;
+};
 #endif
 
 #define OS_FUNC_CONCAT(a, b) a##b
@@ -353,6 +361,8 @@ typedef enum __attribute__((packed)) {
     TARGET_CHARTS_EBPF_DCSTAT       = (1 << 3),
     TARGET_CHARTS_EBPF_FD           = (1 << 4),
     TARGET_CHARTS_EBPF_FD_ERRORS    = (1 << 5),
+    TARGET_CHARTS_EBPF_PROCESS      = (1 << 6),
+    TARGET_CHARTS_EBPF_PROCESS_ERRORS = (1 << 7),
 } TARGET_CHARTS;
 
 typedef enum __attribute__((packed)) {
@@ -475,6 +485,7 @@ struct target {
     kernel_uint_t uptime_max;
 
 #if defined(OS_LINUX)
+    struct apps_ebpf_process_totals process;
     struct ebpf_publish_cachestat cachestat;
     struct apps_ebpf_cachestat_totals cachestat_totals;
     struct apps_ebpf_cachestat_totals cachestat_totals_prev;
@@ -715,6 +726,7 @@ struct pid_stat {
     uint64_t ebpf_dcstat_ct;
     // last fd ct we consumed; gates per-PID delta accumulation
     uint64_t ebpf_fd_ct;
+    uint64_t ebpf_process_ct;
     bool has_ebpf:1;
 #endif
 };
@@ -932,9 +944,13 @@ void apps_ebpf_accumulate_dcstat(void);
 bool apps_ebpf_dcstat_is_available(void);
 bool apps_ebpf_dcstat_data_ready(void);
 void apps_ebpf_accumulate_fd(void);
+void apps_ebpf_accumulate_process(void);
 bool apps_ebpf_fd_is_available(void);
 bool apps_ebpf_fd_data_ready(void);
 bool apps_ebpf_fd_errors_are_available(void);
+bool apps_ebpf_process_data_ready(void);
+bool apps_ebpf_process_is_available(void);
+bool apps_ebpf_process_errors_are_available(void);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------

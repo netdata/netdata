@@ -18,6 +18,7 @@ static netdata_ebpfgo_shared_pid_memory_t apps_ebpf_shared_memory_ctx = {
 static bool apps_ebpf_cachestat_available = false;
 static bool apps_ebpf_dcstat_available = false;
 static bool apps_ebpf_fd_available = false;
+static bool apps_ebpf_process_available = false;
 static uint32_t apps_ebpf_shm_flags = 0;
 
 /* Whether fd is publishing with `ebpf load mode = return`, i.e. whether its
@@ -25,6 +26,9 @@ static uint32_t apps_ebpf_shm_flags = 0;
  * the charts exist they must keep receiving values, and pluginsd logs an error
  * for every SET to a chart that was never declared. */
 static bool apps_ebpf_fd_errors_available = false;
+
+/* process's counterpart of apps_ebpf_fd_errors_available. */
+static bool apps_ebpf_process_errors_available = false;
 
 /* Per-cycle flag: set each cycle to the refresh() return value.  Prevents
  * stale data emission when the producer dies after its first successful
@@ -139,8 +143,29 @@ bool apps_ebpf_shared_memory_refresh(void)
             if (flags & EBPFGO_SHM_FLAG_FD_ERRORS)
                 apps_ebpf_fd_errors_available = true;
         }
+        if (flags & EBPFGO_SHM_FLAG_PROCESS) {
+            apps_ebpf_process_available = true;
+            if (flags & EBPFGO_SHM_FLAG_PROCESS_ERRORS)
+                apps_ebpf_process_errors_available = true;
+        }
     }
     return ok;
+}
+
+bool apps_ebpf_process_data_ready(void)
+{
+    return apps_ebpf_process_available && apps_ebpf_last_refresh_ok &&
+           (apps_ebpf_shm_flags & EBPFGO_SHM_FLAG_PROCESS);
+}
+
+bool apps_ebpf_process_is_available(void)
+{
+    return apps_ebpf_process_available;
+}
+
+bool apps_ebpf_process_errors_are_available(void)
+{
+    return apps_ebpf_process_errors_available;
 }
 
 bool apps_ebpf_cachestat_data_ready(void)
@@ -263,6 +288,39 @@ void apps_ebpf_accumulate_fd(void)
 #endif
 
         p->ebpf_fd_ct = p->ebpf.fd.ct;
+    }
+}
+
+/* Sums the per-PID process deltas the Go plugin published into each app target.
+ *
+ * The totals are MONOTONIC, not per-interval: the process charts use the
+ * incremental algorithm, as in apps_ebpf_accumulate_fd().  The charts exist for
+ * the app family only, so only p->target is fed. */
+void apps_ebpf_accumulate_process(void)
+{
+    for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
+        if (unlikely(!p->has_ebpf || !p->updated))
+            continue;
+
+        struct target *w = p->target;
+        if (!w)
+            continue;
+
+        // Reset the ct gate on regression (Go plugin restart, map reset, SHM
+        // inode swap, PID reuse) so deltas are not permanently suppressed.
+        if (p->ebpf.process.ct < p->ebpf_process_ct)
+            p->ebpf_process_ct = 0;
+
+        if (p->ebpf.process.ct <= p->ebpf_process_ct)
+            continue;
+
+        w->process.process_create += p->ebpf.process.create_process;
+        w->process.thread_create += p->ebpf.process.create_thread;
+        w->process.task_exit += p->ebpf.process.exit_call;
+        w->process.task_close += p->ebpf.process.release_call;
+        w->process.task_error += p->ebpf.process.task_err;
+
+        p->ebpf_process_ct = p->ebpf.process.ct;
     }
 }
 

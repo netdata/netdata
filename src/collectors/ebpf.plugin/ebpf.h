@@ -43,7 +43,6 @@ extern size_t ebpf_hash_table_pids_count;
 #include "mdflush.skel.h"
 #include "mount.skel.h"
 #include "oomkill.skel.h"
-#include "process.skel.h"
 #include "shm.skel.h"
 #include "softirq.skel.h"
 #include "sync.skel.h"
@@ -61,7 +60,6 @@ extern struct softirq_bpf *softirq_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
-extern struct process_bpf *process_bpf_obj;
 #endif
 
 void ebpf_oomkill_unload_bpf(ebpf_module_t *em);
@@ -184,7 +182,6 @@ typedef struct ebpf_tracepoint {
 enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
 
 // Threads
-void ebpf_process_thread(void *ptr);
 
 // Common variables
 extern netdata_mutex_t lock;
@@ -289,7 +286,6 @@ extern const char *btf_path;
 
 // Socket functions and variables
 // Common functions
-void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 
 // BPF teardown callbacks — called by main thread after all module threads have been joined
 void ebpf_unload_legacy_bpf(ebpf_module_t *em); // generic legacy unload helper
