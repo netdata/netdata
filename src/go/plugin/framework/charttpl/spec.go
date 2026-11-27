@@ -156,16 +156,9 @@ type DimensionOptions struct {
 
 // ChartVariable describes one chart-scope variable. Its value is the chart
 // reducer over the series its selector routes to the chart instance in one
-// collection cycle, scaled by Options.
+// collection cycle, sent unscaled: the collector writes the unit its readers
+// expect.
 type ChartVariable struct {
-	Name     string           `yaml:"name"              json:"name"`
-	Selector string           `yaml:"selector"          json:"selector"`
-	Options  *VariableOptions `yaml:"options,omitempty" json:"options,omitempty"`
-}
-
-// VariableOptions scales a chart variable's value. Netdata does not scale
-// variables, so the engine applies value * Multiplier / Divisor; zero means 1.
-type VariableOptions struct {
-	Multiplier int `yaml:"multiplier,omitempty" json:"multiplier,omitempty"`
-	Divisor    int `yaml:"divisor,omitempty"    json:"divisor,omitempty"`
+	Name     string `yaml:"name"     json:"name"`
+	Selector string `yaml:"selector" json:"selector"`
 }

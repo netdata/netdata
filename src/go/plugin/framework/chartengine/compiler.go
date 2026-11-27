@@ -216,22 +216,11 @@ func compileVariable(
 	if err != nil {
 		return program.Variable{}, err
 	}
-	out := program.Variable{
+	return program.Variable{
 		Name:        strings.TrimSpace(variable.Name),
 		Selector:    binding,
 		Aggregation: aggregation,
-		Multiplier:  1,
-		Divisor:     1,
-	}
-	if opts := variable.Options; opts != nil {
-		if opts.Multiplier != 0 {
-			out.Multiplier = opts.Multiplier
-		}
-		if opts.Divisor != 0 {
-			out.Divisor = opts.Divisor
-		}
-	}
-	return out, nil
+	}, nil
 }
 
 // compileSelectorBinding compiles a dimension or variable selector whose metric

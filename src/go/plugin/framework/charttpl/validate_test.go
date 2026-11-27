@@ -1325,12 +1325,8 @@ func TestSpecValidateChartVariables(t *testing.T) {
 		variables []ChartVariable
 		wantErr   string
 	}{
-		"accepts a scaled variable": {
-			variables: []ChartVariable{
-				{Name: "nic_speed_max", Selector: "service_metric", Options: &VariableOptions{
-					Divisor: 1000,
-				}},
-			},
+		"accepts a variable": {
+			variables: []ChartVariable{{Name: "nic_speed_max", Selector: "service_metric"}},
 		},
 		"accepts a leading underscore and digits": {
 			variables: []ChartVariable{{Name: "_limit2", Selector: `service_metric{kind="max"}`}},

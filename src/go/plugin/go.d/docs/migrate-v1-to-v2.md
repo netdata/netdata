@@ -220,8 +220,8 @@ every variable an alert reads:
 - **Value source.** The V1 map key becomes a gauge written every cycle and selected by the variable's `selector`. A
   per-instance variable's gauge carries the chart's instance identity labels, the way V1 formatted the chart's instance
   into the variable ID. A configuration value, such as a threshold, is also written as a gauge every cycle.
-- **Scale.** V1 collectors scaled values themselves; a V2 gauge keeps its base unit and the variable scales it with
-  `options.multiplier`/`options.divisor` when the alert expects another unit.
+- **Unit.** Variables are sent unscaled, so the gauge is written in the unit the alert expects, as V1 collectors already
+  wrote it into their maps.
 - **Initial value.** V1 defines a new chart's variables with `Var.Value` (usually 0); V2 defines them as `nan` (unknown)
   until the first value arrives in the same or a later cycle. An alert that depends on the V1 initial value MUST be
   recorded in the compatibility manifest and decided with the user.

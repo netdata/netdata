@@ -72,7 +72,7 @@ type UpdateDimensionValue struct {
 }
 
 // UpdateVariableValue carries one chart variable value for UPDATE emission.
-// Value is already scaled and may be non-finite (unknown).
+// Value may be non-finite (unknown).
 type UpdateVariableValue struct {
 	Name  string
 	Value float64

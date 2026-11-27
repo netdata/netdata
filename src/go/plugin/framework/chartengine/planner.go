@@ -1154,8 +1154,8 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 	return nil
 }
 
-// chartVariableValues returns, in declaration order, the scaled values of the
-// chart's declared variables that received series in this build, as a
+// chartVariableValues returns, in declaration order, the values of the chart's
+// declared variables that received series in this build, as a
 // capacity-limited window of the build's variable value block.
 func (ctx *planBuildContext) chartVariableValues(cs *chartState) []UpdateVariableValue {
 	if len(ctx.variables) == 0 {
@@ -1177,13 +1177,12 @@ func (ctx *planBuildContext) chartVariableValues(cs *chartState) []UpdateVariabl
 			continue
 		}
 		variable := &declared[i]
-		value := entry.value * float64(variable.Multiplier) / float64(variable.Divisor)
 		if ctx.variableValues == nil {
 			ctx.variableValues = make([]UpdateVariableValue, 0, max(ctx.variableHints[1], len(declared)))
 		}
 		ctx.variableValues = append(ctx.variableValues, UpdateVariableValue{
 			Name:  variable.Name,
-			Value: value,
+			Value: entry.value,
 		})
 		if ctx.routeObserver != nil {
 			entry.attached = true
@@ -1196,8 +1195,6 @@ func (ctx *planBuildContext) chartVariableValues(cs *chartState) []UpdateVariabl
 				VariableName:    variable.Name,
 				Context:         cs.meta.Context,
 				Aggregation:     diagnosticAggregation(variable.Aggregation),
-				Multiplier:      variable.Multiplier,
-				Divisor:         variable.Divisor,
 			})
 		}
 	}

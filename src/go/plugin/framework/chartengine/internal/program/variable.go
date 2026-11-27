@@ -14,10 +14,6 @@ type Variable struct {
 	Selector SelectorBinding
 	// Aggregation is the chart's reducer for several series in one build.
 	Aggregation Aggregation
-	// Multiplier and Divisor scale the reduced value before emission; both are
-	// non-zero after compilation.
-	Multiplier int
-	Divisor    int
 }
 
 func validateVariable(variable Variable) error {
@@ -30,9 +26,6 @@ func validateVariable(variable Variable) error {
 	}
 	if variable.Selector.Matcher == nil {
 		errs = append(errs, fmt.Errorf("selector matcher is required"))
-	}
-	if variable.Multiplier == 0 || variable.Divisor == 0 {
-		errs = append(errs, fmt.Errorf("multiplier and divisor must be non-zero"))
 	}
 	switch variable.Aggregation {
 	case AggregationSum, AggregationMin, AggregationMax, AggregationAvg:

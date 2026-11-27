@@ -27,7 +27,7 @@ engine:
 groups:
   - family: net
     context_namespace: net
-    metrics: [net_received_bytes, net_speed_bits]
+    metrics: [net_received_bytes, net_speed_kbits]
     charts:
       - context: net
         title: Bandwidth
@@ -40,14 +40,9 @@ groups:
             name: received
         variables:
           - name: nic_speed_max
-            selector: net_speed_bits
-            options:
-              divisor: 1000
-          - name: nic_speed_bytes
-            selector: net_speed_bits
-            options:
-              multiplier: 1
-              divisor: 8
+            selector: net_speed_kbits
+          - name: link_speed
+            selector: net_speed_kbits
 `
 
 type variableObservation struct {
@@ -69,26 +64,26 @@ func TestApplyPlanChartVariables(t *testing.T) {
 		cycles [][]variableObservation
 		want   [][]string
 	}{
-		"creation presets nan after dimensions, then the scaled value is set inside the update": {
+		"creation presets nan after dimensions, then the value is set inside the update": {
 			cycles: [][]variableObservation{{
 				deviceObs("net_received_bytes", "eth0", 100),
-				deviceObs("net_speed_bits", "eth0", 1e9),
+				deviceObs("net_speed_kbits", "eth0", 1e6),
 			}},
 			want: [][]string{{
 				"CHART collector.job.net_net_eth0",
 				"DIMENSION received",
 				"VARIABLE CHART 'nic_speed_max' = nan",
-				"VARIABLE CHART 'nic_speed_bytes' = nan",
+				"VARIABLE CHART 'link_speed' = nan",
 				"BEGIN collector.job.net_net_eth0",
 				"SET 'received' = 100",
 				"VARIABLE CHART 'nic_speed_max' = 1000000",
-				"VARIABLE CHART 'nic_speed_bytes' = 125000000",
+				"VARIABLE CHART 'link_speed' = 1000000",
 				"END",
 			}},
 		},
 		"a cycle without the variable series sends no variable": {
 			cycles: [][]variableObservation{
-				{deviceObs("net_received_bytes", "eth0", 100), deviceObs("net_speed_bits", "eth0", 1e9)},
+				{deviceObs("net_received_bytes", "eth0", 100), deviceObs("net_speed_kbits", "eth0", 1e6)},
 				{deviceObs("net_received_bytes", "eth0", 200)},
 			},
 			want: [][]string{
@@ -104,38 +99,38 @@ func TestApplyPlanChartVariables(t *testing.T) {
 			cycles: [][]variableObservation{{
 				deviceObs("net_received_bytes", "eth0", 100),
 				deviceObs("net_received_bytes", "eth1", 300),
-				deviceObs("net_speed_bits", "eth1", 1e8),
-				deviceObs("net_speed_bits", "eth0", 1e9),
+				deviceObs("net_speed_kbits", "eth1", 1e5),
+				deviceObs("net_speed_kbits", "eth0", 1e6),
 			}},
 			want: [][]string{{
 				"CHART collector.job.net_net_eth0",
 				"DIMENSION received",
 				"VARIABLE CHART 'nic_speed_max' = nan",
-				"VARIABLE CHART 'nic_speed_bytes' = nan",
+				"VARIABLE CHART 'link_speed' = nan",
 				"CHART collector.job.net_net_eth1",
 				"DIMENSION received",
 				"VARIABLE CHART 'nic_speed_max' = nan",
-				"VARIABLE CHART 'nic_speed_bytes' = nan",
+				"VARIABLE CHART 'link_speed' = nan",
 				"BEGIN collector.job.net_net_eth0",
 				"SET 'received' = 100",
 				"VARIABLE CHART 'nic_speed_max' = 1000000",
-				"VARIABLE CHART 'nic_speed_bytes' = 125000000",
+				"VARIABLE CHART 'link_speed' = 1000000",
 				"END",
 				"BEGIN collector.job.net_net_eth1",
 				"SET 'received' = 300",
 				"VARIABLE CHART 'nic_speed_max' = 100000",
-				"VARIABLE CHART 'nic_speed_bytes' = 12500000",
+				"VARIABLE CHART 'link_speed' = 100000",
 				"END",
 			}},
 		},
 		"several series of one instance reduce with the chart aggregation": {
 			cycles: [][]variableObservation{{
 				deviceObs("net_received_bytes", "eth0", 100),
-				deviceObs("net_speed_bits", "eth0", 1e8, metrix.Label{
+				deviceObs("net_speed_kbits", "eth0", 1e5, metrix.Label{
 					Key:   "port",
 					Value: "a",
 				}),
-				deviceObs("net_speed_bits", "eth0", 1e9, metrix.Label{
+				deviceObs("net_speed_kbits", "eth0", 1e6, metrix.Label{
 					Key:   "port",
 					Value: "b",
 				}),
@@ -144,37 +139,37 @@ func TestApplyPlanChartVariables(t *testing.T) {
 				"CHART collector.job.net_net_eth0",
 				"DIMENSION received",
 				"VARIABLE CHART 'nic_speed_max' = nan",
-				"VARIABLE CHART 'nic_speed_bytes' = nan",
+				"VARIABLE CHART 'link_speed' = nan",
 				"BEGIN collector.job.net_net_eth0",
 				"SET 'received' = 100",
 				"VARIABLE CHART 'nic_speed_max' = 1000000",
-				"VARIABLE CHART 'nic_speed_bytes' = 125000000",
+				"VARIABLE CHART 'link_speed' = 1000000",
 				"END",
 			}},
 		},
 		"a variable never creates a chart and its series never falls back to autogen": {
 			cycles: [][]variableObservation{{
-				deviceObs("net_speed_bits", "eth0", 1e9),
+				deviceObs("net_speed_kbits", "eth0", 1e6),
 			}},
 			want: [][]string{nil},
 		},
 		"a variable series without the identity labels binds to no chart and falls back like a dimension series": {
 			cycles: [][]variableObservation{{
 				deviceObs("net_received_bytes", "eth0", 100),
-				{metric: "net_speed_bits", value: 1e9},
+				{metric: "net_speed_kbits", value: 1e6},
 			}},
 			want: [][]string{{
 				"CHART collector.job.net_net_eth0",
 				"DIMENSION received",
 				"VARIABLE CHART 'nic_speed_max' = nan",
-				"VARIABLE CHART 'nic_speed_bytes' = nan",
-				"CHART collector.job.net_speed_bits",
-				"DIMENSION net_speed_bits",
+				"VARIABLE CHART 'link_speed' = nan",
+				"CHART collector.job.net_speed_kbits",
+				"DIMENSION net_speed_kbits",
 				"BEGIN collector.job.net_net_eth0",
 				"SET 'received' = 100",
 				"END",
-				"BEGIN collector.job.net_speed_bits",
-				"SET 'net_speed_bits' = 1000000000",
+				"BEGIN collector.job.net_speed_kbits",
+				"SET 'net_speed_kbits' = 1000000",
 				"END",
 			}},
 		},

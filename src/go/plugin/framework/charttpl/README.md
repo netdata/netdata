@@ -933,17 +933,12 @@ value, such as an interface speed or a configured limit.
 variables:
   - name: <variable name>
     selector: <metric selector>
-    options:
-      multiplier: <int>
-      divisor: <int>
 ```
 
-| Field                | Type   | Required | Default | Description                                                               |
-|----------------------|--------|----------|---------|---------------------------------------------------------------------------|
-| `name`               | string | **yes**  |         | The name alerts read as `$name`.                                          |
-| `selector`           | string | **yes**  |         | Metric selector, with the same rules as a [dimension selector](#selectors). |
-| `options.multiplier` | int    | no       | `1`     | Multiply the value by this factor before sending it.                      |
-| `options.divisor`    | int    | no       | `1`     | Divide the value by this factor before sending it.                        |
+| Field      | Type   | Required | Description                                                                  |
+|------------|--------|----------|------------------------------------------------------------------------------|
+| `name`     | string | **yes**  | The name alerts read as `$name`.                                             |
+| `selector` | string | **yes**  | Metric selector, with the same rules as a [dimension selector](#selectors).  |
 
 **Binding.** A series that matches the selector belongs to the chart instance that its own labels select through the
 chart's `instances`, exactly as a dimension series would. The variable series must therefore carry the same identity
@@ -951,9 +946,10 @@ label values as the chart's dimension series; with `by_labels: ["*"]`, `!key` or
 same identity label set. A series without the required identity labels binds to no chart and is treated like any
 unmatched series (autogen, when enabled).
 
-**Value.** The chart's `aggregation` reduces the variable's series of one collection cycle (default `sum`), then the
-value is multiplied and divided by the options; Netdata does not scale variables itself. Feed variables from gauges: a
-counter gives its running total, and a histogram or stateset selector is reduced across its buckets or states.
+**Value.** The chart's `aggregation` reduces the variable's series of one collection cycle (default `sum`), and the
+result is sent as it is: variables have no multiplier or divisor, and Netdata stores them as doubles. Write the gauge in
+the unit the alert expects. Feed variables from gauges: a counter gives its running total, and a histogram or stateset
+selector is reduced across its buckets or states.
 
 **What a variable does not do.** It never creates a chart or a dimension, never changes chart labels or label promotion,
 and does not count toward [output limits](/src/go/plugin/framework/chartengine/README.md#output-limit-per-context). Its
@@ -991,10 +987,8 @@ charts:
       - selector: network_received_bytes
         name: received
     variables:
-      - name: nic_speed_max            # kilobits/s, read as $nic_speed_max
-        selector: network_speed_bits_per_second
-        options:
-          divisor: 1000
+      - name: nic_speed_max            # read as $nic_speed_max
+        selector: network_speed_kilobits_per_second   # a gauge the collector writes in kilobits/s
 ```
 
 Prometheus, Azure Monitor and CloudWatch profiles reject `variables`: their selector rewriting and validation handle

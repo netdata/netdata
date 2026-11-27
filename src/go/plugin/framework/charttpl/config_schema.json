@@ -466,21 +466,6 @@
         "selector": {
           "type": "string",
           "minLength": 1
-        },
-        "options": {
-          "$ref": "#/$defs/variable_options"
-        }
-      }
-    },
-    "variable_options": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "multiplier": {
-          "type": "integer"
-        },
-        "divisor": {
-          "type": "integer"
         }
       }
     }

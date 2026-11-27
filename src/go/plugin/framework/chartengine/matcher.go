@@ -32,7 +32,7 @@ type routeBinding struct {
 	Inferred          bool
 	Autogen           bool
 	// Variable marks a chart variable route: it carries only the chart identity,
-	// variable index, reducer and scale, and never creates a chart or dimension.
+	// variable index and reducer, and never creates a chart or dimension.
 	Variable    bool
 	Aggregation program.Aggregation
 	Meta        program.ChartMeta
@@ -440,8 +440,6 @@ func appendVariableRoutes(
 				DimensionIndex:  candidate.variableIndex,
 				Variable:        true,
 				Aggregation:     variable.Aggregation,
-				Multiplier:      variable.Multiplier,
-				Divisor:         variable.Divisor,
 			})
 		}
 	}

@@ -755,7 +755,7 @@ groups:
 	}
 }
 
-func TestDecodeYAMLRejectsDimensionOnlyVariableOptions(t *testing.T) {
+func TestDecodeYAMLRejectsVariableOptions(t *testing.T) {
 	const tmpl = `
 version: v1
 groups:
@@ -772,11 +772,11 @@ groups:
           - name: nic_speed_max
             selector: speed_bits
             options:
-              hidden: true
+              divisor: 1000
 `
 	_, err := DecodeYAML([]byte(tmpl))
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "hidden")
+	assert.ErrorContains(t, err, "options")
 }
 
 func TestConfigSchemaChartVariables(t *testing.T) {
@@ -794,12 +794,13 @@ func TestConfigSchemaChartVariables(t *testing.T) {
 		"name and selector": {
 			variables: []any{map[string]any{"name": "nic_speed_max", "selector": "service_metric"}},
 		},
-		"scale options": {
+		"options": {
 			variables: []any{map[string]any{
 				"name":     "nic_speed_max",
 				"selector": "service_metric",
-				"options":  map[string]any{"multiplier": 8, "divisor": 1000},
+				"options":  map[string]any{"divisor": 1000},
 			}},
+			wantErr: true,
 		},
 		"missing selector": {
 			variables: []any{map[string]any{"name": "nic_speed_max"}},
@@ -812,14 +813,6 @@ func TestConfigSchemaChartVariables(t *testing.T) {
 		"name with a dot": {
 			variables: []any{map[string]any{"name": "nic.speed", "selector": "service_metric"}},
 			wantErr:   true,
-		},
-		"dimension-only option": {
-			variables: []any{map[string]any{
-				"name":     "nic_speed_max",
-				"selector": "service_metric",
-				"options":  map[string]any{"float": true},
-			}},
-			wantErr: true,
 		},
 		"unknown field": {
 			variables: []any{map[string]any{"name": "nic_speed_max", "selector": "service_metric", "value": 1}},

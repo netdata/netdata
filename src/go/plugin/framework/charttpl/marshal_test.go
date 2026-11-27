@@ -257,8 +257,6 @@ groups:
         variables:
           - name: nic_speed_max
             selector: speed_bits
-            options:
-              divisor: 1000
           - name: link_capacity
             selector: speed_bits
 `

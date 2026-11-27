@@ -26,7 +26,6 @@ func TestGroupClone(t *testing.T) {
 	require.NotSame(t, orig.Charts[0].Lifecycle.Dimensions, clone.Charts[0].Lifecycle.Dimensions)
 	require.NotSame(t, orig.Charts[0].Dimensions[0].Options, clone.Charts[0].Dimensions[0].Options)
 	require.NotSame(t, orig.Groups[0].Charts[0].Dimensions[0].Options, clone.Groups[0].Charts[0].Dimensions[0].Options)
-	require.NotSame(t, orig.Charts[0].Variables[0].Options, clone.Charts[0].Variables[0].Options)
 
 	// aggressively mutate every reference-typed field reachable from the clone
 	clone.Family = "MUTATED"
@@ -45,7 +44,6 @@ func TestGroupClone(t *testing.T) {
 	clone.Charts[0].Dimensions[0].Name = "MUTATED"
 	clone.Charts[0].Dimensions[0].Options.Multiplier = 999
 	clone.Charts[0].Variables[0].Name = "mutated"
-	clone.Charts[0].Variables[0].Options.Divisor = 999
 	clone.Groups[0].Family = "MUTATED"
 	clone.Groups[0].Metrics[0] = "mutated"
 	clone.Groups[0].Charts[0].Dimensions[0].Options.Divisor = 999
@@ -113,10 +111,6 @@ func richGroup() Group {
 					{
 						Name:     "a_limit",
 						Selector: "metric_a",
-						Options: &VariableOptions{
-							Multiplier: 8,
-							Divisor:    1000,
-						},
 					},
 				},
 			},

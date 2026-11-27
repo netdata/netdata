@@ -250,7 +250,7 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 | `CreateChartAction`     | Materialize chart instance (with chart metadata and labels); `Variables` names the chart variables to define as `nan` after its dimensions |
 | `CreateDimensionAction` | Materialize dimension for a chart                                                                                                    |
 | `UpdateChartLabelsAction` | Re-emit chart metadata and replace chart labels                                                                                   |
-| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0); `Variables` carries the scaled values of the chart variables that received series |
+| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0); `Variables` carries the values of the chart variables that received series |
 | `RemoveDimensionAction` | Obsolete one dimension                                                                                                               |
 | `RemoveChartAction`     | Obsolete one chart                                                                                                                   |
 

@@ -118,8 +118,8 @@ a *leaf* is the innermost family that holds charts.
 - Declare a chart variable only for an alert that reads it as `$name` (a stock alert on a shared context, or the
   collector's own); format, binding and wire behavior are owned by
   `src/go/plugin/framework/charttpl/README.md#7-variables`.
-- Feed it from a gauge in its base unit that carries the chart's instance identity labels, and scale it with
-  `options.multiplier`/`options.divisor`; the reduction is the chart's `aggregation`.
+- Feed it from a gauge written in the unit the alert expects that carries the chart's instance identity labels;
+  variables are not scaled, and the reduction is the chart's `aggregation`.
 
 ## Labels
 

@@ -276,12 +276,9 @@ func TestTemplateTransitionComparesChartVariables(t *testing.T) {
 		Name:     "limit",
 		Selector: "speed_limit",
 	}
-	scaled := charttpl.ChartVariable{
+	filtered := charttpl.ChartVariable{
 		Name:     "limit",
-		Selector: "speed_limit",
-		Options: &charttpl.VariableOptions{
-			Divisor: 1000,
-		},
+		Selector: `speed_limit{kind="max"}`,
 	}
 	tests := map[string]struct {
 		next         TemplateEntry
@@ -290,8 +287,8 @@ func TestTemplateTransitionComparesChartVariables(t *testing.T) {
 		"identical entry from a separate set keeps the chart": {
 			next: netEntry("net", limit),
 		},
-		"changed variable scale re-creates the chart": {
-			next:         netEntry("net", scaled),
+		"changed variable selector re-creates the chart": {
+			next:         netEntry("net", filtered),
 			wantRecreate: true,
 		},
 	}

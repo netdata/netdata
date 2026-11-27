@@ -30,8 +30,6 @@ VARIABLES`
 const benchVariablesBlock = `        variables:
           - name: speed
             selector: bench_speed
-            options:
-              divisor: 1000
           - name: limit
             selector: bench_limit
 `
