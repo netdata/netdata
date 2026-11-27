@@ -407,8 +407,9 @@ items below:
    A scripted producer gives that runtime controlled inputs: an Agent with the private state of item 1, `db = ram`,
    `stock health config` pointing at the changed `health.d`, and `enable running new plugins = no` plus one script
    that speaks `src/plugins.d/README.md` (`HOST_DEFINE`/`HOST_LABEL` for host-label filters, real or job-prefixed
-   chart IDs, `BEGIN`/`SET`/`END` in timed phases). `/host/<node>/api/v1/alarm_log` then shows every transition,
-   hysteresis holds included.
+   chart IDs, `BEGIN`/`SET`/`END` in timed phases). `/host/<node>/api/v1/alarm_log` records status changes only; a
+   hysteresis hold writes no entry. Confirm a hold by sampling `/host/<node>/api/v1/alarms?all` during its phase:
+   `value` in the hold band, the same `status` and `last_status_change`, and an advancing `last_updated`.
 4. For an expression that relies on `NaN`, test the evaluator result directly. Check both direct `NaN` propagation and any
    comparison/conditional branch; do not infer the result from ordinary floating-point intuition.
 5. Run collector/profile validation when the alert depends on a collector or profile change. Include source absence and
