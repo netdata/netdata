@@ -242,8 +242,7 @@ collection-failure alert or replace a known-obsolete chart's `REMOVED` lifecycle
 ### Current State
 
 Use `calc` when the source's current value is the full condition. Test start-up, missing input, normal recovery, and chart
-obsoletion separately. `delay:` controls notification hysteresis, not the evaluated alert state; it is not a substitute
-for a Prometheus `for:` duration.
+obsoletion separately.
 
 ### Event Counts
 
@@ -405,6 +404,11 @@ items below:
    `windowComplete` flag or label skipped NULLs as continuous evaluation. Cover startup, active transition, normal zero
    recovery, a true all-null query, partial-null behavior, stale non-runnable behavior, collection resumption, known
    disappearance/`REMOVED`, and label identity.
+   A scripted producer gives that runtime controlled inputs: an Agent with the private state of item 1, `db = ram`,
+   `stock health config` pointing at the changed `health.d`, and `enable running new plugins = no` plus one script
+   that speaks `src/plugins.d/README.md` (`HOST_DEFINE`/`HOST_LABEL` for host-label filters, real or job-prefixed
+   chart IDs, `BEGIN`/`SET`/`END` in timed phases). `/host/<node>/api/v1/alarm_log` then shows every transition,
+   hysteresis holds included.
 4. For an expression that relies on `NaN`, test the evaluator result directly. Check both direct `NaN` propagation and any
    comparison/conditional branch; do not infer the result from ordinary floating-point intuition.
 5. Run collector/profile validation when the alert depends on a collector or profile change. Include source absence and
