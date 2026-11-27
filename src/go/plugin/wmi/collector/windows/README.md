@@ -1,0 +1,1 @@
+integrations/windows_wmi.md

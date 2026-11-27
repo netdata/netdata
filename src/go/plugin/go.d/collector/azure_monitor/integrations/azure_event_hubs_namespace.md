@@ -50,7 +50,7 @@ The service principal or managed identity requires these Azure RBAC roles:
 
 | Role | Purpose | Scope |
 |:-----|:--------|:------|
-| **Monitoring Reader** | Read Azure Monitor metrics | Subscription or resource group |
+| **Monitoring Reader** | Read Azure Monitor metrics through the batch API | Each queried subscription |
 | **Reader** | Query Azure Resource Graph for resource discovery | Subscription or resource group |
 
 
@@ -122,7 +122,7 @@ The collector requires a service principal or managed identity with two Azure RB
 
 | Role | Purpose |
 |:-----|:--------|
-| **Monitoring Reader** | Access Azure Monitor metrics for target resources |
+| **Monitoring Reader** | Read metrics through the batch API in each target subscription |
 | **Reader** | Query Azure Resource Graph for resource discovery |
 
 **Option A: Service principal**
@@ -774,6 +774,35 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep azure_monitor
 ```
 
+### Known Errors
+
+#### Some Azure resources or charts are missing
+
+**Cause**
+
+Discovery may exclude a resource before it reaches an active profile. A matched resource may also have no usable metric values in the requested time window.
+
+
+**Fix**
+
+1. Find the `resource discovery` entry for the expected profile. It appears at startup and when its counts change. Debug mode also shows unchanged refreshes.
+   If the profile is absent, check the resource's Azure type against the [stock profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) and the installed files in `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`. With `profiles.mode: exact`, include the profile in `profiles.mode_exact.entries`. Restart the job if the type first appeared after automatic profile selection at startup.
+2. Compare `candidates` with `matched`. Candidates are resources of that type returned in the job's discovery scope. If candidates are missing, check the subscriptions, the collector identity's Resource Graph visibility, and the global filters or custom KQL. If fewer resources matched, check that profile's filters. Debug output gives sample resource names and UIDs and the first filter that excluded each example.
+3. For matched resources, look for `metrics batch` in debug output. Each batch reports resources with usable samples, returned resources with no usable values (`empty`), and requested resources with no matching response row (`missing`). A positive `unmatched_rows` count means Azure returned rows the collector could not associate with a requested resource. `metric_errors` counts errors on individual metrics, including errors in otherwise successful batches. Use the logged metric names, aggregation, and UTC time window to check the same request in Azure Monitor for a named example.
+
+
+#### `collection batch failed`
+
+**Cause**
+
+The request failed before the collector could read its metrics. The warning identifies the profile, subscription, region, time grain, resource count, and failure class. For an HTTP failure from the Metrics API, `class` includes the HTTP status and `azure_code` shows the service code when Azure provides one.
+
+
+**Fix**
+
+For an authorization error, verify the collector identity has Monitoring Reader access at subscription scope for the Azure Monitor batch API. For DNS or network errors, check access to the regional Metrics endpoint from the Agent host. Warnings repeat at most once per hour per profile and failure class. Debug mode shows each failed request. Jobs using secret references may show a redacted message.
+
+
 ### Other Problems
 
 #### No metrics are collected
@@ -790,19 +819,6 @@ Check the following:
   # non-systemd
   grep azure_monitor /var/log/netdata/collector.log
   ```
-
-
-#### Missing metrics for some resource types
-
-Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
-
-- **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.entries` or `profiles.mode_combined.entries`.
-- **Verify a [built-in profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) exists** -- List available profiles:
-  ```bash
-  ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/
-  ```
-- **Check resource activity** -- Some metrics only appear when the resource is actively processing data (e.g., IoT Hub telemetry metrics require devices to be sending messages).
-- **New resource types after startup** -- Runtime discovery does not activate new profiles. Restart the collector if new resource types were added after bootstrap.
 
 
 #### Charts have gaps or incomplete data
