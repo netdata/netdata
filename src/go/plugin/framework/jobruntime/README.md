@@ -108,9 +108,10 @@ at that time and computes the interval since the chart's previous sample from th
 their collection time whatever happened in between: failed runs, charts a run did not observe, rejected host scopes,
 scrapes slower than the update interval, chart redefinitions.
 
-- Times MUST strictly increase per chart: the Agent reads a time behind the chart's clock as a forward gap and runs the
-  chart into the future. Known exception: two engine charts whose IDs sanitize to one wire chart both send the run's
-  time (the Agent adds a zero-interval sample). All jobs of a plugin process and its runtime charts take their times
+- Times MUST strictly increase per chart: the Agent ignores a sample whose time is not after the chart's last collection
+  time (and when its own clock is behind the chart too, restarts the chart's counter rates at the next sample it
+  accepts). Known exception: two engine charts whose IDs sanitize to one wire chart both send the run's time (the Agent
+  ignores the second). All jobs of a plugin process and its runtime charts take their times
   from one `netdataapi.SampleClock`, created by the agent and passed through `JobConfig.SampleClock`/
   `JobV2Config.SampleClock`, which never issues a time at or before an earlier one (microsecond resolution), across job
   restarts and wall-clock steps back. A job without one gets its own clock.

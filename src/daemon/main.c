@@ -237,6 +237,7 @@ int mrg_unittest(void);
 int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
 int pluginsd_vnodes_unittest(void);
+int pluginsd_sample_times_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_registry_cookie_unittest(void);
 int web_client_header_parsing_unittest(void);
@@ -604,6 +605,7 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
                             if (pluginsd_vnodes_unittest()) return 1;
+                            if (pluginsd_sample_times_unittest()) return 1;
                             if (pluginsd_ipmi_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
@@ -791,6 +793,8 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "pluginsd-vnodes") == 0)
                             return unittest_run_with_rrd(pluginsd_vnodes_unittest);
+                        else if(strcmp(optarg, "pluginsd-sample-times") == 0)
+                            return unittest_run_with_rrd(pluginsd_sample_times_unittest);
                         else if(strcmp(optarg, "pluginsd-ipmi") == 0) {
                             unittest_running = true;
                             return pluginsd_ipmi_unittest();
