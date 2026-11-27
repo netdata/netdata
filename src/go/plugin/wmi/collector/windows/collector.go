@@ -61,6 +61,9 @@ type Collector struct {
 
 	winrmTLS   *tls.Config
 	newSession func(context.Context) (querySession, error)
+	// now reads the poller's clock around each query, so the host's clock can
+	// be compared with it.
+	now func() time.Time
 
 	// pingClient is nil once the poller turned out to lack the privilege to ping.
 	pingClient pinger.Client
@@ -73,6 +76,7 @@ func New() *Collector {
 		Config:    defaultConfig(),
 		store:     store,
 		metrics:   newCollectorMetrics(store),
+		now:       time.Now,
 		newPinger: pinger.New,
 	}
 	c.newSession = c.openSession

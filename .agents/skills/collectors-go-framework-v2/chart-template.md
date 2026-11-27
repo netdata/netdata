@@ -50,7 +50,9 @@ a *leaf* is the innermost family that holds charts.
 - A template MUST NOT restate a framework default; readers take every key as a deliberate deviation. The defaults
   and their owners:
   - `lifecycle`: `src/go/plugin/framework/charttpl/README.md#lifecycle` owns omission versus disabled expiry;
-    deviate only for observed churn (`./SKILL.md#chart-label-identity`).
+    deviate only for observed churn (`./SKILL.md#chart-label-identity`), or to disable expiry for a metric that
+    successful cycles leave out by design, such as a measurement withheld as too uncertain, which the default would
+    retire after five of them.
   - chart `type`: `defaultChartType` in `src/go/plugin/framework/charttpl/defaults.go`.
   - `algorithm`: resolved from the runtime metric kind (`./SKILL.md#metrics-and-charts`).
   - `id`: derived from the composed context.
