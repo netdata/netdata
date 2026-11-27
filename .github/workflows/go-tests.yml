@@ -84,6 +84,7 @@ jobs:
 
   tests:
     name: Go toolchain tests (${{ matrix.module }})
+    if: needs.file-check.outputs.run == 'true'
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -93,25 +94,18 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Install Go
         id: go
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ matrix.version }}
           cache: false
       # Share module downloads; isolate native/race, tagged and cross-target compiled outputs.
       - name: Cache Go modules
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -120,7 +114,6 @@ jobs:
           restore-keys: |
             go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-
       - name: Cache Go build outputs
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -129,16 +122,13 @@ jobs:
           restore-keys: |
             go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-native-race-
       - name: Go mod download
-        if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
       - name: Install CGO system dependencies
-        if: needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y unixodbc-dev
       - name: Compile
-        if: needs.file-check.outputs.run == 'true'
         env:
           TARGETS: ${{ matrix.targets }}
         run: |
@@ -147,32 +137,27 @@ jobs:
           CGO_ENABLED=0 go build -o "${RUNNER_TEMP}/go-test-build/" "${targets[@]}"
         working-directory: ${{ matrix.module }}
       - name: Go fmt
-        if: needs.file-check.outputs.run == 'true'
         run: |
           go fmt ./... | tee modified-files
           [ "$(wc -l modified-files | cut -f 1 -d ' ')" -eq 0 ] || exit 1
         working-directory: ${{ matrix.module }}
       # Re-enable after the Go 1.27 go fix source migration is applied and reviewed.
       # - name: Go fix
-      #   if: needs.file-check.outputs.run == 'true'
       #   run: |
       #     go fix ./...
       #     git diff --exit-code
       #   working-directory: ${{ matrix.module }}
       - name: Go vet
-        if: needs.file-check.outputs.run == 'true'
         run: |
           CGO_ENABLED=0 go vet -tests=false ./...
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
-        if: needs.file-check.outputs.run == 'true'
         uses: GoTestTools/gotestfmt-action@eba2ac97f623e866e7b1b117c99f18b43cd36d18 # v2.3.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
       - name: Go test
         id: go-test
-        if: needs.file-check.outputs.run == 'true'
         run: |
           set -euo pipefail
           # The race detector requires CGO; explicitly enable it to avoid go emitting
@@ -205,28 +190,22 @@ jobs:
 
   ebpf-libbpf-tests:
     name: Go ebpf libbpf-tagged tests
+    if: needs.file-check.outputs.run == 'true'
     runs-on: ubuntu-latest
     needs:
       - file-check
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Install Go
         id: go
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
           cache: false
       - name: Cache Go modules
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -235,7 +214,6 @@ jobs:
           restore-keys: |
             go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-src/collectors/ebpf.plugin/ebpfgo.plugin-
       - name: Cache Go build outputs
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -244,7 +222,6 @@ jobs:
           restore-keys: |
             go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-src/collectors/ebpf.plugin/ebpfgo.plugin-libbpf-race-
       - name: Install libbpf
-        if: needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update
           # libbpf-dev and linux-headers-generic satisfy the libbpf >= 1 + linux/btf.h
@@ -258,18 +235,15 @@ jobs:
           # compiled and tested.
           sudo apt-get install -y libbpf-dev libelf-dev zlib1g-dev linux-headers-generic
       - name: Go mod download
-        if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
       - name: Set up gotestfmt
-        if: needs.file-check.outputs.run == 'true'
         uses: GoTestTools/gotestfmt-action@eba2ac97f623e866e7b1b117c99f18b43cd36d18 # v2.3.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
       - name: Go test (libbpf tag)
         id: go-test
-        if: needs.file-check.outputs.run == 'true'
         env:
           # The libbpfloader package declares no `#cgo LDFLAGS`; the production build
           # passes them via CGO_LDFLAGS from CMake (EBPF_GO_CGO_LDFLAGS), pointing at the
@@ -304,6 +278,7 @@ jobs:
 
   build-tests:
     name: Go build tests (${{ matrix.module }}, ${{ matrix.platform }})
+    if: needs.file-check.outputs.run == 'true'
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -313,24 +288,17 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.matrix.outputs.build_matrix) }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Install Go
         id: go
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ matrix.version }}
           cache: false
       - name: Cache Go modules
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -339,7 +307,6 @@ jobs:
           restore-keys: |
             go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-
       - name: Cache Go build outputs
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -348,11 +315,9 @@ jobs:
           restore-keys: |
             go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-build-${{ matrix.platform }}-
       - name: Go mod download
-        if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
       - name: Compile
-        if: needs.file-check.outputs.run == 'true'
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
