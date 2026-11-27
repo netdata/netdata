@@ -4,12 +4,14 @@ package azure_monitor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 )
 
 func (c *Collector) collect(ctx context.Context) error {
+	// Reserve the closing part of the interval for publishing and the next scheduled tick.
+	interval := secondsToDuration(c.UpdateEvery)
+	recoveryDeadline := time.Now().Add(interval - interval/10)
 	hasResources, err := c.refreshCollectResources(ctx)
 	if err != nil {
 		return err
@@ -22,17 +24,17 @@ func (c *Collector) collect(ctx context.Context) error {
 	queryBatches := c.buildQueryBatches(now)
 
 	dueInstruments := dueInstrumentsForBatches(queryBatches)
-	samples, err := c.collectQuerySamples(ctx, queryBatches, now)
+	samples, err := c.collectQuerySamples(ctx, queryBatches, now, recoveryDeadline)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	statesObserved := c.observeResourceStates(c.now())
-	if err != nil && !statesObserved {
+	cachedObserved := c.observations.reobserveCachedObservations(dueInstruments)
+	if err != nil && !statesObserved && !cachedObserved {
 		return err
 	}
 
 	c.observations.observeSamples(samples)
-	c.observations.reobserveCachedObservations(dueInstruments)
 
 	return nil
 }
@@ -55,38 +57,4 @@ func (c *Collector) refreshCollectResources(ctx context.Context) (bool, error) {
 		c.observations.reconcileResources(c.discovery.ByProfile)
 	}
 	return len(resources) > 0, nil
-}
-
-func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatch, queryNow time.Time) ([]metricSample, error) {
-	if len(batches) == 0 {
-		return nil, nil
-	}
-
-	results := c.queryExecutor.runQueryBatches(ctx, batches, queryNow, c.QueryOffset)
-
-	var (
-		allSamples []metricSample
-		errCount   int
-	)
-	for i, res := range results {
-		batch := &batches[i]
-		if res.Err != nil {
-			errCount++
-			c.logBatchFailure(batch, res.Err, queryNow)
-			continue
-		}
-		if d := res.Diagnostics; d != nil {
-			c.Debugf("metrics batch: profile=%s region=%s subscription=%.80q grain=%s resources=%d with_samples=%d empty=%d missing=%d "+
-				"unmatched_rows=%d metric_errors=%d empty_examples=%v missing_examples=%v error_examples=%v %s",
-				batch.Profile.Name, batch.Region, batch.SubscriptionID, batch.TimeGrain, len(batch.Resources),
-				d.withSamples, d.empty, d.missing, d.unmatchedRows, d.metricErrors, d.emptyExamples, d.missingExamples, d.errorExamples, batch.debugRequest(queryNow, c.QueryOffset))
-		}
-		allSamples = append(allSamples, res.Samples...)
-	}
-
-	if errCount == len(results) {
-		return nil, errors.New("all Azure Monitor batch queries failed")
-	}
-
-	return allSamples, nil
 }

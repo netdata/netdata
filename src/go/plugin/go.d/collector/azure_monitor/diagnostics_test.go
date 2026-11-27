@@ -133,6 +133,10 @@ func TestBatchFailureDiagnostics(t *testing.T) {
 	require.NoError(t, c.Init(t.Context()))
 	require.NoError(t, c.Check(t.Context()))
 
+	c.queryExecutor.lookupDefinitions = func(context.Context, definitionKey) (metricDefinitions, error) {
+		t.Error("unrelated failures should not trigger metric definitions lookup")
+		return nil, context.Canceled
+	}
 	for _, status := range []int{403, 403, 429} {
 		mx.queryErr = &azcore.ResponseError{StatusCode: status, ErrorCode: "ExampleCode"}
 		now = now.Add(time.Hour)

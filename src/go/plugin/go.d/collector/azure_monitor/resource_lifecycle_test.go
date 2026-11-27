@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -323,9 +324,9 @@ func TestCollector_StateExpiresDuringMonitorQuery(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			start := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
-			now := start
+			var elapsed atomic.Int64
 			rg := &mockResourceGraph{resources: []map[string]any{testVirtualMachine("vm-a", "Standard_B2s", "Linux", "PowerState/running")}}
-			mx := &mockMetricsClient{onQuery: func() { now = start.Add(61 * time.Second) }}
+			mx := &mockMetricsClient{onQuery: func() { elapsed.Store(int64(61 * time.Second)) }}
 			if failed {
 				mx.queryErr = errors.New("Monitor unavailable")
 			}
@@ -333,13 +334,13 @@ func TestCollector_StateExpiresDuringMonitorQuery(t *testing.T) {
 			c.Config = testConfig()
 			c.Config.Profiles.ModeExact = testProfilesModeEntries("virtual_machines")
 			c.Config.Discovery.RefreshEvery = 60
-			c.now = func() time.Time { return now }
+			c.now = func() time.Time { return start.Add(time.Duration(elapsed.Load())) }
 			require.NoError(t, c.Init(context.Background()))
 			require.NoError(t, c.Check(context.Background()))
-			now = start.Add(59 * time.Second)
+			elapsed.Store(int64(59 * time.Second))
 			mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{{
 				ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.compute/virtualmachines/vm-a"),
-				Values:     []azmetrics.Metric{metricWithAvg("Percentage CPU", now, 25)},
+				Values:     []azmetrics.Metric{metricWithAvg("Percentage CPU", c.now(), 25)},
 			}}}}
 			series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 			require.Equal(t, 1, rg.calls(), "expiry must not trigger extra discovery polling")

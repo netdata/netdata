@@ -78,13 +78,7 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 		c.Infof("auto-discovery resolved profiles: %v", selection.AutoNames)
 	}
 
-	// TODO(azure_monitor): Insert bootstrap-only metric-definition validation here.
-	// Resolve selected profiles, fetch one representative resource per
-	// (subscription_id, resource_type, metric_namespace), fail open per key on
-	// lookup errors, and prune unsupported metrics/aggregations/time grains
-	// before final runtime build. Because runtime is currently global per job,
-	// multi-subscription capability differences need an explicit merge rule first.
-	runtime, err := buildCollectorRuntimeFromConfig(selection.Names, selection.Entries, c.profileCatalog, c.Config.workloadResourceTagKey())
+	runtime, err := buildCollectorRuntimeFromConfig(selection.Names, selection.Entries, c.profileCatalog, c.Config.workloadResourceTagKey(), c.Limits.MaxMetricsPerQuery)
 	if err != nil {
 		return fmt.Errorf("build collector runtime: %w", err)
 	}
@@ -144,7 +138,13 @@ func (c *Collector) prepareInitClients(cfg Config) (resourceGraphClient, *queryE
 		return nil, nil, fmt.Errorf("create resource graph client: %w", err)
 	}
 
-	return resourceGraph, newQueryExecutor(cfg.Limits.MaxConcurrency, cfg.Timeout.Duration(), credential, cloudCfg, c.newMetricsClient), nil
+	definitions, err := newMetricDefinitionsClient(credential, cloudCfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create Azure metric definitions client: %w", err)
+	}
+	executor := newQueryExecutor(cfg.Limits.MaxConcurrency, cfg.Timeout.Duration(), credential, cloudCfg, c.newMetricsClient)
+	executor.lookupDefinitions = definitions.list
+	return resourceGraph, executor, nil
 }
 
 func fetchInitDiscovery(ctx context.Context, cfg Config, catalog azureprofiles.Catalog, resourceGraph resourceGraphClient, supportedResourceTypes map[string]struct{}) (discoveryFetchResult, error) {
@@ -292,7 +292,8 @@ func defaultNewResourceGraphClient(subscriptionID string, cred azcore.TokenCrede
 }
 
 func defaultNewMetricsClient(endpoint string, cred azcore.TokenCredential, cloudCfg azcloud.Configuration) (metricsQueryClient, error) {
-	client, err := azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: azcore.ClientOptions{Cloud: cloudCfg}})
+	opts := withAzureRequestTransport(azcore.ClientOptions{Cloud: cloudCfg})
+	client, err := azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: opts})
 	if err != nil {
 		return nil, err
 	}

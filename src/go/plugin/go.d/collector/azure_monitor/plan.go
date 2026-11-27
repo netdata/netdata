@@ -4,6 +4,7 @@ package azure_monitor
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
-func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[string]ProfileEntryConfig, catalog azureprofiles.Catalog, workloadResourceTagKey string) (*collectorRuntime, error) {
+func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[string]ProfileEntryConfig, catalog azureprofiles.Catalog, workloadResourceTagKey string, maxMetrics int) (*collectorRuntime, error) {
 	profiles, err := catalog.Resolve(profileNames)
 	if err != nil {
 		return nil, err
@@ -26,7 +27,7 @@ func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[s
 	seenChartIDs := make(map[string]struct{})
 
 	for _, src := range profiles {
-		p, err := buildProfileRuntime(src, profileEntries[src.Name])
+		p, err := buildProfileRuntime(src, profileEntries[src.Name], maxMetrics)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +58,7 @@ func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[s
 	return runtime, nil
 }
 
-func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEntryConfig) (*profileRuntime, error) {
+func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEntryConfig, maxMetrics int) (*profileRuntime, error) {
 	profileName := stringsTrim(resolved.Name)
 	if profileName == "" {
 		return nil, fmt.Errorf("profile has empty name")
@@ -79,46 +80,35 @@ func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEn
 		DisplayName:     displayName,
 		ResourceType:    resourceType,
 		MetricNamespace: metricNamespace,
+		namespaceKey:    strings.ToLower(metricNamespace),
 		Filters:         cloneResourceFilters(entry.Filters),
-		Metrics:         make([]*metricRuntime, 0, len(resolved.Config.Metrics)),
 	}
 
+	groups := make(map[metricQueryGroup][]*metricRuntime)
 	for _, m := range resolved.Config.Metrics {
 		grain := strings.ToUpper(stringsTrim(m.TimeGrain))
 		if grain == "" {
 			grain = "PT1M"
 		}
-		grainEvery, ok := azureprofiles.SupportedTimeGrains[grain]
-		if !ok {
+		if _, ok := azureprofiles.SupportedTimeGrains[grain]; !ok {
 			return nil, fmt.Errorf("profile %q metric %q has unsupported time grain %q", profileName, m.ID, grain)
 		}
-
-		mr := &metricRuntime{
-			ID:             stringsTrim(m.ID),
-			AzureName:      stringsTrim(m.AzureName),
-			TimeGrain:      grain,
-			TimeGrainEvery: grainEvery,
-			Series:         make([]*seriesRuntime, 0, len(m.Series)),
-		}
-
 		for _, s := range m.Series {
 			aggregation := azureprofiles.NormalizeAggregation(s.Aggregation)
-			mr.Series = append(mr.Series, &seriesRuntime{
-				Aggregation: aggregation,
-				Kind:        azureprofiles.NormalizeSeriesKind(s.Kind),
-				Instrument:  azureprofiles.ExportedSeriesName(profileName, m.ID, aggregation),
+			group := metricQueryGroup{TimeGrain: grain, Aggregation: aggregation}
+			groups[group] = append(groups[group], &metricRuntime{
+				ID: stringsTrim(m.ID), AzureName: stringsTrim(m.AzureName),
+				Aggregation: aggregation, Kind: azureprofiles.NormalizeSeriesKind(s.Kind),
+				Instrument: azureprofiles.ExportedSeriesName(profileName, m.ID, aggregation),
 			})
 		}
-
-		sort.Slice(mr.Series, func(i, j int) bool {
-			return mr.Series[i].Aggregation < mr.Series[j].Aggregation
-		})
-		out.Metrics = append(out.Metrics, mr)
 	}
-
-	sort.Slice(out.Metrics, func(i, j int) bool {
-		return out.Metrics[i].ID < out.Metrics[j].ID
-	})
+	for group, metrics := range groups {
+		sort.Slice(metrics, func(i, j int) bool { return metrics[i].ID < metrics[j].ID })
+		for part := range slices.Chunk(metrics, maxMetrics) {
+			out.chunks = append(out.chunks, &metricChunk{profile: out, metricQueryGroup: group, metrics: part, names: batchMetricNames(part)})
+		}
+	}
 
 	for _, label := range resolved.Config.ResourceLabels {
 		name := stringsTrim(label.Name)
@@ -164,8 +154,8 @@ func buildChartTemplate(runtime *collectorRuntime) (string, error) {
 
 func profileMetricsList(p *profileRuntime) []string {
 	list := make([]string, 0)
-	for _, metric := range p.Metrics {
-		for _, series := range metric.Series {
+	for _, chunk := range p.chunks {
+		for _, series := range chunk.metrics {
 			list = append(list, series.Instrument)
 		}
 	}

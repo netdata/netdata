@@ -61,15 +61,9 @@ func summarizeBatchResponse(requested []resourceInfo, byID map[string]resourceIn
 }
 
 func (d *batchDiagnostics) observeMetricError(resource resourceInfo, matched bool, metric azmetrics.Metric) {
-	code := derefOrZero(metric.ErrorCode)
-	if strings.EqualFold(code, "Success") {
-		return
-	}
+	code := metricErrorCode(metric)
 	if code == "" {
-		if stringsTrim(derefOrZero(metric.ErrorMessage)) == "" {
-			return
-		}
-		code = "<unspecified>"
+		return
 	}
 	d.metricErrors++
 	if len(d.errorExamples) >= diagnosticExampleLimit {
@@ -84,6 +78,20 @@ func (d *batchDiagnostics) observeMetricError(resource resourceInfo, matched boo
 		name = *metric.Name.Value
 	}
 	d.errorExamples = append(d.errorExamples, fmt.Sprintf("%s metric=%.80q code=%.80q", label, name, code))
+}
+
+func metricErrorCode(metric azmetrics.Metric) string {
+	code := stringsTrim(derefOrZero(metric.ErrorCode))
+	switch {
+	case strings.EqualFold(code, "Success"):
+		return ""
+	case code != "":
+		return code
+	case stringsTrim(derefOrZero(metric.ErrorMessage)) != "":
+		return "<unspecified>"
+	default:
+		return ""
+	}
 }
 
 func (b *queryBatch) debugRequest(now time.Time, offset int) string {
