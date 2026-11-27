@@ -5541,11 +5541,14 @@ modules:
             The collector detects queues automatically when Perflib reports them; newly created or idle queues may not
             appear until they become active, such as after a message is sent. It charts up to 100 matching queues
             individually by default and aggregates unmatched or over-limit queues into an `Other (aggregated)` series.
-            Configure the selector and cap in `[plugin:windows:PerflibMSMQ]`.
+            Queues matching `queues to ignore` are dropped before that. Configure the ignore list, selector and cap in
+            `[plugin:windows:PerflibMSMQ]`; the collector reads them when it starts, so restart the Agent after a
+            change.
         limits:
           description: |
             By default, at most 100 queues are charted individually. Remaining queues are aggregated; setting the
-            individual queue limit to 0 aggregates all queues.
+            individual queue limit to 0 aggregates all non-ignored queues. Ignored queues are neither charted nor
+            aggregated.
         performance_impact:
           description: ""
     setup:
@@ -5570,6 +5573,14 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+            - name: queues to ignore
+              description: |
+                Queues to drop completely: they get no charts and are not added to the `Other (aggregated)` series. Uses
+                the same pattern syntax as `queues to chart individually` and is applied first, to raw Perflib instance
+                names. The first matching pattern wins, so `!*keep,*sync-*` ignores every queue containing `sync-`
+                except those ending in `keep`. Empty by default; a negative-only list ignores nothing.
+              default_value: ""
+              required: false
             - name: queues to chart individually
               description: |
                 Case-insensitive simple patterns separated by commas or pipes. Windows queue paths can be pasted
@@ -5577,14 +5588,14 @@ modules:
                 raw Perflib instance names; the `queue` chart label is sanitized for display. Matching queues are
                 chosen in case-insensitive alphabetical order before applying the individual chart limit. An empty
                 selector or a negative-only selector, such as `!*temp*`, selects no queues for individual charts, so
-                all queues are aggregated. Add a positive pattern, for example `!*temp*,*`, to select every queue
+                all non-ignored queues are aggregated. Add a positive pattern, for example `!*temp*,*`, to select every queue
                 except those matching `*temp*`.
               default_value: "*"
               required: false
             - name: max individually charted queues
               description: |
-                Maximum number of matching queues to chart individually. Other queues are summed into the `Other
-                (aggregated)` series; 0 aggregates all queues.
+                Maximum number of matching queues to chart individually. Other non-ignored queues are summed into the
+                `Other (aggregated)` series; 0 aggregates all non-ignored queues.
               default_value: 100
               required: false
         examples:
@@ -5607,7 +5618,7 @@ modules:
           description: "These metrics refer to one MSMQ queue or the aggregate of queues selected for the Other series."
           labels:
             - name: queue
-              description: The queue name, or `Other (aggregated)` for the sum of queues not charted individually.
+              description: The queue name, or `Other (aggregated)` for the sum of non-ignored queues not charted individually.
           metrics:
             - name: msmq.queue_messages
               description: MSMQ messages in queue
