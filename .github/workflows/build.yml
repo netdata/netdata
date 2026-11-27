@@ -57,6 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      early-source: ${{ github.event_name == 'pull_request' && steps.check-source-files.outputs.any_modified == 'true' && steps.check-build-files.outputs.any_modified != 'true' }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
       static-native: ${{ steps.check-static.outputs.static-native }}
     steps:
@@ -99,6 +100,8 @@ jobs:
             .github/data/distros.yml
             .github/workflows/build.yml
             .github/scripts/modules/release_versions.py
+            .github/scripts/pr-source-install.py
+            .github/scripts/prepare-artifacts.sh
             .github/scripts/prepare-release-base.sh
             packaging/release_info.py
             .github/scripts/build-static.sh
@@ -192,6 +195,9 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - file-check
+    outputs:
+      source-install-result: ${{ steps.install-source.outcome }}
+      tested-source: ${{ steps.install-source.outputs.identity }}
     steps:
       - name: Skip Check
         id: skip
@@ -235,6 +241,22 @@ jobs:
           path: artifacts/*.tar.*
           compression-level: 0
           retention-days: 30
+      - name: Install and record the tested source
+        id: install-source
+        if: needs.file-check.outputs.early-source == 'true'
+        # Keep the uploaded tarball available for consolidation. The required Source check enforces this outcome.
+        continue-on-error: true
+        env:
+          NETDATA_ARTIFACT_URL_PREFIX: http://127.0.0.1:8080/latest
+        run: |
+          set -euo pipefail
+          .github/scripts/prepare-artifacts.sh --pr-source-only artifacts
+          apache=$(docker run --detach --rm --publish 127.0.0.1:8080:80 \
+            --volume "$PWD/latest:/usr/local/apache2/htdocs/latest:ro" httpd:2.4)
+          trap 'docker stop "$apache" >/dev/null' EXIT
+          curl --fail --silent --show-error --head --output /dev/null \
+            --retry 10 --retry-all-errors --retry-delay 1 --max-time 3 "$NETDATA_ARTIFACT_URL_PREFIX/Manifest"
+          python3 .github/scripts/pr-source-install.py install "$apache"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -865,12 +887,12 @@ jobs:
 
   artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
     if: >-
-      ${{ !failure() && !cancelled()
-          && needs.prepare-upload.result == 'success'
-          && needs.file-check.result == 'success' }}
+      ${{ !cancelled() && (github.event_name == 'pull_request' ||
+          (needs.prepare-upload.result == 'success' && needs.file-check.result == 'success')) }}
     name: Test Consolidated Artifacts (Source)
     runs-on: ubuntu-latest
     needs:
+      - build-dist
       - prepare-upload
       - file-check
     services:
@@ -881,6 +903,14 @@ jobs:
         volumes:
           - ${{ github.workspace }}:/usr/local/apache2/htdocs/
     steps:
+      - name: Require successful source inputs
+        if: >-
+          always() && (needs.file-check.result != 'success' || needs.prepare-upload.result != 'success' ||
+          (needs.file-check.outputs.early-source == 'true' &&
+          (needs.build-dist.outputs.source-install-result != 'success' || needs.build-dist.outputs.tested-source == '')))
+        run: |
+          echo "::error::Check file selection, artifact preparation, and the source installation outcome and archive identity."
+          exit 1
       - name: Skip Check
         id: skip
         if: needs.file-check.outputs.run != 'true'
@@ -906,10 +936,17 @@ jobs:
           mv artifacts/* .
       - name: Verify that artifacts work with installer
         id: verify
-        if: needs.file-check.outputs.run == 'true'
+        if: needs.file-check.outputs.run == 'true' && needs.file-check.outputs.early-source != 'true'
         env:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
+      - name: Compare consolidated source with the installed archive
+        if: needs.file-check.outputs.early-source == 'true'
+        env:
+          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
+          APACHE: ${{ job.services.apache.id }}
+          TESTED_SOURCE: ${{ needs.build-dist.outputs.tested-source }}
+        run: python3 .github/scripts/pr-source-install.py verify "$APACHE"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
