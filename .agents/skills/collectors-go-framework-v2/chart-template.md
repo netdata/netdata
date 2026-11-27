@@ -150,6 +150,9 @@ a *leaf* is the innermost family that holds charts.
   so the stock alerts and dashboard sections apply (`src/go/plugin/wmi/collector/windows/`). It MUST match the
   native producer as the next bullet requires, test that against the native source, set the vnode's `_os` label, and
   list its plugin's platform in `PLUGIN_PLATFORMS` (`integrations/health_alerts.py`).
+- Only templates reach shared contexts: a stock `alarm` matches a chart id or name (`health_prototype_matches_rrdset`
+  in `src/health/health_prototypes.c`), and a V2 chart's id is `<job>.<id>`, so an alarm never attaches. An alarm the
+  shared context needs becomes a template, as `system_reboot_detection` in `src/health/health.d/reboot.conf` did.
 - A remote-target collector MAY reuse another collector's contexts for the same measurement of the same target, so
   that collector's stock alerts apply: `wmi` publishes its host's ping as the go.d ping collector's `ping.host_*`.
 - Reusing a shared context requires the same units, dimension names and states and equivalent labels as the other
