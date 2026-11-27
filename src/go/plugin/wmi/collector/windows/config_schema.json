@@ -80,7 +80,7 @@
           },
           "system": {
             "title": "System",
-            "description": "Collect the number of processes and threads, context switches, processor queue length and uptime.",
+            "description": "Collect the number of processes and threads, context switches, processor queue length, uptime and the host's clock offset.",
             "type": "boolean",
             "default": true
           },

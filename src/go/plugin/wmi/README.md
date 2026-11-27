@@ -1,8 +1,8 @@
 # Remote Windows WMI plugin
 
 `wmi.plugin` monitors Windows hosts without installing anything on them. It runs on a Netdata Agent (the poller) and
-reads CPU, memory, process, uptime, network, TCP, UDP and disk metrics from each configured host over WMI, using DCOM
-or WinRM HTTPS, and pings each host. Each host appears in Netdata as its own virtual node.
+reads CPU, memory, process, uptime, clock offset, network, TCP, UDP and disk metrics from each configured host over WMI,
+using DCOM or WinRM HTTPS, and pings each host. Each host appears in Netdata as its own virtual node.
 
 What it collects, how to prepare the Windows hosts, every option and the known errors are on the Windows (WMI)
 integration page, generated from [`collector/windows/metadata.yaml`](collector/windows/metadata.yaml).

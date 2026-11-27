@@ -2,6 +2,7 @@ version: v1
 # The native Windows Agent's contexts, dimensions and units, so the standard dashboard sections and the stock Windows
 # alerts apply to the host's node, and the go.d ping collector's contexts for the host's ping, so the stock ping alerts
 # apply too. TCP and UDP counters the native agent does not chart use the Linux Agent's contexts for the same counters.
+# The clock offset compares the host with the poller, which no other producer measures, so its context is WMI's own.
 # The contexts have different roots, so the template has no spec-level namespace.
 groups:
   - family: cpu
@@ -358,6 +359,18 @@ groups:
         dimensions:
           - selector: system_uptime_milliseconds
             name: uptime
+            options:
+              divisor: 1000
+  - family: clock
+    context_namespace: wmi
+    metrics: [system_clock_offset_microseconds]
+    charts:
+      - context: clock_offset
+        title: Clock Offset From the Collecting Agent
+        units: milliseconds
+        dimensions:
+          - selector: system_clock_offset_microseconds
+            name: offset
             options:
               divisor: 1000
   - family: network

@@ -70,7 +70,8 @@ func processorRow[T uint64 | string](name string, interrupt, user, privileged, d
 }
 
 // systemRow is a System counter set instance as DCOM decodes it. The host
-// booted 86401.2345678 seconds before the sample; times are 100 ns ticks.
+// booted 86401.2345678 seconds before the sample, taken at
+// 2022-06-19 04:26:41.2345678 UTC by its clock; times are 100 ns ticks.
 func systemRow() map[string]any {
 	return map[string]any{
 		"Processes":             uint32(69),
@@ -392,8 +393,14 @@ func validQueryResults() map[string]queryResult {
 	}
 }
 
+// fixturePollerTime is the poller's clock in the fixture collections: 1.5 s
+// behind the host's clock in systemRow. It stands still, so every query takes
+// no time.
+var fixturePollerTime = time.Date(2022, 6, 19, 4, 26, 39, 734567800, time.UTC)
+
 func configuredCollector() *Collector {
 	c := New()
+	c.now = func() time.Time { return fixturePollerTime }
 	c.Host = "windows.example.com"
 	c.Auth = "ntlm"
 	c.Username = "fixture-account"
@@ -534,6 +541,7 @@ func TestCollector_Collect(t *testing.T) {
 			"system_context_switches":            4294967000,
 			"system_processor_queue_length":      3,
 			"system_uptime_milliseconds":         86401234,
+			"system_clock_offset_microseconds":   1500000,
 			"network_received_bytes" + ethernet:  190,
 			"network_received_bytes" + ethernet1: 0,
 			"network_sent_bytes" + ethernet:      30,
@@ -1101,8 +1109,18 @@ func TestReadSystem(t *testing.T) {
 			valid: true,
 		}
 	}
+	// The host's clock in the WinRM row reads 2022-06-18 04:26:40.005 UTC; the
+	// poller sends the query 1 s earlier by its clock.
+	sent := time.Date(2022, 6, 18, 4, 26, 39, 5000000, time.UTC)
+	offset := func(d time.Duration) clockOffset {
+		return clockOffset{
+			value: d,
+			valid: true,
+		}
+	}
 	for name, tc := range map[string]struct {
 		rows       queryResult
+		timing     queryTiming
 		want       systemCounters
 		wantUsable bool
 	}{
@@ -1116,14 +1134,97 @@ func TestReadSystem(t *testing.T) {
 				"Timestamp_Object":      "133000000000050000",
 				"Frequency_Object":      "10000000",
 			}),
+			// The host read its clock 1 s after the query was sent by the
+			// poller's clock; the poller compares it with the middle of the
+			// 400 ms query.
+			timing: queryTiming{
+				sent:     sent,
+				duration: 400 * time.Millisecond,
+			},
 			want: systemCounters{
 				processes:       valid(138),
 				threads:         valid(1328),
 				contextSwitches: valid(746215952),
 				processorQueue:  valid(2),
 				uptime:          valid(5),
+				clockOffset:     offset(800 * time.Millisecond),
 			},
 			wantUsable: true,
+		},
+		"a host clock behind the poller's": {
+			rows: fixtureRows(map[string]any{
+				"Timestamp_Object": uint64(133000000000050000),
+				"Frequency_Object": uint64(10000000),
+			}),
+			timing: queryTiming{
+				sent: sent.Add(3 * time.Second),
+			},
+			want: systemCounters{
+				clockOffset: offset(-2 * time.Second),
+			},
+			wantUsable: true,
+		},
+		"a query that took the bound still gives a clock offset": {
+			rows: fixtureRows(map[string]any{
+				"Timestamp_Object": uint64(133000000000050000),
+				"Frequency_Object": uint64(10000000),
+			}),
+			timing: queryTiming{
+				sent:     sent,
+				duration: time.Second,
+			},
+			want: systemCounters{
+				clockOffset: offset(500 * time.Millisecond),
+			},
+			wantUsable: true,
+		},
+		"a slower query leaves the clock offset out": {
+			rows: fixtureRows(map[string]any{
+				"Processes":        uint32(69),
+				"Timestamp_Object": uint64(133000000000050000),
+				"Frequency_Object": uint64(10000000),
+			}),
+			timing: queryTiming{
+				sent:     sent,
+				duration: time.Second + time.Nanosecond,
+			},
+			want: systemCounters{
+				processes: valid(69),
+			},
+			wantUsable: true,
+		},
+		"a host clock before 1970 gives a clock offset": {
+			// 1969-12-31 23:59:59 UTC.
+			rows: fixtureRows(map[string]any{
+				"Timestamp_Object": uint64(116444735990000000),
+				"Frequency_Object": uint64(10000000),
+			}),
+			timing: queryTiming{
+				sent: time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+			},
+			want: systemCounters{
+				clockOffset: offset(-2 * time.Second),
+			},
+			wantUsable: true,
+		},
+		"a host clock centuries off leaves the clock offset out": {
+			// 1601-01-01 UTC, beyond the range of a duration from the poller's clock.
+			rows: fixtureRows(map[string]any{
+				"Timestamp_Object": uint64(0),
+				"Frequency_Object": uint64(10000000),
+			}),
+			timing: queryTiming{
+				sent: sent,
+			},
+		},
+		"a timestamp Windows would reject leaves the clock offset out": {
+			rows: fixtureRows(map[string]any{
+				"Timestamp_Object": uint64(math.MaxInt64) + 1,
+				"Frequency_Object": uint64(10000000),
+			}),
+			timing: queryTiming{
+				sent: sent,
+			},
 		},
 		"a boot time after the sample leaves uptime out": {
 			rows: fixtureRows(map[string]any{
@@ -1132,17 +1233,38 @@ func TestReadSystem(t *testing.T) {
 				"Timestamp_Object": uint64(133000000000000000),
 				"Frequency_Object": uint64(10000000),
 			}),
+			timing: queryTiming{
+				sent: sent.Add(-5 * time.Millisecond),
+			},
 			want: systemCounters{
-				processes: valid(69),
+				processes:   valid(69),
+				clockOffset: offset(time.Second),
 			},
 			wantUsable: true,
 		},
-		"a zero frequency leaves uptime out": {
+		"a zero frequency leaves uptime and the clock offset out": {
 			rows: fixtureRows(map[string]any{
 				"SystemUpTime":     uint64(0),
 				"Timestamp_Object": uint64(10000000),
 				"Frequency_Object": uint64(0),
 			}),
+			timing: queryTiming{
+				sent: sent,
+			},
+		},
+		"another frequency leaves the clock offset out": {
+			rows: fixtureRows(map[string]any{
+				"SystemUpTime":     uint64(0),
+				"Timestamp_Object": uint64(133000000000050000),
+				"Frequency_Object": uint64(1000),
+			}),
+			timing: queryTiming{
+				sent: sent,
+			},
+			want: systemCounters{
+				uptime: valid(133000000000050000),
+			},
+			wantUsable: true,
 		},
 		"an uptime beyond the millisecond range is left out": {
 			rows: fixtureRows(map[string]any{
@@ -1150,14 +1272,20 @@ func TestReadSystem(t *testing.T) {
 				"Timestamp_Object": uint64(math.MaxUint64),
 				"Frequency_Object": uint64(1),
 			}),
+			timing: queryTiming{
+				sent: sent,
+			},
 		},
 		"more than one instance": {
 			rows: fixtureRows(systemRow(), systemRow()),
+			timing: queryTiming{
+				sent: sent,
+			},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var o observations
-			assert.Equal(t, tc.wantUsable, o.readSystem(tc.rows.rows))
+			assert.Equal(t, tc.wantUsable, o.readSystem(tc.rows.rows, tc.timing))
 			assert.Equal(t, tc.want, o.system)
 		})
 	}

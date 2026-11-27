@@ -54,6 +54,8 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	// disabled disk group issues no disk query at all.
 	var fixedDrives []map[string]any
 	var fixedDrivesRead bool
+	// timing is the poller's clock around the query whose rows are being read.
+	var timing queryTiming
 	groups := [...]metricGroup{
 		{name: "CPU", enabled: groupEnabled(c.Collectors.CPU), query: queryCPU, read: snapshot.readCPU},
 		{name: "memory", enabled: groupEnabled(c.Collectors.Memory), query: queryMemory, read: snapshot.readMemory},
@@ -75,7 +77,12 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			query:   queryNUMANodes,
 			read:    snapshot.readNUMANodes,
 		},
-		{name: "system", enabled: groupEnabled(c.Collectors.System), query: querySystem, read: snapshot.readSystem},
+		{
+			name:    "system",
+			enabled: groupEnabled(c.Collectors.System),
+			query:   querySystem,
+			read:    func(rows []map[string]any) bool { return snapshot.readSystem(rows, timing) },
+		},
 		{
 			name:    "network",
 			enabled: groupEnabled(c.Collectors.Network),
@@ -123,7 +130,12 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		if ctx.Err() != nil {
 			return observations{}, c.interrupted(parent, ctx)
 		}
+		sent := c.now()
 		rows, err := session.Query(ctx, group.query)
+		timing = queryTiming{
+			sent:     sent,
+			duration: c.now().Sub(sent),
+		}
 		failed := wmiquery.SessionFailed(err)
 		if failed && !reached && ctx.Err() == nil {
 			// WinRM connects and logs in with the first query.

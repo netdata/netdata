@@ -34,6 +34,7 @@ modules:
           - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
           - physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node;
           - the number of processes and threads, context switches, processor queue length and uptime;
+          - how far the host's clock is ahead of or behind the poller's;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - TCP and UDP packets per IP version, TCP connections, connection opens, failures and resets, TCP retransmissions, and UDP errors;
           - available and used space per fixed drive;
@@ -42,11 +43,13 @@ modules:
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
           - host status: when the poller can no longer collect from the host, its node turns Stale and an alert on the poller notifies you.
 
-          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions and UDP errors, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them.
+          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions and UDP errors, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset, which no other collector measures this way, has a context of its own.
         method_description: |
           `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the disk group, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
+
+          For the clock offset, the plugin compares the time the host reports in the System query with the poller's clock at the middle of that query. The result is accurate to half the query's duration, usually a few tens of milliseconds; a collection whose System query takes longer than one second charts no offset.
 
           A collection that fails publishes nothing for the host. When no collection has succeeded for `3 × update_every + timeout` seconds (105 by default, about three missed collections), the Agent marks the host's node Stale, as it does for a child Agent that stops streaming. The Agent checks for stale nodes at that same interval, so marking can take up to about twice as long. The next successful collection makes the node live again. On the poller, the `wmi_host_last_collected_secs` alert ([wmi.plugin.conf](https://github.com/netdata/netdata/blob/master/src/health/health.d/wmi.plugin.conf)) counts the seconds since each job's last successful collection, turns critical after two to three missed collections (more when collections themselves are slow), and notifies the `sysadmin` role. It starts evaluating after the job's second successful collection. Its value is on the job's Data Collection Duration chart of the poller, so the alert table below, which covers the host's own charts, does not list it.
 
@@ -105,6 +108,7 @@ modules:
             - After five failed collections in a row, the plugin waits longer between attempts, up to 10 minutes more than `update_every`. A host that comes back after a long outage can take that long to turn live again.
             - `system_reboot_detection` sees a reboot only when a collection succeeds within the host's first 10 minutes of uptime. After a long outage, the longer wait between attempts can miss that window; the `wmi_host_last_collected_secs` alert reports the outage instead.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
+            - The clock offset is measured against the poller's clock, so it includes the poller's own error with the opposite sign: a poller whose clock is 2 seconds behind shows every host 2 seconds ahead. Keep the poller's clock synchronized. When every host of one poller shows a similar offset, check the poller's clock first.
         performance_impact:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
@@ -249,7 +253,7 @@ modules:
               required: false
               group: Collection
             - name: collectors.system
-              description: "Collect the number of processes and threads, context switches, processor queue length and uptime."
+              description: "Collect the number of processes and threads, context switches, processor queue length, uptime and the host's clock offset."
               default_value: true
               required: false
               group: Collection
@@ -441,6 +445,9 @@ modules:
           - error: 'The host''s node is Stale and the `wmi_host_last_collected_secs` alert is critical'
             cause: The poller has missed two to three collections in a row from the host. The host is down or unreachable, or it rejects the login. The job logs the reason with every failed collection, as one of the errors above.
             fix: Fix the cause the job logs. With the next successful collection the node turns live again and the alert clears; the alert's recovery notification is delayed by at least 5 minutes.
+          - error: 'The `wmi_host_clock_offset` alert is raised'
+            cause: Over the last 5 minutes, the host's clock was on average more than 60 seconds ahead of or behind the poller's. The Windows Time service on the host is stopped or cannot reach its time source, or, when every host of the poller shows a similar offset, the poller's own clock is wrong.
+            fix: On the host, check the time source and the last successful synchronization with `w32tm /query /status`, and synchronize with `w32tm /resync`. When every host of the poller shows a similar offset, fix the time synchronization of the poller instead.
           - error: '`group` WMI query failed: WinRM returned a WS-Management fault'
             when: '`transport: winrm`'
             cause: The listener accepted the login but refused the query, most often because the account lacks permissions on the `root\cimv2` WMI namespace.
@@ -459,6 +466,7 @@ modules:
         - The `ip.*` TCP charts add up IPv4 and IPv6, as the Netdata Agent on Linux counts TCP and as the Netdata Agent on Windows charts `ip.tcppackets`; `ipv4.*` and `ipv6.*` charts show one version. The charts that use Linux contexts have only the dimensions Windows counts: `ip.tcphandshake` has no `OutRsts` or `SynRetrans`, `ip.tcperrors` only `RetransSegs`, and the `udperrors` charts only `InErrors` and `NoPorts`.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue; the `ip.*` TCP charts need both the IPv4 and the IPv6 query. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
+        - `wmi.clock_offset` is the host's clock minus the poller's: a positive value means the host's clock is ahead.
       availability: []
       scopes:
         - name: global
@@ -626,6 +634,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: wmi.clock_offset
+              description: Clock Offset From the Collecting Agent
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: offset
             - name: system.io
               description: Disk I/O
               unit: KiB/s

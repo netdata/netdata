@@ -51,6 +51,7 @@ type collectorMetrics struct {
 	contextSwitches  metrix.SnapshotCounter
 	processorQueue   metrix.SnapshotGauge
 	uptime           metrix.SnapshotGauge
+	clockOffset      metrix.SnapshotGauge
 	netInterface     [len(interfaceCounters)]counterInstrument
 	netSpeedKbps     metrix.SnapshotGauge
 	netTotalReceived metrix.SnapshotCounter
@@ -94,6 +95,7 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		contextSwitches:  m.Counter("system_context_switches"),
 		processorQueue:   m.Gauge("system_processor_queue_length"),
 		uptime:           m.Gauge("system_uptime_milliseconds"),
+		clockOffset:      m.Gauge("system_clock_offset_microseconds"),
 		netTotalReceived: m.Counter("network_total_received_bytes"),
 		netTotalSent:     m.Counter("network_total_sent_bytes"),
 		diskAvail:        m.Gauge("disk_avail_bytes"),
@@ -241,6 +243,9 @@ func (m collectorMetrics) write(snapshot observations) {
 	observeTotal(m.contextSwitches, snapshot.system.contextSwitches)
 	observe(m.processorQueue, snapshot.system.processorQueue)
 	observe(m.uptime, snapshot.system.uptime)
+	if offset := snapshot.system.clockOffset; offset.valid {
+		m.clockOffset.Observe(float64(offset.value.Microseconds()))
+	}
 	observeTotal(m.netTotalReceived, snapshot.netTotalReceived)
 	observeTotal(m.netTotalSent, snapshot.netTotalSent)
 	for _, nic := range snapshot.interfaces {
