@@ -13,14 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/wmi/collector/windows/internal/wmiquery"
 )
 
-const (
-	// Raw performance counters: the formatted classes describe only a moment around
-	// each query, not the interval between polls.
-	queryCPU = "SELECT Name, PercentInterruptTime, PercentUserTime, PercentPrivilegedTime, PercentDPCTime, " +
-		"PercentIdleTime FROM Win32_PerfRawData_Counters_ProcessorInformation"
-	queryDisk = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
-		"WHERE DriveType = 3"
-)
+// Raw performance counters: the formatted classes describe only a moment around
+// each query, not the interval between polls.
+const queryCPU = "SELECT Name, PercentInterruptTime, PercentUserTime, PercentPrivilegedTime, PercentDPCTime, " +
+	"PercentIdleTime FROM Win32_PerfRawData_Counters_ProcessorInformation"
 
 type metricGroup struct {
 	name    string
@@ -99,6 +95,24 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 				return snapshot.readDisks(rows)
 			},
 		},
+		{
+			name:    "physical disk",
+			enabled: groupEnabled(c.Collectors.Disk),
+			query:   queryPhysicalDisks,
+			read:    snapshot.readPhysicalDisks,
+		},
+		{
+			name:    "disk drive",
+			enabled: groupEnabled(c.Collectors.Disk),
+			// Like the native Windows Agent, read a disk's model and device ID
+			// once, when it first appears.
+			needs: func() bool { return snapshot.unknownDiskDrive(c.diskDrives) },
+			query: queryDiskDrives,
+			read: func(rows []map[string]any) bool {
+				c.diskDrives = snapshot.diskDrivesOf(rows)
+				return true
+			},
+		},
 	}
 
 	// reached: a query got an answer from the host. sessionLost: the session
@@ -155,11 +169,36 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	if !snapshot.cpuTimes.empty() {
 		c.lastCPU = snapshot.cpuTimes
 	}
+	if snapshot.physicalDisksRead {
+		c.updatePhysicalDisks(snapshot.physicalDisks)
+	}
 	if inventoryDue && !sessionLost {
 		c.refreshInventory(ctx, session, fixedDrives, fixedDrivesRead)
 	}
 	// Exhausting the optional inventory budget must not discard successful samples.
 	return snapshot, parent.Err()
+}
+
+// updatePhysicalDisks completes this poll's disks with their cached model and
+// device ID and the values of the interval since their previous sample, which
+// a failed query keeps for the next interval. Disks that disappeared are
+// forgotten.
+func (c *Collector) updatePhysicalDisks(disks []physicalDisk) {
+	previous := c.lastDisks
+	c.lastDisks = make(map[string]physicalDisk, len(disks))
+	drives := make(map[string]diskDrive, len(disks))
+	for i := range disks {
+		disk := &disks[i]
+		if drive, ok := c.diskDrives[disk.device]; ok {
+			disk.drive = drive
+			drives[disk.device] = drive
+		}
+		if last, ok := previous[disk.device]; ok {
+			disk.interval = disk.intervalSince(last)
+		}
+		c.lastDisks[disk.device] = *disk
+	}
+	c.diskDrives = drives
 }
 
 // interrupted explains why the poll context ended: an expired collection

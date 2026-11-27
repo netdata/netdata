@@ -57,7 +57,55 @@ func timedQueryResults() map[string]queryResult {
 	results[queryNetworkAdapters] = queryResult{
 		rows: slices.Concat(interfaces, fixtureRows(nativeInterfaceRow("Team Member", 2000)).rows),
 	}
+	disk0, disk1 := timedDiskRow("0 C:", 1), timedDiskRow("1", 2)
+	results[queryPhysicalDisks] = fixtureRows(disk0, disk1, map[string]any{
+		"Name":                 "_Total",
+		"DiskReadBytesPersec":  disk0["DiskReadBytesPersec"].(uint64) + disk1["DiskReadBytesPersec"].(uint64),
+		"DiskWriteBytesPersec": disk0["DiskWriteBytesPersec"].(uint64) + disk1["DiskWriteBytesPersec"].(uint64),
+	})
 	return results
+}
+
+// timedDiskRow is a PhysicalDisk instance whose counters have grown at fixed
+// rates since the host started a day ago: per second, 20,000 reads of
+// scale * 4 KiB taking scale ms each, 50 writes of scale * 64 KiB taking
+// scale * 4 ms each and 7 split I/Os, with the disk idle 3/5 of the time at
+// scale 1 and 1/5 at scale 2. The performance counter runs at 10 MHz, so each
+// 32-bit average timer is the low half of its 100 ns queue-length integral; the
+// read time wraps it more than once in a 30-second interval.
+func timedDiskRow(name string, scale uint64) map[string]any {
+	uptime := uint64(time.Now().Unix()%1000000) + 86400
+	reads, writes := 20000*uptime, 50*uptime
+	readTime, writeTime := reads*10000*scale, writes*40000*scale
+	idleFifths := map[uint64]uint64{1: 3, 2: 1}[scale]
+	return map[string]any{
+		"Name":                       name,
+		"DiskReadBytesPersec":        reads * 4096 * scale,
+		"DiskWriteBytesPersec":       writes * 65536 * scale,
+		"DiskReadsPersec":            uint32(reads),
+		"DiskWritesPersec":           uint32(writes),
+		"SplitIOPerSec":              uint32(7 * uptime),
+		"CurrentDiskQueueLength":     uint32(3),
+		"PercentDiskTime":            readTime + writeTime,
+		"PercentDiskReadTime":        readTime,
+		"PercentDiskWriteTime":       writeTime,
+		"PercentIdleTime":            uptime * 10000000 * idleFifths / 5,
+		"PercentIdleTime_Base":       133000000000000000 + uptime*10000000,
+		"AvgDisksecPerRead":          uint32(readTime),
+		"AvgDisksecPerRead_Base":     uint32(reads),
+		"AvgDiskReadQueueLength":     readTime,
+		"AvgDisksecPerWrite":         uint32(writeTime),
+		"AvgDisksecPerWrite_Base":    uint32(writes),
+		"AvgDiskWriteQueueLength":    writeTime,
+		"AvgDisksecPerTransfer":      uint32(readTime + writeTime),
+		"AvgDisksecPerTransfer_Base": uint32(reads + writes),
+		"AvgDiskQueueLength":         readTime + writeTime,
+		"AvgDiskBytesPerRead":        reads * 4096 * scale,
+		"AvgDiskBytesPerRead_Base":   uint32(reads),
+		"AvgDiskBytesPerWrite":       writes * 65536 * scale,
+		"AvgDiskBytesPerWrite_Base":  uint32(writes),
+		"Frequency_PerfTime":         uint64(10000000),
+	}
 }
 
 type nativeDimension struct {
@@ -404,7 +452,11 @@ func publishedCharts(t *testing.T) []wireChart {
 // src/collectors/windows.plugin/GetSystemUptime.c (system.uptime),
 // src/collectors/windows.plugin/perflib-network.c (system.net and the net.*
 // interface charts) and
-// src/collectors/windows.plugin/perflib-storage.c (disk.space). The ping.*
+// src/collectors/windows.plugin/perflib-storage.c (disk.space) with
+// src/collectors/common-contexts/system-io.h and disk-*.h (system.io and the
+// physical disk charts; the native disk.split dimension is named discards).
+// Native average times are sent in microseconds with a divisor of 1000, as
+// common_disk_await and common_disk_svctm do. The ping.*
 // entries are the wire form of the go.d ping collector's definitions, which
 // TestPingChartsMatchPingCollector compares with that collector's template.
 // Native CPU dimensions use the percent-of-total-delta algorithm, which this
@@ -429,6 +481,13 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 	}
 	single := func(name, algorithm string, divisor int) []wireDimension {
 		return []wireDimension{{name: name, algorithm: algorithm, multiplier: 1, divisor: divisor}}
+	}
+	// readsWrites lists the native disk charts' reads and negated writes.
+	readsWrites := func(algorithm string, divisor int) []wireDimension {
+		return []wireDimension{
+			{name: "reads", algorithm: algorithm, multiplier: 1, divisor: divisor},
+			{name: "writes", algorithm: algorithm, multiplier: -1, divisor: divisor},
+		}
 	}
 	// unscaled lists dimensions without a multiplier or divisor.
 	unscaled := func(algorithm string, names ...string) []wireDimension {
@@ -736,6 +795,89 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 				{name: "used", algorithm: "absolute", multiplier: 1, divisor: 1073741824},
 			},
 		},
+		"system.io": {
+			family:    "disk",
+			title:     "Disk I/O",
+			units:     "KiB/s",
+			chartType: "area",
+			dimensions: []wireDimension{
+				{name: "reads", algorithm: "incremental", multiplier: 1, divisor: 1024},
+				{name: "writes", algorithm: "incremental", multiplier: -1, divisor: 1024},
+			},
+		},
+		"disk.io": {
+			family:    "io",
+			title:     "Disk I/O Bandwidth",
+			units:     "KiB/s",
+			chartType: "area",
+			dimensions: []wireDimension{
+				{name: "reads", algorithm: "incremental", multiplier: 1, divisor: 1024},
+				{name: "writes", algorithm: "incremental", multiplier: -1, divisor: 1024},
+			},
+		},
+		"disk.ops": {
+			family:     "ops",
+			title:      "Disk Completed I/O Operations",
+			units:      "operations/s",
+			chartType:  "line",
+			dimensions: readsWrites("incremental", 1),
+		},
+		"disk.util": {
+			family:     "utilization",
+			title:      "Disk Utilization Time",
+			units:      "% of time working",
+			chartType:  "area",
+			dimensions: single("utilization", "absolute", 1),
+		},
+		"disk.busy": {
+			family:     "utilization",
+			title:      "Disk Busy Time",
+			units:      "milliseconds",
+			chartType:  "area",
+			dimensions: single("busy", "incremental", 1),
+		},
+		"disk.iotime": {
+			family:     "utilization",
+			title:      "Disk Total I/O Time",
+			units:      "milliseconds/s",
+			chartType:  "area",
+			dimensions: readsWrites("incremental", 1),
+		},
+		"disk.qops": {
+			family:     "ops",
+			title:      "Disk Current I/O Operations",
+			units:      "operations",
+			chartType:  "line",
+			dimensions: single("operations", "absolute", 1),
+		},
+		"disk.await": {
+			family:     "latency",
+			title:      "Average Completed I/O Operation Time",
+			units:      "milliseconds/operation",
+			chartType:  "line",
+			dimensions: readsWrites("absolute", 1000),
+		},
+		"disk.svctm": {
+			family:     "latency",
+			title:      "Average Service Time",
+			units:      "milliseconds/operation",
+			chartType:  "line",
+			dimensions: single("svctm", "absolute", 1000),
+		},
+		"disk.avgsz": {
+			family:     "io",
+			title:      "Average Completed I/O Operation Bandwidth",
+			units:      "KiB/operation",
+			chartType:  "area",
+			dimensions: readsWrites("absolute", 1024),
+		},
+		"disk.split": {
+			family:     "iops",
+			title:      "Split I/O Operations",
+			units:      "operations/s",
+			chartType:  "line",
+			dimensions: single("discards", "incremental", 1),
+		},
 		"ping.host_rtt": {
 			family:    "latency",
 			title:     "Ping round-trip time",
@@ -809,6 +951,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			"rw_mode":       "rw",
 			"serial_number": "0xABCD",
 		}),
+		instance("system.io", map[string]string{}),
 		instance("ping.host_rtt", map[string]string{"host": "windows.example.com"}),
 		instance("ping.host_std_dev_rtt", map[string]string{"host": "windows.example.com"}),
 		instance("ping.host_packet_loss", map[string]string{"host": "windows.example.com"}),
@@ -822,6 +965,25 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			want = append(want,
 				instance(context, map[string]string{"device": "Uplink", "interface_type": "real"}),
 				instance(context, map[string]string{"device": "Team Member", "interface_type": "virtual"}),
+			)
+		}
+		// The native agent labels the device ID with slashes for backslashes
+		// too, and gives a disk without a lettered volume an empty mount point,
+		// which the Agent stores as [none].
+		if strings.HasPrefix(context, "disk.") && context != "disk.space" {
+			want = append(want,
+				instance(context, map[string]string{
+					"device":      "Disk 0",
+					"mount_point": "C:",
+					"model":       "QEMU HARDDISK",
+					"device_id":   "//./PHYSICALDRIVE0",
+				}),
+				instance(context, map[string]string{
+					"device":      "Disk 1",
+					"mount_point": "",
+					"model":       "Virtual Disk",
+					"device_id":   "//./PHYSICALDRIVE1",
+				}),
 			)
 		}
 	}
@@ -876,6 +1038,110 @@ func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
 				for dimension, value := range samples[id] {
 					got[device][nativeDimension{chart.context, dimension}] = value
 				}
+			}
+		}
+		assert.Equal(t, want, got)
+	})
+}
+
+// TestCollector_DiskCountersFeedNativeDimensions checks that each PhysicalDisk
+// counter reaches the native chart dimension that reads it
+// (src/collectors/windows.plugin/perflib-storage.c, do_physical_disk), and that
+// the interval values follow the native formulas for the rates of
+// timedDiskRow, whose read time wraps its 32 bits more than once per interval.
+func TestCollector_DiskCountersFeedNativeDimensions(t *testing.T) {
+	native := map[string]nativeDimension{
+		"DiskReadBytesPersec":    {"disk.io", "reads"},
+		"DiskWriteBytesPersec":   {"disk.io", "writes"},
+		"DiskReadsPersec":        {"disk.ops", "reads"},
+		"DiskWritesPersec":       {"disk.ops", "writes"},
+		"SplitIOPerSec":          {"disk.split", "discards"},
+		"CurrentDiskQueueLength": {"disk.qops", "operations"},
+	}
+	// Native times in whole milliseconds: 100 ns units / 10000.
+	nativeTimes := map[string]nativeDimension{
+		"PercentDiskTime":      {"disk.busy", "busy"},
+		"PercentDiskReadTime":  {"disk.iotime", "reads"},
+		"PercentDiskWriteTime": {"disk.iotime", "writes"},
+	}
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		charts := parseCharts(t, collect(c.UpdateEvery))
+		time.Sleep(time.Duration(c.UpdateEvery) * time.Second)
+		output := collect(2 * c.UpdateEvery)
+		samples := parseSamples(t, output)
+		maps.Copy(charts, parseCharts(t, output))
+
+		want := make(map[string]map[nativeDimension]float64)
+		var totalRead, totalWritten float64
+		for device, scale := range map[string]uint64{"Disk 0": 1, "Disk 1": 2} {
+			row := timedDiskRow("", scale)
+			want[device] = make(map[nativeDimension]float64)
+			for property, dimension := range native {
+				switch value := row[property].(type) {
+				case uint32:
+					want[device][dimension] = float64(value)
+				case uint64:
+					want[device][dimension] = float64(value)
+				}
+			}
+			for property, dimension := range nativeTimes {
+				want[device][dimension] = float64(row[property].(uint64) / 10000)
+			}
+			totalRead += float64(row["DiskReadBytesPersec"].(uint64))
+			totalWritten += float64(row["DiskWriteBytesPersec"].(uint64))
+		}
+		// Utilization: 100 less the idle share. Times: reads take scale ms,
+		// writes 4 * scale ms, and a transfer (20000 * scale + 50 * 4 * scale) /
+		// 20050 ms on average, all sent in whole microseconds. Sizes in bytes.
+		for device, values := range map[string]map[nativeDimension]float64{
+			"Disk 0": {
+				{"disk.util", "utilization"}: 40,
+				{"disk.await", "reads"}:      1000,
+				{"disk.await", "writes"}:     4000,
+				{"disk.svctm", "svctm"}:      1007,
+				{"disk.avgsz", "reads"}:      4096,
+				{"disk.avgsz", "writes"}:     65536,
+			},
+			"Disk 1": {
+				{"disk.util", "utilization"}: 80,
+				{"disk.await", "reads"}:      2000,
+				{"disk.await", "writes"}:     8000,
+				{"disk.svctm", "svctm"}:      2014,
+				{"disk.avgsz", "reads"}:      8192,
+				{"disk.avgsz", "writes"}:     131072,
+			},
+		} {
+			maps.Copy(want[device], values)
+		}
+		want[""] = map[nativeDimension]float64{
+			{"system.io", "reads"}:  totalRead,
+			{"system.io", "writes"}: totalWritten,
+		}
+
+		got := make(map[string]map[nativeDimension]float64)
+		for id, chart := range charts {
+			if !strings.HasPrefix(chart.context, "disk.") && chart.context != "system.io" ||
+				chart.context == "disk.space" {
+				continue
+			}
+			device := chart.labels["device"]
+			if got[device] == nil {
+				got[device] = make(map[nativeDimension]float64)
+			}
+			for dimension, value := range samples[id] {
+				got[device][nativeDimension{chart.context, dimension}] = value
 			}
 		}
 		assert.Equal(t, want, got)
