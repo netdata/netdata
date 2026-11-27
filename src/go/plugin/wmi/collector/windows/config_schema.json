@@ -78,6 +78,12 @@
             "type": "boolean",
             "default": true
           },
+          "system": {
+            "title": "System",
+            "description": "Collect the number of processes and threads, context switches, processor queue length and uptime.",
+            "type": "boolean",
+            "default": true
+          },
           "network": {
             "title": "Network",
             "description": "Collect traffic, packets, errors, drops, speed and output queue length per network interface, and the host's total traffic.",

@@ -50,7 +50,7 @@ func TestInventoryRefresh(t *testing.T) {
 		require.NoError(t, c.Check(t.Context()))
 		require.Equal(
 			t,
-			[]string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 			session.queries,
 			"readiness must only wait for metrics",
 		)
@@ -84,7 +84,11 @@ func TestInventoryRefresh(t *testing.T) {
 		metrics, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
 		require.NotEmpty(t, metrics)
-		assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk}, session.queries)
+		assert.Equal(
+			t,
+			[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			session.queries,
+		)
 		time.Sleep(inventoryInterval)
 		session.results[queryOSInfo] = queryResult{
 			err: errors.New("withheld"),
@@ -154,7 +158,11 @@ func TestInventoryDisabledQueries(t *testing.T) {
 			_, err := collecttest.CollectScalarSeries(c)
 			require.NoError(t, err)
 			if vnode != "" {
-				assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters}, session.queries)
+				assert.Equal(
+					t,
+					[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters},
+					session.queries,
+				)
 				return
 			}
 			assert.Contains(t, session.queries, queryOSInfo)
@@ -181,6 +189,19 @@ func TestInventoryStopsWhenSessionIsLost(t *testing.T) {
 
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Equal(t, []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk, queryOSInfo, querySystemInfo}, session.queries)
+	assert.Equal(
+		t,
+		[]string{
+			queryCPU,
+			queryMemory,
+			querySystem,
+			queryNetworkInterfaces,
+			queryNetworkAdapters,
+			queryDisk,
+			queryOSInfo,
+			querySystemInfo,
+		},
+		session.queries,
+	)
 	assert.Equal(t, "FILE01", c.VirtualNode().Hostname, "providers read before the failure are published")
 }

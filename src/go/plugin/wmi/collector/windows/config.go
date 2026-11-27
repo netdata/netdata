@@ -47,6 +47,7 @@ func (transportSpec) Default() string  { return transportDCOM }
 type Collectors struct {
 	CPU     *bool `yaml:"cpu,omitempty"     json:"cpu,omitempty"`
 	Memory  *bool `yaml:"memory,omitempty"  json:"memory,omitempty"`
+	System  *bool `yaml:"system,omitempty"  json:"system,omitempty"`
 	Network *bool `yaml:"network,omitempty" json:"network,omitempty"`
 	Disk    *bool `yaml:"disk,omitempty"    json:"disk,omitempty"`
 }
@@ -90,8 +91,8 @@ func (c *Config) validate() error {
 		return publicError("timeout must be positive")
 	}
 	groups := c.Collectors
-	if !groupEnabled(groups.CPU) && !groupEnabled(groups.Memory) && !groupEnabled(groups.Network) &&
-		!groupEnabled(groups.Disk) {
+	if !groupEnabled(groups.CPU) && !groupEnabled(groups.Memory) && !groupEnabled(groups.System) &&
+		!groupEnabled(groups.Network) && !groupEnabled(groups.Disk) {
 		return publicError("at least one collector group must be enabled")
 	}
 	return nil

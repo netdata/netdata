@@ -214,6 +214,7 @@ func TestCollector_Ping(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := configuredCollector()
 			c.Collectors.CPU = new(false)
+			c.Collectors.System = new(false)
 			c.Collectors.Network = new(false)
 			c.Collectors.Disk = new(false)
 			ping := &fakePinger{

@@ -24,26 +24,26 @@ func TestCollector_GroupConfig(t *testing.T) {
 		wantQueries []string
 	}{
 		"omitted": {
-			wantQueries: []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			wantQueries: []string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 		},
 		"empty object": {
 			yamlGroups:  "collectors: {}\n",
 			jsonGroups:  `,"collectors":{}`,
-			wantQueries: []string{queryCPU, queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			wantQueries: []string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 		},
 		"disable one group": {
 			yamlGroups:  "collectors: {cpu: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false}`,
-			wantQueries: []string{queryMemory, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			wantQueries: []string{queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
 		},
 		"one group only": {
-			yamlGroups:  "collectors: {cpu: false, memory: true, network: false, disk: false}\n",
-			jsonGroups:  `,"collectors":{"cpu":false,"memory":true,"network":false,"disk":false}`,
-			wantQueries: []string{queryMemory},
+			yamlGroups:  "collectors: {cpu: false, memory: false, system: true, network: false, disk: false}\n",
+			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":true,"network":false,"disk":false}`,
+			wantQueries: []string{querySystem},
 		},
 		"all disabled": {
-			yamlGroups: "collectors: {cpu: false, memory: false, network: false, disk: false}\n",
-			jsonGroups: `,"collectors":{"cpu":false,"memory":false,"network":false,"disk":false}`,
+			yamlGroups: "collectors: {cpu: false, memory: false, system: false, network: false, disk: false}\n",
+			jsonGroups: `,"collectors":{"cpu":false,"memory":false,"system":false,"network":false,"disk":false}`,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

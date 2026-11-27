@@ -389,6 +389,10 @@ func publishedCharts(t *testing.T) []wireChart {
 // contexts are the native Windows Agent's
 // src/collectors/windows.plugin/perflib-processor.c (system.cpu, cpu.cpu),
 // src/collectors/common-contexts/system-ram.h (system.ram),
+// src/collectors/windows.plugin/perflib-processes.c with
+// src/collectors/common-contexts/system-processes.h (system.processes,
+// system.threads, system.ctxt, system.processor_queue_length),
+// src/collectors/windows.plugin/GetSystemUptime.c (system.uptime),
 // src/collectors/windows.plugin/perflib-network.c (system.net and the net.*
 // interface charts) and
 // src/collectors/windows.plugin/perflib-storage.c (disk.space). The ping.*
@@ -437,6 +441,36 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 				{name: "free", algorithm: "absolute", multiplier: 1, divisor: 1048576},
 				{name: "used", algorithm: "absolute", multiplier: 1, divisor: 1048576},
 			},
+		},
+		"system.processes": {
+			title:      "System Processes",
+			units:      "processes",
+			chartType:  "line",
+			dimensions: single("running", "absolute", 1),
+		},
+		"system.threads": {
+			title:      "Threads",
+			units:      "threads",
+			chartType:  "line",
+			dimensions: single("threads", "absolute", 1),
+		},
+		"system.ctxt": {
+			title:      "CPU Context Switches",
+			units:      "context switches/s",
+			chartType:  "line",
+			dimensions: single("switches", "incremental", 1),
+		},
+		"system.processor_queue_length": {
+			title:      "The number of threads in the processor queue.",
+			units:      "threads",
+			chartType:  "line",
+			dimensions: single("threads", "absolute", 1),
+		},
+		"system.uptime": {
+			title:      "System Uptime",
+			units:      "seconds",
+			chartType:  "line",
+			dimensions: single("uptime", "absolute", 1000),
 		},
 		"system.net": {
 			title:      "Physical Network Interfaces Aggregated Bandwidth",
@@ -571,6 +605,11 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("cpu.cpu", map[string]string{"cpu": "cpu0"}),
 		instance("cpu.cpu", map[string]string{"cpu": "cpu1"}),
 		instance("system.ram", map[string]string{}),
+		instance("system.processes", map[string]string{}),
+		instance("system.threads", map[string]string{}),
+		instance("system.ctxt", map[string]string{}),
+		instance("system.processor_queue_length", map[string]string{}),
+		instance("system.uptime", map[string]string{}),
 		instance("system.net", map[string]string{}),
 		instance("net.net", map[string]string{"device": "Ethernet", "interface_type": "real"}),
 		instance("net.net", map[string]string{"device": "Ethernet#1", "interface_type": "real"}),
@@ -634,7 +673,9 @@ func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
 				}
 			}
 			// The native agent sets net.net's nic_speed_max to the speed in kilobits/s.
-			want[device][nativeDimension{"net.net", "$nic_speed_max"}] = float64(row["CurrentBandwidth"].(uint64)) / 1000
+			want[device][nativeDimension{"net.net", "$nic_speed_max"}] = float64(
+				row["CurrentBandwidth"].(uint64),
+			) / 1000
 			got[device] = make(map[nativeDimension]float64)
 			for id, chart := range charts {
 				if chart.labels["device"] != device {
@@ -642,6 +683,55 @@ func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
 				}
 				for dimension, value := range samples[id] {
 					got[device][nativeDimension{chart.context, dimension}] = value
+				}
+			}
+		}
+		assert.Equal(t, want, got)
+	})
+}
+
+// TestCollector_SystemCountersFeedNativeDimensions checks that each System
+// counter reaches the native chart dimension that reads it
+// (src/collectors/windows.plugin/perflib-processes.c, do_processes and
+// do_processor_queue), and that uptime arrives in milliseconds since boot, as
+// GetSystemUptime.c sends GetTickCount64().
+func TestCollector_SystemCountersFeedNativeDimensions(t *testing.T) {
+	native := map[string]nativeDimension{
+		"Processes":             {"system.processes", "running"},
+		"Threads":               {"system.threads", "threads"},
+		"ContextSwitchesPersec": {"system.ctxt", "switches"},
+		"ProcessorQueueLength":  {"system.processor_queue_length", "threads"},
+	}
+	row := systemRow()
+	boot, now, frequency := row["SystemUpTime"].(uint64), row["Timestamp_Object"].(uint64), row["Frequency_Object"].(uint64)
+	want := map[nativeDimension]float64{
+		{"system.uptime", "uptime"}: float64((now - boot) * 1000 / frequency),
+	}
+	for property, dimension := range native {
+		want[dimension] = float64(row[property].(uint32))
+	}
+
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		output := collect(c.UpdateEvery)
+		samples := parseSamples(t, output)
+
+		got := make(map[nativeDimension]float64)
+		for id, chart := range parseCharts(t, output) {
+			for dimension, value := range samples[id] {
+				if _, ok := want[nativeDimension{chart.context, dimension}]; ok {
+					got[nativeDimension{chart.context, dimension}] = value
 				}
 			}
 		}

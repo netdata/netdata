@@ -57,6 +57,7 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	groups := [...]metricGroup{
 		{name: "CPU", enabled: groupEnabled(c.Collectors.CPU), query: queryCPU, read: snapshot.readCPU},
 		{name: "memory", enabled: groupEnabled(c.Collectors.Memory), query: queryMemory, read: snapshot.readMemory},
+		{name: "system", enabled: groupEnabled(c.Collectors.System), query: querySystem, read: snapshot.readSystem},
 		{
 			name:    "network",
 			enabled: groupEnabled(c.Collectors.Network),

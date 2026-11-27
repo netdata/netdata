@@ -27,12 +27,13 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor CPU, memory, network interfaces and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them.
+          Monitor CPU, memory, processes, network interfaces and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
           - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
           - free and used physical memory;
+          - the number of processes and threads, context switches, processor queue length and uptime;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - available and used space per fixed drive;
           - round-trip time and packet loss of ICMP ping from the poller;
@@ -60,6 +61,7 @@ modules:
           |---|---|
           | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
           | Memory | `Win32_OperatingSystem` |
+          | System | `Win32_PerfRawData_PerfOS_System` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter` |
           | Disk | `Win32_LogicalDisk` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
@@ -76,7 +78,7 @@ modules:
           | **Enable Account** and **Remote Enable** on the `root\cimv2` WMI namespace | Always |
           | Membership in the local **Distributed COM Users** group | `transport: dcom` |
           | Membership in the local **Remote Management Users** group | `transport: winrm` |
-          | Membership in the local **Performance Monitor Users** group | The CPU or network group is enabled |
+          | Membership in the local **Performance Monitor Users** group | The CPU, system or network group is enabled |
 
           The plugin only reads: do not grant **Execute Methods**, write or full-control permissions. See [Securing a remote WMI connection](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
 
@@ -98,12 +100,13 @@ modules:
             - Stopping or removing a job leaves its charts on the generated node, which then turns Stale. A job restarted after an edit does not remove the charts it no longer sends, such as those of a metric group you switched off: they stay on the node without new data.
             - With `update_every` shorter than `timeout`, one unusually slow collection can raise `wmi_host_last_collected_secs` for a moment. Keep `update_every` at least as long as `timeout`, as the defaults (30 and 15 seconds) are.
             - After five failed collections in a row, the plugin waits longer between attempts, up to 10 minutes more than `update_every`. A host that comes back after a long outage can take that long to turn live again.
+            - `system_reboot_detection` sees a reboot only when a collection succeeds within the host's first 10 minutes of uptime. After a long outage, the longer wait between attempts can miss that window; the `wmi_host_last_collected_secs` alert reports the outage instead.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
         performance_impact:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to five WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to six WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -242,6 +245,11 @@ modules:
               default_value: true
               required: false
               group: Collection
+            - name: collectors.system
+              description: "Collect the number of processes and threads, context switches, processor queue length and uptime."
+              default_value: true
+              required: false
+              group: Collection
             - name: collectors.network
               description: "Collect traffic, packets, errors, drops, speed and output queue length per network interface, and the host's total traffic."
               default_value: true
@@ -362,7 +370,7 @@ modules:
             fix: Remove `timeout` to use the default of 15 seconds, or set a positive number of seconds.
           - error: 'at least one collector group must be enabled'
             cause: Every group under `collectors` is set to `false`.
-            fix: Enable at least one of `cpu`, `memory`, `network` or `disk`, or remove `collectors` to collect them all.
+            fix: Enable at least one of `cpu`, `memory`, `system`, `network` or `disk`, or remove `collectors` to collect them all.
           - error: 'failed to open WMI session: open DCOM object resolver interface: connection refused'
             when: '`transport: dcom`'
             cause: Nothing accepts connections on TCP 135 at the configured `host`, or a firewall rejects them.
@@ -440,6 +448,7 @@ modules:
       description: |
         - Charts belong to the Windows host's node, not to the poller.
         - CPU utilization and the per-second rates, such as traffic, packets and errors, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
+        - Processes, threads and the processor queue length are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
       availability: []
@@ -465,6 +474,36 @@ modules:
               dimensions:
                 - name: free
                 - name: used
+            - name: system.processes
+              description: System Processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: system.threads
+              description: Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: context switches/s
+              chart_type: line
+              dimensions:
+                - name: switches
+            - name: system.processor_queue_length
+              description: The number of threads in the processor queue.
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: system.uptime
+              description: System Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
             - name: system.net
               description: Physical Network Interfaces Aggregated Bandwidth
               unit: kilobits/s

@@ -15,6 +15,7 @@ type observations struct {
 	cpu        cpuUtilization
 	memoryFree sample
 	memoryUsed sample
+	system     systemCounters
 	interfaces []networkInterface
 	// netTotalReceived and netTotalSent sum the byte totals of the Network
 	// Interface instances; physicalInterfaces names them.
