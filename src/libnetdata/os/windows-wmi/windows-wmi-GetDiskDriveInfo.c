@@ -17,6 +17,8 @@ size_t GetDiskDriveInfo(ND_WMI *wmi, DiskDriveInfoWMI *diskInfoArray, size_t arr
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, error_priority, "GetDiskDriveInfo() %s. Error code = 0x%X",
                failed_step ? failed_step : "WMI connect failed", hr);
+        // A cancelled handle fails here while still holding an earlier connection.
+        nd_wmi_disconnect(wmi);
         return 0;
     }
 

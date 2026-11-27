@@ -405,6 +405,7 @@ static bool disk_wmi_stop(void)
             Sleep(10);
 
         if (!InterlockedCompareExchange(&disk_wmi.finished, 1, 1)) {
+            errno_clear();
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
@@ -4105,10 +4106,6 @@ void do_PerflibStorage_cleanup(void)
     netdata_cond_broadcast(&volume_space_cond);
     netdata_mutex_unlock(&volume_space_mutex);
 
-    // The disk metadata worker uses only its own state, which disk_wmi_stop() keeps when the worker does not exit,
-    // so the rest of the cleanup does not depend on it.
-    disk_wmi_stop();
-
     for (size_t i = 0; i < VOLUME_SPACE_WORKER_SLOT_COUNT; i++)
         if (volume_space_threads[i])
             nd_thread_signal_cancel(volume_space_threads[i]);
@@ -4116,6 +4113,10 @@ void do_PerflibStorage_cleanup(void)
     for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++)
         if (mount_points_threads[i])
             nd_thread_signal_cancel(mount_points_threads[i]);
+
+    // With the other workers already cancelling their I/O, stop the disk metadata worker. It uses only its own
+    // state, which disk_wmi_stop() keeps when the worker does not exit, so the rest of the cleanup does not depend on it.
+    disk_wmi_stop();
 
     if (!perflib_storage_join_workers(
             volume_space_threads,
