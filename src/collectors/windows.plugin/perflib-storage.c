@@ -48,7 +48,7 @@ struct physical_disk {
     usec_t first_seen_ut;
     usec_t wmi_retry_after_ut;
     usec_t wmi_retry_every_ut;  // doubles after each miss, up to DISK_WMI_RETRY_MAX_UT
-    uint64_t wmi_checked_seq;   // the newest probe result this disk was looked up in
+    uint64_t wmi_checked_seq;   // the newest probe result this disk was looked up in; 0 until its first probe
 
     STRING *device;
     STRING *mount_point;
@@ -3549,8 +3549,10 @@ static void physical_disk_wmi_update(struct physical_disk *d, int device_index, 
     DiskDriveInfoWMI info;
 
     if (!d->wmi_seq) {
-        // While waiting to retry, use a newer result that another disk asked for, without asking for one.
-        if (disk_wmi_lookup(d->wmi_checked_seq + 1, device_index, &info, &d->wmi_checked_seq) == DISK_WMI_FOUND) {
+        // While waiting to retry, use a newer result that another disk asked for, without asking for one. A disk
+        // that has not had a probe of its own yet must not use a result from before it appeared.
+        if (d->wmi_checked_seq &&
+            disk_wmi_lookup(d->wmi_checked_seq + 1, device_index, &info, &d->wmi_checked_seq) == DISK_WMI_FOUND) {
             physical_disk_wmi_found(d, &info);
             return;
         }
@@ -3678,6 +3680,12 @@ static int physical_disk_wmi_unittest_run(void)
     physical_disk_wmi_update(&d1, 1, waiting);
     errors += mount_points_unittest_expect("a waiting disk uses a newer result",
                                            !d1.wmi_pending && strcmp(string2str(d1.model), "model-1b") == 0);
+
+    // a disk that replaces another with the same index ignores the result from before it appeared
+    struct physical_disk d2 = { .wmi_pending = true, .first_seen_ut = waiting };
+    physical_disk_wmi_update(&d2, 1, waiting);
+    errors += mount_points_unittest_expect("a new disk ignores a result from before it appeared",
+                                           d2.wmi_pending && !d2.model && d2.wmi_seq == disk_wmi_posted_seq + 1);
 
     string_freez(d0.model);
     string_freez(d0.device_id);
