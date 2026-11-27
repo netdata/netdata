@@ -1018,6 +1018,82 @@ func TestReadDisks(t *testing.T) {
 	}
 }
 
+// TestCollector_SumsBothIPVersions checks the TCP values for both IP versions.
+// A sum needs both versions from the same poll. It wraps at 32 bits, like the
+// counters it adds, so the Agent unwraps it as it unwraps each counter: its
+// incremental algorithm (src/database/rrdset-collection.c) takes a drop for a
+// 32-bit wrap only while every value it collected fits in 32 bits, and counts
+// the interval as 0 otherwise.
+func TestCollector_SumsBothIPVersions(t *testing.T) {
+	received := func(segments uint32) queryResult {
+		return fixtureRows(map[string]any{"SegmentsReceivedPersec": segments})
+	}
+	failed := queryResult{
+		err: errors.New("invalid class"),
+	}
+	for name, tc := range map[string]struct {
+		tcpv4 queryResult
+		tcpv6 queryResult
+		want  map[string]metrix.SampleValue
+	}{
+		"both versions": {
+			tcpv4: received(1000),
+			tcpv6: received(20),
+			want: map[string]metrix.SampleValue{
+				"ipv4_tcp_segments_received": 1000,
+				"ipv6_tcp_segments_received": 20,
+				"tcp_segments_received":      1020,
+			},
+		},
+		"without IPv6": {
+			tcpv4: received(1000),
+			tcpv6: failed,
+			want: map[string]metrix.SampleValue{
+				"ipv4_tcp_segments_received": 1000,
+			},
+		},
+		"without IPv4": {
+			tcpv4: failed,
+			tcpv6: received(20),
+			want: map[string]metrix.SampleValue{
+				"ipv6_tcp_segments_received": 20,
+			},
+		},
+		"a sum past 32 bits wraps": {
+			tcpv4: received(math.MaxUint32 - 9),
+			tcpv6: received(30),
+			want: map[string]metrix.SampleValue{
+				"ipv4_tcp_segments_received": math.MaxUint32 - 9,
+				"ipv6_tcp_segments_received": 30,
+				"tcp_segments_received":      20,
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := configuredCollector()
+			c.Collectors.CPU = new(false)
+			c.Collectors.Memory = new(false)
+			c.Collectors.System = new(false)
+			c.Collectors.Disk = new(false)
+			session := &fakeSession{
+				results: map[string]queryResult{
+					queryNetworkInterfaces: fixtureRows(),
+					queryTCPv4:             tc.tcpv4,
+					queryTCPv6:             tc.tcpv6,
+					queryUDPv4:             failed,
+					queryUDPv6:             failed,
+				},
+			}
+			c.newSession = func(context.Context) (querySession, error) { return session, nil }
+			require.NoError(t, c.Init(t.Context()))
+
+			metrics, err := collecttest.CollectScalarSeries(c)
+			require.NoError(t, err)
+			assert.Equal(t, withAnsweredPing(tc.want), metrics)
+		})
+	}
+}
+
 func TestReadSystem(t *testing.T) {
 	valid := func(v uint64) sample {
 		return sample{

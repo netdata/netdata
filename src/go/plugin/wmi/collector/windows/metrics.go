@@ -165,12 +165,15 @@ func (i counterInstrument) observe(s sample, labels ...metrix.LabelSet) {
 // protocolInstruments records a TCP or UDP counter as its protocolCounter
 // selects: per IP version, for both versions summed, or both.
 type protocolInstruments struct {
+	counter  protocolCounter
 	versions [ipVersions]counterInstrument
 	summed   counterInstrument
 }
 
 func newProtocolInstruments(m metrix.SnapshotMeter, counter protocolCounter) protocolInstruments {
-	var p protocolInstruments
+	p := protocolInstruments{
+		counter: counter,
+	}
 	if counter.perVersion {
 		for version, prefix := range ipVersionPrefixes {
 			p.versions[version] = newCounterInstrument(m, prefix+counter.metric, counter.total)
@@ -182,13 +185,13 @@ func newProtocolInstruments(m metrix.SnapshotMeter, counter protocolCounter) pro
 	return p
 }
 
-func (p protocolInstruments) observe(counter protocolCounter, values [ipVersions]sample) {
-	if counter.perVersion {
+func (p protocolInstruments) observe(values [ipVersions]sample) {
+	if p.counter.perVersion {
 		for version, s := range values {
 			p.versions[version].observe(s)
 		}
 	}
-	if counter.summed {
+	if p.counter.summed {
 		p.summed.observe(bothVersions(values))
 	}
 }
@@ -262,14 +265,14 @@ func (m collectorMetrics) write(snapshot observations) {
 			m.netSpeedKbps.Observe(float64(speed.value)/1000, labels)
 		}
 	}
-	for i, counter := range tcpCounters {
-		m.tcp[i].observe(counter, [ipVersions]sample{
+	for i := range tcpCounters {
+		m.tcp[i].observe([ipVersions]sample{
 			ipv4: snapshot.tcp[ipv4][i],
 			ipv6: snapshot.tcp[ipv6][i],
 		})
 	}
-	for i, counter := range udpCounters {
-		m.udp[i].observe(counter, [ipVersions]sample{
+	for i := range udpCounters {
+		m.udp[i].observe([ipVersions]sample{
 			ipv4: snapshot.udp[ipv4][i],
 			ipv6: snapshot.udp[ipv6][i],
 		})

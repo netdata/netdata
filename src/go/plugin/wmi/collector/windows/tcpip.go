@@ -96,12 +96,17 @@ func readProtocol(rows []map[string]any, counters []protocolCounter, values []sa
 // bothVersions adds the IPv4 and IPv6 values of a counter, as the native
 // Windows Agent adds its TCP segments. Without one of them there is no sum: a
 // sum of one version would jump when the other returns.
+//
+// The counters are 32 bits wide, so the sum wraps at 32 bits too: it is the
+// total of both versions modulo 2^32, which the Agent unwraps like any 32-bit
+// counter. A plain sum can exceed 32 bits, after which the Agent counts each
+// wrap of either version as an interval of 0.
 func bothVersions(values [ipVersions]sample) sample {
 	if !values[ipv4].valid || !values[ipv6].valid {
 		return sample{}
 	}
 	return sample{
-		value: values[ipv4].value + values[ipv6].value,
+		value: uint64(uint32(values[ipv4].value + values[ipv6].value)),
 		valid: true,
 	}
 }
