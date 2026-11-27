@@ -63,3 +63,31 @@ fn data_point_round_trip() {
     assert_eq!(back.timestamp_ms, 42);
     assert_eq!(back.items, vec![[1, 2, 3], [4, 5, 6]]);
 }
+
+/// The `info` descriptor advertises the v3 history-table shape the MCP
+/// function registry reads: `v` (POST support), `type`, `has_history`,
+/// and the microsecond timestamp cursor used for pagination. A
+/// whole-value comparison also catches a stray `version` key from the
+/// pre-v3 shape.
+#[test]
+fn info_response_describes_v3_history_table() {
+    let v = serde_json::to_value(InfoResponse::default()).unwrap();
+    assert_eq!(
+        v,
+        serde_json::json!({
+            "v": 3,
+            "status": 200,
+            "accepted_params": ACCEPTED_PARAMS,
+            "required_params": [],
+            "has_history": true,
+            "pagination": {
+                "enabled": true,
+                "key": "anchor",
+                "column": "timestamp",
+                "units": "timestamp_usec",
+            },
+            "type": "table",
+            "help": "Query and visualize OpenTelemetry logs.",
+        })
+    );
+}
