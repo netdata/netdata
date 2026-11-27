@@ -134,6 +134,16 @@ option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
+# Optional system libraries. Each one is used when pkg-config finds it, which
+# makes the result depend on what the build host has installed. A distribution
+# that builds all its packages in one shared sysroot cannot control that, so
+# these let it decline a library, or the one tool that needs it, explicitly.
+option(USE_ZSTD "Use zstd for compression if it is found" True)
+option(USE_BROTLI "Use brotli for compression if it is found" True)
+option(USE_LIBMNL "Use libmnl if it is found" True)
+option(USE_LIBCAP "Use libcap for capabilities if it is found" True)
+option(ENABLE_LOG2JOURNAL "Build log2journal if PCRE2 is found" True)
+
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)

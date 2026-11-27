@@ -9,7 +9,8 @@
 # harmless and it keeps "what do we depend on" free of "what are we building today".
 # Then every requirement: which of those results are mandatory, and under what
 # condition. Read together with the exceptions, the two halves are the whole
-# dependency contract.
+# dependency contract. Between them sits a short list of opt-outs, for optional
+# libraries that a packager may want to decline even when they are installed.
 #
 # What stays out of the second half is derivation. Whether a dependency is mandatory
 # is a fact about the dependency and belongs here; what a found dependency switches
@@ -124,6 +125,24 @@ pkg_check_modules(MONGOC libmongoc-1.0>=1.7)
 pkg_check_modules(ELF libelf)
 
 #
+# Opt-outs.
+#
+# The lookups above take whatever the build host has installed. For the
+# libraries below that is the only thing deciding whether they are used, so a
+# packager gets a switch to decline each. The lookup still runs, and a normal
+# variable then shadows its cached result for the rest of the configure run,
+# which keeps every reader of the *_FOUND variables unchanged.
+#
+
+if(NOT USE_LIBMNL)
+  set(MNL_FOUND FALSE)
+endif()
+
+if(NOT USE_LIBCAP)
+  set(CAP_FOUND FALSE)
+endif()
+
+#
 # Requirements.
 #
 # A missing library is fatal here or nowhere. Each check carries the condition under
@@ -162,6 +181,10 @@ endif()
 
 if(ENABLE_PLUGIN_IBM AND NOT ODBC_FOUND)
   message(FATAL_ERROR "The IBM plugin needs unixODBC, but it could not be found. Pass -DENABLE_PLUGIN_IBM=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_NFACCT AND NOT USE_LIBMNL)
+  message(FATAL_ERROR "The nfacct plugin needs libmnl, but USE_LIBMNL is off. Pass -DENABLE_PLUGIN_NFACCT=Off to build without it, or -DUSE_LIBMNL=On.")
 endif()
 
 if(ENABLE_PLUGIN_NFACCT AND NOT MNL_FOUND)
