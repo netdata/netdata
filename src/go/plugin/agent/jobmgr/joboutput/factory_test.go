@@ -807,6 +807,72 @@ func TestFactoryProbeDoesNotActivateRunPermitOrLiveV2Runtime(t *testing.T) {
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
+func TestFactoryV2ModuleContextRuntimeService(t *testing.T) {
+	tests := map[string]struct {
+		runtime     runtimecomp.Service
+		wantService bool
+	}{
+		"no runtime service exposes none": {
+			runtime:     nil,
+			wantService: false,
+		},
+		"runtime service exposes the staged one": {
+			runtime:     &factoryTestRuntimeService{},
+			wantService: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			state := &factoryTestState{}
+			seen := make(map[string]bool)
+			recordService := func(phase string) func(context.Context) error {
+				return func(ctx context.Context) error {
+					_, seen[phase] = runtimecomp.ServiceFromContext(ctx)
+					return nil
+				}
+			}
+			creator := collectorapi.Creator{
+				CreateV2: func() collectorapi.CollectorV2 {
+					return &factoryTestV2{
+						state:    state,
+						store:    metrix.NewCollectorStore(),
+						template: factoryTestChartTemplate,
+						init:     recordService("init"),
+						check:    recordService("check"),
+					}
+				},
+			}
+			factory, _ := newFactoryTestHarness(t, creator, nil)
+			factory.config.Runtime = test.runtime
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+			prepared, failure, err := prepareFactoryTestCandidate(
+				context.Background(),
+				factory,
+				factoryTestConfig(false),
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
+				permit,
+			)
+			require.NoError(t, err)
+			require.Nil(t, failure)
+
+			want := map[string]bool{
+				"init":  test.wantService,
+				"check": test.wantService,
+			}
+			assert.Equal(t, want, seen)
+
+			require.NoError(t, prepared.Dispose(context.Background()))
+			requireFactoryAttemptsIdle(t, factory)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+		})
+	}
+}
+
 func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testing.T) {
 	state := &factoryTestState{}
 	runtime := &factoryTestRuntimeService{}

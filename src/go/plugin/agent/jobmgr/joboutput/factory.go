@@ -599,9 +599,6 @@ func (f *Factory) buildV2(
 	if err != nil {
 		return nil, nil, nil, redactLifecycle, err
 	}
-	if f.config.Runtime != nil || f.runtimeStaging {
-		runtimeStage = newStagedRuntimeService()
-	}
 	jobConfig := jobruntime.JobV2Config{
 		PluginName:      f.config.PluginName,
 		Name:            config.Name(),
@@ -617,8 +614,13 @@ func (f *Factory) buildV2(
 		IsStock:         config.SourceType() == confgroup.TypeStock,
 		FunctionOnly:    functionOnly,
 		StoreFirst:      creator.StoreFirst,
-		RuntimeService:  runtimeStage,
 		Publication:     f.config.Publication,
+	}
+	if f.runtimeStaging {
+		// Assigned only when staged: a nil *stagedRuntimeService would be a
+		// non-nil RuntimeService interface.
+		runtimeStage = newStagedRuntimeService()
+		jobConfig.RuntimeService = runtimeStage
 	}
 	if redactLifecycle {
 		jobConfig.LifecycleErrorSanitizer = redactResolvedLifecycleError
