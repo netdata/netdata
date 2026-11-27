@@ -509,9 +509,10 @@ func AssertHealthAlertsTargetChartTemplateWith(t testing.TB, healthConfig []byte
 // target a documented metric, to state that metric's documented unit, to look
 // up only its documented dimensions, and to read in calc, warn and crit only
 // its documented dimensions besides built-ins, alert values, qualified
-// references and, with opts.ChartTemplate, the chart's template variables. Health matches a variable against a dimension's ID or name, and
-// go.d sends the dimension name as the ID, so a variable spelled as the
-// collector's internal dimension ID never resolves. An alert whose lookup
+// references and, with opts.ChartTemplate, the chart's template variables.
+// Health matches a variable against a dimension's ID or name, and go.d sends
+// the dimension name as the ID, so a variable spelled as the collector's
+// internal dimension ID never resolves. An alert whose lookup
 // derives another unit (a percentage of the window, an anomaly rate) does not
 // fit this check.
 func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []MetadataMetric, opts HealthAlertsCheck) error {

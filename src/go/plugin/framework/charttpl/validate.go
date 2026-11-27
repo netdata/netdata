@@ -380,10 +380,11 @@ func validateScopedSelector(expr, path string, effectiveMetrics map[string]struc
 	return nil
 }
 
-// maxVariableNameLen is the Netdata Agent's RRDVAR_MAX_LENGTH: the Agent keeps
-// only that many characters of a variable name, so a longer name would not
-// match the `$name` an alert reads.
-const maxVariableNameLen = 1024
+// maxVariableNameLen is the longest name a health expression can read: the
+// expression lexer keeps EVAL_MAX_VARIABLE_NAME_LENGTH-1 (299) bytes of `$name`
+// (src/libnetdata/eval/eval.h), while the Agent stores up to RRDVAR_MAX_LENGTH
+// (1024), so a longer variable would be stored but never read.
+const maxVariableNameLen = 299
 
 // healthBuiltinVariables are the names Netdata health resolves before the
 // chart's dimensions and variables (src/health/health_variable.c), so a chart
@@ -422,7 +423,8 @@ func validateVariables(
 		} else if _, ok := seen[v.Name]; ok {
 			errs = append(errs, semErr(varPath+".name", fmt.Sprintf("duplicate variable name %q", v.Name)))
 		} else if _, ok := staticDimNames[v.Name]; ok {
-			errs = append(errs, semErr(varPath+".name", fmt.Sprintf("variable %q has the name of a dimension of this chart; health would read the dimension", v.Name)))
+			errs = append(errs, semErr(varPath+".name", fmt.Sprintf(
+				"variable %q has the name of a dimension of this chart; health would read the dimension", v.Name)))
 		}
 		seen[v.Name] = struct{}{}
 		errs = append(errs, validateScopedSelector(v.Selector, varPath+".selector", effectiveMetrics))

@@ -3,8 +3,10 @@
 package collecttest
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sort"
 	"testing"
@@ -533,67 +535,135 @@ groups:
           - name: link
             selector: speed
 `
-	device := func(name string) metrix.Label {
-		return metrix.Label{
+	// The bandwidth chart alone, with an instance cap or an optional identity label.
+	const cappedTemplate = `
+version: v1
+context_namespace: net
+groups:
+  - family: Net
+    metrics: [received, speed]
+    charts:
+      - title: Bandwidth
+        context: net
+        units: bits/s
+        instances:
+          by_labels: [device]
+        lifecycle:
+          max_instances: 1
+        dimensions:
+          - selector: received
+            name: received
+        variables:
+          - name: nic_speed
+            selector: speed
+`
+	const optionalTemplate = `
+version: v1
+context_namespace: net
+groups:
+  - family: Net
+    metrics: [received, speed]
+    charts:
+      - title: Bandwidth
+        context: net
+        units: bits/s
+        instances:
+          by_labels: [device]
+          optional_by_labels: [queue]
+        dimensions:
+          - selector: received
+            name: received
+        variables:
+          - name: nic_speed
+            selector: speed
+`
+	labels := func(device string, extra ...string) []metrix.Label {
+		out := []metrix.Label{{
 			Key:   "device",
-			Value: name,
+			Value: device,
+		}}
+		for i := 0; i+1 < len(extra); i += 2 {
+			out = append(out, metrix.Label{
+				Key:   extra[i],
+				Value: extra[i+1],
+			})
 		}
+		return out
+	}
+	unboundMessage := func(variable, chartID string) string {
+		return fmt.Sprintf(
+			"chart variable %q has series for chart %q, which was not updated: no dimension series has the same instance identity",
+			variable,
+			chartID,
+		)
 	}
 	tests := map[string]struct {
+		template         string
 		write            func(m metrix.SnapshotMeter)
 		wantExpectedVars map[string][]string
 		wantActualVars   map[string][]string
-		wantShadowed     int
+		wantShadowed     []string
 		wantUnbound      []string
 	}{
 		"variables sent with their charts are covered": {
 			write: func(m metrix.SnapshotMeter) {
-				m.WithLabels(device("eth0"), metrix.Label{
-					Key:   "kind",
-					Value: "crc",
-				}).Gauge("received").Observe(1)
-				m.WithLabels(device("eth0")).Gauge("speed").Observe(10)
+				m.WithLabels(labels("eth0", "kind", "crc")...).Gauge("received").Observe(1)
+				m.WithLabels(labels("eth0")...).Gauge("speed").Observe(10)
 			},
 			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
 			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
 		},
 		"a variable series for an instance without dimension series is unbound": {
 			write: func(m metrix.SnapshotMeter) {
-				m.WithLabels(device("eth0"), metrix.Label{
-					Key:   "kind",
-					Value: "crc",
-				}).Gauge("received").Observe(1)
-				m.WithLabels(device("eth0")).Gauge("speed").Observe(10)
-				m.WithLabels(device("eth1")).Gauge("speed").Observe(20)
+				m.WithLabels(labels("eth0", "kind", "crc")...).Gauge("received").Observe(1)
+				m.WithLabels(labels("eth0")...).Gauge("speed").Observe(10)
+				m.WithLabels(labels("eth1")...).Gauge("speed").Observe(20)
 			},
 			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
 			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
 			wantUnbound: []string{
-				`chart variable "link" has series for chart "net_errors_eth1", which was not updated: no dimension series has the same instance identity`,
-				`chart variable "nic_speed" has series for chart "net_net_eth1", which was not updated: no dimension series has the same instance identity`,
+				unboundMessage("link", "net_errors_eth1"),
+				unboundMessage("nic_speed", "net_net_eth1"),
 			},
 		},
 		"a dynamic dimension named like a variable shadows it": {
 			write: func(m metrix.SnapshotMeter) {
-				m.WithLabels(device("eth0"), metrix.Label{
-					Key:   "kind",
-					Value: "link",
-				}).Gauge("received").Observe(1)
-				m.WithLabels(device("eth0")).Gauge("speed").Observe(10)
+				m.WithLabels(labels("eth0", "kind", "link")...).Gauge("received").Observe(1)
+				m.WithLabels(labels("eth0")...).Gauge("speed").Observe(10)
 			},
 			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
 			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
-			wantShadowed:     1,
+			wantShadowed: []string{
+				`dimension "link" of chart "net_errors_eth0" has the name of a chart variable; health reads the dimension`,
+			},
+		},
+		"a chart omitted by the instance cap is not an identity mismatch": {
+			template: cappedTemplate,
+			write: func(m metrix.SnapshotMeter) {
+				for _, device := range []string{"eth0", "eth1"} {
+					m.WithLabels(labels(device)...).Gauge("received").Observe(1)
+					m.WithLabels(labels(device)...).Gauge("speed").Observe(10)
+				}
+			},
+			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}},
+			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}},
+		},
+		"a variable series with another identity label set is expected but not sent": {
+			template: optionalTemplate,
+			write: func(m metrix.SnapshotMeter) {
+				m.WithLabels(labels("eth0", "queue", "q1")...).Gauge("received").Observe(1)
+				m.WithLabels(labels("eth0")...).Gauge("speed").Observe(10)
+			},
+			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}},
+			wantActualVars:   map[string][]string{},
+			wantUnbound:      []string{unboundMessage("nic_speed", "net_net_eth0")},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			store := newTestCollectorStore(t, tc.write)
-			coverage, err := buildChartCoverage(
-				testCoverageSet(t, template),
-				store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
-				nil,
-			)
+			set := testCoverageSet(t, cmp.Or(tc.template, template))
+			coverage, err := buildChartCoverage(set, store.Read(metrix.ReadRaw(), metrix.ReadFlatten()), nil)
 			require.NoError(t, err)
 			assert.Equal(
 				t,
@@ -605,7 +675,7 @@ groups:
 				normalizeCoverageDimsList(tc.wantActualVars),
 				normalizeCoverageDims(coverage.ActualVariablesByContext),
 			)
-			assert.Len(t, coverage.ShadowedVariables, tc.wantShadowed)
+			assert.Equal(t, tc.wantShadowed, coverage.ShadowedVariables)
 			unbound := slices.Clone(coverage.UnboundVariables)
 			slices.Sort(unbound)
 			assert.Equal(t, tc.wantUnbound, unbound)

@@ -1036,7 +1036,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		)
 		if chartCreated && ctx.index.hasVariables() {
 			// A chart created in this build is discarded as a whole on rollback.
-			matChart.variableNames = ctx.index.variableNames[cs.templateID]
+			matChart.variableNames = ctx.index.templateVariableNames(cs.templateID)
 		}
 		previousPresentation := matChart.presentation
 		membershipChanged := cs.labelTracker.changed()
@@ -1161,7 +1161,7 @@ func (ctx *planBuildContext) chartVariableValues(cs *chartState) []UpdateVariabl
 	if len(ctx.variables) == 0 {
 		return nil
 	}
-	declared := ctx.index.variablesByTemplate[cs.templateID]
+	declared := ctx.index.templateVariables(cs.templateID)
 	if len(declared) == 0 {
 		return nil
 	}
@@ -1233,7 +1233,7 @@ func (ctx *planBuildContext) observeUnboundVariables() {
 			reason = PlanRouteReasonVariableChartOtherOwner
 		}
 		name := ""
-		if declared := ctx.index.variablesByTemplate[key.templateID]; key.index < len(declared) {
+		if declared := ctx.index.templateVariables(key.templateID); key.index < len(declared) {
 			name = declared[key.index].Name
 		}
 		ctx.observeRouteDiagnostic(PlanRouteDiagnostic{

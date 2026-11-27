@@ -153,7 +153,8 @@ func buildChartCoverage(
 	}
 
 	collisions := make(map[coverageRouteKey]struct{})
-	var unbound []string
+	var unbound []chartengine.PlanRouteDiagnostic
+	omitted := make(map[string]bool)
 	engine, err := chartengine.New(
 		chartengine.WithRuntimeStore(nil),
 		chartengine.WithPlanRouteDiagnosticObserver(func(fact chartengine.PlanRouteDiagnostic) {
@@ -164,15 +165,15 @@ func buildChartCoverage(
 					dimensionIndex: fact.DimensionIndex,
 					series:         fact.SeriesIdentity,
 				}] = struct{}{}
+			case fact.Decision == chartengine.PlanRouteContextRejected,
+				fact.Decision == chartengine.PlanRouteLifecycleRejected &&
+					fact.Reason == chartengine.PlanRouteReasonChartInstanceCap:
+				omitted[fact.ChartID] = true
 			case fact.Decision == chartengine.PlanRouteVariableUnbound &&
 				fact.Reason == chartengine.PlanRouteReasonVariableChartNotUpdated &&
 				!matchesAny(fact.Context, contextMatchers):
 				// A variable owned by another template's chart follows the collision rules instead.
-				unbound = append(unbound, fmt.Sprintf(
-					"chart variable %q has series for chart %q, which was not updated: no dimension series has the same instance identity",
-					fact.VariableName,
-					fact.ChartID,
-				))
+				unbound = append(unbound, fact)
 			}
 		}),
 	)
@@ -188,6 +189,18 @@ func buildChartCoverage(
 
 	actualByContext := materializedContextsByPattern(plan, contextMatchers)
 	actualVariables, shadowed := materializedVariablesByContext(plan, contextMatchers)
+	var unboundVariables []string
+	for _, fact := range unbound {
+		// Charts omitted by an output limit or instance cap are not a template mismatch.
+		if omitted[fact.ChartID] {
+			continue
+		}
+		unboundVariables = append(unboundVariables, fmt.Sprintf(
+			"chart variable %q has series for chart %q, which was not updated: no dimension series has the same instance identity",
+			fact.VariableName,
+			fact.ChartID,
+		))
+	}
 	expectedByContext, expectedVariables, err := expectedTemplateCoverage(set, reader, contextMatchers, collisions)
 	if err != nil {
 		return chartCoverage{}, err
@@ -199,7 +212,7 @@ func buildChartCoverage(
 		ActualVariablesByContext:   actualVariables,
 		ExpectedVariablesByContext: expectedVariables,
 		ShadowedVariables:          shadowed,
-		UnboundVariables:           unbound,
+		UnboundVariables:           unboundVariables,
 	}, nil
 }
 

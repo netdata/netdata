@@ -217,11 +217,14 @@ func TestPlanChartVariablesRecreationResetsRemovedNames(t *testing.T) {
 	tests := map[string]struct {
 		from, to TemplateEntry
 		want     []string
+		// wantLater is a later re-creation under the new template alone.
+		wantLater []string
 	}{
 		"dropped variable is reset": {
-			from: netEntry("net", limit, burst),
-			to:   netEntry("net", limit),
-			want: []string{"limit", "burst"},
+			from:      netEntry("net", limit, burst),
+			to:        netEntry("net", limit),
+			want:      []string{"limit", "burst"},
+			wantLater: []string{"limit"},
 		},
 		"all variables dropped": {
 			from: netEntry("net", limit),
@@ -229,9 +232,10 @@ func TestPlanChartVariablesRecreationResetsRemovedNames(t *testing.T) {
 			want: []string{"limit"},
 		},
 		"added variable needs no reset": {
-			from: netEntry("net", limit),
-			to:   netEntry("net", limit, extra),
-			want: []string{"limit", "extra"},
+			from:      netEntry("net", limit),
+			to:        netEntry("net", limit, extra),
+			want:      []string{"limit", "extra"},
+			wantLater: []string{"limit", "extra"},
 		},
 	}
 	for name, tc := range tests {
@@ -261,7 +265,7 @@ func TestPlanChartVariablesRecreationResetsRemovedNames(t *testing.T) {
 			attempt = variableAttempt(t, e, store, next, series)
 			created = findCreateChartAction(attempt.Plan())
 			require.NotNil(t, created, "the expired chart is created again")
-			assert.Equal(t, e.state.matchIndex.variableNames[created.ChartTemplateID], created.Variables)
+			assert.Equal(t, tc.wantLater, created.Variables)
 			require.NoError(t, attempt.Commit())
 		})
 	}

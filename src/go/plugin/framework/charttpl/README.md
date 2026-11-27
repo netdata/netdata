@@ -238,8 +238,9 @@ groups:
 > Some consumers embed a chart template as a **single group** instead of a full spec — for example a
 > [Prometheus profile](/src/go/plugin/go.d/collector/prometheus/profile-format.md)'s `template:` key holds one item of
 > the `groups` list above (written without the leading dash), and the collector supplies `version` and `engine` itself.
-> All group and chart fields documented below apply unchanged, except chart `variables`, which Prometheus, Azure Monitor
-> and CloudWatch profiles reject; the spec-level `version`, top-level `context_namespace`, and `engine` fields do not. Use the consumer's own policy surface for engine behavior. Prometheus profiles expose
+> All group and chart fields documented below apply unchanged, except chart `variables`, which Prometheus, Azure
+> Monitor and CloudWatch profiles reject; the spec-level `version`, top-level `context_namespace`, and `engine` fields
+> do not. Use the consumer's own policy surface for engine behavior. Prometheus profiles expose
 > `autogen.selector` at the profile root to constrain fallback charts inside that profile's `match` scope while
 > retaining samples; use the job `selector` or a relabeling `drop` rule when the samples themselves must be discarded.
 
@@ -969,6 +970,9 @@ value is sent only with a chart that is updated in that cycle and is owned by th
 - Netdata keeps chart variables for the chart's lifetime and has no command to delete one. When the engine creates a
   chart again over a previous definition with the same ID (a template change, an ownership change or a revival), it also
   resets to `nan` any variable that the previous definition declared and the new one does not.
+- That reset needs the previous definition. A chart that was already marked obsolete before a template change dropped
+  one of its variables, and is then defined again while Netdata still holds it, keeps that variable's last value until
+  Netdata frees the chart. The same holds across a plugin restart.
 
 **Naming.** A dimension with the same name as a chart variable hides it, because health reads the dimension first.
 Validation rejects static dimension names; a dynamic dimension name (`name_from_label`, inferred) can only collide at
@@ -1283,7 +1287,7 @@ All rules below produce semantic validation errors unless noted:
 | `name` and `name_from_label` are mutually exclusive                                     | semantic                        |
 | `name` and `name_from_label` must not be whitespace-only                                | semantic                        |
 | Duplicate dimension `name` values within the same chart are rejected                    | semantic                        |
-| `variables[].name` matches `^[A-Za-z_][A-Za-z0-9_]*$`, is at most 1024 bytes and unique in the chart | semantic          |
+| `variables[].name` matches `^[A-Za-z_][A-Za-z0-9_]*$`, is at most 299 bytes (the longest `$name` health reads) and unique in the chart | semantic |
 | `variables[].name` is not a static dimension `name` of the chart or a health built-in, and does not end in `_raw` or `_last_collected_t` | semantic |
 | `variables[].selector` follows the dimension selector rules                             | semantic                        |
 | `instances` must contain at least one required or optional label                        | semantic                        |

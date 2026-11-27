@@ -225,7 +225,8 @@ context. Ordinary omission/recovery logging does not enable this diagnostic obse
 Chart variable routes report under their own decisions with `VariableIndex` and `VariableName` (`DimensionIndex` is
 unused): `variable_selector_rejected`, `variable_identity_rejected` and `variable_resolved` at routing, then
 `variable_accepted` when the value is attached to an updated chart or `variable_unbound` with the reason
-(`variable_chart_not_updated`, `variable_chart_other_owner`).
+(`variable_chart_not_updated`, `variable_chart_other_owner`). A chart omitted by the output limit or an instance cap is
+also "not updated"; its own `context_rejected` or `lifecycle_rejected` fact says why.
 
 `ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
 `instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
@@ -276,7 +277,9 @@ engine implements them without cross-cycle state:
   attempts need no rollback; the Agent keeps the last value between updates.
 - `CreateChartAction.Variables` lists the template's declared names and, when the chart is created over a retired or
   previous definition with the same ID (template change, ownership change, revival), the names that definition declared
-  and the new template does not. Each materialized chart records its creating template's names for this.
+  and the new template does not. Each materialized chart records its creating template's names for this. A chart that
+  is no longer materialized (removed earlier, or a new engine after a restart or `LoadYAML`) has no previous definition
+  to compare, so a variable only its older definition declared keeps its value in Netdata until the chart is freed.
 - chartemit writes the `nan` presets after the created chart's DIMENSION lines and the values inside BEGIN..END after
   the SET lines; both positions have a scope chart, which `VARIABLE CHART` requires.
 
@@ -540,7 +543,8 @@ includes repeated growth and recovery. Candidate sizing follows the pre-admissio
 chart-state allocations for omitted contexts.
 
 Chart variables add no work to engines whose templates declare none (one match-index check per series and per updated
-chart). With variables, each routed variable value is one entry in a per-build map sized from the previous build and
+chart) except about 16 bytes per updated chart: the boxed `UpdateChartAction` carries a variable slice header, 64 instead
+of 48 bytes after size-class rounding; the allocation count is unchanged. With variables, each routed variable value is one entry in a per-build map sized from the previous build and
 each emitted value one slot in a per-build block, so allocations stay constant per build rather than per series.
 `BenchmarkBuildPlanChartVariables` compares one chart per instance without variables, with variables fed for one
 instance in ten, and with variables fed for every instance.

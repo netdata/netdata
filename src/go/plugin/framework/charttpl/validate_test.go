@@ -1352,7 +1352,7 @@ func TestSpecValidateChartVariables(t *testing.T) {
 		},
 		"rejects a name over the agent limit": {
 			variables: []ChartVariable{{Name: strings.Repeat("v", maxVariableNameLen+1), Selector: "service_metric"}},
-			wantErr:   "at most 1024 bytes",
+			wantErr:   "at most 299 bytes",
 		},
 		"rejects a duplicate name": {
 			variables: []ChartVariable{

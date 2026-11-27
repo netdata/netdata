@@ -55,14 +55,19 @@ type matchIndex struct {
 	// validate that the plan reader is flattened.
 	firstInfer inferredDimensionRef
 
-	// The variable indexes are empty when no chart template declares variables,
-	// which keeps the dimension-only path free of variable work.
-	variablesByMetricName map[string][]variableCandidate
-	wildcardVariables     []variableCandidate
-	// variablesByTemplate and variableNames hold each declaring template's
-	// variables and their names, shared read-only with plan actions.
-	variablesByTemplate map[string][]program.Variable
-	variableNames       map[string][]string
+	// variables is nil when no chart template declares a chart variable, which
+	// keeps the dimension-only path free of variable work and the index small
+	// (the planner copies it by value).
+	variables *variableIndex
+}
+
+// variableIndex holds the chart variables of the templates that declare them.
+// Compiled charts are immutable, so plan actions share these slices read-only.
+type variableIndex struct {
+	byMetricName map[string][]variableCandidate
+	wildcard     []variableCandidate
+	byTemplate   map[string][]program.Variable
+	names        map[string][]string
 }
 
 type variableCandidate struct {
@@ -73,7 +78,23 @@ type variableCandidate struct {
 
 // hasVariables reports whether any chart template declares a chart variable.
 func (m *matchIndex) hasVariables() bool {
-	return len(m.variablesByTemplate) > 0
+	return m.variables != nil
+}
+
+// templateVariables returns the declared variables of a chart template.
+func (m *matchIndex) templateVariables(templateID string) []program.Variable {
+	if m.variables == nil {
+		return nil
+	}
+	return m.variables.byTemplate[templateID]
+}
+
+// templateVariableNames returns the declared variable names of a chart template.
+func (m *matchIndex) templateVariableNames(templateID string) []string {
+	if m.variables == nil {
+		return nil
+	}
+	return m.variables.names[templateID]
 }
 
 type inferredDimensionRef struct {
@@ -119,13 +140,15 @@ func (m *matchIndex) addVariables(chart program.Chart) {
 	if len(chart.Variables) == 0 {
 		return
 	}
-	if m.variablesByTemplate == nil {
-		m.variablesByTemplate = make(map[string][]program.Variable)
-		m.variableNames = make(map[string][]string)
-		m.variablesByMetricName = make(map[string][]variableCandidate)
+	if m.variables == nil {
+		m.variables = &variableIndex{
+			byMetricName: make(map[string][]variableCandidate),
+			byTemplate:   make(map[string][]program.Variable),
+			names:        make(map[string][]string),
+		}
 	}
-	// chart is this index's own copy, so its variables can be shared.
-	m.variablesByTemplate[chart.TemplateID] = chart.Variables
+	vars := m.variables
+	vars.byTemplate[chart.TemplateID] = chart.Variables
 	names := make([]string, len(chart.Variables))
 	for i := range chart.Variables {
 		names[i] = chart.Variables[i].Name
@@ -135,14 +158,14 @@ func (m *matchIndex) addVariables(chart program.Chart) {
 			variable:        &chart.Variables[i],
 		}
 		if len(chart.Variables[i].Selector.MetricNames) == 0 {
-			m.wildcardVariables = append(m.wildcardVariables, candidate)
+			vars.wildcard = append(vars.wildcard, candidate)
 			continue
 		}
 		for _, metricName := range chart.Variables[i].Selector.MetricNames {
-			m.variablesByMetricName[metricName] = append(m.variablesByMetricName[metricName], candidate)
+			vars.byMetricName[metricName] = append(vars.byMetricName[metricName], candidate)
 		}
 	}
-	m.variableNames[chart.TemplateID] = names
+	vars.names[chart.TemplateID] = names
 }
 
 func firstInferDimension(chartsByID map[string]program.Chart) inferredDimensionRef {
@@ -304,7 +327,16 @@ func (e *Engine) resolveSeriesRoutes(
 
 	if index.hasVariables() {
 		var err error
-		routes, err = appendVariableRoutes(routes, observe, identity, name, labels, index)
+		routes, err = appendVariableRoutes(
+			routes,
+			observe,
+			identity,
+			name,
+			labels,
+			index.variables,
+			index.chartsByID,
+			index.labelPolicies,
+		)
 		if err != nil {
 			return nil, false, err
 		}
@@ -346,13 +378,15 @@ func appendVariableRoutes(
 	identity metrix.SeriesIdentity,
 	name string,
 	labels metrix.LabelView,
-	index matchIndex,
+	vars *variableIndex,
+	chartsByID map[string]program.Chart,
+	labelPolicies map[string]*chartLabelPolicy,
 ) ([]routeBinding, error) {
-	byName := index.variablesByMetricName[name]
-	if len(byName) == 0 && len(index.wildcardVariables) == 0 {
+	byName := vars.byMetricName[name]
+	if len(byName) == 0 && len(vars.wildcard) == 0 {
 		return routes, nil
 	}
-	for _, candidates := range [2][]variableCandidate{byName, index.wildcardVariables} {
+	for _, candidates := range [2][]variableCandidate{byName, vars.wildcard} {
 		for _, candidate := range candidates {
 			variable := candidate.variable
 			fact := PlanRouteDiagnostic{
@@ -369,14 +403,14 @@ func appendVariableRoutes(
 				}
 				continue
 			}
-			chart, ok := index.chartsByID[candidate.chartTemplateID]
+			chart, ok := chartsByID[candidate.chartTemplateID]
 			if !ok {
 				return nil, fmt.Errorf(
 					"chartengine: variable route references unknown chart template %q",
 					candidate.chartTemplateID,
 				)
 			}
-			labelPolicy, ok := index.labelPolicies[candidate.chartTemplateID]
+			labelPolicy, ok := labelPolicies[candidate.chartTemplateID]
 			if !ok {
 				return nil, fmt.Errorf(
 					"chartengine: variable route references unknown label policy %q",

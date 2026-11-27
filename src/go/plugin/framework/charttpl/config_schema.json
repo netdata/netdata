@@ -461,7 +461,7 @@
           "type": "string",
           "description": "Chart variable name that health alerts read as $name.",
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "maxLength": 1024
+          "maxLength": 299
         },
         "selector": {
           "type": "string",
