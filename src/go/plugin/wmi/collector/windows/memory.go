@@ -13,16 +13,9 @@ import (
 const queryMemory = "SELECT TotalVisibleMemorySize, FreePhysicalMemory, TotalVirtualMemorySize, FreeVirtualMemory " +
 	"FROM Win32_OperatingSystem"
 
-// memoryCounter is a raw counter of the Memory counter set that feeds one
-// dimension of the native Windows Agent's memory charts.
-type memoryCounter struct {
-	property string
-	metric   string
-	// total marks a count since the counter started, whose rate Netdata charts.
-	total bool
-}
-
-var memoryCounters = [...]memoryCounter{
+// memoryCounters are the raw counters of the Memory counter set that feed the
+// native Windows Agent's memory charts.
+var memoryCounters = [...]rawCounter{
 	{property: "AvailableBytes", metric: "memory_available_bytes"},
 	{property: "PageReadsPersec", metric: "memory_page_reads", total: true},
 	{property: "PageWritesPersec", metric: "memory_page_writes", total: true},
@@ -63,13 +56,8 @@ const (
 	pagesProperty      = "PagesPersec"
 )
 
-var queryMemoryCounters = func() string {
-	properties := []string{pageFaultsProperty, pagesProperty}
-	for _, counter := range memoryCounters {
-		properties = append(properties, counter.property)
-	}
-	return "SELECT " + strings.Join(properties, ", ") + " FROM Win32_PerfRawData_PerfOS_Memory"
-}()
+var queryMemoryCounters = counterQuery("Win32_PerfRawData_PerfOS_Memory", memoryCounters[:], pageFaultsProperty,
+	pagesProperty)
 
 // queryPagingFiles reads each paging file's pages in use and its size in
 // pages, the raw fraction the native Windows Agent reads.
@@ -133,11 +121,7 @@ func (o *observations) readMemoryCounters(rows []map[string]any) bool {
 		return false
 	}
 	row := rows[0]
-	var usable bool
-	for i, counter := range memoryCounters {
-		o.memoryCounters[i] = readUnsigned(row[strings.ToLower(counter.property)])
-		usable = usable || o.memoryCounters[i].valid
-	}
+	usable := readCounters(row, memoryCounters[:], o.memoryCounters[:])
 	total := readUnsigned(row[strings.ToLower(pageFaultsProperty)])
 	major := readUnsigned(row[strings.ToLower(pagesProperty)])
 	if total.valid && major.valid {

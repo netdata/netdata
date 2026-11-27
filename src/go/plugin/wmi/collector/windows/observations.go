@@ -5,6 +5,7 @@ package windows
 import (
 	"math"
 	"strconv"
+	"strings"
 )
 
 // observations holds one poll's values in base units: bytes, raw counters,
@@ -38,6 +39,35 @@ type observations struct {
 	// _Total byte counts.
 	diskTotalRead    sample
 	diskTotalWritten sample
+}
+
+// rawCounter is a raw performance counter that feeds one chart dimension.
+type rawCounter struct {
+	property string
+	metric   string
+	// total marks a count since the counter started, whose rate Netdata charts.
+	total bool
+}
+
+// counterQuery selects the leading properties and then the counters from a
+// counter set's class.
+func counterQuery(class string, counters []rawCounter, leading ...string) string {
+	properties := append([]string(nil), leading...)
+	for _, counter := range counters {
+		properties = append(properties, counter.property)
+	}
+	return "SELECT " + strings.Join(properties, ", ") + " FROM " + class
+}
+
+// readCounters reads one instance's counters and reports whether any of them
+// has a value.
+func readCounters(row map[string]any, counters []rawCounter, values []sample) bool {
+	var usable bool
+	for i, counter := range counters {
+		values[i] = readUnsigned(row[strings.ToLower(counter.property)])
+		usable = usable || values[i].valid
+	}
+	return usable
 }
 
 // sample distinguishes a reported zero from a missing or malformed value.

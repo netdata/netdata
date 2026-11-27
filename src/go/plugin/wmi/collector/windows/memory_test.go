@@ -76,7 +76,7 @@ func TestReadMemory(t *testing.T) {
 func memoryCounterValues(values map[string]sample) [len(memoryCounters)]sample {
 	var samples [len(memoryCounters)]sample
 	for property, value := range values {
-		i := slices.IndexFunc(memoryCounters[:], func(c memoryCounter) bool { return c.property == property })
+		i := slices.IndexFunc(memoryCounters[:], func(c rawCounter) bool { return c.property == property })
 		samples[i] = value
 	}
 	return samples
