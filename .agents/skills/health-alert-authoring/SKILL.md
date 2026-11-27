@@ -222,6 +222,11 @@ Important rules:
 - **Do not duplicate freshness ownership.** Use `$now - $last_collected_t` for an explicit collection/staleness alert only
   when no existing generic collection-failure alert already owns the incident. A data-state alert normally owns the
   measured condition, not the collector outage.
+- **`$last_collected_t` follows the sample time the producer reports.** A sample with a collection time
+  (`END <seconds> <microseconds> 1`, every Go plugin chart) sets it to that time. A `BEGIN` interval advances it
+  instead: `rrdset_timed_next` (`src/database/rrdset-collection.c`) trusts that interval up to five update intervals,
+  so a producer that reports less than the time since the chart's previous sample leaves it behind. Test a freshness
+  alert with an outage shorter than five intervals too; a longer one resyncs the clock and hides that drift.
 
 For a data-state alert that MUST become `UNDEFINED` when its lookup is non-finite, use and test this condition shape:
 

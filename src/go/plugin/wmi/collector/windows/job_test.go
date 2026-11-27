@@ -4,6 +4,7 @@ package windows
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"os"
 	"regexp"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
@@ -94,12 +96,19 @@ func startJob(t *testing.T, c *Collector, vnode vnodes.VirtualNode) func(clock i
 
 func TestCollector_JobV2Publication(t *testing.T) {
 	const namedGUID = "245dea48-ae2a-4697-a22e-050e7e358afb"
+	namedStaleAfter := confopt.Duration(5 * time.Minute)
 	for name, vnode := range map[string]vnodes.VirtualNode{
 		"generated vnode": {},
 		"named vnode": {
 			Name:     "override",
 			Hostname: "configured.example.com",
 			GUID:     namedGUID,
+		},
+		"named vnode with its own stale_after": {
+			Name:       "override",
+			Hostname:   "configured.example.com",
+			GUID:       namedGUID,
+			StaleAfter: &namedStaleAfter,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -140,6 +149,12 @@ func TestCollector_JobV2Publication(t *testing.T) {
 					assert.Contains(t, output, "HOST_DEFINE '"+namedGUID+"' 'configured.example.com'")
 					assert.NotContains(t, output, c.VirtualNode().GUID)
 					assert.NotContains(t, output, "HOST_LABEL '_os_edition'")
+					// A named node keeps its own lifecycle setting.
+					if vnode.StaleAfter != nil {
+						assert.Contains(t, output, "HOST_LABEL '_node_stale_after_seconds' '300'")
+					} else {
+						assert.NotContains(t, output, "_node_stale_after_seconds")
+					}
 					return
 				}
 				guid := c.VirtualNode().GUID
@@ -147,15 +162,57 @@ func TestCollector_JobV2Publication(t *testing.T) {
 				assert.Contains(t, output, "HOST_LABEL '_vnode_type' 'wmi'")
 				assert.Contains(t, output, "HOST_LABEL 'address' 'windows.example.com'")
 				assert.Contains(t, output, "HOST_LABEL '_os_edition' 'Standard'")
+				// Three missed 30 s collections plus the 15 s timeout.
+				assert.Contains(t, output, "HOST_LABEL '_node_stale_after_seconds' '105'")
 
 				time.Sleep(inventoryInterval)
 				renamed := collect(2 * c.UpdateEvery)
 				assert.Contains(t, renamed, "HOST_DEFINE '"+guid+"' 'WIN-RENAMED'")
 				assert.Contains(t, renamed, "SET 'user' = 25")
 				assert.Contains(t, renamed, "HOST_LABEL 'address' 'windows.example.com'")
+				assert.Contains(t, renamed, "HOST_LABEL '_node_stale_after_seconds' '105'")
 			})
 		})
 	}
+}
+
+// The Agent marks a node stale when it is not selected for longer than its
+// timeout, while the plugin keeps selecting localhost. So a failed collection
+// must not touch the node but must still report the job status on localhost,
+// and the next successful collection selects the node again.
+func TestCollector_JobV2HostStatus(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		reachable := true
+		c.newSession = func(context.Context) (querySession, error) {
+			if !reachable {
+				return nil, errors.New("connection timed out")
+			}
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{})
+		guid := c.VirtualNode().GUID
+
+		up := collect(c.UpdateEvery)
+		assert.Contains(t, up, "HOST_DEFINE '"+guid+"'")
+		assert.Contains(t, up, "HOST_LABEL '_node_stale_after_seconds' '105'")
+
+		reachable = false
+		for clock := 2 * c.UpdateEvery; clock <= 4*c.UpdateEvery; clock += c.UpdateEvery {
+			down := collect(clock)
+			assert.NotContains(t, down, guid, "clock %d", clock)
+			assert.Contains(t, down, "HOST ''", "clock %d", clock)
+			assert.Contains(t, down, "SET 'failed' = 1", "clock %d", clock)
+		}
+
+		reachable = true
+		back := collect(5 * c.UpdateEvery)
+		assert.Contains(t, back, "HOST '"+guid+"'")
+		assert.Contains(t, back, "SET 'used' = 6442450944")
+		assert.Contains(t, back, "SET 'success' = 1")
+	})
 }
 
 type wireDimension struct {
