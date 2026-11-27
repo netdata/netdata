@@ -42,6 +42,22 @@ static bool nd_sock_open_ssl(ND_SOCK *s) {
                        s->sni_hostname);
                 // Continue anyway - SNI failure is not fatal
             }
+
+            // security_test_certificate() below only checks that a trusted CA signed the
+            // certificate, so without this any trusted certificate - issued for any name -
+            // would be accepted. An IP literal must match an iPAddress SAN, anything else a
+            // dNSName, the same way the ACLK clients verify the cloud.
+            if(s->verify_certificate) {
+                X509_VERIFY_PARAM *param = SSL_get0_param(s->ssl.conn);
+                if(!X509_VERIFY_PARAM_set1_ip_asc(param, s->sni_hostname) &&
+                   !X509_VERIFY_PARAM_set1_host(param, s->sni_hostname, 0)) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "Failed to set '%s' as the expected host of the SSL certificate",
+                           s->sni_hostname);
+                    s->error = ND_SOCK_ERR_SSL_FAILED_TO_OPEN;
+                    return false;
+                }
+            }
         }
 
         if(!netdata_ssl_connect(&s->ssl)) {
@@ -75,7 +91,8 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
     }
 
     // Extract hostname for SNI before establishing connection
-    if(ssl) {
+    // (unix domain sockets have no hostname to send or to verify)
+    if(ssl && strncmp(definition, "unix:", 5) != 0 && *definition != '/') {
         CLEAN_CHAR_P *buffer = strdupz(definition);
         
         char *host = buffer;
