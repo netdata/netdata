@@ -228,12 +228,11 @@ source material through the approved source-delivery channel.
 
 ## ELF preparation and qualification
 
-patchelf 0.15.0 is checksum-pinned. Earlier builds found invalid ELF layouts with
-0.18 and 0.19.1 on arm64 Node. Upstream 0.19.3 includes a
-[fix for overlapping load segments](https://github.com/NixOS/patchelf/pull/672).
-On the pinned arm64 Node binary, a host-side rewrite with 0.19.3 also cleared
-the overlap seen with 0.19.1. Changing the pin requires validating the runtime
-on both Linux architectures.
+The builder pins patchelf 0.19.3. With 0.18 and 0.19.1, rewriting the pinned
+arm64 Node binary placed its dynamic section in overlapping load segments with
+conflicting permissions. Version 0.19.3 includes the
+[upstream fix](https://github.com/NixOS/patchelf/pull/672). Changes to this pin
+require runtime qualification on native Linux amd64 and arm64.
 Dynamic objects receive `$ORIGIN`-relative private library search paths. Loader
 and libc retain their donor ABI layout; libc is not an execution entry point.
 Runtime-loaded NSS modules supplement the transitive library closure. Missing
