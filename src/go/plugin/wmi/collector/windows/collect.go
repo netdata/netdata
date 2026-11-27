@@ -84,6 +84,12 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			read:    func(rows []map[string]any) bool { return snapshot.readSystem(rows, timing) },
 		},
 		{
+			name:    "time service",
+			enabled: groupEnabled(c.Collectors.Time),
+			query:   queryTimeService,
+			read:    snapshot.readTimeService,
+		},
+		{
 			name:    "network",
 			enabled: groupEnabled(c.Collectors.Network),
 			query:   queryNetworkInterfaces,

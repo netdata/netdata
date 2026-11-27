@@ -23,6 +23,7 @@ type observations struct {
 	pagingFiles    []pagingFile
 	numaNodes      []numaNode
 	system         systemCounters
+	timeService    [len(timeServiceCounters)]sample
 	interfaces     []networkInterface
 	// netTotalReceived and netTotalSent sum the byte totals of the Network
 	// Interface instances; physicalInterfaces names them.

@@ -76,7 +76,13 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 		},
 		"no group succeeded": {
 			options: map[string]any{
-				"collectors": map[string]any{"system": false, "network": false, "disk": false, "smb": false},
+				"collectors": map[string]any{
+					"system":  false,
+					"network": false,
+					"disk":    false,
+					"smb":     false,
+					"time":    false,
+				},
 			},
 			newSession: sessionWith(map[string]queryResult{
 				queryCPU:    {err: classified},

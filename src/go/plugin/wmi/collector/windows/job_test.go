@@ -452,6 +452,9 @@ func publishedCharts(t *testing.T) []wireChart {
 // src/collectors/common-contexts/system-processes.h (system.processes,
 // system.threads, system.ctxt, system.processor_queue_length),
 // src/collectors/windows.plugin/GetSystemUptime.c (system.uptime),
+// src/collectors/timex.plugin/plugin_timex.c (system.clock_sync_offset, which
+// the native agent does not chart; timex sends microseconds with a divisor of
+// 1000, as WMI sends the Windows Time service's computed offset),
 // src/collectors/windows.plugin/perflib-network.c (system.net, the net.*
 // interface charts and the tcppackets and udppackets charts),
 // src/collectors/proc.plugin/proc_net_netstat.c (ip.tcpsock, ip.tcpopens,
@@ -716,6 +719,13 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			units:      "seconds",
 			chartType:  "line",
 			dimensions: single("uptime", "absolute", 1000),
+		},
+		"system.clock_sync_offset": {
+			family:     "clock synchronization",
+			title:      "Computed Time Offset Between Local System and Reference Clock",
+			units:      "milliseconds",
+			chartType:  "line",
+			dimensions: single("offset", "absolute", 1000),
 		},
 		"system.net": {
 			family:     "network",
@@ -1076,6 +1086,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("system.ctxt", map[string]string{}),
 		instance("system.processor_queue_length", map[string]string{}),
 		instance("system.uptime", map[string]string{}),
+		instance("system.clock_sync_offset", map[string]string{}),
 		instance("system.net", map[string]string{}),
 		instance("net.net", map[string]string{"device": "Ethernet", "interface_type": "real"}),
 		instance("net.net", map[string]string{"device": "Ethernet#1", "interface_type": "real"}),
@@ -1142,7 +1153,8 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		}
 	}
 	// WMI's own contexts have no other producer to compare with;
-	// TestCollector_JobV2ClockOffset covers them.
+	// TestCollector_JobV2ClockOffset and
+	// TestCollector_TimeServiceCountersReachCharts cover the clock ones.
 	published := slices.DeleteFunc(publishedCharts(t), func(chart wireChart) bool {
 		return strings.HasPrefix(chart.context, "wmi.")
 	})

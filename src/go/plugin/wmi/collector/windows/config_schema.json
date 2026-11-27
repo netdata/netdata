@@ -101,6 +101,12 @@
             "description": "Collect the SMB file server's traffic, sessions, logons, open files, logon and access errors and resource shortages, and the open files, requests, connections and traffic of each share.",
             "type": "boolean",
             "default": true
+          },
+          "time": {
+            "title": "Time synchronization",
+            "description": "Collect the Windows Time service's offset from its time source, NTP round-trip delay and number of answering time sources. Needs Windows Server 2016 or later.",
+            "type": "boolean",
+            "default": true
           }
         }
       },

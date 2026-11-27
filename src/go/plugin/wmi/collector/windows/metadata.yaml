@@ -27,7 +27,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor CPU, memory, processes, network, TCP, UDP, disks and SMB shares on Windows hosts remotely over WMI, and ping them, without installing anything on them.
+          Monitor Windows hosts remotely over WMI without installing anything on them: CPU, memory, processes, network, TCP, UDP, disks, SMB shares, time sync and ping.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
@@ -35,6 +35,7 @@ modules:
           - physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node;
           - the number of processes and threads, context switches, processor queue length and uptime;
           - how far the host's clock is ahead of or behind the poller's;
+          - how the Windows Time service keeps the host's clock synchronized: its offset from the host's time source, the round trip of its latest NTP request and the number of time sources that answer it;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - TCP and UDP packets per IP version, TCP connections, connection opens, failures and resets, TCP retransmissions, and UDP errors;
           - available and used space per fixed drive;
@@ -44,7 +45,7 @@ modules:
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
           - host status: when the poller can no longer collect from the host, its node turns Stale and an alert on the poller notifies you.
 
-          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions and UDP errors, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset, which no other collector measures this way, and the SMB server's server-wide counters, which the Netdata Agent on Windows does not chart, have contexts of their own.
+          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions, UDP errors and the Windows Time service's offset from the time source, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset from the poller, the NTP round trip and time sources, and the SMB server's server-wide counters, which no other collector charts this way, have contexts of their own.
         method_description: |
           `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the disk and SMB groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
@@ -71,6 +72,7 @@ modules:
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter`, `Win32_PerfRawData_Tcpip_TCPv4`, `Win32_PerfRawData_Tcpip_TCPv6`, `Win32_PerfRawData_Tcpip_UDPv4`, `Win32_PerfRawData_Tcpip_UDPv6` |
           | Disk | `Win32_LogicalDisk`, `Win32_PerfRawData_PerfDisk_PhysicalDisk`, `Win32_DiskDrive` |
           | SMB | `Win32_PerfRawData_PerfNet_Server`, `Win32_PerfRawData_Counters_SMBServerShares` |
+          | Time synchronization | `Win32_PerfRawData_MicrosoftWindowsW32TimePerf_WindowsTimeService` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
       supported_platforms:
         include: [Linux, Windows]
@@ -112,11 +114,12 @@ modules:
             - `system_reboot_detection` sees a reboot only when a collection succeeds within the host's first 10 minutes of uptime. After a long outage, the longer wait between attempts can miss that window; the `wmi_host_last_collected_secs` alert reports the outage instead.
             - A collection must finish within `timeout` (15 seconds by default); a collection that does not is discarded and leaves a gap in every chart of the host.
             - The clock offset is measured against the poller's clock, so it includes the poller's own error with the opposite sign: a poller whose clock is 2 seconds behind shows every host 2 seconds ahead. Keep the poller's clock synchronized. When every host of one poller shows a similar offset, check the poller's clock first.
+            - Time synchronization needs Windows Server 2016 or later, which added the Windows Time service's counters. On an older host its query fails in every collection and the job logs a warning once a minute; switch off `collectors.time` for that host. The charts show the Windows Time service's own synchronization, not that of another NTP client installed on the host.
         performance_impact:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to sixteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to seventeen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -275,6 +278,11 @@ modules:
               default_value: true
               required: false
               group: Collection
+            - name: collectors.time
+              description: "Collect the Windows Time service's offset from its time source, NTP round-trip delay and number of answering time sources. Needs Windows Server 2016 or later."
+              default_value: true
+              required: false
+              group: Collection
             - name: vnode
               description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
               default_value: ''
@@ -321,7 +329,7 @@ modules:
                     username: 'EXAMPLE\monitor'
                     password: '${env:WMI_PASSWORD}'
             - name: CPU and memory only
-              description: Skip the system, network, disk and SMB queries.
+              description: Skip the system, network, disk, SMB and time synchronization queries.
               config: |
                 jobs:
                   - name: fileserver
@@ -334,6 +342,7 @@ modules:
                       network: false
                       disk: false
                       smb: false
+                      time: false
             - name: Multi-instance
               description: Monitor several Windows hosts with one account. Each job creates its own node.
               config: |
@@ -387,7 +396,7 @@ modules:
             fix: Remove `timeout` to use the default of 15 seconds, or set a positive number of seconds.
           - error: 'at least one collector group must be enabled'
             cause: Every group under `collectors` is set to `false`.
-            fix: Enable at least one of `cpu`, `memory`, `system`, `network`, `disk` or `smb`, or remove `collectors` to collect them all.
+            fix: Enable at least one of `cpu`, `memory`, `system`, `network`, `disk`, `smb` or `time`, or remove `collectors` to collect them all.
           - error: 'failed to open WMI session: open DCOM object resolver interface: connection refused'
             when: '`transport: dcom`'
             cause: Nothing accepts connections on TCP 135 at the configured `host`, or a firewall rejects them.
@@ -456,7 +465,14 @@ modules:
             fix: Fix the cause the job logs. With the next successful collection the node turns live again and the alert clears; the alert's recovery notification is delayed by at least 5 minutes.
           - error: 'The `wmi_host_clock_offset` alert is raised'
             cause: Over the last 5 minutes, the host's clock was on average more than 60 seconds ahead of or behind the poller's. The Windows Time service on the host is stopped or cannot reach its time source, or, when every host of the poller shows a similar offset, the poller's own clock is wrong.
-            fix: On the host, check the time source and the last successful synchronization with `w32tm /query /status`, and synchronize with `w32tm /resync`. When every host of the poller shows a similar offset, fix the time synchronization of the poller instead.
+            fix: On the host, check the time source and the last successful synchronization with `w32tm /query /status`, and synchronize with `w32tm /resync`; `wmi.clock_sync_sources` at 0 shows that no time source answers the Windows Time service. When every host of the poller shows a similar offset, fix the time synchronization of the poller instead.
+          - error: 'The `wmi_host_time_sources` alert is raised'
+            cause: No collection in the last hour counted a time server that answers the host's Windows Time service, so the host keeps time on its own clock, which drifts. Its time source cannot be resolved or reached, or the host keeps time without NTP, such as through Hyper-V time synchronization alone or as a forest-root domain controller on its own clock. The alert notifies nobody; `wmi_host_clock_offset` notifies when the drift grows.
+            fix: On the host, check the configured time source with `w32tm /query /peers` and `w32tm /query /status`, and the Windows Time service's events in the System log, such as event 47 (no answer from the time source) and event 134 (its name cannot be resolved). A host that keeps time without NTP needs no fix.
+          - error: 'time service WMI query failed: read WMI query results: StatusInvalidClass (0x80041010)'
+            when: '`transport: dcom`; with `transport: winrm` the message ends in `WinRM returned a WS-Management fault`'
+            cause: The host has no Windows Time service counters, because it runs a Windows version older than Windows Server 2016. The other metric groups keep collecting.
+            fix: 'Set `time: false` under `collectors` in the host''s job.'
           - error: '`group` WMI query failed: WinRM returned a WS-Management fault'
             when: '`transport: winrm`'
             cause: The listener accepted the login but refused the query, most often because the account lacks permissions on the `root\cimv2` WMI namespace.
@@ -476,6 +492,8 @@ modules:
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue; the `ip.*` TCP charts need both the IPv4 and the IPv6 query. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
         - `wmi.clock_offset` is the host's clock minus the poller's: a positive value means the host's clock is ahead.
+        - `system.clock_sync_offset` is how far the host's clock is from its own time source, as the Windows Time service computes it from each NTP answer; it falls while the service corrects the clock. Windows reports only its size, so unlike on the Netdata Agent on Linux it is never negative. It changes only with a new answer from the time source, so it does not show the drift of a host whose time source stopped answering; `wmi.clock_offset` does.
+        - `wmi.clock_sync_roundtrip_delay` is the round trip of the Windows Time service's latest NTP request and changes only with its next request. `wmi.clock_sync_sources` counts the time servers that answer the host's NTP client; it is 0 on a host that keeps time without NTP.
         - The `wmi.smb_server_*` charts cover the host's whole SMB file service, as Windows' Server counters count it; the `smb.server_shares_*` charts show it per share, as on the Netdata Agent running on Windows. `wmi.smb_server_logons` counts every logon attempt, failed ones included. In `wmi.smb_server_access_errors`, `logon` counts failed logons, `access_permissions` file opens refused with access denied, and `granted_access` denied accesses to files already open. In `wmi.smb_server_resource_errors`, `system` counts internal server errors, `work_item_shortages` and `blocking_requests_rejected` requests the server had no free work item for, and the pool failures failed kernel memory allocations.
       availability: []
       scopes:
@@ -646,6 +664,24 @@ modules:
                 - name: uptime
             - name: wmi.clock_offset
               description: Clock Offset From the Collecting Agent
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: offset
+            - name: wmi.clock_sync_roundtrip_delay
+              description: NTP Round-Trip Delay
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: delay
+            - name: wmi.clock_sync_sources
+              description: Active NTP Time Sources
+              unit: sources
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: system.clock_sync_offset
+              description: Computed Time Offset Between Local System and Reference Clock
               unit: milliseconds
               chart_type: line
               dimensions:

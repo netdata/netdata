@@ -24,31 +24,36 @@ func TestCollector_GroupConfig(t *testing.T) {
 		wantQueries []string
 	}{
 		"omitted": {
-			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
+			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
 		},
 		"empty object": {
 			yamlGroups:  "collectors: {}\n",
 			jsonGroups:  `,"collectors":{}`,
-			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
+			wantQueries: []string{queryCPU, queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
 		},
 		"disable one group": {
 			yamlGroups:  "collectors: {cpu: false}\n",
 			jsonGroups:  `,"collectors":{"cpu":false}`,
-			wantQueries: []string{queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
+			wantQueries: []string{queryMemory, queryMemoryCounters, queryPagingFiles, queryNUMANodes, querySystem, queryTimeService, queryNetworkInterfaces, queryNetworkAdapters, queryTCPv4, queryTCPv6, queryUDPv4, queryUDPv6, queryDisk, queryPhysicalDisks, querySMBServer, querySMBShares, queryDiskDrives},
 		},
 		"one group only": {
-			yamlGroups:  "collectors: {cpu: false, memory: false, system: true, network: false, disk: false, smb: false}\n",
-			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":true,"network":false,"disk":false,"smb":false}`,
+			yamlGroups:  "collectors: {cpu: false, memory: false, system: true, network: false, disk: false, smb: false, time: false}\n",
+			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":true,"network":false,"disk":false,"smb":false,"time":false}`,
 			wantQueries: []string{querySystem},
 		},
 		"SMB only": {
-			yamlGroups:  "collectors: {cpu: false, memory: false, system: false, network: false, disk: false, smb: true}\n",
-			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":false,"network":false,"disk":false,"smb":true}`,
+			yamlGroups:  "collectors: {cpu: false, memory: false, system: false, network: false, disk: false, smb: true, time: false}\n",
+			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":false,"network":false,"disk":false,"smb":true,"time":false}`,
 			wantQueries: []string{querySMBServer, querySMBShares},
 		},
+		"time synchronization only": {
+			yamlGroups:  "collectors: {cpu: false, memory: false, system: false, network: false, disk: false, smb: false, time: true}\n",
+			jsonGroups:  `,"collectors":{"cpu":false,"memory":false,"system":false,"network":false,"disk":false,"smb":false,"time":true}`,
+			wantQueries: []string{queryTimeService},
+		},
 		"all disabled": {
-			yamlGroups: "collectors: {cpu: false, memory: false, system: false, network: false, disk: false, smb: false}\n",
-			jsonGroups: `,"collectors":{"cpu":false,"memory":false,"system":false,"network":false,"disk":false,"smb":false}`,
+			yamlGroups: "collectors: {cpu: false, memory: false, system: false, network: false, disk: false, smb: false, time: false}\n",
+			jsonGroups: `,"collectors":{"cpu":false,"memory":false,"system":false,"network":false,"disk":false,"smb":false,"time":false}`,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
