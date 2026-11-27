@@ -95,7 +95,7 @@ func (o *observations) readNetworkInterfaces(rows []map[string]any) bool {
 
 // readNetworkAdapters adds the Network Adapter instances that this poll's
 // Network Interface rows do not list, such as adapters without a TCP/IP
-// binding. It runs only after readNetworkInterfaces succeeded.
+// binding. It runs only after readNetworkInterfaces named an interface.
 func (o *observations) readNetworkAdapters(rows []map[string]any) bool {
 	var usable bool
 	for _, row := range rows {

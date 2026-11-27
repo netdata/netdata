@@ -63,7 +63,7 @@
       },
       "collectors": {
         "title": "Metric groups",
-        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection. Keep at least one group enabled.",
+        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the network group two. Keep at least one group enabled.",
         "type": "object",
         "properties": {
           "cpu": {

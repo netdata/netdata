@@ -66,8 +66,9 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		{
 			name:    "network adapter",
 			enabled: groupEnabled(c.Collectors.Network),
-			// Adapters are virtual only when this poll's interface list lacks them.
-			needs: func() bool { return snapshot.physicalInterfaces != nil },
+			// Adapters are virtual only when this poll's interface list lacks
+			// them; a host reached over the network lists at least one interface.
+			needs: func() bool { return len(snapshot.physicalInterfaces) > 0 },
 			query: queryNetworkAdapters,
 			read:  snapshot.readNetworkAdapters,
 		},

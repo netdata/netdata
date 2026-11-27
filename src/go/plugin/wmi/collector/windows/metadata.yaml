@@ -89,8 +89,9 @@ modules:
             - Authentication is NTLMv2 only. Hosts or domains that block NTLM and accept only Kerberos cannot be monitored.
             - Every collection logs in again. With a wrong or expired password, each collection adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
-            - Traffic appears from the second collection after a job starts, because a rate needs two readings.
+            - Rates, such as traffic, packets and errors, appear from the second collection after a job starts, because a rate needs two readings.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
+            - Some stock packet alerts expect the one-second collection of the Netdata Agent running on Windows. At the default `update_every` of 30, `10s_received_packets_storm` cannot reach its thresholds; `net_interface_inbound_packets` and `net_interface_outbound_packets` add up per-second rates, so they show the packets divided by `update_every`; and the drop-ratio alerts evaluate only interfaces that average more than about 500 received or 50 sent packets per second, and report 0 below that.
             - The stock alerts that compare traffic with the interface speed (`interface_speed`, `1m_received_traffic_overflow` and `1m_sent_traffic_overflow`) have no value. They read the speed from a chart variable that the plugin does not publish; the speed itself is on the Interface Speed chart.
             - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
             - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it; its node turns Stale and the `wmi_host_last_collected_secs` alert reports it instead.
@@ -230,7 +231,7 @@ modules:
               required: false
               group: Collection
             - name: collectors
-              description: "Metric groups to collect. Each enabled group runs one WMI query per collection. Keep at least one group enabled."
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the network group two. Keep at least one group enabled."
               default_value: ''
               required: false
               group: Collection

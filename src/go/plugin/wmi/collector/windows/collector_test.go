@@ -266,6 +266,57 @@ func TestCollector_Collect(t *testing.T) {
 	c.Cleanup(t.Context())
 }
 
+func TestCollector_NetworkAdapterQuery(t *testing.T) {
+	ethernet := map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)}
+	for name, tc := range map[string]struct {
+		interfaces  queryResult
+		adapters    queryResult
+		wantQueries []string
+		wantMetrics map[string]metrix.SampleValue
+	}{
+		"a failed adapter query keeps the interfaces": {
+			interfaces: fixtureRows(ethernet),
+			adapters: queryResult{
+				err: errors.New("invalid class"),
+			},
+			wantQueries: []string{queryNetworkInterfaces, queryNetworkAdapters},
+			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
+				`network_received_bytes{device="Ethernet",interface_type="real"}`: 190,
+				`network_sent_bytes{device="Ethernet",interface_type="real"}`:     30,
+				"network_total_received_bytes":                                    190,
+				"network_total_sent_bytes":                                        30,
+			}),
+		},
+		// Without the interface list, every adapter would pass for virtual.
+		"an empty interface list leaves the adapters out": {
+			interfaces:  fixtureRows(),
+			adapters:    fixtureRows(ethernet),
+			wantQueries: []string{queryNetworkInterfaces},
+			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{}),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := configuredCollector()
+			c.Collectors.CPU = new(false)
+			c.Collectors.Memory = new(false)
+			c.Collectors.Disk = new(false)
+			session := &fakeSession{
+				results: map[string]queryResult{
+					queryNetworkInterfaces: tc.interfaces,
+					queryNetworkAdapters:   tc.adapters,
+				},
+			}
+			c.newSession = func(context.Context) (querySession, error) { return session, nil }
+			require.NoError(t, c.Init(t.Context()))
+
+			metrics, err := collecttest.CollectScalarSeries(c)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantMetrics, metrics)
+			assert.Equal(t, tc.wantQueries, metricQueries(session.queries))
+		})
+	}
+}
+
 func TestCollector_CheckFailure(t *testing.T) {
 	const secret = "permission denied: fixture-account fixture-secret"
 	for name, tc := range map[string]struct {

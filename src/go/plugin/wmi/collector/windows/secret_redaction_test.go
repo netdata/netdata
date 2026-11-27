@@ -98,6 +98,17 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 			}),
 			wantLog: []string{"CPU WMI query failed: WMI collection timed out", "memory WMI query failed"},
 		},
+		"failed adapter query is logged": {
+			newSession: sessionWith(func() map[string]queryResult {
+				results := validQueryResults()
+				results[queryNetworkAdapters] = queryResult{
+					err: classified,
+				}
+				return results
+			}()),
+			collect: true,
+			wantLog: []string{"network adapter WMI query failed: WMI collection timed out"},
+		},
 		"failed inventory queries are logged": {
 			newSession: sessionWith(func() map[string]queryResult {
 				results := validQueryResults()
