@@ -92,6 +92,7 @@ modules:
             - Every collection logs in again. With a wrong or expired password, each collection adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
             - Rates, such as traffic, packets and errors, appear from the second collection after a job starts, because a rate needs two readings.
+            - When a host restarts, counters that Windows keeps in 32 bits, such as context switches, start again from zero. If such a counter was close to its 32-bit maximum before the restart, the Agent reads the drop as a counter wrap and its chart shows one spike.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
             - Some stock packet alerts expect the one-second collection of the Netdata Agent running on Windows. At the default `update_every` of 30, `10s_received_packets_storm` cannot reach its thresholds; `net_interface_inbound_packets` and `net_interface_outbound_packets` add up per-second rates, so they show the packets divided by `update_every`; and the drop-ratio alerts evaluate only interfaces that average more than about 500 received or 50 sent packets per second, and report 0 below that.
             - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
@@ -306,7 +307,7 @@ modules:
                     username: 'EXAMPLE\monitor'
                     password: '${env:WMI_PASSWORD}'
             - name: CPU and memory only
-              description: Skip the network and disk queries.
+              description: Skip the system, network and disk queries.
               config: |
                 jobs:
                   - name: fileserver
@@ -315,6 +316,7 @@ modules:
                     username: 'EXAMPLE\monitor'
                     password: '${env:WMI_PASSWORD}'
                     collectors:
+                      system: false
                       network: false
                       disk: false
             - name: Multi-instance
