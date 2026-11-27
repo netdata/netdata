@@ -2995,6 +2995,31 @@ fn init_timeseries_layout_uses_source_tier_as_bucket_floor() {
 }
 
 #[test]
+fn init_timeseries_layout_keeps_bucket_count_bounded_for_full_u32_window() {
+    let max_buckets = super::TIMESERIES_MAX_BUCKETS as usize + 1;
+    for (after, before, tier, expected_bucket_seconds) in [
+        (0, u32::MAX, super::TierKind::Raw, 8_589_960),
+        (498, u32::MAX, super::TierKind::Raw, 8_589_960),
+        (0, u32::MAX, super::TierKind::Hour1, 8_593_200),
+    ] {
+        let layout = super::init_timeseries_layout_for_tier(after, before, tier);
+        assert_eq!(
+            layout.bucket_seconds, expected_bucket_seconds,
+            "after={after} before={before} tier={tier:?}"
+        );
+        assert!(
+            (1..=max_buckets).contains(&layout.bucket_count),
+            "after={after} before={before} tier={tier:?} bucket_count={}",
+            layout.bucket_count
+        );
+    }
+
+    let layout = super::init_timeseries_layout_for_tier(1, 30_001, super::TierKind::Raw);
+    assert_eq!(layout.bucket_seconds, 60);
+    assert_eq!(layout.bucket_count, max_buckets);
+}
+
+#[test]
 fn plan_query_tier_spans_stitches_aligned_ranges_greedily() {
     let spans = super::plan_query_tier_spans(
         14 * 3600 + 12 * 60 + 30,
