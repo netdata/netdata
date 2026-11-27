@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
-      netflow-only: ${{ steps.netflow-scope.outputs.only_modified }}
+      netflow-only: ${{ steps.netflow-scope.outputs.netflow_only }}
     steps:
       - name: Checkout
         id: checkout
@@ -115,17 +115,23 @@ jobs:
             src/go/tools/topology-ip-intel-downloader/stock/README.md
       - name: Check whether the PR changes only NetFlow source and documentation
         id: netflow-scope
-        if: github.event_name == 'pull_request' && steps.check-files.outputs.any_modified == 'true'
-        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
-        with:
-          since_last_remote_commit: false
-          output_renamed_files_as_deleted_and_added: true
-          files: |
-            src/crates/netflow-plugin/**/*.rs
-            README.md
-            docs/**/*.md
-            src/crates/**/*.md
-            packaging/**/*.md
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Inspect both sides of renames and include file type changes in the complete PR diff.
+          git diff --no-renames --ignore-submodules=none --name-only -z "${BASE_SHA}...${HEAD_SHA}" > "${RUNNER_TEMP}/netflow-paths"
+          netflow_only=false
+          while IFS= read -r -d '' path; do
+            case "${path}" in
+              src/crates/netflow-plugin/*.rs) netflow_only=true ;;
+              README.md|docs/*.md|src/crates/*.md|packaging/*.md) ;;
+              *) netflow_only=false; break ;;
+            esac
+          done < "${RUNNER_TEMP}/netflow-paths"
+          echo "netflow_only=${netflow_only}" >> "${GITHUB_OUTPUT}"
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -137,7 +143,7 @@ jobs:
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0 }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"

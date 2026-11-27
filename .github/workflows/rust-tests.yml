@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
-      netflow: ${{ steps.netflow.outputs.any_modified }}
+      netflow: ${{ steps.netflow.outputs.any_modified == 'true' || steps.netflow.outputs.type_changed_files_count > 0 }}
     steps:
       - name: Checkout
         id: checkout
@@ -37,7 +37,7 @@ jobs:
             src/crates/**/metadata.yaml
       - name: Check NetFlow and its workspace dependencies
         id: netflow
-        if: steps.check-files.outputs.any_modified == 'true'
+        if: steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
@@ -63,7 +63,7 @@ jobs:
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ]; then
+          if [ "${{ steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0 }}" == "true" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
