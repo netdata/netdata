@@ -29,6 +29,8 @@ memmap2 = { workspace = true }
 tokio-util = { workspace = true }
 libc = { workspace = true }
 regex = { workspace = true }
+# Step 1 of the logs query evaluates sources in parallel (one shard per source).
+rayon = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true }
