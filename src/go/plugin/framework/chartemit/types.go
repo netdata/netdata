@@ -44,6 +44,7 @@ type (
 	UpdateChartLabelsAction = chartengine.UpdateChartLabelsAction
 	UpdateChartAction       = chartengine.UpdateChartAction
 	UpdateDimensionValue    = chartengine.UpdateDimensionValue
+	UpdateVariableValue     = chartengine.UpdateVariableValue
 	RemoveDimensionAction   = chartengine.RemoveDimensionAction
 	RemoveChartAction       = chartengine.RemoveChartAction
 )

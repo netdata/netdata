@@ -4,6 +4,7 @@ package charttpl
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1315,6 +1316,92 @@ func TestCompileCounterRawCharts(t *testing.T) {
 				got[name] = compiled.Selects(name)
 			}
 			assert.Equal(t, tc.selects, got)
+		})
+	}
+}
+
+func TestSpecValidateChartVariables(t *testing.T) {
+	tests := map[string]struct {
+		variables []ChartVariable
+		wantErr   string
+	}{
+		"accepts a scaled variable": {
+			variables: []ChartVariable{
+				{Name: "nic_speed_max", Selector: "service_metric", Options: &VariableOptions{
+					Divisor: 1000,
+				}},
+			},
+		},
+		"accepts a leading underscore and digits": {
+			variables: []ChartVariable{{Name: "_limit2", Selector: `service_metric{kind="max"}`}},
+		},
+		"accepts a name of the maximum length": {
+			variables: []ChartVariable{{Name: strings.Repeat("v", maxVariableNameLen), Selector: "service_metric"}},
+		},
+		"rejects an empty name": {
+			variables: []ChartVariable{{Selector: "service_metric"}},
+			wantErr:   "variables[0].name",
+		},
+		"rejects a leading digit": {
+			variables: []ChartVariable{{Name: "1limit", Selector: "service_metric"}},
+			wantErr:   "must start with a letter or underscore",
+		},
+		"rejects a dot": {
+			variables: []ChartVariable{{Name: "speed.max", Selector: "service_metric"}},
+			wantErr:   "must start with a letter or underscore",
+		},
+		"rejects a name over the agent limit": {
+			variables: []ChartVariable{{Name: strings.Repeat("v", maxVariableNameLen+1), Selector: "service_metric"}},
+			wantErr:   "at most 1024 bytes",
+		},
+		"rejects a duplicate name": {
+			variables: []ChartVariable{
+				{Name: "limit", Selector: "service_metric"},
+				{Name: "limit", Selector: "service_metric"},
+			},
+			wantErr: "variables[1].name",
+		},
+		"rejects the name of a static dimension": {
+			variables: []ChartVariable{{Name: "value", Selector: "service_metric"}},
+			wantErr:   "health would read the dimension",
+		},
+		"rejects a health built-in": {
+			variables: []ChartVariable{{Name: "this", Selector: "service_metric"}},
+			wantErr:   "health built-in",
+		},
+		"rejects the raw suffix": {
+			variables: []ChartVariable{{Name: "limit_raw", Selector: "service_metric"}},
+			wantErr:   `must not end in "_raw"`,
+		},
+		"rejects the collection time suffix": {
+			variables: []ChartVariable{{Name: "limit_last_collected_t", Selector: "service_metric"}},
+			wantErr:   `must not end in "_last_collected_t"`,
+		},
+		"rejects an empty selector": {
+			variables: []ChartVariable{{Name: "limit"}},
+			wantErr:   "variables[0].selector: must not be empty",
+		},
+		"rejects a label-only selector": {
+			variables: []ChartVariable{{Name: "limit", Selector: `{kind="max"}`}},
+			wantErr:   "selector must include explicit metric name",
+		},
+		"rejects a metric outside the group scope": {
+			variables: []ChartVariable{{Name: "limit", Selector: "other_metric"}},
+			wantErr:   `metric "other_metric" is not visible in current group scope`,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := validationSpec()
+			spec.Groups[0].Charts[0].Variables = tc.variables
+			err := spec.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
 		})
 	}
 }

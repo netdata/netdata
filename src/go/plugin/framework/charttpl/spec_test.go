@@ -754,3 +754,94 @@ groups:
 		})
 	}
 }
+
+func TestDecodeYAMLRejectsDimensionOnlyVariableOptions(t *testing.T) {
+	const tmpl = `
+version: v1
+groups:
+  - family: Net
+    metrics: [speed_bits]
+    charts:
+      - title: Speed
+        context: speed
+        units: kilobits/s
+        dimensions:
+          - selector: speed_bits
+            name: speed
+        variables:
+          - name: nic_speed_max
+            selector: speed_bits
+            options:
+              hidden: true
+`
+	_, err := DecodeYAML([]byte(tmpl))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "hidden")
+}
+
+func TestConfigSchemaChartVariables(t *testing.T) {
+	var schemaDoc any
+	require.NoError(t, json.Unmarshal([]byte(ConfigSchemaJSON), &schemaDoc))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("charttpl.schema.json", schemaDoc))
+	schema, err := compiler.Compile("charttpl.schema.json")
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		variables []any
+		wantErr   bool
+	}{
+		"name and selector": {
+			variables: []any{map[string]any{"name": "nic_speed_max", "selector": "service_metric"}},
+		},
+		"scale options": {
+			variables: []any{map[string]any{
+				"name":     "nic_speed_max",
+				"selector": "service_metric",
+				"options":  map[string]any{"multiplier": 8, "divisor": 1000},
+			}},
+		},
+		"missing selector": {
+			variables: []any{map[string]any{"name": "nic_speed_max"}},
+			wantErr:   true,
+		},
+		"missing name": {
+			variables: []any{map[string]any{"selector": "service_metric"}},
+			wantErr:   true,
+		},
+		"name with a dot": {
+			variables: []any{map[string]any{"name": "nic.speed", "selector": "service_metric"}},
+			wantErr:   true,
+		},
+		"dimension-only option": {
+			variables: []any{map[string]any{
+				"name":     "nic_speed_max",
+				"selector": "service_metric",
+				"options":  map[string]any{"float": true},
+			}},
+			wantErr: true,
+		},
+		"unknown field": {
+			variables: []any{map[string]any{"name": "nic_speed_max", "selector": "service_metric", "value": 1}},
+			wantErr:   true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(validationSpec())
+			require.NoError(t, err)
+			var instance map[string]any
+			require.NoError(t, json.Unmarshal(raw, &instance))
+			chart := instance["groups"].([]any)[0].(map[string]any)["charts"].([]any)[0].(map[string]any)
+			chart["variables"] = tc.variables
+
+			err = schema.Validate(instance)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 )
@@ -170,11 +171,17 @@ func (a *API) setPrefix(id string) []byte {
 }
 
 // VARIABLE sets the value of a CHART scope variable for the initialized chart.
+// A non-finite value is sent as "nan", the only non-finite spelling the Agent
+// parses; it stores any other unparsable value as 0.
 func (a *API) VARIABLE(ID string, value float64) {
 	b := append(a.line(), "VARIABLE CHART '"...)
 	b = append(b, ID...)
 	b = append(b, "' = "...)
-	b = strconv.AppendFloat(b, value, 'f', -1, 64)
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		b = append(b, "nan"...)
+	} else {
+		b = strconv.AppendFloat(b, value, 'f', -1, 64)
+	}
 	a.send(append(b, '\n'))
 }
 

@@ -238,3 +238,38 @@ func richSpec() Spec {
 		Groups: []Group{richGroup()},
 	}
 }
+
+func TestSpecMarshalTemplateRoundTripsChartVariables(t *testing.T) {
+	const tmpl = `
+version: v1
+groups:
+  - family: Net
+    metrics: [received_bytes, speed_bits]
+    charts:
+      - title: Bandwidth
+        context: net
+        units: kilobits/s
+        instances:
+          by_labels: [device]
+        dimensions:
+          - selector: received_bytes
+            name: received
+        variables:
+          - name: nic_speed_max
+            selector: speed_bits
+            options:
+              divisor: 1000
+          - name: link_capacity
+            selector: speed_bits
+`
+	spec, err := DecodeYAML([]byte(tmpl))
+	require.NoError(t, err)
+	require.Len(t, spec.Groups[0].Charts[0].Variables, 2)
+
+	out, err := spec.MarshalTemplate()
+	require.NoError(t, err)
+
+	reDecoded, err := DecodeYAML([]byte(out))
+	require.NoError(t, err)
+	assert.Equal(t, spec, reDecoded)
+}

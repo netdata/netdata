@@ -187,6 +187,20 @@ func TestProfile_RejectsUncompilableTemplate(t *testing.T) {
 	require.ErrorContains(t, profile.Validate("test_vm", "test_vm"), "name inference requires inferable selector")
 }
 
+func TestProfile_RejectsChartVariables(t *testing.T) {
+	profile := loadResourceProfile(t, func(p *Profile) {
+		p.Template.Charts[0].Variables = []charttpl.ChartVariable{{
+			Name:     "limit",
+			Selector: p.Template.Charts[0].Dimensions[0].Selector,
+		}}
+	})
+	require.ErrorContains(
+		t,
+		profile.Validate("test_vm", "test_vm"),
+		"chart variables are not supported in Azure Monitor profiles",
+	)
+}
+
 func TestProfile_StateDimensionNaming(t *testing.T) {
 	for _, selector := range []string{"phase", "test_vm.phase", `phase{region="eastus"}`} {
 		t.Run(selector, func(t *testing.T) {

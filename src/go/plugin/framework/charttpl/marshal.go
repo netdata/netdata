@@ -71,6 +71,9 @@ func (c Chart) MarshalYAML() (any, error) {
 		appendField("lifecycle", c.Lifecycle)
 	}
 	appendField("dimensions", c.Dimensions)
+	if len(c.Variables) > 0 {
+		appendField("variables", c.Variables)
+	}
 	return fields, nil
 }
 

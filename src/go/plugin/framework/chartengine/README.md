@@ -222,6 +222,11 @@ context. Ordinary omission/recovery logging does not enable this diagnostic obse
   existing collision owner, and entry/local provenance for rejected autogen rules. Consumers need not parse encoded
   ownership strings.
 
+Chart variable routes report under their own decisions with `VariableIndex` and `VariableName` (`DimensionIndex` is
+unused): `variable_selector_rejected`, `variable_identity_rejected` and `variable_resolved` at routing, then
+`variable_accepted` when the value is attached to an updated chart or `variable_unbound` with the reason
+(`variable_chart_not_updated`, `variable_chart_other_owner`).
+
 `ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
 `instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
 flag, so validation tooling does not reproduce compiler or planner precedence rules.
@@ -241,10 +246,10 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 
 | Action                  | Meaning                                                                                                                              |
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| `CreateChartAction`     | Materialize chart instance (with chart metadata and labels)                                                                          |
+| `CreateChartAction`     | Materialize chart instance (with chart metadata and labels); `Variables` names the chart variables to define as `nan` after its dimensions |
 | `CreateDimensionAction` | Materialize dimension for a chart                                                                                                    |
 | `UpdateChartLabelsAction` | Re-emit chart metadata and replace chart labels                                                                                   |
-| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0) |
+| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0); `Variables` carries the scaled values of the chart variables that received series |
 | `RemoveDimensionAction` | Obsolete one dimension                                                                                                               |
 | `RemoveChartAction`     | Obsolete one chart                                                                                                                   |
 
@@ -257,6 +262,23 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 
 `chartemit.EmittedCharts` applies the same order to record which charts a plan leaves defined on the Agent; V2 job
 cleanup and runtime components obsolete that set through its `ObsoletePlan`.
+
+### Chart Variables
+
+Template semantics are in the chart-template format's [variables section](../charttpl/README.md#7-variables). The
+engine implements them without cross-cycle state:
+
+- A variable route renders the chart instance from the series' own labels, like a dimension route, but never creates a
+  chart, claims a chart ID, adds a dimension, contributes labels or counts toward output limits. A series matched only
+  by variable routes is matched (no autogen fallback); label replay skips variable routes.
+- Values are reduced per chart instance and template during the scan and attached at materialization to a chart that
+  is updated in the build and owned by the variable's template. No variable state survives the build, so aborted
+  attempts need no rollback; the Agent keeps the last value between updates.
+- `CreateChartAction.Variables` lists the template's declared names and, when the chart is created over a retired or
+  previous definition with the same ID (template change, ownership change, revival), the names that definition declared
+  and the new template does not. Each materialized chart records its creating template's names for this.
+- chartemit writes the `nan` presets after the created chart's DIMENSION lines and the values inside BEGIN..END after
+  the SET lines; both positions have a scope chart, which `VARIABLE CHART` requires.
 
 ## Routing and Collision Rules
 
@@ -516,3 +538,9 @@ and cached labels through omission/recovery; admission itself does not add a pas
 `BenchmarkContextLimitInstances` covers many small charts and `BenchmarkContextLimitRecoveryCycle`
 includes repeated growth and recovery. Candidate sizing follows the pre-admission population to avoid repeated cold
 chart-state allocations for omitted contexts.
+
+Chart variables add no work to engines whose templates declare none (one match-index check per series and per updated
+chart). With variables, each routed variable value is one entry in a per-build map sized from the previous build and
+each emitted value one slot in a per-build block, so allocations stay constant per build rather than per series.
+`BenchmarkBuildPlanChartVariables` compares one chart per instance without variables, with variables fed for one
+instance in ten, and with variables fed for every instance.

@@ -211,10 +211,11 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 
 ### Migration Hard Stops
 
-- A collector using V1 chart `Vars` is blocked until framework support, an
-  approved equivalent design, or explicit breaking-alert approval exists.
+- V1 chart `Vars` MUST map to chart-template `variables` with unchanged names
+  (`src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-variables`); an alert that
+  relies on V1's initial value is a recorded user decision.
 - `collecttest.AssertChartCoverage` is not chart-identity parity; it cannot
-  prove old chart IDs, family, priority, lifecycle, labels, or alert variables.
+  prove old chart IDs, family, priority, lifecycle or labels.
 - A finished migration MUST pass an import/runtime-path audit proving no V1
   collection path or V1 map-to-`metrix` bridge remains reachable from normal
   execution.

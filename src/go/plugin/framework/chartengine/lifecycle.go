@@ -15,7 +15,10 @@ type materializedState struct {
 
 // materializedChartState tracks one materialized chart instance.
 type materializedChartState struct {
-	templateID         string
+	templateID string
+	// variableNames are the chart variables the creating template declared,
+	// shared read-only with the match index.
+	variableNames      []string
 	meta               program.ChartMeta
 	emittedMeta        program.ChartMeta
 	lifecycle          program.LifecyclePolicy

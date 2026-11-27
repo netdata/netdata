@@ -113,6 +113,14 @@ a *leaf* is the innermost family that holds charts.
 - Multiplier, divisor and `hidden` are presentation and stay in the template.
 - Aggregation and algorithm overrides follow `./SKILL.md#metrics-and-charts`.
 
+## Chart Variables
+
+- Declare a chart variable only for an alert that reads it as `$name` (a stock alert on a shared context, or the
+  collector's own); format, binding and wire behavior are owned by
+  `src/go/plugin/framework/charttpl/README.md#7-variables`.
+- Feed it from a gauge in its base unit that carries the chart's instance identity labels, and scale it with
+  `options.multiplier`/`options.divisor`; the reduction is the chart's `aggregation`.
+
 ## Labels
 
 - **Decide at the source.** Attach a label to a metric only when an operator filters or groups charts by it
@@ -161,7 +169,8 @@ a *leaf* is the innermost family that holds charts.
   metadata comparison, selects the module by `meta.id`). `AssertMetadataDocumentsChartTemplate` compares stateset
   dimensions in declared order, not rendered order. `AssertHealthAlertsMatchMetadata` requires each alert's target,
   unit and lookup dimensions to be documented, and the variables of `calc`, `warn` and `crit` to be documented
-  dimensions, built-ins, alert names or qualified references. Page alert tables are derived, not checked
+  dimensions, built-ins, alert names, qualified references or, with `HealthAlertsCheck.ChartTemplate`, chart variables
+  the template declares on the alert's chart. Page alert tables are derived, not checked
   (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1).
 - **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
@@ -171,8 +180,8 @@ a *leaf* is the innermost family that holds charts.
   instantiates) as the V1 renderer sends them, so the same metadata checks apply through
   `collecttest.CheckMetadataMetricsMatchCharts` (the `elasticsearch` and `mssql` artifacts tests).
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
-  expected charts and dimensions from the live static or native provider and store, per host scope; do not add
-  `RequiredContexts` that repeat it.
+  expected charts, dimensions and chart variables from the live static or native provider and store, per host scope; do
+  not add `RequiredContexts` that repeat it.
 - **Lifecycle.** Chart coverage creates a fresh planner per call. Expiry/recovery tests MUST reuse a planner across
   successful missing-data cycles beyond the configured expiry and metric-store retention, then verify retirement
   or retained gaps and recovery through plan actions or emitted protocol.

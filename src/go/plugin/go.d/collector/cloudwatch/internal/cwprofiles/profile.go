@@ -201,6 +201,13 @@ func (p Profile) Validate(prefix, baseName string) error {
 	if countChartsInGroup(p.Template) == 0 {
 		errs = append(errs, fmt.Errorf("%s: 'template' must contain at least one chart", prefix))
 	}
+	// Profile selector normalization and attribute-label protection handle dimensions only.
+	if p.Template.HasChartVariables() {
+		errs = append(
+			errs,
+			fmt.Errorf("%s: 'template': chart variables are not supported in CloudWatch profiles", prefix),
+		)
+	}
 
 	seenMetricIDs := map[string]struct{}{}
 	seenMetricNames := map[string]struct{}{}

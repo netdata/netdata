@@ -15,9 +15,11 @@ import (
 )
 
 type routeBinding struct {
-	autogenGuard      *autogenRouteGuard
-	ChartTemplateID   string
-	ChartID           string
+	autogenGuard    *autogenRouteGuard
+	ChartTemplateID string
+	ChartID         string
+	// DimensionIndex is the declaration index of the dimension, or of the chart
+	// variable when Variable is set.
 	DimensionIndex    int
 	DimensionName     string
 	DimensionKeyLabel string
@@ -29,9 +31,12 @@ type routeBinding struct {
 	Static            bool
 	Inferred          bool
 	Autogen           bool
-	Aggregation       program.Aggregation
-	Meta              program.ChartMeta
-	Lifecycle         program.LifecyclePolicy
+	// Variable marks a chart variable route: it carries only the chart identity,
+	// variable index, reducer and scale, and never creates a chart or dimension.
+	Variable    bool
+	Aggregation program.Aggregation
+	Meta        program.ChartMeta
+	Lifecycle   program.LifecyclePolicy
 }
 
 type routeCandidate struct {
@@ -49,6 +54,26 @@ type matchIndex struct {
 	// firstInfer is the first inferred dimension in template-ID order, used to
 	// validate that the plan reader is flattened.
 	firstInfer inferredDimensionRef
+
+	// The variable indexes are empty when no chart template declares variables,
+	// which keeps the dimension-only path free of variable work.
+	variablesByMetricName map[string][]variableCandidate
+	wildcardVariables     []variableCandidate
+	// variablesByTemplate and variableNames hold each declaring template's
+	// variables and their names, shared read-only with plan actions.
+	variablesByTemplate map[string][]program.Variable
+	variableNames       map[string][]string
+}
+
+type variableCandidate struct {
+	chartTemplateID string
+	variableIndex   int
+	variable        *program.Variable
+}
+
+// hasVariables reports whether any chart template declares a chart variable.
+func (m *matchIndex) hasVariables() bool {
+	return len(m.variablesByTemplate) > 0
 }
 
 type inferredDimensionRef struct {
@@ -69,6 +94,7 @@ func buildMatchIndex(charts []program.Chart) matchIndex {
 	for _, chart := range charts {
 		index.chartsByID[chart.TemplateID] = chart
 		index.labelPolicies[chart.TemplateID] = compileChartLabelPolicy(chart)
+		index.addVariables(chart)
 		for i, dim := range chart.Dimensions {
 			candidate := routeCandidate{
 				chartTemplateID: chart.TemplateID,
@@ -87,6 +113,36 @@ func buildMatchIndex(charts []program.Chart) matchIndex {
 
 	index.firstInfer = firstInferDimension(index.chartsByID)
 	return index
+}
+
+func (m *matchIndex) addVariables(chart program.Chart) {
+	if len(chart.Variables) == 0 {
+		return
+	}
+	if m.variablesByTemplate == nil {
+		m.variablesByTemplate = make(map[string][]program.Variable)
+		m.variableNames = make(map[string][]string)
+		m.variablesByMetricName = make(map[string][]variableCandidate)
+	}
+	// chart is this index's own copy, so its variables can be shared.
+	m.variablesByTemplate[chart.TemplateID] = chart.Variables
+	names := make([]string, len(chart.Variables))
+	for i := range chart.Variables {
+		names[i] = chart.Variables[i].Name
+		candidate := variableCandidate{
+			chartTemplateID: chart.TemplateID,
+			variableIndex:   i,
+			variable:        &chart.Variables[i],
+		}
+		if len(chart.Variables[i].Selector.MetricNames) == 0 {
+			m.wildcardVariables = append(m.wildcardVariables, candidate)
+			continue
+		}
+		for _, metricName := range chart.Variables[i].Selector.MetricNames {
+			m.variablesByMetricName[metricName] = append(m.variablesByMetricName[metricName], candidate)
+		}
+	}
+	m.variableNames[chart.TemplateID] = names
 }
 
 func firstInferDimension(chartsByID map[string]program.Chart) inferredDimensionRef {
@@ -246,6 +302,14 @@ func (e *Engine) resolveSeriesRoutes(
 		})
 	}
 
+	if index.hasVariables() {
+		var err error
+		routes, err = appendVariableRoutes(routes, observe, identity, name, labels, index)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
 	typedOrder := e.state.templateSet != nil && !e.state.templateSet.legacy
 	sort.Slice(routes, func(i, j int) bool {
 		if routes[i].ChartID != routes[j].ChartID {
@@ -258,6 +322,9 @@ func (e *Engine) resolveSeriesRoutes(
 			}
 			return left < right
 		}
+		if routes[i].Variable != routes[j].Variable {
+			return !routes[i].Variable
+		}
 		if routes[i].DimensionIndex != routes[j].DimensionIndex {
 			return routes[i].DimensionIndex < routes[j].DimensionIndex
 		}
@@ -268,4 +335,81 @@ func (e *Engine) resolveSeriesRoutes(
 		cache.Store(identity, revision, buildSeq, routes)
 	}
 	return routes, false, nil
+}
+
+// appendVariableRoutes adds the chart variable routes of one series. A variable
+// binds to the chart instance that the series' own labels render under the
+// chart's instance identity, exactly as a dimension series would.
+func appendVariableRoutes(
+	routes []routeBinding,
+	observe func(PlanRouteDiagnostic),
+	identity metrix.SeriesIdentity,
+	name string,
+	labels metrix.LabelView,
+	index matchIndex,
+) ([]routeBinding, error) {
+	byName := index.variablesByMetricName[name]
+	if len(byName) == 0 && len(index.wildcardVariables) == 0 {
+		return routes, nil
+	}
+	for _, candidates := range [2][]variableCandidate{byName, index.wildcardVariables} {
+		for _, candidate := range candidates {
+			variable := candidate.variable
+			fact := PlanRouteDiagnostic{
+				SeriesIdentity:  identity,
+				MetricName:      name,
+				ChartTemplateID: candidate.chartTemplateID,
+				VariableIndex:   candidate.variableIndex,
+				VariableName:    variable.Name,
+			}
+			if !variable.Selector.Matcher.Matches(name, labels) {
+				if observe != nil {
+					fact.Decision = PlanRouteVariableSelectorRejected
+					observe(fact)
+				}
+				continue
+			}
+			chart, ok := index.chartsByID[candidate.chartTemplateID]
+			if !ok {
+				return nil, fmt.Errorf(
+					"chartengine: variable route references unknown chart template %q",
+					candidate.chartTemplateID,
+				)
+			}
+			labelPolicy, ok := index.labelPolicies[candidate.chartTemplateID]
+			if !ok {
+				return nil, fmt.Errorf(
+					"chartengine: variable route references unknown label policy %q",
+					candidate.chartTemplateID,
+				)
+			}
+			chartID, ok, err := renderChartInstanceIDFromViewWithPlan(chart.Identity, labelPolicy.instancePlan, labels)
+			if err != nil {
+				return nil, err
+			}
+			if !ok || strings.TrimSpace(chartID) == "" {
+				if observe != nil {
+					fact.Decision = PlanRouteVariableIdentityRejected
+					fact.MissingInstanceLabels = missingChartInstanceLabels(labelPolicy.instancePlan, labels)
+					observe(fact)
+				}
+				continue
+			}
+			if observe != nil {
+				fact.Decision = PlanRouteVariableResolved
+				fact.ChartID = chartID
+				observe(fact)
+			}
+			routes = append(routes, routeBinding{
+				ChartTemplateID: candidate.chartTemplateID,
+				ChartID:         chartID,
+				DimensionIndex:  candidate.variableIndex,
+				Variable:        true,
+				Aggregation:     variable.Aggregation,
+				Multiplier:      variable.Multiplier,
+				Divisor:         variable.Divisor,
+			})
+		}
+	}
+	return routes, nil
 }

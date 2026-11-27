@@ -314,6 +314,7 @@ lifecycle, dimension, presentation, and selector field. CloudWatch profiles add 
   excludes that label, but excluding a required identity label fails validation.
 - Do not author `template.metrics`; the collector derives the visible series from `metrics`.
 - Every dimension selector must resolve to a series exported by the profile.
+- Chart `variables` are not supported; a template that declares one fails validation.
 - Set an explicit `id` on every chart and keep it unique across the loaded profile catalog. A collision between two
   stock profiles fails loading; a collision involving a user profile logs a warning and drops the colliding chart. The
   uniqueness check covers only explicitly set IDs.

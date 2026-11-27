@@ -4,6 +4,7 @@ package collecttest
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -24,6 +25,15 @@ const (
 type chartCoverage struct {
 	ActualByContext   map[string]map[string]struct{}
 	ExpectedByContext map[string][]string
+	// Chart variables, by context, as dimensions are.
+	ActualVariablesByContext   map[string]map[string]struct{}
+	ExpectedVariablesByContext map[string][]string
+	// ShadowedVariables lists chart variables that a materialized dimension of
+	// the same chart hides from health, which reads the dimension first.
+	ShadowedVariables []string
+	// UnboundVariables lists variable values whose series render a chart
+	// instance that was not updated: no dimension series shares their identity.
+	UnboundVariables []string
 }
 
 type scopedChartCoverage struct {
@@ -46,6 +56,11 @@ type ChartCoverageExpectation struct {
 // exclude routes rejected by the planner for chart-ID collisions; they do not
 // independently verify collision winners. Pin intended winners with RequiredContexts
 // or explicit plan assertions when testing overlapping templates.
+//
+// Chart variables are covered like dimensions: a declared variable of an expected
+// chart whose selector matches a current series carrying the chart's required
+// instance labels must be sent with that chart's values. A materialized dimension
+// with the name of a declared variable of its chart fails the check.
 func AssertChartCoverage(
 	t *testing.T,
 	collector interface {
@@ -83,6 +98,12 @@ func AssertChartCoverage(
 	for _, scoped := range coverages {
 		for contextName, dims := range scoped.Coverage.ExpectedByContext {
 			requireContextDims(t, scoped.Coverage.ActualByContext, contextName, dims, scoped.ScopeKey)
+		}
+		for contextName, names := range scoped.Coverage.ExpectedVariablesByContext {
+			requireContextVariables(t, scoped.Coverage.ActualVariablesByContext, contextName, names, scoped.ScopeKey)
+		}
+		for _, problem := range append(scoped.Coverage.ShadowedVariables, scoped.Coverage.UnboundVariables...) {
+			t.Fatalf("collecttest: %s%s", problem, scopeSuffix(scoped.ScopeKey))
 		}
 		for contextName, dims := range exp.RequiredContexts {
 			requireContextDims(t, scoped.Coverage.ActualByContext, contextName, dims, scoped.ScopeKey)
@@ -132,16 +153,29 @@ func buildChartCoverage(
 	}
 
 	collisions := make(map[coverageRouteKey]struct{})
-	engine, err := chartengine.New(chartengine.WithRuntimeStore(nil), chartengine.WithPlanRouteDiagnosticObserver(func(fact chartengine.PlanRouteDiagnostic) {
-		if fact.Decision != chartengine.PlanRouteCollisionRejected || fact.Autogen {
-			return
-		}
-		collisions[coverageRouteKey{
-			templateID:     fact.ChartTemplateID,
-			dimensionIndex: fact.DimensionIndex,
-			series:         fact.SeriesIdentity,
-		}] = struct{}{}
-	}))
+	var unbound []string
+	engine, err := chartengine.New(
+		chartengine.WithRuntimeStore(nil),
+		chartengine.WithPlanRouteDiagnosticObserver(func(fact chartengine.PlanRouteDiagnostic) {
+			switch {
+			case fact.Decision == chartengine.PlanRouteCollisionRejected && !fact.Autogen:
+				collisions[coverageRouteKey{
+					templateID:     fact.ChartTemplateID,
+					dimensionIndex: fact.DimensionIndex,
+					series:         fact.SeriesIdentity,
+				}] = struct{}{}
+			case fact.Decision == chartengine.PlanRouteVariableUnbound &&
+				fact.Reason == chartengine.PlanRouteReasonVariableChartNotUpdated &&
+				!matchesAny(fact.Context, contextMatchers):
+				// A variable owned by another template's chart follows the collision rules instead.
+				unbound = append(unbound, fmt.Sprintf(
+					"chart variable %q has series for chart %q, which was not updated: no dimension series has the same instance identity",
+					fact.VariableName,
+					fact.ChartID,
+				))
+			}
+		}),
+	)
 	if err != nil {
 		return chartCoverage{}, err
 	}
@@ -153,14 +187,19 @@ func buildChartCoverage(
 	plan := attempt.Plan()
 
 	actualByContext := materializedContextsByPattern(plan, contextMatchers)
-	expectedByContext, err := expectedTemplateCoverage(set, reader, contextMatchers, collisions)
+	actualVariables, shadowed := materializedVariablesByContext(plan, contextMatchers)
+	expectedByContext, expectedVariables, err := expectedTemplateCoverage(set, reader, contextMatchers, collisions)
 	if err != nil {
 		return chartCoverage{}, err
 	}
 
 	return chartCoverage{
-		ActualByContext:   actualByContext,
-		ExpectedByContext: expectedByContext,
+		ActualByContext:            actualByContext,
+		ExpectedByContext:          expectedByContext,
+		ActualVariablesByContext:   actualVariables,
+		ExpectedVariablesByContext: expectedVariables,
+		ShadowedVariables:          shadowed,
+		UnboundVariables:           unbound,
 	}, nil
 }
 
@@ -215,6 +254,61 @@ func materializedContextsByPattern(plan chartengine.Plan, contextMatchers []matc
 	return out
 }
 
+// materializedVariablesByContext returns the chart variables sent with chart
+// values, by context, and the declared variables a materialized dimension of the
+// same chart shadows. The coverage engine is fresh, so every chart it updates is
+// created in the same plan.
+func materializedVariablesByContext(
+	plan chartengine.Plan,
+	contextMatchers []matcher.Matcher,
+) (map[string]map[string]struct{}, []string) {
+	created := make(map[string]chartengine.CreateChartAction)
+	dimsByChart := make(map[string][]string)
+	for _, action := range plan.Actions {
+		switch v := action.(type) {
+		case chartengine.CreateChartAction:
+			created[v.ChartID] = v
+		case chartengine.CreateDimensionAction:
+			dimsByChart[v.ChartID] = append(dimsByChart[v.ChartID], v.Name)
+		}
+	}
+
+	out := make(map[string]map[string]struct{})
+	for _, action := range plan.Actions {
+		update, ok := action.(chartengine.UpdateChartAction)
+		if !ok || len(update.Variables) == 0 {
+			continue
+		}
+		contextName := created[update.ChartID].Meta.Context
+		if matchesAny(contextName, contextMatchers) {
+			continue
+		}
+		names, ok := out[contextName]
+		if !ok {
+			names = make(map[string]struct{})
+			out[contextName] = names
+		}
+		for _, variable := range update.Variables {
+			names[variable.Name] = struct{}{}
+		}
+	}
+
+	var shadowed []string
+	for chartID, chart := range created {
+		for _, dim := range dimsByChart[chartID] {
+			if slices.Contains(chart.Variables, dim) {
+				shadowed = append(shadowed, fmt.Sprintf(
+					"dimension %q of chart %q has the name of a chart variable; health reads the dimension",
+					dim,
+					chartID,
+				))
+			}
+		}
+	}
+	sort.Strings(shadowed)
+	return out, shadowed
+}
+
 type coverageRouteKey struct {
 	templateID     string
 	dimensionIndex int
@@ -229,6 +323,7 @@ type templateCoverageBuilder struct {
 	globalSelector     metrixselector.Selector
 	collisions         map[coverageRouteKey]struct{}
 	byContext          map[string]map[string]struct{}
+	variablesByContext map[string]map[string]struct{}
 }
 
 func expectedTemplateCoverage(
@@ -236,7 +331,7 @@ func expectedTemplateCoverage(
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
 	collisions map[coverageRouteKey]struct{},
-) (map[string][]string, error) {
+) (map[string][]string, map[string][]string, error) {
 	policy := set.GlobalPolicy()
 	entries := set.Entries()
 	b := templateCoverageBuilder{
@@ -246,33 +341,37 @@ func expectedTemplateCoverage(
 		selectorParseCache: make(map[string]metrixselector.Selector),
 		collisions:         collisions,
 		byContext:          make(map[string]map[string]struct{}),
+		variablesByContext: make(map[string]map[string]struct{}),
 	}
 	if policy.Selector != nil {
 		var err error
 		b.globalSelector, err = policy.Selector.Parse()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	for _, entry := range entries {
 		rootContext := normalizeOptionalContextPart(entry.ContextNamespace)
 		for i, group := range entry.Groups {
 			if err := b.collectTemplateContexts(group, rootContext, entry.ID, []int{i}); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
+	return sortedNamesByContext(b.byContext), sortedNamesByContext(b.variablesByContext), nil
+}
 
-	out := make(map[string][]string, len(b.byContext))
-	for contextName, dimSet := range b.byContext {
-		dims := make([]string, 0, len(dimSet))
-		for dimName := range dimSet {
-			dims = append(dims, dimName)
+func sortedNamesByContext(byContext map[string]map[string]struct{}) map[string][]string {
+	out := make(map[string][]string, len(byContext))
+	for contextName, nameSet := range byContext {
+		names := make([]string, 0, len(nameSet))
+		for name := range nameSet {
+			names = append(names, name)
 		}
-		sort.Strings(dims)
-		out[contextName] = dims
+		sort.Strings(names)
+		out[contextName] = names
 	}
-	return out, nil
+	return out
 }
 
 func (b *templateCoverageBuilder) collectTemplateContexts(
@@ -326,6 +425,21 @@ func (b *templateCoverageBuilder) collectTemplateContexts(
 		}
 		for name := range dims {
 			existingDims[name] = struct{}{}
+		}
+		for _, variable := range chart.Variables {
+			matched, err := b.matchesExpectedVariable(variable, instances.RequiredKeys)
+			if err != nil {
+				return err
+			}
+			if !matched {
+				continue
+			}
+			names, ok := b.variablesByContext[contextName]
+			if !ok {
+				names = make(map[string]struct{})
+				b.variablesByContext[contextName] = names
+			}
+			names[strings.TrimSpace(variable.Name)] = struct{}{}
 		}
 	}
 
@@ -399,6 +513,41 @@ func (b *templateCoverageBuilder) collectExpectedDimensionNames(
 	}
 	sort.Strings(out)
 	return out, matched, nil
+}
+
+// matchesExpectedVariable reports whether a current series can feed the variable:
+// it passes the global and variable selectors and carries the chart's required
+// instance labels, as the planner requires to bind it to a chart instance.
+func (b *templateCoverageBuilder) matchesExpectedVariable(
+	variable charttpl.ChartVariable,
+	requiredKeys []string,
+) (bool, error) {
+	sel, err := parseSelectorCached(strings.TrimSpace(variable.Selector), b.selectorParseCache)
+	if err != nil {
+		return false, err
+	}
+	matched := false
+	lastSuccessSeq := b.reader.CollectMeta().LastSuccessSeq
+	b.reader.ForEachSeriesIdentity(
+		func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, metricName string, labels metrix.LabelView, _ metrix.SampleValue) {
+			if matched || meta.LastSeenSuccessSeq != lastSuccessSeq {
+				return
+			}
+			if b.globalSelector != nil && !b.globalSelector.Matches(metricName, labels) {
+				return
+			}
+			if !sel.Matches(metricName, labels) {
+				return
+			}
+			for _, required := range requiredKeys {
+				if _, present := labels.Get(required); !present {
+					return
+				}
+			}
+			matched = true
+		},
+	)
+	return matched, nil
 }
 
 func parseSelectorCached(selectorExpr string, cache map[string]metrixselector.Selector) (metrixselector.Selector, error) {
@@ -508,4 +657,28 @@ func requireContextDims(t *testing.T, byContext map[string]map[string]struct{}, 
 			return
 		}
 	}
+}
+
+func requireContextVariables(
+	t *testing.T,
+	byContext map[string]map[string]struct{},
+	contextName string,
+	names []string,
+	scopeKey string,
+) {
+	t.Helper()
+	sent := byContext[contextName]
+	for _, name := range names {
+		if _, ok := sent[name]; !ok {
+			t.Fatalf("collecttest: missing chart variable %q in context %q%s", name, contextName, scopeSuffix(scopeKey))
+			return
+		}
+	}
+}
+
+func scopeSuffix(scopeKey string) string {
+	if scopeKey == "" {
+		return ""
+	}
+	return fmt.Sprintf(" in host scope %q", scopeKey)
 }

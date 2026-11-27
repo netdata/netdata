@@ -5,6 +5,7 @@ package collecttest
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"testing"
 
@@ -499,4 +500,115 @@ func testCoverageSet(t *testing.T, data string) *chartengine.TemplateSet {
 	set, err := chartengine.NewTemplateSetYAML([]byte(data))
 	require.NoError(t, err)
 	return set
+}
+
+func TestBuildChartCoverageChartVariables(t *testing.T) {
+	const template = `
+version: v1
+context_namespace: net
+groups:
+  - family: Net
+    metrics: [received, speed]
+    charts:
+      - title: Bandwidth
+        context: net
+        units: bits/s
+        instances:
+          by_labels: [device]
+        dimensions:
+          - selector: received
+            name: received
+        variables:
+          - name: nic_speed
+            selector: speed
+      - title: Errors
+        context: errors
+        units: errors
+        instances:
+          by_labels: [device]
+        dimensions:
+          - selector: received
+            name_from_label: kind
+        variables:
+          - name: link
+            selector: speed
+`
+	device := func(name string) metrix.Label {
+		return metrix.Label{
+			Key:   "device",
+			Value: name,
+		}
+	}
+	tests := map[string]struct {
+		write            func(m metrix.SnapshotMeter)
+		wantExpectedVars map[string][]string
+		wantActualVars   map[string][]string
+		wantShadowed     int
+		wantUnbound      []string
+	}{
+		"variables sent with their charts are covered": {
+			write: func(m metrix.SnapshotMeter) {
+				m.WithLabels(device("eth0"), metrix.Label{
+					Key:   "kind",
+					Value: "crc",
+				}).Gauge("received").Observe(1)
+				m.WithLabels(device("eth0")).Gauge("speed").Observe(10)
+			},
+			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
+			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
+		},
+		"a variable series for an instance without dimension series is unbound": {
+			write: func(m metrix.SnapshotMeter) {
+				m.WithLabels(device("eth0"), metrix.Label{
+					Key:   "kind",
+					Value: "crc",
+				}).Gauge("received").Observe(1)
+				m.WithLabels(device("eth0")).Gauge("speed").Observe(10)
+				m.WithLabels(device("eth1")).Gauge("speed").Observe(20)
+			},
+			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
+			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
+			wantUnbound: []string{
+				`chart variable "link" has series for chart "net_errors_eth1", which was not updated: no dimension series has the same instance identity`,
+				`chart variable "nic_speed" has series for chart "net_net_eth1", which was not updated: no dimension series has the same instance identity`,
+			},
+		},
+		"a dynamic dimension named like a variable shadows it": {
+			write: func(m metrix.SnapshotMeter) {
+				m.WithLabels(device("eth0"), metrix.Label{
+					Key:   "kind",
+					Value: "link",
+				}).Gauge("received").Observe(1)
+				m.WithLabels(device("eth0")).Gauge("speed").Observe(10)
+			},
+			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
+			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}, "net.errors": {"link"}},
+			wantShadowed:     1,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			store := newTestCollectorStore(t, tc.write)
+			coverage, err := buildChartCoverage(
+				testCoverageSet(t, template),
+				store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
+				nil,
+			)
+			require.NoError(t, err)
+			assert.Equal(
+				t,
+				normalizeCoverageDimsList(tc.wantExpectedVars),
+				normalizeCoverageDimsList(coverage.ExpectedVariablesByContext),
+			)
+			assert.Equal(
+				t,
+				normalizeCoverageDimsList(tc.wantActualVars),
+				normalizeCoverageDims(coverage.ActualVariablesByContext),
+			)
+			assert.Len(t, coverage.ShadowedVariables, tc.wantShadowed)
+			unbound := slices.Clone(coverage.UnboundVariables)
+			slices.Sort(unbound)
+			assert.Equal(t, tc.wantUnbound, unbound)
+		})
+	}
 }

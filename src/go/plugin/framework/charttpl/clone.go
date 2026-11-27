@@ -34,6 +34,16 @@ func cloneChart(in Chart) Chart {
 	out.Instances = cloneInstances(in.Instances)
 	out.Lifecycle = cloneLifecycle(in.Lifecycle)
 	out.Dimensions = cloneSlice(in.Dimensions, cloneDimension)
+	out.Variables = cloneSlice(in.Variables, cloneVariable)
+	return out
+}
+
+func cloneVariable(in ChartVariable) ChartVariable {
+	out := in
+	if in.Options != nil {
+		opts := *in.Options
+		out.Options = &opts
+	}
 	return out
 }
 

@@ -403,6 +403,8 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   `version` and `engine` fields are rejected. The collector wraps your group into its per-job spec, where autogeneration
   for uncovered metrics stays enabled. Configure conditional fallback through the profile-root `autogen.selector`, not
   a nested `engine`.
+- **No chart `variables`.** Profile validation and semantic proofs handle dimensions only, so a template that declares
+  a chart variable fails to load.
 - **Root `family` is optional.** Omit `template.family` when the template root is only a container and the resolved
   application already provides the same navigation level. Its named child groups then become the top-level families.
   Keep a meaningful root on reusable instrumentation profiles so their charts remain identifiable when composed into

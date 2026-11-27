@@ -197,6 +197,7 @@ func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{
 		validateLifecycle(chart.Lifecycle, path),
 		validateInstances(chart.Instances, path),
 		validateDimensions(chart.Dimensions, path, effectiveMetrics),
+		validateVariables(chart.Variables, chart.Dimensions, path, effectiveMetrics),
 	)
 }
 
@@ -335,17 +336,10 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 	seenDimNames := make(map[string]struct{}, len(dimensions))
 	for i := range dimensions {
 		d := dimensions[i]
-		selectorExpr := strings.TrimSpace(d.Selector)
-		if selectorExpr == "" {
-			errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "must not be empty"))
-		} else {
-			metricName, ok := selectorMetricName(selectorExpr)
-			if !ok {
-				errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "selector must include explicit metric name"))
-			} else if _, ok := effectiveMetrics[metricName]; !ok {
-				errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), fmt.Sprintf("metric %q is not visible in current group scope", metricName)))
-			}
-		}
+		errs = append(
+			errs,
+			validateScopedSelector(d.Selector, fmt.Sprintf("%s.dimensions[%d].selector", path, i), effectiveMetrics),
+		)
 
 		name := strings.TrimSpace(d.Name)
 		nameFrom := strings.TrimSpace(d.NameFromLabel)
@@ -367,6 +361,105 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// validateScopedSelector checks a dimension or variable selector: it names an
+// explicit metric that the current group scope declares.
+func validateScopedSelector(expr, path string, effectiveMetrics map[string]struct{}) error {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return semErr(path, "must not be empty")
+	}
+	metricName, ok := selectorMetricName(expr)
+	if !ok {
+		return semErr(path, "selector must include explicit metric name")
+	}
+	if _, ok := effectiveMetrics[metricName]; !ok {
+		return semErr(path, fmt.Sprintf("metric %q is not visible in current group scope", metricName))
+	}
+	return nil
+}
+
+// maxVariableNameLen is the Netdata Agent's RRDVAR_MAX_LENGTH: the Agent keeps
+// only that many characters of a variable name, so a longer name would not
+// match the `$name` an alert reads.
+const maxVariableNameLen = 1024
+
+// healthBuiltinVariables are the names Netdata health resolves before the
+// chart's dimensions and variables (src/health/health_variable.c), so a chart
+// variable with one of these names would never be read.
+var healthBuiltinVariables = []string{
+	"this", "now", "after", "before", "status", "REMOVED", "UNINITIALIZED", "UNDEFINED",
+	"CLEAR", "WARNING", "CRITICAL", "last_collected_t", "update_every",
+}
+
+// healthDimensionSuffixes make health strip the suffix and resolve the base
+// name as a dimension before it reads a chart variable.
+var healthDimensionSuffixes = []string{"_raw", "_last_collected_t"}
+
+func validateVariables(
+	variables []ChartVariable,
+	dimensions []Dimension,
+	path string,
+	effectiveMetrics map[string]struct{},
+) error {
+	if len(variables) == 0 {
+		return nil
+	}
+	staticDimNames := make(map[string]struct{}, len(dimensions))
+	for _, d := range dimensions {
+		if name := strings.TrimSpace(d.Name); name != "" {
+			staticDimNames[name] = struct{}{}
+		}
+	}
+
+	var errs []error
+	seen := make(map[string]struct{}, len(variables))
+	for i, v := range variables {
+		varPath := fmt.Sprintf("%s.variables[%d]", path, i)
+		if err := validateVariableName(v.Name); err != nil {
+			errs = append(errs, semErr(varPath+".name", err.Error()))
+		} else if _, ok := seen[v.Name]; ok {
+			errs = append(errs, semErr(varPath+".name", fmt.Sprintf("duplicate variable name %q", v.Name)))
+		} else if _, ok := staticDimNames[v.Name]; ok {
+			errs = append(errs, semErr(varPath+".name", fmt.Sprintf("variable %q has the name of a dimension of this chart; health would read the dimension", v.Name)))
+		}
+		seen[v.Name] = struct{}{}
+		errs = append(errs, validateScopedSelector(v.Selector, varPath+".selector", effectiveMetrics))
+	}
+	return errors.Join(errs...)
+}
+
+func validateVariableName(name string) error {
+	switch {
+	case name == "":
+		return errors.New("must not be empty")
+	case len(name) > maxVariableNameLen:
+		return fmt.Errorf("must be at most %d bytes", maxVariableNameLen)
+	case !isVariableName(name):
+		return errors.New("must start with a letter or underscore and contain only letters, digits and underscores")
+	case slices.Contains(healthBuiltinVariables, name):
+		return fmt.Errorf("%q is a health built-in variable", name)
+	}
+	for _, suffix := range healthDimensionSuffixes {
+		if strings.HasSuffix(name, suffix) {
+			return fmt.Errorf("must not end in %q; health reads it as a dimension selector", suffix)
+		}
+	}
+	return nil
+}
+
+func isVariableName(name string) bool {
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c == '_', c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+		case c >= '0' && c <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func validateAggregation(aggregation Aggregation, path string) error {

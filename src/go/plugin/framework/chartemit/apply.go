@@ -49,6 +49,9 @@ type dimensionEmission struct {
 type definitionVisitor interface {
 	visitChart(chartID string, meta chartengine.ChartMeta, labels map[string]string, emitLabels, obsolete bool)
 	visitDimension(chartID string, dim dimensionEmission)
+	// visitVariablePresets follows a created chart's dimensions; it defines the
+	// chart variables as unknown (nan) while CHART still scopes the commands.
+	visitVariablePresets(chartID string, names []string)
 }
 
 type emissionDefinitionVisitor struct {
@@ -72,6 +75,12 @@ func (v emissionDefinitionVisitor) visitChart(
 
 func (v emissionDefinitionVisitor) visitDimension(_ string, dim dimensionEmission) {
 	emitDimension(v.api, dim)
+}
+
+func (v emissionDefinitionVisitor) visitVariablePresets(_ string, names []string) {
+	for _, name := range names {
+		v.api.VARIABLE(name, math.NaN())
+	}
 }
 
 // ApplyPlan emits chartengine actions to the Netdata wire API.
@@ -223,6 +232,9 @@ func visitCreatePhase[V definitionVisitor](visitor V, actions normalizedActions)
 				Divisor:    dim.Divisor,
 			})
 		}
+		if len(createChart.Variables) > 0 {
+			visitor.visitVariablePresets(chartID, createChart.Variables)
+		}
 		// Mark dimensions as emitted alongside explicit chart-create path.
 		delete(actions.createDimsByID, chartID)
 	}
@@ -284,6 +296,10 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 				continue
 			}
 			api.SET(sanitizeWireID(dim.Name), dim.Int64)
+		}
+		// Variable names are validated by the chart template; a non-finite value is sent as nan.
+		for _, variable := range update.Variables {
+			api.VARIABLE(variable.Name, variable.Value)
 		}
 		api.ENDTimed(env.CollectedAt)
 	}

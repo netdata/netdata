@@ -51,7 +51,7 @@ Create a compatibility manifest before implementation. The manifest can live in 
    - units;
    - title, family, type, priority, multiplier, divisor, hidden, and float flags;
    - labels;
-   - chart variables (`Vars`) -- STOP if present; see `Chart Variables` before implementation;
+   - chart variables (`Vars`): names, value sources and the alerts reading them; see `Chart Variables`;
    - dynamic chart/instance generation rules;
    - chart lifecycle and obsoletion timing.
 5. Integration artifacts.
@@ -80,8 +80,7 @@ A V2 migration MUST replace the V1 collection path:
 - `ChartTemplateYAML()` returns embedded `charts.yaml`; the static provider workflow below remains recommended
   for compatibility migrations. Runtime membership changes may instead use the native provider under
   `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`;
-- if the compatibility manifest contains V1 chart `Vars`, the migration stops until the `Chart Variables` decision path
-  is resolved;
+- V1 chart `Vars` become chart-template `variables` under `Chart Variables`;
 - `Collect(ctx)` returns `error` and writes observations to `metrix`;
 - the completed migration removes the V1 `Collect() map[string]int64` output path and any runtime bridge from V1 maps
   into V2 `metrix`.
@@ -97,7 +96,7 @@ Temporary V1 logic can be useful while developing the migration. For example, te
 exists for the migration.
 
 Do not invent an unreviewed local snapshot format when the comparison needs compiled chart identity that the framework
-does not expose. If the migration needs reusable chart-identity or alert-variable comparison helpers, treat that as a
+does not expose. If the migration needs reusable chart-identity comparison helpers, treat that as a
 framework/test-helper prerequisite and follow `src/go/plugin/framework/docs/changing-framework-code.md` before relying
 on it.
 
@@ -213,20 +212,23 @@ improve filtering are acceptable only when they do not break existing chart/dime
 
 ### Chart Variables
 
-V1 `collectorapi.Chart.Vars` have no direct `charts.yaml` / `charttpl` support today. Some shipped health alerts depend
-on those variables.
+V1 `collectorapi.Chart.Vars` map to chart-template `variables`
+(`src/go/plugin/framework/charttpl/README.md#7-variables`). Shipped health alerts read them, so the migration MUST keep
+every variable an alert reads:
 
-If the V1 collector uses `Vars`, the migration MUST NOT silently drop them. Choose one of these paths before
-implementation:
+- **Name.** The V1 wire name (`Var.Name`, or `Var.ID` when the name is empty) becomes the variable `name` unchanged.
+- **Value source.** The V1 map key becomes a gauge written every cycle and selected by the variable's `selector`. A
+  per-instance variable's gauge carries the chart's instance identity labels, the way V1 formatted the chart's instance
+  into the variable ID. A configuration value, such as a threshold, is also written as a gauge every cycle.
+- **Scale.** V1 collectors scaled values themselves; a V2 gauge keeps its base unit and the variable scales it with
+  `options.multiplier`/`options.divisor` when the alert expects another unit.
+- **Initial value.** V1 defines a new chart's variables with `Var.Value` (usually 0); V2 defines them as `nan` (unknown)
+  until the first value arrives in the same or a later cycle. An alert that depends on the V1 initial value MUST be
+  recorded in the compatibility manifest and decided with the user.
+- **Missing values.** Both send nothing for a cycle without the value; the Agent keeps the last one.
 
-- add clean framework support by following `src/go/plugin/framework/docs/changing-framework-code.md`;
-- preserve the alert semantics through an approved equivalent design;
-- get explicit user approval for a breaking alert change and update health, metadata, generated docs, and release notes
-  accordingly.
-
-Until one of those paths is approved, migrating a collector that uses chart variables is blocked. Known V1 go.d
-collectors using chart variables at the time of writing include `postgres`, `cockroachdb`, `hdfs`, `puppet`, `scaleio`,
-`whoisquery`, and `zookeeper`.
+Known V1 go.d collectors using chart variables at the time of writing are `postgres`, `cockroachdb`, `hdfs`, `puppet`,
+`scaleio`, `whoisquery`, and `zookeeper`.
 
 ### Obsoletion Timing
 
@@ -274,13 +276,13 @@ Host scopes, Functions, and topology are product design choices, not automatic m
 
 Migration tests MUST prove compatibility and V2 behavior.
 
-Current shared helpers can prove schema validation, template compilation, and fixture chart coverage. They do not prove
-full V1-to-V2 chart identity parity, and they do not prove alert variables unless the migration records the variable
-source explicitly.
+Current shared helpers can prove schema validation, template compilation, fixture chart coverage including chart
+variables, and that alert expressions read only documented dimensions or template chart variables. They do not prove
+full V1-to-V2 chart identity parity.
 
 The non-negotiable minimum is alert-observable parity. The migration MUST prove that health alert `on:` contexts,
 referenced dimensions, referenced variables, and dimension algorithms/units used by alerts still resolve after
-migration. This is provable today with chart-template checks plus manual alert-variable review.
+migration. This is provable with the chart-template and health-alert checks below.
 
 Compiled presentation compatibility is broader: title, family, type, priority, multiplier, divisor, hidden, float
 flags, label promotion, and lifecycle policy. If existing exported helpers cannot observe those fields, either add a
@@ -296,9 +298,9 @@ At minimum:
 - alert-observable parity for chart contexts, dimension names, algorithms, units, and variables used by health
   alerts;
 - chart template schema/decode/validate/compile coverage;
-- chart coverage for fixture data expected to materialize all dimensions;
+- chart coverage for fixture data expected to materialize all dimensions and chart variables;
 - health alert compatibility when alerts exist: each alert `on:` context must exist in the compiled template, and every
-  variable referenced by alert calculations must still be provided by a dimension, variable-equivalent design, or
+  variable referenced by alert calculations must still be provided by a dimension, a template chart variable, or an
   approved alert change;
 - generated integration artifact consistency when metadata changes;
 - host-scope tests if scopes/vnodes are preserved or introduced.
@@ -310,14 +312,11 @@ Check the compiled fields listed above before claiming presentation compatibilit
 values and instance labels independently of chart/dimension IDs. If the migration lacks evidence for a field, claim
 only the compatibility actually proven; changed IDs permitted by this guide do not require literal identity parity.
 
-Until a shared alert-variable helper exists, use a manual grep/review pass for alert variables:
-
-```bash
-rg -n "\\$[A-Za-z_][A-Za-z0-9_]*" src/health/health.d/<collector>.conf
-rg -n "Vars:" src/go/plugin/go.d/collector/<collector> -g '*.go'
-```
-
-Every referenced variable must still be supplied by a dimension, variable-equivalent design, or approved alert change.
+Alert variables are checked by `collecttest.AssertHealthAlertsMatchMetadataWith` with
+`HealthAlertsCheck{ChartTemplate: <charts.yaml>}`: every variable an alert's `calc`, `warn` or `crit` reads must be a
+documented dimension, a built-in, an alert name, a qualified reference, or a variable the template declares on the
+alert's chart. `collecttest.AssertChartCoverage` then proves the fixture sends every declared variable that has series.
+Every V1 `Vars` entry an alert reads must still be supplied by a template variable or an approved alert change.
 
 Prefer table-driven tests using `map[string]struct{}` keyed by case name when cases share setup and assertion shape.
 

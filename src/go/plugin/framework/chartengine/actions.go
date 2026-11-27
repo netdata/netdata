@@ -29,6 +29,12 @@ type CreateChartAction struct {
 	ChartID         string
 	Meta            program.ChartMeta
 	Labels          map[string]string
+	// Variables are the chart variable names defined as unknown (nan) right after
+	// the chart's dimensions: the template's declared names, then any name a
+	// previous definition of the same chart declared and this one does not. The
+	// Agent keeps chart variables across a re-definition and has no delete, so
+	// nan is the only reset.
+	Variables []string
 }
 
 func (a CreateChartAction) Kind() ActionKind { return ActionCreateChart }
@@ -65,10 +71,20 @@ type UpdateDimensionValue struct {
 	Float64 float64
 }
 
+// UpdateVariableValue carries one chart variable value for UPDATE emission.
+// Value is already scaled and may be non-finite (unknown).
+type UpdateVariableValue struct {
+	Name  string
+	Value float64
+}
+
 // UpdateChartAction updates one chart instance values in deterministic order.
+// Variables lists, in declaration order, the chart variables that received at
+// least one series in this build; an absent variable keeps its last value.
 type UpdateChartAction struct {
-	ChartID string
-	Values  []UpdateDimensionValue
+	ChartID   string
+	Values    []UpdateDimensionValue
+	Variables []UpdateVariableValue
 }
 
 func (a UpdateChartAction) Kind() ActionKind { return ActionUpdateChart }
