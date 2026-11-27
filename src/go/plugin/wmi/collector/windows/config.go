@@ -51,6 +51,7 @@ type Collectors struct {
 	Network *bool `yaml:"network,omitempty" json:"network,omitempty"`
 	Disk    *bool `yaml:"disk,omitempty"    json:"disk,omitempty"`
 	SMB     *bool `yaml:"smb,omitempty"     json:"smb,omitempty"`
+	Time    *bool `yaml:"time,omitempty"    json:"time,omitempty"`
 }
 
 func groupEnabled(option *bool) bool { return option == nil || *option }
@@ -93,7 +94,8 @@ func (c *Config) validate() error {
 	}
 	groups := c.Collectors
 	if !groupEnabled(groups.CPU) && !groupEnabled(groups.Memory) && !groupEnabled(groups.System) &&
-		!groupEnabled(groups.Network) && !groupEnabled(groups.Disk) && !groupEnabled(groups.SMB) {
+		!groupEnabled(groups.Network) && !groupEnabled(groups.Disk) && !groupEnabled(groups.SMB) &&
+		!groupEnabled(groups.Time) {
 		return publicError("at least one collector group must be enabled")
 	}
 	return nil

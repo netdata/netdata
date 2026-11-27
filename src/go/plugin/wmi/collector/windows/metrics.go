@@ -53,6 +53,7 @@ type collectorMetrics struct {
 	processorQueue   metrix.SnapshotGauge
 	uptime           metrix.SnapshotGauge
 	clockOffset      metrix.SnapshotGauge
+	timeService      [len(timeServiceCounters)]counterInstrument
 	netInterface     [len(interfaceCounters)]counterInstrument
 	netSpeedKbps     metrix.SnapshotGauge
 	netTotalReceived metrix.SnapshotCounter
@@ -123,6 +124,9 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	}
 	for i, counter := range memoryCounters {
 		metrics.memoryCounters[i] = newCounterInstrument(m, counter.metric, counter.total)
+	}
+	for i, counter := range timeServiceCounters {
+		metrics.timeService[i] = newCounterInstrument(m, counter.metric, counter.total)
 	}
 	for i, counter := range interfaceCounters {
 		metrics.netInterface[i] = newCounterInstrument(m, counter.metric, counter.total)
@@ -254,6 +258,9 @@ func (m collectorMetrics) write(snapshot observations) {
 	observe(m.uptime, snapshot.system.uptime)
 	if offset := snapshot.system.clockOffset; offset.valid {
 		m.clockOffset.Observe(float64(offset.value.Microseconds()))
+	}
+	for i, s := range snapshot.timeService {
+		m.timeService[i].observe(s)
 	}
 	observeTotal(m.netTotalReceived, snapshot.netTotalReceived)
 	observeTotal(m.netTotalSent, snapshot.netTotalSent)
