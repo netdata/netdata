@@ -98,7 +98,7 @@ There are eight sections in the file which you can configure:
 |  | TCP out-of-order queue | Enable or disable monitoring of TCP out-of-order queue metrics (inqueue). | auto | no |
 |  | TCP connection aborts | Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout). | auto | no |
 |  | ipv4 UDP packets | Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.). | yes | no |
-|  | ipv4 UDP errors | Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi). | yes | no |
+|  | ipv4 UDP errors | Enable or disable monitoring of ipv4 UDP errors metrics (Received Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi). | yes | no |
 |  | ipv4 icmp packets | Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error). | yes | no |
 |  | ipv4 icmp messages | Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum). | yes | no |
 |  | ipv4 packets | Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered). | yes | no |
