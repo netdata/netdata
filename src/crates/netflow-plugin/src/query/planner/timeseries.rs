@@ -66,7 +66,7 @@ pub(crate) fn init_timeseries_layout_for_tier(
         .unwrap_or(MIN_TIMESERIES_BUCKET_SECONDS)
         .max(MIN_TIMESERIES_BUCKET_SECONDS);
     let window = before - after;
-    let raw_bucket_seconds = (window + TIMESERIES_MAX_BUCKETS - 1) / TIMESERIES_MAX_BUCKETS;
+    let raw_bucket_seconds = window.div_ceil(TIMESERIES_MAX_BUCKETS);
     let bucket_seconds = align_up(raw_bucket_seconds.max(floor_seconds), floor_seconds);
     let aligned_after = align_down(after, bucket_seconds);
     let aligned_before = align_up(before, bucket_seconds);
