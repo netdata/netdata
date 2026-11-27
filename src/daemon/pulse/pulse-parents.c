@@ -247,7 +247,7 @@ static void chart_by_reason(struct by_reason *b, const char *id, const char *con
             , "netdata"
             , "pulse"
             , priority
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_LINE
         );
 
@@ -383,7 +383,7 @@ static inline RRDDIM *pulse_child_dim(RRDSET *st, const char *id, collected_numb
     return rrddim_add(st, id, NULL, multiplier, 1, algorithm);
 }
 
-static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) {
+static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state, int update_every) {
     char id[RRD_ID_LENGTH_MAX + 1];
     const char *guid = host->machine_guid;
 
@@ -426,7 +426,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
     RRDSET *st_traffic = rrdset_create_localhost(
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.traffic",
         "Inbound Streaming Traffic", "bytes/s", "netdata", "pulse",
-        130160, localhost->rrd_update_every, RRDSET_TYPE_AREA);
+        130160, update_every, RRDSET_TYPE_AREA);
     if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_traffic, host);
     rrddim_set_by_pointer(st_traffic, pulse_child_dim(st_traffic, "in", 1, RRD_ALGORITHM_INCREMENTAL),
@@ -448,7 +448,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
     RRDSET *st_state = rrdset_create_localhost(
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.state",
         "Inbound Streaming State", "state", "netdata", "pulse",
-        130161, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+        130161, update_every, RRDSET_TYPE_LINE);
     if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_state, host);
     for(size_t i = 0; i < PULSE_INBOUND_MAX ; i++) {
@@ -463,7 +463,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
     RRDSET *st_reconnects = rrdset_create_localhost(
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.reconnects",
         "Inbound Streaming Reconnects", "connects/s", "netdata", "pulse",
-        130162, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+        130162, update_every, RRDSET_TYPE_LINE);
     if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_reconnects, host);
     rrddim_set_by_pointer(st_reconnects, pulse_child_dim(st_reconnects, "connections", 1, RRD_ALGORITHM_INCREMENTAL),
@@ -475,7 +475,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
     RRDSET *st_age = rrdset_create_localhost(
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.age",
         "Inbound Streaming State Age", "seconds", "netdata", "pulse",
-        130163, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+        130163, update_every, RRDSET_TYPE_LINE);
     if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_age, host);
     time_t changed = __atomic_load_n(&host->stream.rcv.status.state_changed_s, __ATOMIC_RELAXED);
@@ -492,6 +492,9 @@ static void pulse_parents_traverse(ssize_t inbound[2][PULSE_INBOUND_MAX], ssize_
     // per-child charts only when streaming ingest is actually configured
     bool do_children = stream_conf_is_parent(false);
 
+    // the per-child charts are looked up on every pass; read the interval once, not per chart
+    int update_every = pulse_update_every();
+
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
         PULSE_HOST_STATUS s = __atomic_load_n(&host->stream.pulse_state, __ATOMIC_RELAXED);
@@ -504,7 +507,7 @@ static void pulse_parents_traverse(ssize_t inbound[2][PULSE_INBOUND_MAX], ssize_
             inbound[type][in]++;
 
             if(do_children && !rrdhost_is_local(host))
-                pulse_child_charts_update(host, in);
+                pulse_child_charts_update(host, in, update_every);
         }
 
         PULSE_OUTBOUND_STATE out = pulse_outbound_state(s);
@@ -550,7 +553,7 @@ void pulse_parents_do(bool extended) {
                     , "netdata"
                     , "pulse"
                     , 130150
-                    , localhost->rrd_update_every
+                    , pulse_update_every()
                     , RRDSET_TYPE_LINE
                 );
 
@@ -622,7 +625,7 @@ void pulse_parents_do(bool extended) {
                     , "netdata"
                     , "pulse"
                     , 130153
-                    , localhost->rrd_update_every
+                    , pulse_update_every()
                     , RRDSET_TYPE_LINE
                 );
 

@@ -247,7 +247,7 @@ void pulse_daemon_memory_system_do(bool extended) {
                     "netdata",
                     "pulse",
                     130120,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
 
                 rd_arenas = rrddim_add(st_arenas, "arenas", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -276,7 +276,7 @@ void pulse_daemon_memory_system_do(bool extended) {
                     "netdata",
                     "pulse",
                     130121,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_STACKED);
 
                 rd_unused_fast = rrddim_add(st_malloc, "unused fast", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -316,7 +316,7 @@ void pulse_daemon_memory_system_do(bool extended) {
                 "netdata",
                 "pulse",
                 130105,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_netdata = rrddim_add(st_maps, "netdata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -354,7 +354,7 @@ void pulse_daemon_memory_system_do(bool extended) {
                 "netdata",
                 "pulse",
                 130106,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_AREA);
 
             rd_used = rrddim_add(st_maps_percent, "used", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);

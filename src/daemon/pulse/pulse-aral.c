@@ -70,6 +70,9 @@ void pulse_aral_init(void) {
 void pulse_aral_do(bool extended) {
     if(!extended) return;
 
+    // read before taking our lock: pulse_update_every() takes its own
+    int update_every = pulse_update_every();
+
     spinlock_lock(&globals.spinlock);
     Word_t s = 0;
     for(struct aral_info *ai = ARAL_STATS_FIRST(&globals.idx, &s);
@@ -123,7 +126,7 @@ void pulse_aral_do(bool extended) {
                     "netdata",
                     "pulse",
                     910000,
-                    localhost->rrd_update_every,
+                    update_every,
                     RRDSET_TYPE_STACKED);
 
                 rrdlabels_add(ai->st_memory->rrdlabels, "ARAL", ai->name, RRDLABEL_SRC_AUTO);
@@ -163,7 +166,7 @@ void pulse_aral_do(bool extended) {
                     "netdata",
                     "pulse",
                     910001,
-                    localhost->rrd_update_every,
+                    update_every,
                     RRDSET_TYPE_LINE);
 
                 rrdlabels_add(ai->st_utilization->rrdlabels, "ARAL", ai->name, RRDLABEL_SRC_AUTO);

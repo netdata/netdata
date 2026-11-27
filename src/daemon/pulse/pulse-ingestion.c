@@ -39,7 +39,7 @@ void pulse_ingestion_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 131003
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_STACKED
             );
 

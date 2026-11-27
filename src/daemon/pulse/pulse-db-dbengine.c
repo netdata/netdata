@@ -116,7 +116,7 @@ static RRDSET *dbengine2_cache_chart_create(const char *name, const char *id_suf
         "netdata",
         "pulse",
         priority,
-        localhost->rrd_update_every,
+        pulse_update_every(),
         type);
 }
 
@@ -490,7 +490,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_pgc_memory_main    = rrddim_add(st_pgc_memory, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -547,7 +547,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -606,7 +606,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_mrg_metrics = rrddim_add(st_mrg_metrics, "all", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -642,7 +642,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_mrg_add = rrddim_add(st_mrg_ops, "add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -674,7 +674,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_mrg_references = rrddim_add(st_mrg_references, "references", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -705,7 +705,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "overall", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
@@ -782,7 +782,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_total = rrddim_add(st_queries, "total", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -818,7 +818,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_queries = rrddim_add(st_queries_running, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -848,7 +848,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_cache = rrddim_add(st_query_pages_metadata_source, "cache hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -882,7 +882,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_pages_main_cache = rrddim_add(st_query_pages_data_source, "main cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -918,7 +918,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_pass4 = rrddim_add(st_query_next_page, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -959,7 +959,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_pages_zero_time = rrddim_add(st_query_page_issues, "zero timestamp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1006,7 +1006,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_compressed = rrddim_add(st_query_pages_from_disk, "ok compressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1058,7 +1058,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_journal_v2_mapped = rrddim_add(st_events, "journal v2 mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1104,7 +1104,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_routing_sync = rrddim_add(st_prep_timings, "pdc sync", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1150,7 +1150,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority + 1,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_routing_sync = rrddim_add(st_prep_timings, "pdc sync", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1195,7 +1195,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_init = rrddim_add(st_query_timings, "plan", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1238,7 +1238,7 @@ void pulse_dbengine_do(bool extended) {
                 "netdata",
                 "pulse",
                 priority + 1,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_init = rrddim_add(st_query_timings_average, "plan", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1316,7 +1316,7 @@ void pulse_dbengine_do(bool extended) {
                         "netdata",
                         "pulse",
                         priority,
-                        localhost->rrd_update_every,
+                        pulse_update_every(),
                         RRDSET_TYPE_LINE);
 
                     rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -1357,7 +1357,7 @@ void pulse_dbengine_do(bool extended) {
                         "netdata",
                         "pulse",
                         priority,
-                        localhost->rrd_update_every,
+                        pulse_update_every(),
                         RRDSET_TYPE_LINE);
 
                     rd_compressed = rrddim_add(st_decompression, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -1393,7 +1393,7 @@ void pulse_dbengine_do(bool extended) {
                         "netdata",
                         "pulse",
                         priority,
-                        localhost->rrd_update_every,
+                        pulse_update_every(),
                         RRDSET_TYPE_LINE);
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -1425,7 +1425,7 @@ void pulse_dbengine_do(bool extended) {
                         "netdata",
                         "pulse",
                         priority,
-                        localhost->rrd_update_every,
+                        pulse_update_every(),
                         RRDSET_TYPE_LINE);
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1457,7 +1457,7 @@ void pulse_dbengine_do(bool extended) {
                         "netdata",
                         "pulse",
                         priority,
-                        localhost->rrd_update_every,
+                        pulse_update_every(),
                         RRDSET_TYPE_LINE);
 
                     rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1489,7 +1489,7 @@ void pulse_dbengine_do(bool extended) {
                         "netdata",
                         "pulse",
                         priority,
-                        localhost->rrd_update_every,
+                        pulse_update_every(),
                         RRDSET_TYPE_LINE);
 
                     rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

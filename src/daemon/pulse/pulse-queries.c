@@ -142,7 +142,7 @@ void pulse_queries_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 131000
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_STACKED
             );
 
@@ -191,7 +191,7 @@ void pulse_queries_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 131001
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_STACKED
             );
 
@@ -238,7 +238,7 @@ void pulse_queries_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 131002
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_STACKED
             );
 

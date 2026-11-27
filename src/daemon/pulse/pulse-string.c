@@ -31,7 +31,7 @@ void pulse_string_do(bool extended) {
             , "netdata"
             , "pulse"
             , 910000
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_LINE);
 
         rd_ops_inserts      = rrddim_add(st_ops, "inserts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -64,7 +64,7 @@ void pulse_string_do(bool extended) {
             , "netdata"
             , "pulse"
             , 910001
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_AREA);
 
         rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -91,7 +91,7 @@ void pulse_string_do(bool extended) {
             , "netdata"
             , "pulse"
             , 910001
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_STACKED);
 
         rd_mem     = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
