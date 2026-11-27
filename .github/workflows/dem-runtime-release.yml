@@ -98,6 +98,16 @@ jobs:
         run: |
           go test -count=1 -run 'Pair|Recovery|RuntimeFetchPrepareActivateAndRollback' \
             ./plugin/dem/synthetic/browserruntime ./cmd/demplugin
+      - name: Read the patchelf source pin
+        id: patchelf
+        run: |
+          jq -r '.sources.patchelf | "name=\(.name)", "sha256=\(.sha256)"' \
+            packaging/dem-runtime/inputs.json >> "$GITHUB_OUTPUT"
+      - name: Cache the pinned patchelf source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/sources/patchelf/${{ steps.patchelf.outputs.name }}
+          key: dem-patchelf-source-${{ steps.patchelf.outputs.sha256 }}
       - name: Build portable runtime and matching sources
         env:
           DEM_ARCH: ${{ matrix.arch }}

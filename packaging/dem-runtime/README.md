@@ -201,6 +201,14 @@ staging tool's local Go build closure and module pins, runtime identity/provenan
 `source-assembly.json` file inventory. Existing downloads are reverified on rerun. The output must stay outside the recipe
 directory; unexpected existing files are rejected and preserved, not included in
 the verified inventory.
+
+Companion CI caches the patchelf source tarball under its pinned SHA-256 across
+runs. Source assembly checks the digest on a cache hit. On a cache miss, the
+locked downloader makes up to three attempts for transient connection failures,
+timeouts and retryable HTTP responses, waiting one and then two seconds between
+attempts. Each attempt restarts the transfer. Integrity failures stop the build
+immediately.
+
 Agent-integration tests in the recipe require the matching full Agent checkout:
 they exercise core package metadata and maintainer scripts outside the runtime
 source archive. Run their repository-relative commands from that checkout, not
@@ -220,8 +228,12 @@ source material through the approved source-delivery channel.
 
 ## ELF preparation and qualification
 
-patchelf 0.15.0 is checksum-pinned. Versions 0.18 and 0.19.1 corrupted the tested
-arm64 Node PHDR/LOAD layout; changing tools requires both-architecture validation.
+patchelf 0.15.0 is checksum-pinned. Earlier builds found invalid ELF layouts with
+0.18 and 0.19.1 on arm64 Node. Upstream 0.19.3 includes a
+[fix for overlapping load segments](https://github.com/NixOS/patchelf/pull/672).
+On the pinned arm64 Node binary, a host-side rewrite with 0.19.3 also cleared
+the overlap seen with 0.19.1. Changing the pin requires validating the runtime
+on both Linux architectures.
 Dynamic objects receive `$ORIGIN`-relative private library search paths. Loader
 and libc retain their donor ABI layout; libc is not an execution entry point.
 Runtime-loaded NSS modules supplement the transitive library closure. Missing
