@@ -4,16 +4,15 @@ package jobruntime
 
 import (
 	"maps"
-	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 )
 
 type jobV2CleanupSnapshot struct {
 	scopeKey   string
-	charts     map[string]chartengine.ChartMeta
+	charts     chartemit.EmittedCharts
 	host       jobV2HostRef
 	owner      *hostoutput.Owner
 	definition *hostoutput.Definition
@@ -90,27 +89,4 @@ func (s *jobV2HostState) clearAfterCleanup() {
 	s.cleanupDefinition = nil
 	s.engineHost = jobV2HostRef{}
 	s.cleanupOwner = jobV2HostRef{}
-}
-
-func buildJobV2CleanupPlan(charts map[string]chartengine.ChartMeta) chartengine.Plan {
-	if len(charts) == 0 {
-		return chartengine.Plan{}
-	}
-
-	chartIDs := make([]string, 0, len(charts))
-	for chartID := range charts {
-		chartIDs = append(chartIDs, chartID)
-	}
-	sort.Strings(chartIDs)
-
-	actions := make([]chartengine.EngineAction, 0, len(chartIDs))
-	for _, chartID := range chartIDs {
-		actions = append(actions, chartengine.RemoveChartAction{
-			ChartID: chartID,
-			Meta:    charts[chartID],
-		})
-	}
-	return chartengine.Plan{
-		Actions: actions,
-	}
 }

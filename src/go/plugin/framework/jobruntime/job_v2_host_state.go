@@ -4,7 +4,6 @@ package jobruntime
 
 import (
 	"fmt"
-	"maps"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
@@ -54,7 +53,7 @@ type jobV2HostState struct {
 	engineHost        jobV2HostRef
 	cleanupOwner      jobV2HostRef
 	cleanupDefinition *hostoutput.Definition
-	cleanupCharts     map[string]chartengine.ChartMeta
+	cleanupCharts     chartemit.EmittedCharts
 	owner             *hostoutput.Owner
 	ownerGUID         string
 }
@@ -113,41 +112,7 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 	if s.cleanupOwner != decision.targetHost {
 		clear(s.cleanupCharts)
 	}
-	if s.cleanupCharts == nil {
-		s.cleanupCharts = make(map[string]chartengine.ChartMeta)
-	}
-
-	createCharts := make(map[string]chartengine.ChartMeta)
-	dimensionOnlyCharts := make(map[string]chartengine.ChartMeta)
-	removeCharts := make(map[string]struct{})
-
-	for _, action := range plan.Actions {
-		switch v := action.(type) {
-		case chartengine.CreateChartAction:
-			createCharts[v.ChartID] = v.Meta
-		case chartengine.CreateDimensionAction:
-			if _, ok := createCharts[v.ChartID]; ok {
-				continue
-			}
-			if _, ok := dimensionOnlyCharts[v.ChartID]; !ok {
-				dimensionOnlyCharts[v.ChartID] = v.ChartMeta
-			}
-		case chartengine.RemoveChartAction:
-			removeCharts[v.ChartID] = struct{}{}
-		}
-	}
-
-	maps.Copy(s.cleanupCharts, createCharts)
-	for chartID, meta := range dimensionOnlyCharts {
-		if _, ok := s.cleanupCharts[chartID]; ok {
-			continue
-		}
-		s.cleanupCharts[chartID] = meta
-	}
-	for chartID := range removeCharts {
-		delete(s.cleanupCharts, chartID)
-	}
-
+	s.cleanupCharts.Record(plan)
 	s.cleanupOwner = decision.targetHost
 }
 

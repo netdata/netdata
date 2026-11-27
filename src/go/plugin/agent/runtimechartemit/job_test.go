@@ -5,6 +5,8 @@ package runtimechartemit
 import (
 	"bytes"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -188,38 +190,47 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 				)
 			},
 		},
-		"effective chart tracking includes dimension only creation": {
+		"aborted tick keeps the installed chart set": {
 			run: func(t *testing.T) {
-				plan := chartengine.Plan{
-					Actions: []chartengine.EngineAction{
-						chartengine.CreateDimensionAction{
-							ChartID: "component_load",
-							ChartMeta: chartengine.ChartMeta{
-								Title:   "Component Load",
-								Context: "netdata.go.plugin.component.component_load",
-								Units:   "load",
-							},
-							Name: "value",
-						},
-					},
-				}
+				reg := newComponentRegistry()
+				store := metrix.NewRuntimeStore()
+				meter := store.Write().StatefulMeter("component")
+				meter.Gauge("load").Set(5)
 
-				known := applyEffectiveChartSet(nil, plan)
-				require.Contains(t, known, "component_load")
-
-				known = applyEffectiveChartSet(known, chartengine.Plan{
-					Actions: []chartengine.EngineAction{
-						chartengine.RemoveChartAction{
-							ChartID: "component_load",
-							Meta: chartengine.ChartMeta{
-								Title:   "Component Load",
-								Context: "netdata.go.plugin.component.component_load",
-								Units:   "load",
-							},
-						},
+				reg.upsert(componentSpec{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeTwoChartTemplateYAML()),
+					UpdateEvery:  1,
+					EmitEnv: chartemit.EmitEnv{
+						TypeID:      "netdata.go.d.internal.component",
+						UpdateEvery: 1,
+						Plugin:      "go.d",
+						Module:      "internal",
+						JobName:     "component",
 					},
 				})
-				require.NotContains(t, known, "component_load")
+
+				job := newRuntimeMetricsJob(&safeBuffer{}, reg, nil, nil)
+				job.runOnce(1)
+				state := job.components["component"]
+				require.NotNil(t, state)
+				require.Equal(t, []string{"component_load"}, slices.Sorted(maps.Keys(state.knownCharts)))
+
+				// The second chart appears in a tick whose output is rejected.
+				meter.Gauge("queue").Set(3)
+				job.out = failingWriter{}
+				job.runOnce(2)
+				require.Same(t, state, job.components["component"])
+				assert.Equal(t, []string{"component_load"}, slices.Sorted(maps.Keys(state.knownCharts)))
+
+				job.out = &safeBuffer{}
+				job.runOnce(3)
+				assert.Equal(
+					t,
+					[]string{"component_load", "component_queue"},
+					slices.Sorted(maps.Keys(job.components["component"].knownCharts)),
+				)
 			},
 		},
 		"generation replacement keeps old state when obsolete emit fails": {
@@ -306,4 +317,30 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, tc.run)
 	}
+}
+
+func runtimeTwoChartTemplateYAML() string {
+	return `
+version: v1
+groups:
+  - family: Runtime
+    metrics:
+      - component.load
+      - component.queue
+    charts:
+      - id: component_load
+        title: Component Load
+        context: netdata.go.plugin.component.component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name: value
+      - id: component_queue
+        title: Component Queue
+        context: netdata.go.plugin.component.component_queue
+        units: items
+        dimensions:
+          - selector: component.queue
+            name: value
+`
 }
