@@ -230,10 +230,12 @@ func TestCollector_Ping(t *testing.T) {
 			require.NoError(t, c.Init(t.Context()))
 
 			// WMI collection continues whatever the probe returns.
-			wantMetrics := map[string]metrix.SampleValue{
-				"memory_used_bytes": 6 * 1024 * 1024 * 1024,
-				"memory_free_bytes": 2 * 1024 * 1024 * 1024,
-			}
+			wantMetrics := withMemoryCounters(map[string]metrix.SampleValue{
+				"memory_used_bytes":      6 * 1024 * 1024 * 1024,
+				"memory_free_bytes":      2 * 1024 * 1024 * 1024,
+				"memory_swap_used_bytes": 3 * 1024 * 1024 * 1024,
+				"memory_swap_free_bytes": 9 * 1024 * 1024 * 1024,
+			})
 			for metric, value := range tc.wantMetrics {
 				wantMetrics[metric] = value
 			}

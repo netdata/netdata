@@ -63,7 +63,7 @@
       },
       "collectors": {
         "title": "Metric groups",
-        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the network group two. Keep at least one group enabled.",
+        "description": "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four and the network group two. Keep at least one group enabled.",
         "type": "object",
         "properties": {
           "cpu": {
@@ -74,7 +74,7 @@
           },
           "memory": {
             "title": "Memory",
-            "description": "Collect free and used physical memory.",
+            "description": "Collect physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node.",
             "type": "boolean",
             "default": true
           },

@@ -50,7 +50,17 @@ func TestInventoryRefresh(t *testing.T) {
 		require.NoError(t, c.Check(t.Context()))
 		require.Equal(
 			t,
-			[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			[]string{
+				queryCPU,
+				queryMemory,
+				queryMemoryCounters,
+				queryPagingFiles,
+				queryNUMANodes,
+				querySystem,
+				queryNetworkInterfaces,
+				queryNetworkAdapters,
+				queryDisk,
+			},
 			session.queries,
 			"readiness must only wait for metrics",
 		)
@@ -86,7 +96,17 @@ func TestInventoryRefresh(t *testing.T) {
 		require.NotEmpty(t, metrics)
 		assert.Equal(
 			t,
-			[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			[]string{
+				queryCPU,
+				queryMemory,
+				queryMemoryCounters,
+				queryPagingFiles,
+				queryNUMANodes,
+				querySystem,
+				queryNetworkInterfaces,
+				queryNetworkAdapters,
+				queryDisk,
+			},
 			session.queries,
 		)
 		time.Sleep(inventoryInterval)
@@ -160,7 +180,16 @@ func TestInventoryDisabledQueries(t *testing.T) {
 			if vnode != "" {
 				assert.Equal(
 					t,
-					[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters},
+					[]string{
+						queryCPU,
+						queryMemory,
+						queryMemoryCounters,
+						queryPagingFiles,
+						queryNUMANodes,
+						querySystem,
+						queryNetworkInterfaces,
+						queryNetworkAdapters,
+					},
 					session.queries,
 				)
 				return
@@ -194,6 +223,9 @@ func TestInventoryStopsWhenSessionIsLost(t *testing.T) {
 		[]string{
 			queryCPU,
 			queryMemory,
+			queryMemoryCounters,
+			queryPagingFiles,
+			queryNUMANodes,
 			querySystem,
 			queryNetworkInterfaces,
 			queryNetworkAdapters,

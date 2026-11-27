@@ -148,8 +148,10 @@ a *leaf* is the innermost family that holds charts.
   (`./go-v2-host-scope.md`). The one-namespace rule above makes this checkable in one line.
 - Exception: a collector whose generated vnode stands for a whole remote OS host MAY emit that OS's native contexts,
   so the stock alerts and dashboard sections apply (`src/go/plugin/wmi/collector/windows/`). It MUST match the
-  native producer as the next bullet requires, test that against the native source, set the vnode's `_os` label, and
-  list its plugin's platform in `PLUGIN_PLATFORMS` (`integrations/health_alerts.py`).
+  native producer as the last bullet requires, families included except one the native code takes from an instance
+  name (an interface or drive), which a template's static family cannot reproduce. It MUST test that against the
+  native source, set the vnode's `_os` label, and list its plugin's platform in `PLUGIN_PLATFORMS`
+  (`integrations/health_alerts.py`).
 - Only templates reach shared contexts: a stock `alarm` matches a chart id or name (`health_prototype_matches_rrdset`
   in `src/health/health_prototypes.c`), and a V2 chart's id is `<job>.<id>`, so an alarm never attaches. An alarm the
   shared context needs becomes a template, as `system_reboot_detection` in `src/health/health.d/reboot.conf` did.

@@ -81,7 +81,10 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 				queryMemory: {},
 			}),
 			wantErr: "no enabled WMI query group succeeded: CPU WMI query failed: WMI collection timed out\n" +
-				"memory WMI query returned no usable observations",
+				"memory WMI query returned no usable observations\n" +
+				"memory counters WMI query failed\n" +
+				"paging file WMI query failed\n" +
+				"NUMA node WMI query failed",
 		},
 		"collection timeout": {
 			options:    map[string]any{"timeout": "50ms"},

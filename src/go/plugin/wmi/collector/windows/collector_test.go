@@ -83,6 +83,97 @@ func systemRow() map[string]any {
 	}
 }
 
+// memoryCountersRow is a Memory counter set instance as DCOM decodes it: byte
+// counts as uint64, per-second counters and counts as uint32. Every value is
+// distinct; Pages/sec is the sum of the pages read and written.
+func memoryCountersRow() map[string]any {
+	return map[string]any{
+		"PageFaultsPersec":                uint32(575466442),
+		"PagesPersec":                     uint32(2304136),
+		"AvailableBytes":                  uint64(10437402624),
+		"PageReadsPersec":                 uint32(291996),
+		"PageWritesPersec":                uint32(5),
+		"PagesInputPersec":                uint32(2304130),
+		"PagesOutputPersec":               uint32(6),
+		"CommittedBytes":                  uint64(2267668480),
+		"CommitLimit":                     uint64(14808518656),
+		"CacheBytes":                      uint64(85794816),
+		"CacheBytesPeak":                  uint64(235356160),
+		"SystemCacheResidentBytes":        uint64(81920),
+		"FreeAndZeroPageListBytes":        uint64(4500127744),
+		"ModifiedPageListBytes":           uint64(191234048),
+		"StandbyCacheCoreBytes":           uint64(4096),
+		"StandbyCacheNormalPriorityBytes": uint64(2746179584),
+		"StandbyCacheReserveBytes":        uint64(3191095296),
+		"PoolPagedBytes":                  uint64(346816512),
+		"PoolNonpagedBytes":               uint64(87597056),
+		"PoolPagedResidentBytes":          uint64(335323136),
+		"PoolPagedAllocs":                 uint32(423244),
+		"PoolNonpagedAllocs":              uint32(221739),
+		"FreeSystemPageTableEntries":      uint32(12302931),
+		"SystemCodeResidentBytes":         uint64(8192),
+		"SystemCodeTotalBytes":            uint64(12288),
+		"SystemDriverResidentBytes":       uint64(29765632),
+		"SystemDriverTotalBytes":          uint64(16011264),
+		"CacheFaultsPersec":               uint32(49373616),
+		"DemandZeroFaultsPersec":          uint32(199225414),
+		"TransitionFaultsPersec":          uint32(348256032),
+		"WriteCopiesPersec":               uint32(2372610),
+		"TransitionPagesRePurposedPersec": uint32(3),
+	}
+}
+
+// withMemoryCounters adds the metrics of memoryCountersRow and of the paging
+// files and NUMA nodes of validQueryResults to a collection's metrics.
+func withMemoryCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	for metric, value := range map[string]metrix.SampleValue{
+		"memory_page_faults_minor":                    573162306,
+		"memory_page_faults_major":                    2304136,
+		"memory_available_bytes":                      10437402624,
+		"memory_page_reads":                           291996,
+		"memory_page_writes":                          5,
+		"memory_pages_input":                          2304130,
+		"memory_pages_output":                         6,
+		"memory_committed_bytes":                      2267668480,
+		"memory_commit_limit_bytes":                   14808518656,
+		"memory_system_cache_bytes":                   85794816,
+		"memory_system_cache_peak_bytes":              235356160,
+		"memory_system_cache_resident_bytes":          81920,
+		"memory_free_and_zero_page_list_bytes":        4500127744,
+		"memory_modified_page_list_bytes":             191234048,
+		"memory_standby_cache_core_bytes":             4096,
+		"memory_standby_cache_normal_priority_bytes":  2746179584,
+		"memory_standby_cache_reserve_bytes":          3191095296,
+		"memory_pool_paged_bytes":                     346816512,
+		"memory_pool_nonpaged_bytes":                  87597056,
+		"memory_pool_paged_resident_bytes":            335323136,
+		"memory_pool_paged_allocations":               423244,
+		"memory_pool_nonpaged_allocations":            221739,
+		"memory_free_system_page_table_entries":       12302931,
+		"memory_system_code_resident_bytes":           8192,
+		"memory_system_code_total_bytes":              12288,
+		"memory_system_driver_resident_bytes":         29765632,
+		"memory_system_driver_total_bytes":            16011264,
+		"memory_cache_faults":                         49373616,
+		"memory_demand_zero_faults":                   199225414,
+		"memory_transition_faults":                    348256032,
+		"memory_write_copy_faults":                    2372610,
+		"memory_transition_pages_repurposed":          3,
+		`numa_node_free_and_zero_mebibytes{node="0"}`: 4304,
+		`numa_node_standby_mebibytes{node="0"}`:       5662,
+		`numa_node_free_and_zero_mebibytes{node="1"}`: 1157,
+		`numa_node_standby_mebibytes{node="1"}`:       6598,
+		// 88040 of 475136 and 1024 of 262144 pages of 4 KiB in use.
+		`pagefile_used_bytes{pagefile="C:\\pagefile.sys"}`: 360611840,
+		`pagefile_free_bytes{pagefile="C:\\pagefile.sys"}`: 1585545216,
+		`pagefile_used_bytes{pagefile="D:\\pagefile.sys"}`: 4194304,
+		`pagefile_free_bytes{pagefile="D:\\pagefile.sys"}`: 1069547520,
+	} {
+		metrics[metric] = value
+	}
+	return metrics
+}
+
 func validQueryResults() map[string]queryResult {
 	return map[string]queryResult{
 		// Instances come in no particular order; "1,0" is the first processor
@@ -97,7 +188,29 @@ func validQueryResults() map[string]queryResult {
 		queryMemory: fixtureRows(map[string]any{
 			"TotalVisibleMemorySize": "8388608",
 			"FreePhysicalMemory":     uint64(2097152),
+			"TotalVirtualMemorySize": uint64(12582912),
+			"FreeVirtualMemory":      "9437184",
 		}),
+		queryMemoryCounters: fixtureRows(memoryCountersRow()),
+		// Paging files carry the NT prefix; WinRM reports the numbers as text.
+		queryPagingFiles: fixtureRows(
+			map[string]any{
+				"Name":              `\??\C:\pagefile.sys`,
+				"PercentUsage":      uint32(88040),
+				"PercentUsage_Base": uint32(475136),
+			},
+			map[string]any{"Name": `\??\D:\pagefile.sys`, "PercentUsage": "1024", "PercentUsage_Base": "262144"},
+			map[string]any{"Name": "_Total", "PercentUsage": uint32(89064), "PercentUsage_Base": uint32(737280)},
+		),
+		queryNUMANodes: fixtureRows(
+			map[string]any{"Name": "0", "FreeAndZeroPageListMBytes": uint32(4304), "StandbyListMBytes": uint32(5662)},
+			map[string]any{"Name": "1", "FreeAndZeroPageListMBytes": "1157", "StandbyListMBytes": "6598"},
+			map[string]any{
+				"Name":                      "_Total",
+				"FreeAndZeroPageListMBytes": uint32(5461),
+				"StandbyListMBytes":         uint32(12260),
+			},
+		),
 		querySystem: fixtureRows(systemRow()),
 		queryNetworkInterfaces: fixtureRows(
 			map[string]any{"Name": "Ethernet", "BytesReceivedPersec": uint64(190), "BytesSentPersec": uint64(30)},
@@ -172,6 +285,22 @@ func TestCollector_Collect(t *testing.T) {
 		err: errors.New("fixture-secret"),
 	}
 	sessions[1].results[queryMemory] = fixtureRows(map[string]any{"FreePhysicalMemory": uint64(0)})
+	// WinRM text, a malformed value, more pages than faults and a valid zero.
+	sessions[1].results[queryMemoryCounters] = fixtureRows(map[string]any{
+		"AvailableBytes":   "6596587520",
+		"CommittedBytes":   "malformed",
+		"PageFaultsPersec": "100",
+		"PagesPersec":      "120",
+		"PoolPagedAllocs":  uint32(0),
+	})
+	sessions[1].results[queryPagingFiles] = queryResult{
+		err: errors.New("invalid class"),
+	}
+	sessions[1].results[queryNUMANodes] = fixtureRows(map[string]any{
+		"Name":                      "0",
+		"FreeAndZeroPageListMBytes": "malformed",
+		"StandbyListMBytes":         "0",
+	})
 	// WinRM text, a 32-bit counter that wrapped, a valid zero and no uptime.
 	sessions[1].results[querySystem] = fixtureRows(map[string]any{
 		"Processes":             "70",
@@ -232,9 +361,11 @@ func TestCollector_Collect(t *testing.T) {
 		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
 		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
 	)
-	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
+	assert.Equal(t, withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
 		"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
+		"memory_swap_used_bytes":             3 * 1024 * 1024 * 1024,
+		"memory_swap_free_bytes":             9 * 1024 * 1024 * 1024,
 		"system_processes":                   69,
 		"system_threads":                     951,
 		"system_context_switches":            4294967000,
@@ -252,18 +383,23 @@ func TestCollector_Collect(t *testing.T) {
 		"disk_avail_bytes" + driveC:          420000000000,
 		"disk_used_bytes" + driveD:           4294967296,
 		"disk_avail_bytes" + driveD:          0,
-	}), first)
+	})), first)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 	second, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, withAnsweredPing(map[string]metrix.SampleValue{
-		"memory_free_bytes":                 0,
-		"system_processes":                  70,
-		"system_context_switches":           200,
-		"system_processor_queue_length":     0,
-		"network_received_bytes" + ethernet: 250,
-		"network_total_received_bytes":      250,
+		"memory_free_bytes":                     0,
+		"memory_available_bytes":                6596587520,
+		"memory_page_faults_minor":              0,
+		"memory_page_faults_major":              120,
+		"memory_pool_paged_allocations":         0,
+		`numa_node_standby_mebibytes{node="0"}`: 0,
+		"system_processes":                      70,
+		"system_context_switches":               200,
+		"system_processor_queue_length":         0,
+		"network_received_bytes" + ethernet:     250,
+		"network_total_received_bytes":          250,
 		`network_received_bytes{device="Ethernet#1",interface_type="virtual"}`: 0,
 		`network_sent_bytes{device="Ethernet#1",interface_type="virtual"}`:     80,
 		"disk_used_bytes" + driveC:  0,
@@ -297,7 +433,17 @@ func TestCollector_Collect(t *testing.T) {
 	for _, session := range sessions {
 		assert.Equal(
 			t,
-			[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk},
+			[]string{
+				queryCPU,
+				queryMemory,
+				queryMemoryCounters,
+				queryPagingFiles,
+				queryNUMANodes,
+				querySystem,
+				queryNetworkInterfaces,
+				queryNetworkAdapters,
+				queryDisk,
+			},
 			metricQueries(session.queries),
 		)
 		assert.Equal(t, 1, session.closed)
@@ -381,8 +527,18 @@ func TestCollector_CheckFailure(t *testing.T) {
 			c.Collectors.Disk = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
-					queryCPU:    {err: tc.queryErr},
-					queryMemory: {err: tc.queryErr},
+					queryCPU:            {err: tc.queryErr},
+					queryMemory:         {err: tc.queryErr},
+					queryMemoryCounters: {err: tc.queryErr},
+					// A paging file without a size and a node without values give no sample.
+					queryPagingFiles: {
+						rows: fixtureRows(map[string]any{"Name": `\??\C:\pagefile.sys`}).rows,
+						err:  tc.queryErr,
+					},
+					queryNUMANodes: {
+						rows: fixtureRows(map[string]any{"Name": "0"}).rows,
+						err:  tc.queryErr,
+					},
 				},
 			}
 			c.newSession = func(_ context.Context) (querySession, error) {
@@ -463,7 +619,15 @@ func metricQueries(queries []string) []string {
 	var metrics []string
 	for _, query := range queries {
 		switch query {
-		case queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryNetworkAdapters, queryDisk:
+		case queryCPU,
+			queryMemory,
+			queryMemoryCounters,
+			queryPagingFiles,
+			queryNUMANodes,
+			querySystem,
+			queryNetworkInterfaces,
+			queryNetworkAdapters,
+			queryDisk:
 			metrics = append(metrics, query)
 		}
 	}
@@ -527,19 +691,27 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 			results: map[string]queryResult{
 				queryCPU:               validQueryResults()[queryCPU],
 				queryMemory:            validQueryResults()[queryMemory],
+				queryMemoryCounters:    lost,
+				queryPagingFiles:       lost,
+				queryNUMANodes:         lost,
 				querySystem:            lost,
 				queryNetworkInterfaces: lost,
 				queryDisk:              lost,
 			},
 			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
-				"memory_used_bytes": 6 * 1024 * 1024 * 1024,
-				"memory_free_bytes": 2 * 1024 * 1024 * 1024,
+				"memory_used_bytes":      6 * 1024 * 1024 * 1024,
+				"memory_free_bytes":      2 * 1024 * 1024 * 1024,
+				"memory_swap_used_bytes": 3 * 1024 * 1024 * 1024,
+				"memory_swap_free_bytes": 9 * 1024 * 1024 * 1024,
 			}),
 		},
 		"after a refused query, report the query failures": {
 			results: map[string]queryResult{
 				queryCPU:               {err: errors.New("WS-Management fault")},
 				queryMemory:            lost,
+				queryMemoryCounters:    lost,
+				queryPagingFiles:       lost,
+				queryNUMANodes:         lost,
 				querySystem:            lost,
 				queryNetworkInterfaces: lost,
 				queryDisk:              lost,
@@ -565,7 +737,16 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 			// A lost interface query leaves no interface list, so the adapter query is skipped.
 			assert.Equal(
 				t,
-				[]string{queryCPU, queryMemory, querySystem, queryNetworkInterfaces, queryDisk},
+				[]string{
+					queryCPU,
+					queryMemory,
+					queryMemoryCounters,
+					queryPagingFiles,
+					queryNUMANodes,
+					querySystem,
+					queryNetworkInterfaces,
+					queryDisk,
+				},
 				session.queries,
 			)
 		})

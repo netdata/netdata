@@ -18,8 +18,7 @@ const (
 	// each query, not the interval between polls.
 	queryCPU = "SELECT Name, PercentInterruptTime, PercentUserTime, PercentPrivilegedTime, PercentDPCTime, " +
 		"PercentIdleTime FROM Win32_PerfRawData_Counters_ProcessorInformation"
-	queryMemory = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
-	queryDisk   = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
+	queryDisk = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
 		"WHERE DriveType = 3"
 )
 
@@ -57,6 +56,24 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	groups := [...]metricGroup{
 		{name: "CPU", enabled: groupEnabled(c.Collectors.CPU), query: queryCPU, read: snapshot.readCPU},
 		{name: "memory", enabled: groupEnabled(c.Collectors.Memory), query: queryMemory, read: snapshot.readMemory},
+		{
+			name:    "memory counters",
+			enabled: groupEnabled(c.Collectors.Memory),
+			query:   queryMemoryCounters,
+			read:    snapshot.readMemoryCounters,
+		},
+		{
+			name:    "paging file",
+			enabled: groupEnabled(c.Collectors.Memory),
+			query:   queryPagingFiles,
+			read:    snapshot.readPagingFiles,
+		},
+		{
+			name:    "NUMA node",
+			enabled: groupEnabled(c.Collectors.Memory),
+			query:   queryNUMANodes,
+			read:    snapshot.readNUMANodes,
+		},
 		{name: "system", enabled: groupEnabled(c.Collectors.System), query: querySystem, read: snapshot.readSystem},
 		{
 			name:    "network",
