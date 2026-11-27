@@ -245,7 +245,7 @@ if(ENABLE_LIBBACKTRACE)
     netdata_bundle_libbacktrace()
 endif()
 
-netdata_bundle_sqlite3()
+netdata_detect_sqlite3()
 
 netdata_detect_protobuf()
 

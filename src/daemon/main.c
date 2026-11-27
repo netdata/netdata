@@ -467,8 +467,7 @@ int netdata_main(int argc, char **argv) {
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
-                            sql_init_meta_database(DB_CHECK_RECOVER, 0);
-                            return 0;
+                            return sql_init_meta_database(DB_CHECK_RECOVER, 0) ? 1 : 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {

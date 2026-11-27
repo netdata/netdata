@@ -3826,17 +3826,22 @@ int test_sqlite(void) {
         return 1;
     }
 
-    rc = sqlite3_exec_monitored(db_mt, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
-    if (rc != SQLITE_OK) {
-        fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
-        return 1;
-    }
+    // UPDATE and DELETE with LIMIT are a build option of SQLite, a system library usually lacks it
+    if (sqlite3_compileoption_used("ENABLE_UPDATE_DELETE_LIMIT")) {
+        rc = sqlite3_exec_monitored(db_mt, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
+            return 1;
+        }
 
-    rc = sqlite3_exec_monitored(db_mt, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
-    if (rc != SQLITE_OK) {
-        fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
-        return 1;
+        rc = sqlite3_exec_monitored(db_mt, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
+            return 1;
+        }
     }
+    else
+        fprintf(stderr, "SQLite is built without UPDATE and DELETE with LIMIT, not testing them\n");
 
     rc = sqlite3_create_function(db_mt, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
     if (unlikely(rc != SQLITE_OK)) {

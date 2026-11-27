@@ -133,6 +133,7 @@ option(ENABLE_EXPORTER_MONGODB "Enable exporting to MongoDB" ${DEFAULT_FEATURE_S
 option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
+option(ENABLE_BUNDLED_SQLITE "Use a vendored copy of SQLite, turn off to use the system library" True)
 
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
