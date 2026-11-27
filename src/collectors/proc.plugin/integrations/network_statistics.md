@@ -152,7 +152,7 @@ Metrics:
 | ipv4.udppackets | IPv4 UDP Packets | received, sent | packets/s |
 | ipv4.udperrors | IPv4 UDP Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
 | ipv4.udplite | IPv4 UDPLite Packets | received, sent | packets/s |
-| ipv4.udplite_errors | IPv4 UDPLite Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | packets/s |
+| ipv4.udplite_errors | IPv4 UDPLite Errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
 | ipv4.ecnpkts | IPv4 ECN Statistics | CEP, NoECTP, ECTP0, ECTP1 | packets/s |
 | ipv4.fragsin | IPv4 Fragments Reassembly | ok, failed, all | packets/s |
 | ipv4.fragsout | IPv4 Fragments Sent | ok, failed, created | packets/s |

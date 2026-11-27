@@ -251,6 +251,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [vm.swap_info](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_info.md) | Collect information about SWAP memory. |
 | [vm.swap_reserved](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_reserved.md) | Read how much anonymous memory the kernel has reserved for running processes. |
 | [vm.vmtotal](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.vmtotal.md) | Collect Virtual Memory information from host. |
+| [Windows (WMI)](https://github.com/netdata/netdata/blob/master/src/go/plugin/wmi/collector/windows/integrations/windows_wmi.md) | Monitor CPU, memory, network traffic and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them. |
 | [Windows printers](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_printers.md) | This collector monitors Windows print queues: queued jobs, printer status, and jobs by status. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/windows_services.md) | This integration monitors resource utilization grouped by Windows Service. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_services.md) | This collector monitors Windows Services Status and States. |

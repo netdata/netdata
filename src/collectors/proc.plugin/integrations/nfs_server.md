@@ -101,5 +101,5 @@ Metrics:
 | nfsd.rpc | NFS Server Remote Procedure Calls Statistics | calls, bad_format, bad_auth | calls/s |
 | nfsd.proc2 | NFS v2 Server Remote Procedure Calls | a dimension per proc2 call | calls/s |
 | nfsd.proc3 | NFS v3 Server Remote Procedure Calls | a dimension per proc3 call | calls/s |
-| nfsd.proc4 | NFS v4 Server Remote Procedure Calls | a dimension per proc4 call | calls/s |
+| nfsd.proc4 | NFS v4 Server Remote Procedure Calls | null, compound | calls/s |
 | nfsd.proc4ops | NFS v4 Server Operations | a dimension per proc4 operation | operations/s |
