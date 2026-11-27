@@ -123,6 +123,71 @@ func memoryCountersRow() map[string]any {
 	}
 }
 
+// physicalDiskRow is a PhysicalDisk instance as DCOM decodes it: byte counts,
+// time integrals and the idle time with its timestamp as uint64, operation
+// counts, average timers and their bases as uint32. Each average timer is the
+// low 32 bits of its queue-length integral, as Windows reports it.
+func physicalDiskRow(name string) map[string]any {
+	return map[string]any{
+		"Name":                       name,
+		"DiskReadBytesPersec":        uint64(8555499008),
+		"DiskWriteBytesPersec":       uint64(43681006080),
+		"DiskReadsPersec":            uint32(218802),
+		"DiskWritesPersec":           uint32(2805931),
+		"SplitIOPerSec":              uint32(160491),
+		"CurrentDiskQueueLength":     uint32(2),
+		"PercentDiskTime":            uint64(111251464098),
+		"PercentDiskReadTime":        uint64(6537594026),
+		"PercentDiskWriteTime":       uint64(104713870072),
+		"PercentIdleTime":            uint64(40333877810720),
+		"PercentIdleTime_Base":       uint64(134402530853236929),
+		"AvgDisksecPerRead":          uint32(2242626730),
+		"AvgDisksecPerRead_Base":     uint32(218802),
+		"AvgDiskReadQueueLength":     uint64(6537594026),
+		"AvgDisksecPerWrite":         uint32(1634654968),
+		"AvgDisksecPerWrite_Base":    uint32(2805931),
+		"AvgDiskWriteQueueLength":    uint64(104713870072),
+		"AvgDisksecPerTransfer":      uint32(3877281698),
+		"AvgDisksecPerTransfer_Base": uint32(3024733),
+		"AvgDiskQueueLength":         uint64(111251464098),
+		"AvgDiskBytesPerRead":        uint64(8555499008),
+		"AvgDiskBytesPerRead_Base":   uint32(218802),
+		"AvgDiskBytesPerWrite":       uint64(43681006080),
+		"AvgDiskBytesPerWrite_Base":  uint32(2805931),
+		"Frequency_PerfTime":         uint64(10000000),
+	}
+}
+
+// Label sets of the physical disks of validQueryResults.
+const (
+	disk0Labels = `{device="Disk 0",device_id="\\\\.\\PHYSICALDRIVE0",model="QEMU HARDDISK",mount_point="C:"}`
+	disk1Labels = `{device="Disk 1",device_id="\\\\.\\PHYSICALDRIVE1",model="Virtual Disk"}`
+)
+
+// withDiskCounters adds the raw counter metrics of the physical disks and the
+// disk totals of validQueryResults to a collection's metrics; times arrive in
+// whole milliseconds.
+func withDiskCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	for _, labels := range []string{disk0Labels, disk1Labels} {
+		for metric, value := range map[string]metrix.SampleValue{
+			"disk_read_bytes":              8555499008,
+			"disk_written_bytes":           43681006080,
+			"disk_reads":                   218802,
+			"disk_writes":                  2805931,
+			"disk_split_io":                160491,
+			"disk_queue_length":            2,
+			"disk_busy_milliseconds":       11125146,
+			"disk_read_time_milliseconds":  653759,
+			"disk_write_time_milliseconds": 10471387,
+		} {
+			metrics[metric+labels] = value
+		}
+	}
+	metrics["disk_total_read_bytes"] = 2 * 8555499008
+	metrics["disk_total_written_bytes"] = 2 * 43681006080
+	return metrics
+}
+
 // withMemoryCounters adds the metrics of memoryCountersRow and of the paging
 // files and NUMA nodes of validQueryResults to a collection's metrics.
 func withMemoryCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
@@ -245,6 +310,20 @@ func validQueryResults() map[string]queryResult {
 				"VolumeSerialNumber": "0000ABCD",
 			},
 		),
+		// Disk 1 has no volume with a drive letter.
+		queryPhysicalDisks: fixtureRows(
+			physicalDiskRow("0 C:"),
+			physicalDiskRow("1"),
+			map[string]any{
+				"Name":                 "_Total",
+				"DiskReadBytesPersec":  uint64(2 * 8555499008),
+				"DiskWriteBytesPersec": uint64(2 * 43681006080),
+			},
+		),
+		queryDiskDrives: fixtureRows(
+			map[string]any{"Index": uint32(1), "Model": "Virtual Disk", "DeviceID": `\\.\PHYSICALDRIVE1`},
+			map[string]any{"Index": uint32(0), "Model": "QEMU HARDDISK", "DeviceID": `\\.\PHYSICALDRIVE0`},
+		),
 	}
 }
 
@@ -337,6 +416,9 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		map[string]any{"DeviceID": "D:", "Size": uint64(500)},
 	)
+	sessions[1].results[queryPhysicalDisks] = queryResult{
+		err: errors.New("invalid class"),
+	}
 
 	next := 0
 	c.newSession = func(ctx context.Context) (querySession, error) {
@@ -361,7 +443,7 @@ func TestCollector_Collect(t *testing.T) {
 		driveC    = `{drive_type="fixed",filesystem="NTFS",mount_point="C:",rw_mode="rw",serial_number="0xBEF3E296"}`
 		driveD    = `{drive_type="fixed",filesystem="unknown",mount_point="D:",rw_mode="rw",serial_number="0xABCD"}`
 	)
-	assert.Equal(t, withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
+	assert.Equal(t, withDiskCounters(withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
 		"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
 		"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
 		"memory_swap_used_bytes":             3 * 1024 * 1024 * 1024,
@@ -383,7 +465,7 @@ func TestCollector_Collect(t *testing.T) {
 		"disk_avail_bytes" + driveC:          420000000000,
 		"disk_used_bytes" + driveD:           4294967296,
 		"disk_avail_bytes" + driveD:          0,
-	})), first)
+	}))), first)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 	second, err := collecttest.CollectScalarSeries(c)
@@ -406,7 +488,9 @@ func TestCollector_Collect(t *testing.T) {
 		"disk_avail_bytes" + driveC: 300,
 	}), second)
 
-	// The failed CPU query keeps the first sample, so the shares span both intervals.
+	// The failed CPU query keeps the first sample, so the shares span both
+	// intervals. The failed physical disk query leaves the disks without a
+	// previous sample, so they have no interval values yet.
 	recovered, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	for metric, value := range map[string]metrix.SampleValue{
@@ -430,22 +514,24 @@ func TestCollector_Collect(t *testing.T) {
 	}
 	assert.Equal(t, first, recovered)
 
-	for _, session := range sessions {
-		assert.Equal(
-			t,
-			[]string{
-				queryCPU,
-				queryMemory,
-				queryMemoryCounters,
-				queryPagingFiles,
-				queryNUMANodes,
-				querySystem,
-				queryNetworkInterfaces,
-				queryNetworkAdapters,
-				queryDisk,
-			},
-			metricQueries(session.queries),
-		)
+	// The disks' model and device ID are read once, when they first appear.
+	for i, session := range sessions {
+		want := []string{
+			queryCPU,
+			queryMemory,
+			queryMemoryCounters,
+			queryPagingFiles,
+			queryNUMANodes,
+			querySystem,
+			queryNetworkInterfaces,
+			queryNetworkAdapters,
+			queryDisk,
+			queryPhysicalDisks,
+		}
+		if i == 0 {
+			want = append(want, queryDiskDrives)
+		}
+		assert.Equal(t, want, metricQueries(session.queries))
 		assert.Equal(t, 1, session.closed)
 	}
 	c.Cleanup(t.Context())
@@ -627,7 +713,9 @@ func metricQueries(queries []string) []string {
 			querySystem,
 			queryNetworkInterfaces,
 			queryNetworkAdapters,
-			queryDisk:
+			queryDisk,
+			queryPhysicalDisks,
+			queryDiskDrives:
 			metrics = append(metrics, query)
 		}
 	}
@@ -697,6 +785,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				querySystem:            lost,
 				queryNetworkInterfaces: lost,
 				queryDisk:              lost,
+				queryPhysicalDisks:     lost,
 			},
 			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
 				"memory_used_bytes":      6 * 1024 * 1024 * 1024,
@@ -715,6 +804,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				querySystem:            lost,
 				queryNetworkInterfaces: lost,
 				queryDisk:              lost,
+				queryPhysicalDisks:     lost,
 			},
 			wantErr: "no enabled WMI query group succeeded",
 		},
@@ -746,6 +836,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 					querySystem,
 					queryNetworkInterfaces,
 					queryDisk,
+					queryPhysicalDisks,
 				},
 				session.queries,
 			)

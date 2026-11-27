@@ -52,6 +52,12 @@ type Collector struct {
 	vnode         *vnodes.VirtualNode
 	nextInventory time.Time
 	lastCPU       cpuSample
+	// lastDisks holds each physical disk's sample of the previous poll, by
+	// device, when that poll read the disks.
+	lastDisks map[string]physicalDisk
+	// diskDrives caches each numbered physical disk's Win32_DiskDrive entry,
+	// by device; an empty entry stands for a disk Windows does not list there.
+	diskDrives map[string]diskDrive
 
 	winrmTLS   *tls.Config
 	newSession func(context.Context) (querySession, error)

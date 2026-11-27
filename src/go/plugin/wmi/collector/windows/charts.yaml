@@ -521,6 +521,145 @@ groups:
             name: used
             options:
               divisor: 1073741824
+  - family: disk
+    context_namespace: system
+    metrics: [disk_total_read_bytes, disk_total_written_bytes]
+    charts:
+      - context: io
+        title: Disk I/O
+        units: KiB/s
+        type: area
+        dimensions:
+          - selector: disk_total_read_bytes
+            name: reads
+            options:
+              divisor: 1024
+          - selector: disk_total_written_bytes
+            name: writes
+            options:
+              multiplier: -1
+              divisor: 1024
+  # Physical disks.
+  - context_namespace: disk
+    chart_defaults:
+      instances:
+        by_labels: [device]
+    groups:
+      - family: io
+        metrics: [disk_read_bytes, disk_written_bytes, disk_read_average_bytes, disk_write_average_bytes]
+        charts:
+          - context: io
+            title: Disk I/O Bandwidth
+            units: KiB/s
+            type: area
+            dimensions:
+              - selector: disk_read_bytes
+                name: reads
+                options:
+                  divisor: 1024
+              - selector: disk_written_bytes
+                name: writes
+                options:
+                  multiplier: -1
+                  divisor: 1024
+          - context: avgsz
+            title: Average Completed I/O Operation Bandwidth
+            units: KiB/operation
+            type: area
+            dimensions:
+              - selector: disk_read_average_bytes
+                name: reads
+                options:
+                  divisor: 1024
+              - selector: disk_write_average_bytes
+                name: writes
+                options:
+                  multiplier: -1
+                  divisor: 1024
+      - family: ops
+        metrics: [disk_reads, disk_writes, disk_queue_length]
+        charts:
+          - context: ops
+            title: Disk Completed I/O Operations
+            units: operations/s
+            dimensions:
+              - selector: disk_reads
+                name: reads
+              - selector: disk_writes
+                name: writes
+                options:
+                  multiplier: -1
+          - context: qops
+            title: Disk Current I/O Operations
+            units: operations
+            dimensions:
+              - selector: disk_queue_length
+                name: operations
+      - family: utilization
+        metrics:
+          - disk_utilization_percent
+          - disk_busy_milliseconds
+          - disk_read_time_milliseconds
+          - disk_write_time_milliseconds
+        charts:
+          - context: util
+            title: Disk Utilization Time
+            units: '% of time working'
+            type: area
+            dimensions:
+              - selector: disk_utilization_percent
+                name: utilization
+          - context: busy
+            title: Disk Busy Time
+            units: milliseconds
+            type: area
+            dimensions:
+              - selector: disk_busy_milliseconds
+                name: busy
+          - context: iotime
+            title: Disk Total I/O Time
+            units: milliseconds/s
+            type: area
+            dimensions:
+              - selector: disk_read_time_milliseconds
+                name: reads
+              - selector: disk_write_time_milliseconds
+                name: writes
+                options:
+                  multiplier: -1
+      - family: latency
+        metrics: [disk_read_await_microseconds, disk_write_await_microseconds, disk_service_time_microseconds]
+        charts:
+          - context: await
+            title: Average Completed I/O Operation Time
+            units: milliseconds/operation
+            dimensions:
+              - selector: disk_read_await_microseconds
+                name: reads
+                options:
+                  divisor: 1000
+              - selector: disk_write_await_microseconds
+                name: writes
+                options:
+                  multiplier: -1
+                  divisor: 1000
+          - context: svctm
+            title: Average Service Time
+            units: milliseconds/operation
+            dimensions:
+              - selector: disk_service_time_microseconds
+                name: svctm
+                options:
+                  divisor: 1000
+      - family: iops
+        metrics: [disk_split_io]
+        charts:
+          - context: split
+            title: Split I/O Operations
+            units: operations/s
+            dimensions:
+              - selector: disk_split_io
+                name: discards
   - family: latency
     context_namespace: ping
     metrics: [ping_rtt_min, ping_rtt_max, ping_rtt_avg, ping_rtt_std_dev]

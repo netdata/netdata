@@ -27,7 +27,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor CPU, memory, processes, network interfaces and disk space on Windows hosts remotely over WMI, and ping them, without installing anything on them.
+          Monitor CPU, memory, processes, network interfaces and disks on Windows hosts remotely over WMI, and ping them, without installing anything on them.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
@@ -36,13 +36,14 @@ modules:
           - the number of processes and threads, context switches, processor queue length and uptime;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - available and used space per fixed drive;
+          - bandwidth, operations, latency, utilization and queue per physical disk, and the total disk I/O of the host;
           - round-trip time and packet loss of ICMP ping from the poller;
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
           - host status: when the poller can no longer collect from the host, its node turns Stale and an alert on the poller notifies you.
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, two for the network and disk groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -63,7 +64,7 @@ modules:
           | Memory | `Win32_OperatingSystem`, `Win32_PerfRawData_PerfOS_Memory`, `Win32_PerfRawData_PerfOS_PagingFile`, `Win32_PerfRawData_PerfOS_NUMANodeMemory` |
           | System | `Win32_PerfRawData_PerfOS_System` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter` |
-          | Disk | `Win32_LogicalDisk` |
+          | Disk | `Win32_LogicalDisk`, `Win32_PerfRawData_PerfDisk_PhysicalDisk`, `Win32_DiskDrive` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
       supported_platforms:
         include: [Linux, Windows]
@@ -78,7 +79,7 @@ modules:
           | **Enable Account** and **Remote Enable** on the `root\cimv2` WMI namespace | Always |
           | Membership in the local **Distributed COM Users** group | `transport: dcom` |
           | Membership in the local **Remote Management Users** group | `transport: winrm` |
-          | Membership in the local **Performance Monitor Users** group | The CPU, memory, system or network group is enabled |
+          | Membership in the local **Performance Monitor Users** group | Always |
 
           The plugin only reads: do not grant **Execute Methods**, write or full-control permissions. See [Securing a remote WMI connection](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
 
@@ -107,7 +108,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to nine WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to ten WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -230,7 +231,7 @@ modules:
               required: false
               group: Collection
             - name: collectors
-              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four and the network group two. Keep at least one group enabled."
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four and the network and disk groups two. Keep at least one group enabled."
               default_value: ''
               required: false
               group: Collection
@@ -257,7 +258,7 @@ modules:
               required: false
               group: Collection
             - name: collectors.disk
-              description: "Collect available and used space per fixed drive."
+              description: "Collect available and used space per fixed drive, and bandwidth, operations, latency, utilization and queue per physical disk."
               default_value: true
               required: false
               group: Collection
@@ -450,9 +451,10 @@ modules:
       description: |
         - Charts belong to the Windows host's node, not to the poller.
         - CPU utilization and the per-second rates, such as traffic, packets, errors, paging and page faults, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
-        - Memory sizes, processes, threads and the processor queue length are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
+        - Memory sizes, processes, threads, the processor queue length and the disk queue (`disk.qops`) are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
         - As on the Netdata Agent running on Windows, `mem.swap` and `mem.committed` show the commit charge against the commit limit, which counts physical memory and all paging files; `mem.pagefile_usage` shows how full each paging file is.
         - As on the Netdata Agent running on Windows, `mem.system_pool_allocs` shows how fast the number of outstanding pool allocations grows, and 0 while it shrinks.
+        - As on the Netdata Agent running on Windows, disk utilization, operation times (`disk.await`, `disk.svctm`) and sizes (`disk.avgsz`) are averages over each collection interval, and an interval in which no operation completed shows a time and size of 0. `disk.busy` shows Windows' % Disk Time, which adds up the time of concurrent operations, so it can exceed 1000 ms per second.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
       availability: []
@@ -622,6 +624,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: system.io
+              description: Disk I/O
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
             - name: system.net
               description: Physical Network Interfaces Aggregated Bandwidth
               unit: kilobits/s
@@ -776,6 +785,83 @@ modules:
               dimensions:
                 - name: avail
                 - name: used
+        - name: physical disk
+          description: A physical disk as Windows performance counters list it, including a virtual machine's virtual disks and the volumes a storage array presents as disks.
+          labels:
+            - name: device
+              description: Disk number, for example `Disk 0`.
+            - name: mount_point
+              description: "Drive letters of the disk's volumes, for example `C:` or `C: D:`. Left out for a disk without a volume that has a drive letter."
+            - name: model
+              description: Model of the disk, for example `QEMU HARDDISK`. Left out when Windows does not list the disk among its disk drives.
+            - name: device_id
+              description: Device path of the disk, for example `//./PHYSICALDRIVE0`. Backslashes are shown as forward slashes. Left out when Windows does not list the disk among its disk drives.
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: KiB/operation
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: operations
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: '% of time working'
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: milliseconds
+              chart_type: area
+              dimensions:
+                - name: busy
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: milliseconds/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: milliseconds/operation
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: milliseconds/operation
+              chart_type: line
+              dimensions:
+                - name: svctm
+            - name: disk.split
+              description: Split I/O Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: discards
         - name: ping target
           description: The Windows host as the poller pings it.
           labels:

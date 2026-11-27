@@ -18,6 +18,8 @@ const (
 	readWriteModeLabel = "rw_mode"
 	serialNumberLabel  = "serial_number"
 	pagefileLabel      = "pagefile"
+	modelLabel         = "model"
+	deviceIDLabel      = "device_id"
 	numaNodeLabel      = "node"
 	// The go.d ping collector's label: the target as configured.
 	hostLabel = "host"
@@ -55,6 +57,15 @@ type collectorMetrics struct {
 	netTotalSent     metrix.SnapshotCounter
 	diskAvail        metrix.SnapshotGauge
 	diskUsed         metrix.SnapshotGauge
+	diskTotalRead    metrix.SnapshotCounter
+	diskTotalWritten metrix.SnapshotCounter
+	disk             [len(diskCounters)]counterInstrument
+	diskUtilization  metrix.SnapshotGauge
+	diskReadAwait    metrix.SnapshotGauge
+	diskWriteAwait   metrix.SnapshotGauge
+	diskServiceTime  metrix.SnapshotGauge
+	diskReadSize     metrix.SnapshotGauge
+	diskWriteSize    metrix.SnapshotGauge
 	pingRTTMin       metrix.SnapshotGauge
 	pingRTTMax       metrix.SnapshotGauge
 	pingRTTAvg       metrix.SnapshotGauge
@@ -85,6 +96,14 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		netTotalSent:     m.Counter("network_total_sent_bytes"),
 		diskAvail:        m.Gauge("disk_avail_bytes"),
 		diskUsed:         m.Gauge("disk_used_bytes"),
+		diskTotalRead:    m.Counter("disk_total_read_bytes"),
+		diskTotalWritten: m.Counter("disk_total_written_bytes"),
+		diskUtilization:  m.Gauge("disk_utilization_percent"),
+		diskReadAwait:    m.Gauge("disk_read_await_microseconds"),
+		diskWriteAwait:   m.Gauge("disk_write_await_microseconds"),
+		diskServiceTime:  m.Gauge("disk_service_time_microseconds"),
+		diskReadSize:     m.Gauge("disk_read_average_bytes"),
+		diskWriteSize:    m.Gauge("disk_write_average_bytes"),
 		pingRTTMin:       m.Gauge("ping_rtt_min"),
 		pingRTTMax:       m.Gauge("ping_rtt_max"),
 		pingRTTAvg:       m.Gauge("ping_rtt_avg"),
@@ -100,6 +119,9 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	}
 	for i, counter := range interfaceCounters {
 		metrics.netInterface[i] = newCounterInstrument(m, counter.metric, counter.total)
+	}
+	for i, counter := range diskCounters {
+		metrics.disk[i] = newCounterInstrument(m, counter.metric, counter.total)
 	}
 	// Chart variables are sent unscaled, so the speed variable has its own gauge.
 	metrics.netSpeedKbps = m.Gauge("network_speed_kilobits_per_second", metrix.WithFloat(true))
@@ -133,8 +155,8 @@ func (i counterInstrument) observe(s sample, labels ...metrix.LabelSet) {
 }
 
 // write records the valid samples. Label sets are built per poll, so a
-// processor, paging file, NUMA node, interface or drive that disappears stops
-// being observed. Raw totals are counters: Netdata computes their rate over each
+// processor, paging file, NUMA node, interface, drive or disk that disappears
+// stops being observed. Raw totals are counters: Netdata computes their rate over each
 // collection interval.
 func (m collectorMetrics) write(snapshot observations) {
 	if snapshot.cpu.hasTotal {
@@ -206,6 +228,20 @@ func (m collectorMetrics) write(snapshot observations) {
 		observe(m.diskAvail, drive.avail, labels)
 		observe(m.diskUsed, drive.used, labels)
 	}
+	observeTotal(m.diskTotalRead, snapshot.diskTotalRead)
+	observeTotal(m.diskTotalWritten, snapshot.diskTotalWritten)
+	for _, disk := range snapshot.physicalDisks {
+		labels := m.meter.LabelSet(disk.labels()...)
+		for i, s := range disk.values {
+			m.disk[i].observe(s, labels)
+		}
+		observe(m.diskUtilization, disk.interval.utilization, labels)
+		observe(m.diskReadAwait, disk.interval.readAwait, labels)
+		observe(m.diskWriteAwait, disk.interval.writeAwait, labels)
+		observe(m.diskServiceTime, disk.interval.serviceTime, labels)
+		observe(m.diskReadSize, disk.interval.readSize, labels)
+		observe(m.diskWriteSize, disk.interval.writeSize, labels)
+	}
 }
 
 // writePing records a probe in the go.d ping collector's units, which the
@@ -249,6 +285,38 @@ func (d diskSpace) labels() []metrix.Label {
 			Value: d.serialNumber,
 		},
 	}
+}
+
+// labels are the native Windows Agent's physical disk labels, each left out
+// when its value is empty, as the native agent does: the mount point for a
+// disk without a lettered volume, the model and device ID for a disk Windows
+// does not list among its disk drives.
+func (d physicalDisk) labels() []metrix.Label {
+	labels := []metrix.Label{
+		{
+			Key:   deviceLabel,
+			Value: d.device,
+		},
+	}
+	if d.mountPoint != "" {
+		labels = append(labels, metrix.Label{
+			Key:   mountPointLabel,
+			Value: d.mountPoint,
+		})
+	}
+	if d.drive.model != "" {
+		labels = append(labels, metrix.Label{
+			Key:   modelLabel,
+			Value: d.drive.model,
+		})
+	}
+	if d.drive.deviceID != "" {
+		labels = append(labels, metrix.Label{
+			Key:   deviceIDLabel,
+			Value: d.drive.deviceID,
+		})
+	}
+	return labels
 }
 
 func observeShares(gauges [len(cpuModes)]metrix.SnapshotGauge, shares cpuShares, labels ...metrix.LabelSet) {
