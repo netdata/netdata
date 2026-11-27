@@ -1001,7 +1001,7 @@ modules:
             - name: ipv4.packets
               description: IPv4 Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
@@ -1035,10 +1035,10 @@ modules:
               dimensions:
                 - name: InDiscards
                 - name: OutDiscards
-                - name: OutNoRoutes
-                - name: InAddrErrors
                 - name: InHdrErrors
+                - name: InAddrErrors
                 - name: InUnknownProtos
+                - name: OutNoRoutes
             - name: ipv4.icmpmsg
               description: IPv4 ICMP Packets
               unit: "packets/s"
@@ -1052,10 +1052,6 @@ modules:
                 - name: OutRedirects
                 - name: InEchos
                 - name: OutEchos
-                - name: InRouterAdvert
-                - name: OutRouterAdvert
-                - name: InRouterSelect
-                - name: OutRouterSelect
                 - name: InTimeExcds
                 - name: OutTimeExcds
                 - name: InParmProbs
@@ -1101,10 +1097,10 @@ modules:
               dimensions:
                 - name: InDiscards
                 - name: OutDiscards
-                - name: OutNoRoutes
-                - name: InAddrErrors
                 - name: InHdrErrors
+                - name: InAddrErrors
                 - name: InUnknownProtos
+                - name: OutNoRoutes
             - name: ipv6.icmpmsg
               description: IPv6 ICMP Packets
               unit: "packets/s"
@@ -1118,10 +1114,6 @@ modules:
                 - name: OutRedirects
                 - name: InEchos
                 - name: OutEchos
-                - name: InRouterAdvert
-                - name: OutRouterAdvert
-                - name: InRouterSelect
-                - name: OutRouterSelect
                 - name: InTimeExcds
                 - name: OutTimeExcds
                 - name: InParmProbs
