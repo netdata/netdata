@@ -599,6 +599,7 @@ groups:
 	}
 	tests := map[string]struct {
 		template         string
+		exclude          []string
 		write            func(m metrix.SnapshotMeter)
 		wantExpectedVars map[string][]string
 		wantActualVars   map[string][]string
@@ -637,6 +638,15 @@ groups:
 				`dimension "link" of chart "net_errors_eth0" has the name of a chart variable; health reads the dimension`,
 			},
 		},
+		"an excluded context is not checked for shadowing": {
+			exclude: []string{"net.errors"},
+			write: func(m metrix.SnapshotMeter) {
+				m.WithLabels(labels("eth0", "kind", "link")...).Gauge("received").Observe(1)
+				m.WithLabels(labels("eth0")...).Gauge("speed").Observe(10)
+			},
+			wantExpectedVars: map[string][]string{"net.net": {"nic_speed"}},
+			wantActualVars:   map[string][]string{"net.net": {"nic_speed"}},
+		},
 		"a chart omitted by the instance cap is not an identity mismatch": {
 			template: cappedTemplate,
 			write: func(m metrix.SnapshotMeter) {
@@ -663,7 +673,7 @@ groups:
 		t.Run(name, func(t *testing.T) {
 			store := newTestCollectorStore(t, tc.write)
 			set := testCoverageSet(t, cmp.Or(tc.template, template))
-			coverage, err := buildChartCoverage(set, store.Read(metrix.ReadRaw(), metrix.ReadFlatten()), nil)
+			coverage, err := buildChartCoverage(set, store.Read(metrix.ReadRaw(), metrix.ReadFlatten()), tc.exclude)
 			require.NoError(t, err)
 			assert.Equal(
 				t,

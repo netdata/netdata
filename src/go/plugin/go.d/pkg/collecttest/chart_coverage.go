@@ -308,6 +308,9 @@ func materializedVariablesByContext(
 
 	var shadowed []string
 	for chartID, chart := range created {
+		if matchesAny(chart.Meta.Context, contextMatchers) {
+			continue
+		}
 		for _, dim := range dimsByChart[chartID] {
 			if slices.Contains(chart.Variables, dim) {
 				shadowed = append(shadowed, fmt.Sprintf(

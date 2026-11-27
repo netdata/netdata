@@ -5,6 +5,7 @@ package chartengine
 import (
 	"cmp"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -390,4 +391,50 @@ func sortedVariableFacts(facts []variableFact) []variableFact {
 		)
 	})
 	return out
+}
+
+func TestPlanChartVariablesAllocationEnvelope(t *testing.T) {
+	// A steady plan allocates one boxed update action per chart plus per-plan
+	// setup. Chart variables fed for every chart may add only a constant (the
+	// per-build value map and value block), never an allocation per series.
+	const variableOverhead = 16
+	steadyAllocs := func(t *testing.T, charts int, variables bool) float64 {
+		t.Helper()
+		block := ""
+		if variables {
+			block = benchVariablesBlock
+		}
+		e, err := New(WithRuntimeStore(nil), WithRuntimePlannerMode())
+		require.NoError(t, err)
+		require.NoError(t, e.LoadYAML([]byte(replaceVariablesPlaceholder(block)), 1))
+		store := metrix.NewCollectorStore()
+		cc := mustCycleController(t, store)
+		cc.BeginCycle()
+		meter := store.Write().SnapshotMeter("")
+		for i := range charts {
+			labels := meter.LabelSet(metrix.Label{
+				Key:   "id",
+				Value: strconv.Itoa(i),
+			})
+			meter.Gauge("bench_rx").Observe(float64(i), labels)
+			meter.Gauge("bench_speed").Observe(1e6, labels)
+			meter.Gauge("bench_limit").Observe(1, labels)
+		}
+		require.NoError(t, cc.CommitCycleSuccess())
+		reader := store.Read(metrix.ReadRaw())
+		_, err = buildPlan(e, reader)
+		require.NoError(t, err)
+		return testing.AllocsPerRun(10, func() {
+			plan, err := buildPlan(e, reader)
+			require.NoError(t, err)
+			require.Len(t, plan.Actions, charts)
+		})
+	}
+	for _, charts := range []int{128, 512} {
+		t.Run(strconv.Itoa(charts), func(t *testing.T) {
+			without := steadyAllocs(t, charts, false)
+			with := steadyAllocs(t, charts, true)
+			assert.LessOrEqual(t, with, without+variableOverhead, "without=%v with=%v", without, with)
+		})
+	}
 }

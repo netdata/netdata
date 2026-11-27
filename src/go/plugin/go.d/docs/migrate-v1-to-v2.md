@@ -282,7 +282,9 @@ full V1-to-V2 chart identity parity.
 
 The non-negotiable minimum is alert-observable parity. The migration MUST prove that health alert `on:` contexts,
 referenced dimensions, referenced variables, and dimension algorithms/units used by alerts still resolve after
-migration. This is provable with the chart-template and health-alert checks below.
+migration, which the chart-template and health-alert checks below prove, and that the chart variables alerts read keep
+their V1 values, which the [parity manifest](#parity-manifest-recipe) proves: a variable that resolves but is written in
+another unit still breaks its alerts.
 
 Compiled presentation compatibility is broader: title, family, type, priority, multiplier, divisor, hidden, float
 flags, label promotion, and lifecycle policy. If existing exported helpers cannot observe those fields, either add a
@@ -327,15 +329,15 @@ of that "manual comparison recipe": prove context/dimension/value parity by rend
 shape, without depending on chart-ID string equality.
 
 1. Freeze the V1 output as a golden manifest. For representative fixtures, run the V1 `Collect()` + `Charts()` and
-   serialize, per chart: context, identifying labels, type, family, units, priority, and per dimension the name,
-   algorithm, and de-scaled value (the V1 `map[string]int64` value divided by the dimension `Div`). Commit the goldens
-   under `testdata/`.
+   serialize, per chart: context, identifying labels, type, family, units, priority, per dimension the name,
+   algorithm, and de-scaled value (the V1 `map[string]int64` value divided by the dimension `Div`), and per chart
+   variable the name and value (the map value of its `Var.ID`). Commit the goldens under `testdata/`.
 2. Render the V2 path into the same shape. Load the collector's LIVE `ChartTemplateYAML()` into a real `chartengine`,
    run a cycle through the real `Collect()` and `metrix` store, plan against the store, and read the plan's
-   create/update actions into the same per-chart structure.
+   create/update actions, including `UpdateChartAction.Variables`, into the same per-chart structure.
 3. Compare structurally with a float tolerance. V1 truncates `value*Div` to `int64` while V2 stores the true float, so
    compare values within a tolerance (for example `1e-3`), not for exact equality. Assert that context, family, units,
-   dimension names, and dimension algorithms match.
+   dimension names, dimension algorithms, and chart variable names and values match.
 
 Match chart instances by context and their identifying labels, and dimensions by display name. Compare literal IDs
 only when their continuity is an explicit migration requirement. Review ID-addressed examples and alert references,
