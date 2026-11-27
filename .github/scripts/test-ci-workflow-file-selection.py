@@ -119,6 +119,32 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), expected)
 
+    def test_package_scope_for_rust_changes(self) -> None:
+        from runpy import run_path
+
+        select = run_path(str(ROOT / ".github/scripts/pr-package-scope.py"))["package_scope"]
+        tool = "src/crates/otel-streams/src/bin/github.rs"
+        ingestor = "src/crates/otel-ingestor/src/http_service.rs"
+        netflow = "src/crates/netflow-plugin/src/main.rs"
+        for paths, expected in (
+            ([tool], "skip"),
+            ([tool, "README.md"], "skip"),
+            ([ingestor, "src/crates/wal/src/lib.rs"], "representative"),
+            ([ingestor, "docs/opentelemetry/README.md"], "representative"),
+            ([netflow, "README.md"], "representative"),
+            ([tool, ingestor], "ordinary"),
+            ([netflow, ingestor], "ordinary"),
+            ([ingestor, "packaging/build-package.sh"], "ordinary"),
+            ([tool, "src/crates/otel-streams/Cargo.toml"], "ordinary"),
+            ([ingestor, "src/crates/Cargo.lock"], "ordinary"),
+            (["src/crates/netdata-plugin/protocol/src/lib.rs"], "ordinary"),
+            (["src/crates/otel-new/src/lib.rs"], "ordinary"),
+            (["README.md"], "ordinary"),
+            ([], "ordinary"),
+        ):
+            with self.subTest(paths=paths):
+                self.assertEqual(select(paths), expected)
+
     def test_codeql_go_and_rust_source_selection(self) -> None:
         workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")
         cases = {

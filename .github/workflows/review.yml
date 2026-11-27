@@ -32,7 +32,7 @@ jobs:
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/actionlint') }}" = "true" ]; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
-          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '^\.github/workflows/|^\.github/scripts/test-ci-workflow-file-selection\.py$' ; then
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '^\.github/workflows/|^\.github/scripts/(pr-package-scope|test-ci-workflow-file-selection)\.py$' ; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'GitHub Actions workflows have changed, need to run actionlint.'
           else
