@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      netflow: ${{ steps.netflow.outputs.any_modified == 'true' || steps.netflow.outputs.type_changed_files_count > 0 }}
     steps:
       - name: Checkout
         id: checkout
@@ -27,9 +28,27 @@ jobs:
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
           files: |
             .github/workflows/rust-tests.yml
             src/crates/**
+          files_ignore: |
+            **/*.md
+            src/crates/**/metadata.yaml
+      - name: Check NetFlow and its workspace dependencies
+        id: netflow
+        if: steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
+          files: |
+            .github/workflows/rust-tests.yml
+            src/crates/Cargo.toml
+            src/crates/Cargo.lock
+            src/crates/.cargo/**
+            src/crates/netdata-plugin/**
+            src/crates/netflow-plugin/**
           files_ignore: |
             **/*.md
             src/crates/**/metadata.yaml
@@ -44,7 +63,7 @@ jobs:
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ]; then
+          if [ "${{ steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0 }}" == "true" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
@@ -56,6 +75,10 @@ jobs:
     needs:
       - file-check
     timeout-minutes: 60
+    env: # Incremental artifacts and full debug info would triple the build size on the runner's limited disk.
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_TERM_COLOR: always
     steps:
       - name: Skip Check
         id: skip
@@ -77,10 +100,10 @@ jobs:
       - name: Cargo test
         if: needs.file-check.outputs.run == 'true'
         working-directory: src/crates
-        env: # Incremental artifacts and full debug info would triple the build size on the runner's limited disk.
-          CARGO_INCREMENTAL: 0
-          CARGO_PROFILE_DEV_DEBUG: line-tables-only
-          CARGO_TERM_COLOR: always
         run: |
           cargo --version
           cargo test --locked --workspace --exclude netflow-plugin --exclude netipc
+      - name: Test NetFlow
+        if: needs.file-check.outputs.netflow == 'true'
+        working-directory: src/crates
+        run: cargo test --locked -p netflow-plugin
