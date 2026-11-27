@@ -348,6 +348,12 @@ func normalizedEntryContent(entry TemplateEntry, charts []program.Chart) templat
 			selector.Matcher = nil
 			selector.Expression = strings.TrimSpace(selector.Expression)
 		}
+		chart.Variables = slices.Clone(chart.Variables)
+		for j := range chart.Variables {
+			selector := &chart.Variables[j].Selector
+			selector.Matcher = nil
+			selector.Expression = strings.TrimSpace(selector.Expression)
+		}
 	}
 	return out
 }

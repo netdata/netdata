@@ -410,7 +410,33 @@ func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 			}),
 		},
 		"raw and collection-time suffixes name the dimension": {
-			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed_raw + $ok_last_collected_t - $now"} }),
+			alerts: alert(
+				func(a *HealthAlert) { a.Expressions = []string{"$failed_raw + $ok_last_collected_t - $now"} },
+			),
+		},
+		"expression reads a chart variable the template declares on its chart": {
+			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed * 100 / $requests_limit"} }),
+			opts: HealthAlertsCheck{
+				ChartTemplate: variablesTemplate("requests"),
+			},
+		},
+		"chart variable declared on another chart": {
+			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed * 100 / $requests_limit"} }),
+			opts: HealthAlertsCheck{
+				ChartTemplate: variablesTemplate("latency"),
+			},
+			wantErr: `app_requests_failed: variable "requests_limit" is not a documented dimension of app.requests`,
+		},
+		"chart variable without the template": {
+			alerts:  alert(func(a *HealthAlert) { a.Expressions = []string{"$failed * 100 / $requests_limit"} }),
+			wantErr: `app_requests_failed: variable "requests_limit" is not a documented dimension of app.requests`,
+		},
+		"invalid chart template": {
+			alerts: testHealthAlerts(),
+			opts: HealthAlertsCheck{
+				ChartTemplate: "version: v1\n",
+			},
+			wantErr: "chart template:",
 		},
 		"shared file with prefix": {
 			alerts: append(testHealthAlerts(), HealthAlert{Name: "other_alert", On: "other.chart", Units: "x"}),
@@ -438,4 +464,40 @@ func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 		require.ErrorContains(t, err, "app.requests: documented twice")
 		assert.NotContains(t, err.Error(), "documented unit", "the first declaration stays the validation target")
 	})
+}
+
+// variablesTemplate declares the requests_limit chart variable on the chart
+// whose context leaf is variableChart.
+func variablesTemplate(variableChart string) string {
+	return `
+version: v1
+context_namespace: app
+groups:
+  - family: Root
+    metrics: [requests_total, requests_limit, latency_seconds]
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: requests_total{code="200"}
+            name: ok
+          - selector: requests_total{code="500"}
+            name: failed` + variableBlock(variableChart, "requests") + `
+      - title: Latency
+        context: latency
+        units: seconds
+        dimensions:
+          - selector: latency_seconds
+            name: latency` + variableBlock(variableChart, "latency")
+}
+
+func variableBlock(variableChart, chart string) string {
+	if variableChart != chart {
+		return ""
+	}
+	return `
+        variables:
+          - name: requests_limit
+            selector: requests_limit`
 }

@@ -3,6 +3,8 @@
 package charttpl
 
 import (
+	"slices"
+
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 )
 
@@ -72,6 +74,17 @@ type Group struct {
 	Charts []Chart `yaml:"charts,omitempty" json:"charts,omitempty"`
 }
 
+// HasChartVariables reports whether a chart of the group or of a nested group
+// declares a chart variable.
+func (g Group) HasChartVariables() bool {
+	for _, chart := range g.Charts {
+		if len(chart.Variables) > 0 {
+			return true
+		}
+	}
+	return slices.ContainsFunc(g.Groups, Group.HasChartVariables)
+}
+
 // ChartDefaults defines inheritable chart fields on a group.
 type ChartDefaults struct {
 	Priority      int        `yaml:"priority,omitempty"        json:"priority,omitempty"`
@@ -97,6 +110,10 @@ type Chart struct {
 	Lifecycle *Lifecycle `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty"`
 
 	Dimensions []Dimension `yaml:"dimensions" json:"dimensions"`
+
+	// Variables are chart-scope variables (VARIABLE CHART) fed by metric series,
+	// in emission order.
+	Variables []ChartVariable `yaml:"variables,omitempty" json:"variables,omitempty"`
 }
 
 // Instances defines chart instance identity labels.
@@ -135,4 +152,13 @@ type DimensionOptions struct {
 	Divisor    int  `yaml:"divisor,omitempty"    json:"divisor,omitempty"`
 	Hidden     bool `yaml:"hidden,omitempty"     json:"hidden,omitempty"`
 	Float      bool `yaml:"float,omitempty"      json:"float,omitempty"`
+}
+
+// ChartVariable describes one chart-scope variable. Its value is the chart
+// reducer over the series its selector routes to the chart instance in one
+// collection cycle, sent unscaled: the collector writes the unit its readers
+// expect.
+type ChartVariable struct {
+	Name     string `yaml:"name"     json:"name"`
+	Selector string `yaml:"selector" json:"selector"`
 }

@@ -232,6 +232,13 @@ func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
 	if !groupHasChart(group) {
 		return charttpl.Group{}, fmt.Errorf("profile %q: 'template' must contain at least one chart", name)
 	}
+	// Profile validation and semantic proofs reason about dimensions only.
+	if group.HasChartVariables() {
+		return charttpl.Group{}, fmt.Errorf(
+			"profile %q: 'template': chart variables are not supported in Prometheus profiles",
+			name,
+		)
+	}
 
 	spec := charttpl.Spec{
 		Version: charttpl.VersionV1,

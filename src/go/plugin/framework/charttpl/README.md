@@ -238,8 +238,9 @@ groups:
 > Some consumers embed a chart template as a **single group** instead of a full spec — for example a
 > [Prometheus profile](/src/go/plugin/go.d/collector/prometheus/profile-format.md)'s `template:` key holds one item of
 > the `groups` list above (written without the leading dash), and the collector supplies `version` and `engine` itself.
-> All group and chart fields documented below apply unchanged; the spec-level `version`, top-level `context_namespace`,
-> and `engine` fields do not. Use the consumer's own policy surface for engine behavior. Prometheus profiles expose
+> All group and chart fields documented below apply unchanged, except chart `variables`, which Prometheus, Azure
+> Monitor and CloudWatch profiles reject; the spec-level `version`, top-level `context_namespace`, and `engine` fields
+> do not. Use the consumer's own policy surface for engine behavior. Prometheus profiles expose
 > `autogen.selector` at the profile root to constrain fallback charts inside that profile's `match` scope while
 > retaining samples; use the job `selector` or a relabeling `drop` rule when the samples themselves must be discarded.
 
@@ -581,6 +582,8 @@ charts:
         expire_after_cycles: <int>
     dimensions:
       - <dimension definition>
+    variables:
+      - <chart variable definition>
 ```
 
 | Field             | Type          | Required | Default                | Description                                                                  |
@@ -598,6 +601,7 @@ charts:
 | `instances`       | object        | no       | from `chart_defaults`  | Instance identity policy (see [instances](#instances)).                      |
 | `lifecycle`       | object        | no       |                        | Instance/dimension cap and expiry (see [lifecycle](#lifecycle)).             |
 | `dimensions`      | array         | **yes**  |                        | At least one dimension required (see [dimensions](#6-dimensions)).           |
+| `variables`       | array         | no       |                        | Chart variables health alerts read (see [variables](#7-variables)).          |
 
 Chart and dimension identity labels are immutable routing inputs: changing one creates a new chart or dimension
 ID. Promoted labels are non-identity metadata. They are the intersection across every routed contributor to the chart,
@@ -919,6 +923,77 @@ dimensions:
 
 If the metric has series with `method="GET"`, `method="POST"`, etc., each becomes its own dimension on the chart.
 
+### 7. variables
+
+A chart variable is a value that Netdata health alerts read as `$name` on the chart (`VARIABLE CHART` in the plugin
+protocol). It is not drawn and is not a dimension. Use it when a stock or collector alert needs a per-chart reference
+value, such as an interface speed or a configured limit.
+
+```yaml
+variables:
+  - name: <variable name>
+    selector: <metric selector>
+```
+
+| Field      | Type   | Required | Description                                                                  |
+|------------|--------|----------|------------------------------------------------------------------------------|
+| `name`     | string | **yes**  | The name alerts read as `$name`.                                             |
+| `selector` | string | **yes**  | Metric selector, with the same rules as a [dimension selector](#selectors).  |
+
+**Binding.** A series that matches the selector belongs to the chart instance that its own labels select through the
+chart's `instances`, exactly as a dimension series would. The variable series must therefore carry the same identity
+label values as the chart's dimension series; with `by_labels: ["*"]`, `!key` or `optional_by_labels` that means the
+same identity label set. A series without the required identity labels binds to no chart and is treated like any
+unmatched series (autogen, when enabled).
+
+**Value.** The chart's `aggregation` reduces the variable's series of one collection cycle (default `sum`), and the
+result is sent as it is: variables have no multiplier or divisor, and Netdata stores them as doubles. Write the gauge in
+the unit the alert expects. Feed variables from gauges: a counter gives its running total, and a histogram or stateset
+selector is reduced across its buckets or states.
+
+**What a variable does not do.** It never creates a chart or a dimension, never changes chart labels or label promotion,
+and does not count toward [output limits](/src/go/plugin/framework/chartengine/README.md#output-limit-per-context). Its
+value is sent only with a chart that is updated in that cycle and is owned by the variable's template.
+
+**On the wire.**
+
+- When a chart is created, each declared variable is defined as `nan` right after the chart's dimensions, so an alert
+  sees a defined but unknown value instead of failing on an unknown variable.
+- In every cycle that has a value, `VARIABLE CHART '<name>' = <value>` is sent inside the chart's update, after its
+  dimension values.
+- In a cycle without the variable's series nothing is sent, and Netdata keeps the last value.
+- A non-finite value (for example an unavailable MeasureSet field) is sent as `nan`.
+- Netdata keeps chart variables for the chart's lifetime and has no command to delete one. When the engine creates a
+  chart again over a previous definition with the same ID (a template change, an ownership change or a revival), it also
+  resets to `nan` any variable that the previous definition declared and the new one does not.
+- That reset needs the previous definition. A chart that was already marked obsolete before a template change dropped
+  one of its variables, and is then defined again while Netdata still holds it, keeps that variable's last value until
+  Netdata frees the chart. The same holds across a plugin restart.
+
+**Naming.** A dimension with the same name as a chart variable hides it, because health reads the dimension first.
+Validation rejects static dimension names; a dynamic dimension name (`name_from_label`, inferred) can only collide at
+runtime, which `collecttest.AssertChartCoverage` reports.
+
+**Example: interface speed for the stock `interface_speed` alert**
+
+```yaml
+charts:
+  - context: net
+    title: Bandwidth
+    units: kilobits/s
+    instances:
+      by_labels: [device]
+    dimensions:
+      - selector: network_received_bytes
+        name: received
+    variables:
+      - name: nic_speed_max            # read as $nic_speed_max
+        selector: network_speed_kilobits_per_second   # a gauge the collector writes in kilobits/s
+```
+
+Prometheus, Azure Monitor and CloudWatch profiles reject `variables`: their selector rewriting and validation handle
+dimensions only.
+
 ## Examples
 
 ### Simple: static metrics, no instances
@@ -1206,6 +1281,9 @@ All rules below produce semantic validation errors unless noted:
 | `name` and `name_from_label` are mutually exclusive                                     | semantic                        |
 | `name` and `name_from_label` must not be whitespace-only                                | semantic                        |
 | Duplicate dimension `name` values within the same chart are rejected                    | semantic                        |
+| `variables[].name` matches `^[A-Za-z_][A-Za-z0-9_]*$`, is at most 299 bytes (the longest `$name` health reads) and unique in the chart | semantic |
+| `variables[].name` is not a static dimension `name` of the chart or a health built-in, and does not end in `_raw` or `_last_collected_t` | semantic |
+| `variables[].selector` follows the dimension selector rules                             | semantic                        |
 | `instances` must contain at least one required or optional label                        | semantic                        |
 | `instances.by_labels` exclude token must use `!label_key` syntax                         | semantic                        |
 | `instances.by_labels` must include at least one positive selector (`*` or `label_key`)   | semantic                        |

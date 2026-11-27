@@ -344,6 +344,13 @@ func TestProfile_Validate(t *testing.T) {
 				p.Template.ChartDefaults.Instances.ByLabels = []string{"*"}
 			},
 		},
+		"chart variables are rejected": {
+			mutate: func(p *Profile) {
+				p.Template.Charts[0].Variables = []charttpl.ChartVariable{{Name: "limit", Selector: "network_in_sum"}}
+			},
+			wantErr:     true,
+			errContains: "chart variables are not supported in CloudWatch profiles",
+		},
 	}
 
 	for name, tc := range tests {

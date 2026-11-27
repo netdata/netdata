@@ -4,6 +4,7 @@ package netdataapi
 
 import (
 	"bytes"
+	"math"
 	"testing"
 	"time"
 
@@ -136,8 +137,12 @@ func TestVARIABLE(t *testing.T) {
 
 	api.VARIABLE("var1", 100)
 	api.VARIABLE("var2", 100.1)
+	api.VARIABLE("nan", math.NaN())
+	api.VARIABLE("pos_inf", math.Inf(1))
+	api.VARIABLE("neg_inf", math.Inf(-1))
 
-	expected := "VARIABLE CHART 'var1' = 100\nVARIABLE CHART 'var2' = 100.1\n"
+	expected := "VARIABLE CHART 'var1' = 100\nVARIABLE CHART 'var2' = 100.1\n" +
+		"VARIABLE CHART 'nan' = nan\nVARIABLE CHART 'pos_inf' = nan\nVARIABLE CHART 'neg_inf' = nan\n"
 
 	require.Equal(t, expected, w.String())
 }

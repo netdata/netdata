@@ -49,6 +49,8 @@ type Chart struct {
 
 	// Dimensions are declaration-ordered templates.
 	Dimensions []Dimension
+	// Variables are declaration-ordered chart-scope variable templates.
+	Variables []Variable
 }
 
 // ChartMeta carries normalized chart metadata. Algorithm records the configured
@@ -120,6 +122,16 @@ func validateChart(chart Chart) error {
 			errs = append(errs, fmt.Errorf("dimension[%d]: %w", i, err))
 		}
 	}
+	seenVariables := make(map[string]struct{}, len(chart.Variables))
+	for i, variable := range chart.Variables {
+		if err := validateVariable(variable); err != nil {
+			errs = append(errs, fmt.Errorf("variable[%d]: %w", i, err))
+		}
+		if _, ok := seenVariables[variable.Name]; ok {
+			errs = append(errs, fmt.Errorf("variable[%d]: duplicate name %q", i, variable.Name))
+		}
+		seenVariables[variable.Name] = struct{}{}
+	}
 	return errors.Join(errs...)
 }
 
@@ -133,6 +145,12 @@ func (c Chart) clone() Chart {
 	out.Dimensions = make([]Dimension, 0, len(c.Dimensions))
 	for _, dim := range c.Dimensions {
 		out.Dimensions = append(out.Dimensions, dim.clone())
+	}
+	if c.Variables != nil {
+		out.Variables = make([]Variable, 0, len(c.Variables))
+		for _, variable := range c.Variables {
+			out.Variables = append(out.Variables, variable.clone())
+		}
 	}
 	return out
 }

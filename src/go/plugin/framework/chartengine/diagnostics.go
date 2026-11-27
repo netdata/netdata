@@ -25,6 +25,17 @@ const (
 	PlanRouteContextRejected           PlanRouteDecision = "context_rejected"
 	PlanRouteLifecycleRejected         PlanRouteDecision = "lifecycle_rejected"
 	PlanRouteUnmatched                 PlanRouteDecision = "series_unmatched"
+
+	// Chart variable routes report under their own decisions, with VariableIndex
+	// and VariableName set and DimensionIndex unused.
+	PlanRouteVariableSelectorRejected PlanRouteDecision = "variable_selector_rejected"
+	PlanRouteVariableIdentityRejected PlanRouteDecision = "variable_identity_rejected"
+	PlanRouteVariableResolved         PlanRouteDecision = "variable_resolved"
+	// PlanRouteVariableAccepted reports a variable value attached to an updated chart.
+	PlanRouteVariableAccepted PlanRouteDecision = "variable_accepted"
+	// PlanRouteVariableUnbound reports a resolved variable value that no updated
+	// chart took, with the reason.
+	PlanRouteVariableUnbound PlanRouteDecision = "variable_unbound"
 )
 
 // PlanInstanceIdentity is an opaque collision-resistant identity for the raw
@@ -43,6 +54,11 @@ const (
 	PlanRouteReasonChartInstanceCap         PlanRouteReason = "chart_instance_cap"
 	PlanRouteReasonContextSeriesLimit       PlanRouteReason = "context_series_limit"
 	PlanRouteReasonDimensionCap             PlanRouteReason = "dimension_cap"
+	// PlanRouteReasonVariableChartNotUpdated: no chart instance with that ID was
+	// updated in this build (no dimension series, or omitted by a limit or cap).
+	PlanRouteReasonVariableChartNotUpdated PlanRouteReason = "variable_chart_not_updated"
+	// PlanRouteReasonVariableChartOtherOwner: the chart ID belongs to another template.
+	PlanRouteReasonVariableChartOtherOwner PlanRouteReason = "variable_chart_other_owner"
 )
 
 // PlanLabelPromotionMode is the effective non-identity label policy for an
@@ -69,6 +85,8 @@ type PlanRouteDiagnostic struct {
 	TemplateEntryID              string
 	LocalChartTemplateID         string
 	DimensionIndex               int
+	VariableIndex                int
+	VariableName                 string
 	ChartID                      string
 	DimensionName                string
 	DimensionKeyLabel            string

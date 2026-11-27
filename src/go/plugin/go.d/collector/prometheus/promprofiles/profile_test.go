@@ -13,6 +13,28 @@ import (
 // real decode path. A user profile (isStock=false) validates its template at
 // load, so every rule — header (app format) and template (no chart, undeclared
 // dimension) — surfaces from decodeProfile.
+func TestDecodeProfileRejectsChartVariables(t *testing.T) {
+	const profile = `match: "a_*"
+template:
+  family: fam
+  metrics:
+    - a_total
+    - a_limit
+  charts:
+    - title: Title
+      context: ctx
+      units: count
+      dimensions:
+        - selector: a_total
+          name: d0
+      variables:
+        - name: limit
+          selector: a_limit
+`
+	_, err := decodeProfile([]byte(profile), "test", false)
+	require.ErrorContains(t, err, "chart variables are not supported in Prometheus profiles")
+}
+
 func TestDecodeProfile_validation(t *testing.T) {
 	tests := map[string]struct {
 		yaml    string

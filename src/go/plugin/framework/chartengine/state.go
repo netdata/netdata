@@ -38,7 +38,10 @@ type plannerSizingHints struct {
 	seenInfer  int
 	actions    int
 	values     int
-	journal    journalSizing
+	// variables and variableValues size the chart variable map and value block.
+	variables      int
+	variableValues int
+	journal        journalSizing
 }
 
 type buildSeqState struct {

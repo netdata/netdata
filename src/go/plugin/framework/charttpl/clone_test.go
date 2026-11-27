@@ -43,6 +43,7 @@ func TestGroupClone(t *testing.T) {
 	clone.Charts[0].Lifecycle.Dimensions.MaxDims = 999
 	clone.Charts[0].Dimensions[0].Name = "MUTATED"
 	clone.Charts[0].Dimensions[0].Options.Multiplier = 999
+	clone.Charts[0].Variables[0].Name = "mutated"
 	clone.Groups[0].Family = "MUTATED"
 	clone.Groups[0].Metrics[0] = "mutated"
 	clone.Groups[0].Charts[0].Dimensions[0].Options.Divisor = 999
@@ -104,6 +105,12 @@ func richGroup() Group {
 							Hidden:     true,
 							Float:      true,
 						},
+					},
+				},
+				Variables: []ChartVariable{
+					{
+						Name:     "a_limit",
+						Selector: "metric_a",
 					},
 				},
 			},

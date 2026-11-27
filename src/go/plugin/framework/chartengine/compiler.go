@@ -118,6 +118,18 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		}
 	}
 
+	var variables []program.Variable
+	if len(chart.Variables) > 0 {
+		variables = make([]program.Variable, 0, len(chart.Variables))
+	}
+	for i := range chart.Variables {
+		compiledVar, err := compileVariable(chart.Variables[i], chart.Aggregation, scope.metrics)
+		if err != nil {
+			return program.Chart{}, fmt.Errorf("variable[%d]: %w", i, err)
+		}
+		variables = append(variables, compiledVar)
+	}
+
 	algorithm, err := compileAlgorithm(chart.Algorithm)
 	if err != nil {
 		return program.Chart{}, err
@@ -185,9 +197,59 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		},
 		Lifecycle:  compileLifecycle(chart.Lifecycle),
 		Dimensions: dimensions,
+		Variables:  variables,
 	}
 
 	return out, nil
+}
+
+func compileVariable(
+	variable charttpl.ChartVariable,
+	chartAggregation charttpl.Aggregation,
+	visibleMetrics map[string]struct{},
+) (program.Variable, error) {
+	binding, _, err := compileSelectorBinding(variable.Selector, visibleMetrics)
+	if err != nil {
+		return program.Variable{}, err
+	}
+	aggregation, err := compileAggregation(chartAggregation)
+	if err != nil {
+		return program.Variable{}, err
+	}
+	return program.Variable{
+		Name:        strings.TrimSpace(variable.Name),
+		Selector:    binding,
+		Aggregation: aggregation,
+	}, nil
+}
+
+// compileSelectorBinding compiles a dimension or variable selector whose metric
+// names must be declared in the current group scope.
+func compileSelectorBinding(
+	expr string,
+	visibleMetrics map[string]struct{},
+) (program.SelectorBinding, metrixselector.Meta, error) {
+	compiledSel, err := metrixselector.ParseCompiled(expr)
+	if err != nil {
+		return program.SelectorBinding{}, metrixselector.Meta{}, fmt.Errorf("selector: %w", err)
+	}
+	meta := compiledSel.Meta()
+	if len(visibleMetrics) > 0 {
+		for _, metricName := range meta.MetricNames {
+			if _, ok := visibleMetrics[metricName]; !ok {
+				return program.SelectorBinding{}, metrixselector.Meta{}, fmt.Errorf(
+					"selector: metric %q is not visible in current group scope", metricName)
+			}
+		}
+	}
+	return program.SelectorBinding{
+		Expression: strings.TrimSpace(expr),
+		Matcher: selectorMatcher{
+			compiled: compiledSel,
+		},
+		MetricNames:          append([]string(nil), meta.MetricNames...),
+		ConstrainedLabelKeys: append([]string(nil), meta.ConstrainedLabelKeys...),
+	}, meta, nil
 }
 
 type compiledDimension struct {
@@ -201,18 +263,9 @@ func compileDimension(
 	chartAggregation charttpl.Aggregation,
 	visibleMetrics map[string]struct{},
 ) (compiledDimension, error) {
-	compiledSel, err := metrixselector.ParseCompiled(dim.Selector)
+	binding, meta, err := compileSelectorBinding(dim.Selector, visibleMetrics)
 	if err != nil {
-		return compiledDimension{}, fmt.Errorf("selector: %w", err)
-	}
-
-	meta := compiledSel.Meta()
-	if len(visibleMetrics) > 0 {
-		for _, metricName := range meta.MetricNames {
-			if _, ok := visibleMetrics[metricName]; !ok {
-				return compiledDimension{}, fmt.Errorf("selector: metric %q is not visible in current group scope", metricName)
-			}
-		}
+		return compiledDimension{}, err
 	}
 
 	name := strings.TrimSpace(dim.Name)
@@ -245,12 +298,7 @@ func compileDimension(
 
 	return compiledDimension{
 		dimension: program.Dimension{
-			Selector: program.SelectorBinding{
-				Expression:           strings.TrimSpace(dim.Selector),
-				Matcher:              selectorMatcher{compiled: compiledSel},
-				MetricNames:          append([]string(nil), meta.MetricNames...),
-				ConstrainedLabelKeys: append([]string(nil), meta.ConstrainedLabelKeys...),
-			},
+			Selector:                binding,
 			NameTemplate:            nameTemplate,
 			NameFromLabel:           nameFromLabel,
 			InferNameFromSeriesMeta: inferFromSeriesMeta,

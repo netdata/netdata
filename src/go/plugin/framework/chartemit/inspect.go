@@ -8,7 +8,7 @@ import (
 
 // PlanInspection contains the chart and dimension definitions ApplyPlan would
 // emit after production normalization and type-ID budget validation. Value
-// updates and host-selection commands are intentionally omitted.
+// updates, chart variables and host-selection commands are intentionally omitted.
 type PlanInspection struct {
 	Charts     []ChartInspection
 	Dimensions []DimensionInspection
@@ -49,6 +49,9 @@ func (v inspectionDefinitionVisitor) visitChart(
 func (v inspectionDefinitionVisitor) visitDimension(chartID string, dim dimensionEmission) {
 	v.out.addDimension(v.env, chartID, dim)
 }
+
+// Chart variable presets are values, not chart or dimension definitions.
+func (inspectionDefinitionVisitor) visitVariablePresets(string, []string) {}
 
 // InspectPlan returns structured definition facts from the same normalization,
 // sanitization, ordering, and type-ID budget used by ApplyPlan.

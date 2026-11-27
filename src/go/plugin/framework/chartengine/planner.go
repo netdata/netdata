@@ -114,34 +114,45 @@ type dimensionSortKey struct {
 }
 
 type dimBuildEntry struct {
-	seenSeq      uint64
-	observations uint64
-	value        metrix.SampleValue
+	seenSeq uint64
+	sampleReduction
 	dimensionState
 	journalToken uint64
 }
 
 func (e *dimBuildEntry) aggregate(value metrix.SampleValue) {
-	if e.aggregation == program.AggregationSum {
-		e.value += value
-		return
-	}
-	e.aggregateNonSum(value)
+	e.add(e.aggregation, value)
 }
 
-func (e *dimBuildEntry) aggregateNonSum(value metrix.SampleValue) {
-	switch e.aggregation {
+// sampleReduction is the value of several series reduced into one dimension or
+// chart variable during one build. It starts from the first observation with
+// observations set to 1.
+type sampleReduction struct {
+	value        metrix.SampleValue
+	observations uint64
+}
+
+func (r *sampleReduction) add(aggregation program.Aggregation, value metrix.SampleValue) {
+	if aggregation == program.AggregationSum {
+		r.value += value
+		return
+	}
+	r.addNonSum(aggregation, value)
+}
+
+func (r *sampleReduction) addNonSum(aggregation program.Aggregation, value metrix.SampleValue) {
+	switch aggregation {
 	case program.AggregationMin:
-		if math.IsNaN(e.value) || (!math.IsNaN(value) && value < e.value) {
-			e.value = value
+		if math.IsNaN(r.value) || (!math.IsNaN(value) && value < r.value) {
+			r.value = value
 		}
 	case program.AggregationMax:
-		if math.IsNaN(e.value) || (!math.IsNaN(value) && value > e.value) {
-			e.value = value
+		if math.IsNaN(r.value) || (!math.IsNaN(value) && value > r.value) {
+			r.value = value
 		}
 	case program.AggregationAvg:
-		e.observations++
-		e.value = runningAverage(e.value, value, e.observations)
+		r.observations++
+		r.value = runningAverage(r.value, value, r.observations)
 	}
 }
 
@@ -213,7 +224,28 @@ type planBuildContext struct {
 	scan             planSeriesScan
 	collisions       chartIDCollisions
 
+	// variables holds this build's chart variable values, created on the first
+	// variable route; variableValues backs the update actions' variable windows.
+	variables      map[variableKey]variableBuildEntry
+	variableValues []UpdateVariableValue
+	// variableHints are the previous build's sizes of variables and variableValues.
+	variableHints [2]int
+
 	planRouteStats
+}
+
+// variableKey identifies one declared variable of one chart instance as routed
+// by one template; only the template that owns the chart attaches its values.
+type variableKey struct {
+	chartID    string
+	templateID string
+	index      int
+}
+
+type variableBuildEntry struct {
+	sampleReduction
+	// attached is tracked only for route diagnostics.
+	attached bool
 }
 
 type flattenedReadChecker interface {
@@ -374,6 +406,8 @@ func (e *Engine) buildPlan(
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 	e.state.hints.actions = len(out.Actions)
 	e.state.hints.values = len(ctx.values)
+	e.state.hints.variables = len(ctx.variables)
+	e.state.hints.variableValues = len(ctx.variableValues)
 
 	return out, staged, true, nil
 }
@@ -444,6 +478,7 @@ func (e *Engine) preparePlanBuildContext(
 		values:            make([]UpdateDimensionValue, 0, e.state.hints.values),
 		materialized:      materialized,
 		materializedByID:  materialized.charts,
+		variableHints:     [2]int{e.state.hints.variables, e.state.hints.variableValues},
 	}, nil
 }
 
@@ -615,6 +650,13 @@ func (ctx *planBuildContext) visitPlanSeries(
 	}
 
 	for _, route := range routes {
+		if route.Variable {
+			// Label replay walks the same snapshot again; values were taken in the scan.
+			if !ctx.scan.replayLabels {
+				ctx.accumulateVariable(route, v)
+			}
+			continue
+		}
 		if ctx.scan.replayLabels {
 			chart := ctx.chartsByID[route.ChartID]
 			if chart == nil || chart.templateID != route.ChartTemplateID {
@@ -649,6 +691,28 @@ func (ctx *planBuildContext) visitPlanSeries(
 			return
 		}
 	}
+}
+
+// accumulateVariable reduces one series value into its chart variable. Variables
+// never create charts, claim chart IDs or affect labels and lifecycle; the value
+// is attached at materialization if the chart is updated and owned by the
+// variable's template.
+func (ctx *planBuildContext) accumulateVariable(route routeBinding, value metrix.SampleValue) {
+	if ctx.variables == nil {
+		ctx.variables = make(map[variableKey]variableBuildEntry, ctx.variableHints[0])
+	}
+	key := variableKey{
+		chartID:    route.ChartID,
+		templateID: route.ChartTemplateID,
+		index:      route.DimensionIndex,
+	}
+	entry, ok := ctx.variables[key]
+	if ok {
+		entry.add(route.Aggregation, value)
+	} else {
+		entry.value, entry.observations = value, 1
+	}
+	ctx.variables[key] = entry
 }
 
 // newChartState returns zeroed chart state from the build block while it has room.
@@ -970,6 +1034,10 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			cs.meta,
 			cs.lifecycle,
 		)
+		if chartCreated && ctx.index.hasVariables() {
+			// A chart created in this build is discarded as a whole on rollback.
+			matChart.variableNames = ctx.index.templateVariableNames(cs.templateID)
+		}
 		previousPresentation := matChart.presentation
 		membershipChanged := cs.labelTracker.changed()
 		if membershipChanged {
@@ -986,6 +1054,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 						ChartID:         cs.chartID,
 						Meta:            cs.meta,
 						Labels:          chartLabels,
+						Variables:       ctx.createdChartVariables(cs.chartID, matChart),
 					})
 				} else {
 					ctx.out.Actions = append(ctx.out.Actions, UpdateChartLabelsAction{
@@ -1008,6 +1077,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				ChartID:         cs.chartID,
 				Meta:            cs.meta,
 				Labels:          maps.Clone(previous.presentation.labelValues),
+				Variables:       ctx.createdChartVariables(cs.chartID, matChart),
 			})
 		}
 		ctx.journal.setChartSeen(matChart, ctx.collectMeta.LastSuccessSeq)
@@ -1069,14 +1139,135 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		}
 		// Each chart owns a capacity-limited window of the build's value block.
 		ctx.values = values
-		ctx.out.Actions = append(ctx.out.Actions, UpdateChartAction{
+		update := UpdateChartAction{
 			ChartID: cs.chartID,
 			Values:  values[start:len(values):len(values)],
-		})
+		}
+		if ctx.index.hasVariables() {
+			update.Variables = ctx.chartVariableValues(cs)
+		}
+		ctx.out.Actions = append(ctx.out.Actions, update)
 		matChart.storeScratchEntries(ctx.journal, cs.adoptedScratchEntries(), cs.entriesOwner)
 		matChart.pruneScratchEntries(ctx.journal, cs.currentBuildSeq)
 	}
+	ctx.observeUnboundVariables()
 	return nil
+}
+
+// chartVariableValues returns, in declaration order, the values of the chart's
+// declared variables that received series in this build, as a
+// capacity-limited window of the build's variable value block.
+func (ctx *planBuildContext) chartVariableValues(cs *chartState) []UpdateVariableValue {
+	if len(ctx.variables) == 0 {
+		return nil
+	}
+	declared := ctx.index.templateVariables(cs.templateID)
+	if len(declared) == 0 {
+		return nil
+	}
+	start := len(ctx.variableValues)
+	for i := range declared {
+		key := variableKey{
+			chartID:    cs.chartID,
+			templateID: cs.templateID,
+			index:      i,
+		}
+		entry, ok := ctx.variables[key]
+		if !ok {
+			continue
+		}
+		variable := &declared[i]
+		if ctx.variableValues == nil {
+			ctx.variableValues = make([]UpdateVariableValue, 0, max(ctx.variableHints[1], len(declared)))
+		}
+		ctx.variableValues = append(ctx.variableValues, UpdateVariableValue{
+			Name:  variable.Name,
+			Value: entry.value,
+		})
+		if ctx.routeObserver != nil {
+			entry.attached = true
+			ctx.variables[key] = entry
+			ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+				Decision:        PlanRouteVariableAccepted,
+				ChartTemplateID: cs.templateID,
+				ChartID:         cs.chartID,
+				VariableIndex:   i,
+				VariableName:    variable.Name,
+				Context:         cs.meta.Context,
+				Aggregation:     diagnosticAggregation(variable.Aggregation),
+			})
+		}
+	}
+	end := len(ctx.variableValues)
+	if end == start {
+		return nil
+	}
+	return ctx.variableValues[start:end:end]
+}
+
+// observeUnboundVariables reports the resolved variable values that no updated
+// chart took. It runs only with a route observer.
+func (ctx *planBuildContext) observeUnboundVariables() {
+	if ctx.routeObserver == nil || len(ctx.variables) == 0 {
+		return
+	}
+	keys := make([]variableKey, 0, len(ctx.variables))
+	for key, entry := range ctx.variables {
+		if !entry.attached {
+			keys = append(keys, key)
+		}
+	}
+	slices.SortFunc(keys, func(a, b variableKey) int {
+		return cmp.Or(
+			cmp.Compare(a.chartID, b.chartID),
+			cmp.Compare(a.templateID, b.templateID),
+			cmp.Compare(a.index, b.index),
+		)
+	})
+	for _, key := range keys {
+		reason := PlanRouteReasonVariableChartNotUpdated
+		if owner, ok := ctx.chartOwner(key.chartID); ok && owner != key.templateID {
+			reason = PlanRouteReasonVariableChartOtherOwner
+		}
+		name := ""
+		if declared := ctx.index.templateVariables(key.templateID); key.index < len(declared) {
+			name = declared[key.index].Name
+		}
+		ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+			Decision:        PlanRouteVariableUnbound,
+			Reason:          reason,
+			ChartTemplateID: key.templateID,
+			ChartID:         key.chartID,
+			VariableIndex:   key.index,
+			VariableName:    name,
+			Context:         ctx.index.chartsByID[key.templateID].Meta.Context,
+		})
+	}
+}
+
+// createdChartVariables returns the variable names a newly created chart defines
+// as unknown: its template's names, then the names a retired previous definition
+// of the same chart ID declared and this template does not.
+func (ctx *planBuildContext) createdChartVariables(chartID string, chart *materializedChartState) []string {
+	names := chart.variableNames
+	previous := ctx.retired[chartID]
+	if previous == nil || len(previous.variableNames) == 0 {
+		return names
+	}
+	var out []string
+	for _, name := range previous.variableNames {
+		if slices.Contains(names, name) {
+			continue
+		}
+		if out == nil {
+			out = slices.Clone(names)
+		}
+		out = append(out, name)
+	}
+	if out == nil {
+		return names
+	}
+	return out
 }
 
 func (e *Engine) reconcileChangedChartLabels(ctx *planBuildContext) error {

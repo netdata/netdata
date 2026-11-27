@@ -118,6 +118,13 @@ func (p Profile) Validate(prefix, baseName string) error {
 	if countChartsInGroup(p.Template) == 0 {
 		errs = append(errs, fmt.Errorf("%s: 'template' must contain at least one chart", prefix))
 	}
+	// Profile selector normalization handles dimension selectors only.
+	if p.Template.HasChartVariables() {
+		errs = append(
+			errs,
+			fmt.Errorf("%s: 'template': chart variables are not supported in Azure Monitor profiles", prefix),
+		)
+	}
 
 	seenMetricIDs := map[string]struct{}{}
 	seenAzureNames := map[string]struct{}{}

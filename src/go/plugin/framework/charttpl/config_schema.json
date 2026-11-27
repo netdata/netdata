@@ -297,6 +297,12 @@
           "items": {
             "$ref": "#/$defs/dimension"
           }
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/variable"
+          }
         }
       }
     },
@@ -440,6 +446,26 @@
         },
         "float": {
           "type": "boolean"
+        }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "selector"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Chart variable name that health alerts read as $name.",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "maxLength": 299
+        },
+        "selector": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

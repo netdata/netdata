@@ -452,6 +452,10 @@ type HealthAlertsCheck struct {
 	ContextPrefix string
 	// ModuleID selects the metadata module by meta.id; empty requires a single module.
 	ModuleID string
+	// ChartTemplate is the collector's chart template YAML. When set, an alert
+	// expression may also read a chart variable that the template declares on
+	// the chart of the alert's context; metadata.yaml does not document variables.
+	ChartTemplate string
 }
 
 // CheckHealthAlertsTargetCharts requires every alert (within opts) to target a
@@ -504,14 +508,19 @@ func AssertHealthAlertsTargetChartTemplateWith(t testing.TB, healthConfig []byte
 // CheckHealthAlertsMatchMetadataMetrics requires every alert (within opts) to
 // target a documented metric, to state that metric's documented unit, to look
 // up only its documented dimensions, and to read in calc, warn and crit only
-// its documented dimensions besides built-ins, alert values and qualified
-// references. Health matches a variable against a dimension's ID or name, and
-// go.d sends the dimension name as the ID, so a variable spelled as the
-// collector's internal dimension ID never resolves. An alert whose lookup
+// its documented dimensions besides built-ins, alert values, qualified
+// references and, with opts.ChartTemplate, the chart's template variables.
+// Health matches a variable against a dimension's ID or name, and go.d sends
+// the dimension name as the ID, so a variable spelled as the collector's
+// internal dimension ID never resolves. An alert whose lookup
 // derives another unit (a percentage of the window, an anomaly rate) does not
 // fit this check.
 func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []MetadataMetric, opts HealthAlertsCheck) error {
 	var problems []error
+	variables, err := chartTemplateVariables(opts.ChartTemplate)
+	if err != nil {
+		problems = append(problems, fmt.Errorf("chart template: %w", err))
+	}
 	alertNames := make(map[string]bool, len(alerts))
 	for _, alert := range alerts {
 		alertNames[alert.Name] = true
@@ -542,12 +551,34 @@ func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []Metad
 			}
 		}
 		for _, dimension := range expressionDimensions(alert.Expressions, alertNames) {
-			if !slices.Contains(metric.Dimensions, dimension) {
-				problems = append(problems, fmt.Errorf("%s: variable %q is not a documented dimension of %s", alert.Name, dimension, alert.On))
+			if !slices.Contains(metric.Dimensions, dimension) && !slices.Contains(variables[alert.On], dimension) {
+				problems = append(
+					problems,
+					fmt.Errorf("%s: variable %q is not a documented dimension of %s", alert.Name, dimension, alert.On),
+				)
 			}
 		}
 	}
 	return errors.Join(sortedErrors(problems)...)
+}
+
+// chartTemplateVariables returns the declared chart variable names by context;
+// an empty template declares none.
+func chartTemplateVariables(templateYAML string) (map[string][]string, error) {
+	if templateYAML == "" {
+		return nil, nil
+	}
+	charts, err := ChartTemplateCharts(templateYAML)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string][]string)
+	for context, chart := range charts {
+		for _, variable := range chart.Variables {
+			out[context] = append(out[context], strings.TrimSpace(variable.Name))
+		}
+	}
+	return out, nil
 }
 
 // CheckHealthAlertsMatchMetadata parses a health.d configuration, decodes a
