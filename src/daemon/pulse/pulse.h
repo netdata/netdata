@@ -28,6 +28,8 @@ extern bool pulse_extended_enabled;
 #include "pulse-network.h"
 #include "pulse-parents.h"
 
+int pulse_update_every(void);
+
 void pulse_thread_main(void *ptr);
 void pulse_thread_sqlite3_main(void *ptr);
 void pulse_thread_workers_main(void *ptr);
