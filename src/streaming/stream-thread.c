@@ -460,7 +460,7 @@ void stream_thread(void *ptr) {
                                       WORKER_METRIC_ABSOLUTE);
 
     worker_register_job_custom_metric(WORKER_SENDER_JOB_MESSAGES,
-                                      "ops processed", "messages",
+                                      "ops processed", "messages/s",
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
     worker_register_job_custom_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE,
@@ -468,7 +468,7 @@ void stream_thread(void *ptr) {
                                       WORKER_METRIC_ABSOLUTE);
 
     worker_register_job_custom_metric(WORKER_STREAM_JOB_SEND_MISSES,
-                                      "send misses", "misses",
+                                      "send misses", "misses/s",
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
 
