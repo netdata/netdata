@@ -700,7 +700,7 @@ static ALWAYS_INLINE size_t aral_next_allocation_size___adders_lock_needed(ARAL 
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+static NEVER_INLINE_COLD ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     struct aral_page_type_stats *stats;
     ARAL_PAGE *page;
 
@@ -795,7 +795,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     return page;
 }
 
-static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+static NEVER_INLINE_COLD void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     size_t idx = mark_to_idx(page->started_marked);
     __atomic_store_n(&ar->ops[idx].atomic.last_allocated_page, false, __ATOMIC_RELAXED);
 
