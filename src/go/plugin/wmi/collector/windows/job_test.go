@@ -389,6 +389,12 @@ func publishedCharts(t *testing.T) []wireChart {
 // contexts are the native Windows Agent's
 // src/collectors/windows.plugin/perflib-processor.c (system.cpu, cpu.cpu),
 // src/collectors/common-contexts/system-ram.h (system.ram),
+// src/collectors/windows.plugin/GetSystemRAM.c with
+// src/collectors/common-contexts/mem-swap.h (mem.swap),
+// src/collectors/windows.plugin/perflib-memory.c with
+// src/collectors/common-contexts/mem-available.h and mem-pgfaults.h (the other
+// mem.* charts; the swap I/O multiplier is the page size, 4096 on Windows),
+// src/collectors/windows.plugin/perflib-pagefile.c (mem.pagefile_usage),
 // src/collectors/windows.plugin/perflib-processes.c with
 // src/collectors/common-contexts/system-processes.h (system.processes,
 // system.threads, system.ctxt, system.processor_queue_length),
@@ -420,6 +426,19 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 	single := func(name, algorithm string, divisor int) []wireDimension {
 		return []wireDimension{{name: name, algorithm: algorithm, multiplier: 1, divisor: divisor}}
 	}
+	// unscaled lists dimensions without a multiplier or divisor.
+	unscaled := func(algorithm string, names ...string) []wireDimension {
+		var dims []wireDimension
+		for _, name := range names {
+			dims = append(dims, wireDimension{
+				name:       name,
+				algorithm:  algorithm,
+				multiplier: 1,
+				divisor:    1,
+			})
+		}
+		return dims
+	}
 	native := map[string]wireChart{
 		"system.cpu": {
 			title:      "Total CPU Utilization",
@@ -441,6 +460,120 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 				{name: "free", algorithm: "absolute", multiplier: 1, divisor: 1048576},
 				{name: "used", algorithm: "absolute", multiplier: 1, divisor: 1048576},
 			},
+		},
+		"mem.available": {
+			title:      "Available RAM for applications",
+			units:      "MiB",
+			chartType:  "area",
+			dimensions: single("avail", "absolute", 1048576),
+		},
+		"mem.swap": {
+			title:     "System Swap",
+			units:     "MiB",
+			chartType: "stacked",
+			dimensions: []wireDimension{
+				{name: "free", algorithm: "absolute", multiplier: 1, divisor: 1048576},
+				{name: "used", algorithm: "absolute", multiplier: 1, divisor: 1048576},
+			},
+		},
+		"mem.swap_iops": {
+			title:     "Swap Operations",
+			units:     "operations/s",
+			chartType: "stacked",
+			dimensions: []wireDimension{
+				{name: "read", algorithm: "incremental", multiplier: 1, divisor: 1},
+				{name: "write", algorithm: "incremental", multiplier: 1, divisor: -1},
+			},
+		},
+		"mem.swapio": {
+			title:     "Swap I/O",
+			units:     "KiB/s",
+			chartType: "area",
+			dimensions: []wireDimension{
+				{name: "in", algorithm: "incremental", multiplier: 4096, divisor: 1024},
+				{name: "out", algorithm: "incremental", multiplier: -4096, divisor: 1024},
+			},
+		},
+		"mem.committed": {
+			title:      "Committed Memory",
+			units:      "bytes",
+			chartType:  "line",
+			dimensions: unscaled("absolute", "committed", "limit"),
+		},
+		"mem.system_cache": {
+			title:      "System Cache Memory",
+			units:      "bytes",
+			chartType:  "line",
+			dimensions: unscaled("absolute", "cache", "peak", "resident"),
+		},
+		"mem.page_lists": {
+			title:      "Memory Page Lists",
+			units:      "bytes",
+			chartType:  "stacked",
+			dimensions: unscaled("absolute", "free", "modified", "standby_core", "standby_normal", "standby_reserve"),
+		},
+		"mem.system_pool_size": {
+			title:      "System Memory Pool",
+			units:      "bytes",
+			chartType:  "stacked",
+			dimensions: unscaled("absolute", "paged", "non-paged"),
+		},
+		"mem.system_pool_paged": {
+			title:      "Paged System Memory Pool",
+			units:      "bytes",
+			chartType:  "line",
+			dimensions: unscaled("absolute", "resident"),
+		},
+		"mem.system_pool_allocs": {
+			title:      "System Pool Allocations",
+			units:      "allocations/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "paged", "non-paged"),
+		},
+		"mem.system_page_table_entries": {
+			title:      "Unused page table entries.",
+			units:      "pages",
+			chartType:  "line",
+			dimensions: unscaled("absolute", "free"),
+		},
+		"mem.system_code": {
+			title:      "System Code Memory",
+			units:      "bytes",
+			chartType:  "line",
+			dimensions: unscaled("absolute", "resident", "total"),
+		},
+		"mem.system_drivers": {
+			title:      "System Driver Memory",
+			units:      "bytes",
+			chartType:  "line",
+			dimensions: unscaled("absolute", "resident", "total"),
+		},
+		"mem.pgfaults": {
+			title:     "Memory Page Faults",
+			units:     "faults/s",
+			chartType: "line",
+			dimensions: []wireDimension{
+				{name: "minor", algorithm: "incremental", multiplier: 1, divisor: 1},
+				{name: "major", algorithm: "incremental", multiplier: -1, divisor: 1},
+			},
+		},
+		"mem.page_faults_breakdown": {
+			title:      "Memory Page Fault Breakdown",
+			units:      "faults/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "cache", "demand_zero", "transition", "write_copies"),
+		},
+		"mem.transition_repurposed": {
+			title:      "Transition Pages Repurposed",
+			units:      "pages/s",
+			chartType:  "line",
+			dimensions: unscaled("incremental", "repurposed"),
+		},
+		"mem.pagefile_usage": {
+			title:      "Paging file usage",
+			units:      "bytes",
+			chartType:  "stacked",
+			dimensions: unscaled("absolute", "free", "used"),
 		},
 		"system.processes": {
 			title:      "System Processes",
@@ -599,12 +732,15 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 
 	// One chart per instance in the fixture. Ethernet and Ethernet#1 report
 	// only their byte totals; the interface without traffic has none, and the
-	// adapters that are also interfaces are charted once, as real.
+	// adapters that are also interfaces are charted once, as real. The Agent
+	// shows the backslashes of the native pagefile label as slashes.
 	want := []wireChart{
 		instance("system.cpu", map[string]string{}),
 		instance("cpu.cpu", map[string]string{"cpu": "cpu0"}),
 		instance("cpu.cpu", map[string]string{"cpu": "cpu1"}),
 		instance("system.ram", map[string]string{}),
+		instance("mem.pagefile_usage", map[string]string{"pagefile": "C:/pagefile.sys"}),
+		instance("mem.pagefile_usage", map[string]string{"pagefile": "D:/pagefile.sys"}),
 		instance("system.processes", map[string]string{}),
 		instance("system.threads", map[string]string{}),
 		instance("system.ctxt", map[string]string{}),
@@ -632,6 +768,9 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("ping.host_packet_loss", map[string]string{"host": "windows.example.com"}),
 	}
 	for context := range native {
+		if strings.HasPrefix(context, "mem.") && context != "mem.pagefile_usage" {
+			want = append(want, instance(context, map[string]string{}))
+		}
 		if strings.HasPrefix(context, "net.") {
 			want = append(want,
 				instance(context, map[string]string{"device": "Uplink", "interface_type": "real"}),
@@ -733,6 +872,120 @@ func TestCollector_SystemCountersFeedNativeDimensions(t *testing.T) {
 				if _, ok := want[nativeDimension{chart.context, dimension}]; ok {
 					got[nativeDimension{chart.context, dimension}] = value
 				}
+			}
+		}
+		assert.Equal(t, want, got)
+	})
+}
+
+// TestCollector_MemoryCountersFeedNativeDimensions checks that each WMI value
+// reaches the native chart dimension that reads it: the Memory counters as
+// src/collectors/windows.plugin/perflib-memory.c reads them (minor page faults
+// are all faults less Pages/sec), the commit limit and available commit as
+// GetSystemRAM.c charts the swap, and each paging file's pages, in 4 KiB pages,
+// as perflib-pagefile.c charts them.
+func TestCollector_MemoryCountersFeedNativeDimensions(t *testing.T) {
+	native := map[string]nativeDimension{
+		"AvailableBytes":                  {"mem.available", "avail"},
+		"PageReadsPersec":                 {"mem.swap_iops", "read"},
+		"PageWritesPersec":                {"mem.swap_iops", "write"},
+		"PagesInputPersec":                {"mem.swapio", "in"},
+		"PagesOutputPersec":               {"mem.swapio", "out"},
+		"CommittedBytes":                  {"mem.committed", "committed"},
+		"CommitLimit":                     {"mem.committed", "limit"},
+		"CacheBytes":                      {"mem.system_cache", "cache"},
+		"CacheBytesPeak":                  {"mem.system_cache", "peak"},
+		"SystemCacheResidentBytes":        {"mem.system_cache", "resident"},
+		"FreeAndZeroPageListBytes":        {"mem.page_lists", "free"},
+		"ModifiedPageListBytes":           {"mem.page_lists", "modified"},
+		"StandbyCacheCoreBytes":           {"mem.page_lists", "standby_core"},
+		"StandbyCacheNormalPriorityBytes": {"mem.page_lists", "standby_normal"},
+		"StandbyCacheReserveBytes":        {"mem.page_lists", "standby_reserve"},
+		"PoolPagedBytes":                  {"mem.system_pool_size", "paged"},
+		"PoolNonpagedBytes":               {"mem.system_pool_size", "non-paged"},
+		"PoolPagedResidentBytes":          {"mem.system_pool_paged", "resident"},
+		"PoolPagedAllocs":                 {"mem.system_pool_allocs", "paged"},
+		"PoolNonpagedAllocs":              {"mem.system_pool_allocs", "non-paged"},
+		"FreeSystemPageTableEntries":      {"mem.system_page_table_entries", "free"},
+		"SystemCodeResidentBytes":         {"mem.system_code", "resident"},
+		"SystemCodeTotalBytes":            {"mem.system_code", "total"},
+		"SystemDriverResidentBytes":       {"mem.system_drivers", "resident"},
+		"SystemDriverTotalBytes":          {"mem.system_drivers", "total"},
+		"CacheFaultsPersec":               {"mem.page_faults_breakdown", "cache"},
+		"DemandZeroFaultsPersec":          {"mem.page_faults_breakdown", "demand_zero"},
+		"TransitionFaultsPersec":          {"mem.page_faults_breakdown", "transition"},
+		"WriteCopiesPersec":               {"mem.page_faults_breakdown", "write_copies"},
+		"TransitionPagesRePurposedPersec": {"mem.transition_repurposed", "repurposed"},
+	}
+	number := func(value any) float64 {
+		switch v := value.(type) {
+		case uint32:
+			return float64(v)
+		case uint64:
+			return float64(v)
+		case string:
+			n, err := strconv.ParseUint(v, 10, 64)
+			require.NoError(t, err)
+			return float64(n)
+		}
+		t.Fatalf("unexpected fixture value %v", value)
+		return 0
+	}
+
+	// Values by the native pagefile label, empty for the host's charts.
+	want := map[string]map[nativeDimension]float64{"": {}}
+	counters := memoryCountersRow()
+	for property, dimension := range native {
+		want[""][dimension] = number(counters[property])
+	}
+	faults, pages := number(counters["PageFaultsPersec"]), number(counters["PagesPersec"])
+	want[""][nativeDimension{"mem.pgfaults", "minor"}] = faults - pages
+	want[""][nativeDimension{"mem.pgfaults", "major"}] = pages
+	results := validQueryResults()
+	osMemory := results[queryMemory].rows[0]
+	commitLimit, commitAvailable := number(osMemory["totalvirtualmemorysize"]), number(osMemory["freevirtualmemory"])
+	want[""][nativeDimension{"mem.swap", "free"}] = commitAvailable * 1024
+	want[""][nativeDimension{"mem.swap", "used"}] = (commitLimit - commitAvailable) * 1024
+	for _, row := range results[queryPagingFiles].rows {
+		name := row["name"].(string)
+		if name == "_Total" {
+			continue
+		}
+		path := strings.ReplaceAll(strings.TrimPrefix(name, `\??\`), `\`, "/")
+		used, size := number(row["percentusage"]), number(row["percentusage_base"])
+		want[path] = map[nativeDimension]float64{
+			{"mem.pagefile_usage", "used"}: used * 4096,
+			{"mem.pagefile_usage", "free"}: (size - used) * 4096,
+		}
+	}
+
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		output := collect(c.UpdateEvery)
+		samples := parseSamples(t, output)
+
+		got := make(map[string]map[nativeDimension]float64)
+		for id, chart := range parseCharts(t, output) {
+			if !strings.HasPrefix(chart.context, "mem.") {
+				continue
+			}
+			pagefile := chart.labels["pagefile"]
+			if got[pagefile] == nil {
+				got[pagefile] = make(map[nativeDimension]float64)
+			}
+			for dimension, value := range samples[id] {
+				got[pagefile][nativeDimension{chart.context, dimension}] = value
 			}
 		}
 		assert.Equal(t, want, got)

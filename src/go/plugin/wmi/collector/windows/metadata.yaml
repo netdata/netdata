@@ -32,7 +32,7 @@ modules:
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
           - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
-          - free and used physical memory;
+          - physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, and the usage of each paging file;
           - the number of processes and threads, context switches, processor queue length and uptime;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
           - available and used space per fixed drive;
@@ -42,7 +42,7 @@ modules:
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (three for the memory group, two for the network group), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -60,7 +60,7 @@ modules:
           | Data | WMI classes |
           |---|---|
           | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
-          | Memory | `Win32_OperatingSystem` |
+          | Memory | `Win32_OperatingSystem`, `Win32_PerfRawData_PerfOS_Memory`, `Win32_PerfRawData_PerfOS_PagingFile` |
           | System | `Win32_PerfRawData_PerfOS_System` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter` |
           | Disk | `Win32_LogicalDisk` |
@@ -78,7 +78,7 @@ modules:
           | **Enable Account** and **Remote Enable** on the `root\cimv2` WMI namespace | Always |
           | Membership in the local **Distributed COM Users** group | `transport: dcom` |
           | Membership in the local **Remote Management Users** group | `transport: winrm` |
-          | Membership in the local **Performance Monitor Users** group | The CPU, system or network group is enabled |
+          | Membership in the local **Performance Monitor Users** group | The CPU, memory, system or network group is enabled |
 
           The plugin only reads: do not grant **Execute Methods**, write or full-control permissions. See [Securing a remote WMI connection](https://learn.microsoft.com/en-us/windows/win32/wmisdk/securing-a-remote-wmi-connection).
 
@@ -107,7 +107,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to six WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to eight WMI queries, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -230,7 +230,7 @@ modules:
               required: false
               group: Collection
             - name: collectors
-              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the network group two. Keep at least one group enabled."
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group three and the network group two. Keep at least one group enabled."
               default_value: ''
               required: false
               group: Collection
@@ -242,7 +242,7 @@ modules:
               detailed_description: |
                 As on the Netdata Agent running on Windows, each mode is its share of the time all modes accumulated in the interval. The privileged time Windows reports (`system`) already includes the interrupt (`irq`) and DPC (`dpc`) time, so those two also count within `system`.
             - name: collectors.memory
-              description: "Collect free and used physical memory."
+              description: "Collect physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, and the usage of each paging file."
               default_value: true
               required: false
               group: Collection
@@ -449,8 +449,10 @@ modules:
         enabled: false
       description: |
         - Charts belong to the Windows host's node, not to the poller.
-        - CPU utilization and the per-second rates, such as traffic, packets and errors, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
-        - Processes, threads and the processor queue length are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
+        - CPU utilization and the per-second rates, such as traffic, packets, errors, paging and page faults, are averages over each collection interval, computed from Windows' raw performance counters, so a short spike counts toward the interval it happens in.
+        - Memory sizes, processes, threads and the processor queue length are the values at the moment of the collection. As on the Netdata Agent running on Windows, `system.processes` counts every process on the host as `running`.
+        - As on the Netdata Agent running on Windows, `mem.swap` and `mem.committed` show the commit charge against the commit limit, which counts physical memory and all paging files; `mem.pagefile_usage` shows how full each paging file is.
+        - As on the Netdata Agent running on Windows, `mem.system_pool_allocs` shows how fast the number of outstanding pool allocations grows, and 0 while it shrinks.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
       availability: []
@@ -476,6 +478,120 @@ modules:
               dimensions:
                 - name: free
                 - name: used
+            - name: mem.available
+              description: Available RAM for applications
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: avail
+            - name: mem.swap
+              description: System Swap
+              unit: MiB
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: mem.swap_iops
+              description: Swap Operations
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: read
+                - name: write
+            - name: mem.swapio
+              description: Swap I/O
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: mem.committed
+              description: Committed Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+                - name: limit
+            - name: mem.system_cache
+              description: System Cache Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: peak
+                - name: resident
+            - name: mem.page_lists
+              description: Memory Page Lists
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: modified
+                - name: standby_core
+                - name: standby_normal
+                - name: standby_reserve
+            - name: mem.system_pool_size
+              description: System Memory Pool
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: paged
+                - name: non-paged
+            - name: mem.system_pool_paged
+              description: Paged System Memory Pool
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: resident
+            - name: mem.system_pool_allocs
+              description: System Pool Allocations
+              unit: allocations/s
+              chart_type: line
+              dimensions:
+                - name: paged
+                - name: non-paged
+            - name: mem.system_page_table_entries
+              description: Unused page table entries.
+              unit: pages
+              chart_type: line
+              dimensions:
+                - name: free
+            - name: mem.system_code
+              description: System Code Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: resident
+                - name: total
+            - name: mem.system_drivers
+              description: System Driver Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: resident
+                - name: total
+            - name: mem.pgfaults
+              description: Memory Page Faults
+              unit: faults/s
+              chart_type: line
+              dimensions:
+                - name: minor
+                - name: major
+            - name: mem.page_faults_breakdown
+              description: Memory Page Fault Breakdown
+              unit: faults/s
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: demand_zero
+                - name: transition
+                - name: write_copies
+            - name: mem.transition_repurposed
+              description: Transition Pages Repurposed
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: repurposed
             - name: system.processes
               description: System Processes
               unit: processes
@@ -513,6 +629,19 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
+        - name: paging file
+          description: A paging file of the host. Windows creates one, `C:\pagefile.sys`, by default.
+          labels:
+            - name: pagefile
+              description: Path of the paging file, for example `C:/pagefile.sys`. Backslashes are shown as forward slashes.
+          metrics:
+            - name: mem.pagefile_usage
+              description: Paging file usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
         - name: logical processor
           description: A logical processor of the host.
           labels:

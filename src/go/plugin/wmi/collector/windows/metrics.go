@@ -17,6 +17,7 @@ const (
 	fileSystemLabel    = "filesystem"
 	readWriteModeLabel = "rw_mode"
 	serialNumberLabel  = "serial_number"
+	pagefileLabel      = "pagefile"
 	// The go.d ping collector's label: the target as configured.
 	hostLabel = "host"
 
@@ -33,12 +34,19 @@ type collectorMetrics struct {
 	cpuCore          [len(cpuModes)]metrix.SnapshotGauge
 	memoryFree       metrix.SnapshotGauge
 	memoryUsed       metrix.SnapshotGauge
+	swapFree         metrix.SnapshotGauge
+	swapUsed         metrix.SnapshotGauge
+	memoryCounters   [len(memoryCounters)]counterInstrument
+	pageFaultsMinor  metrix.SnapshotCounter
+	pageFaultsMajor  metrix.SnapshotCounter
+	pagefileFree     metrix.SnapshotGauge
+	pagefileUsed     metrix.SnapshotGauge
 	processes        metrix.SnapshotGauge
 	threads          metrix.SnapshotGauge
 	contextSwitches  metrix.SnapshotCounter
 	processorQueue   metrix.SnapshotGauge
 	uptime           metrix.SnapshotGauge
-	netInterface     [len(interfaceCounters)]interfaceInstrument
+	netInterface     [len(interfaceCounters)]counterInstrument
 	netSpeedKbps     metrix.SnapshotGauge
 	netTotalReceived metrix.SnapshotCounter
 	netTotalSent     metrix.SnapshotCounter
@@ -57,6 +65,12 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		meter:            m,
 		memoryFree:       m.Gauge("memory_free_bytes"),
 		memoryUsed:       m.Gauge("memory_used_bytes"),
+		swapFree:         m.Gauge("memory_swap_free_bytes"),
+		swapUsed:         m.Gauge("memory_swap_used_bytes"),
+		pageFaultsMinor:  m.Counter("memory_page_faults_minor"),
+		pageFaultsMajor:  m.Counter("memory_page_faults_major"),
+		pagefileFree:     m.Gauge("pagefile_free_bytes"),
+		pagefileUsed:     m.Gauge("pagefile_used_bytes"),
 		processes:        m.Gauge("system_processes"),
 		threads:          m.Gauge("system_threads"),
 		contextSwitches:  m.Counter("system_context_switches"),
@@ -76,37 +90,47 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 		metrics.cpuTotal[i] = m.Gauge("cpu_total_"+mode+"_percent", metrix.WithFloat(true))
 		metrics.cpuCore[i] = m.Gauge("cpu_core_"+mode+"_percent", metrix.WithFloat(true))
 	}
+	for i, counter := range memoryCounters {
+		metrics.memoryCounters[i] = newCounterInstrument(m, counter.metric, counter.total)
+	}
 	for i, counter := range interfaceCounters {
-		if counter.total {
-			metrics.netInterface[i].total = m.Counter(counter.metric)
-		} else {
-			metrics.netInterface[i].gauge = m.Gauge(counter.metric)
-		}
+		metrics.netInterface[i] = newCounterInstrument(m, counter.metric, counter.total)
 	}
 	// Chart variables are sent unscaled, so the speed variable has its own gauge.
 	metrics.netSpeedKbps = m.Gauge("network_speed_kilobits_per_second", metrix.WithFloat(true))
 	return metrics
 }
 
-// interfaceInstrument records one interface counter: a count since the counter
-// started, or a current value.
-type interfaceInstrument struct {
+// counterInstrument records one raw performance counter: a count since the
+// counter started, or a current value.
+type counterInstrument struct {
 	total metrix.SnapshotCounter
 	gauge metrix.SnapshotGauge
 }
 
-func (i interfaceInstrument) observe(s sample, labels metrix.LabelSet) {
+func newCounterInstrument(m metrix.SnapshotMeter, metric string, total bool) counterInstrument {
+	if total {
+		return counterInstrument{
+			total: m.Counter(metric),
+		}
+	}
+	return counterInstrument{
+		gauge: m.Gauge(metric),
+	}
+}
+
+func (i counterInstrument) observe(s sample, labels ...metrix.LabelSet) {
 	if i.total != nil {
-		observeTotal(i.total, s, labels)
+		observeTotal(i.total, s, labels...)
 	} else {
-		observe(i.gauge, s, labels)
+		observe(i.gauge, s, labels...)
 	}
 }
 
 // write records the valid samples. Label sets are built per poll, so a
-// processor, interface or drive that disappears stops being observed. Raw
-// totals are counters: Netdata computes their rate over each collection
-// interval.
+// processor, paging file, interface or drive that disappears stops being
+// observed. Raw totals are counters: Netdata computes their rate over each
+// collection interval.
 func (m collectorMetrics) write(snapshot observations) {
 	if snapshot.cpu.hasTotal {
 		observeShares(m.cpuTotal, snapshot.cpu.total)
@@ -120,6 +144,21 @@ func (m collectorMetrics) write(snapshot observations) {
 	}
 	observe(m.memoryFree, snapshot.memoryFree)
 	observe(m.memoryUsed, snapshot.memoryUsed)
+	observe(m.swapFree, snapshot.swapFree)
+	observe(m.swapUsed, snapshot.swapUsed)
+	for i, s := range snapshot.memoryCounters {
+		m.memoryCounters[i].observe(s)
+	}
+	observeTotal(m.pageFaultsMinor, snapshot.pageFaults.minor)
+	observeTotal(m.pageFaultsMajor, snapshot.pageFaults.major)
+	for _, file := range snapshot.pagingFiles {
+		labels := m.meter.LabelSet(metrix.Label{
+			Key:   pagefileLabel,
+			Value: file.path,
+		})
+		observe(m.pagefileFree, file.free, labels)
+		observe(m.pagefileUsed, file.used, labels)
+	}
 	observe(m.processes, snapshot.system.processes)
 	observe(m.threads, snapshot.system.threads)
 	observeTotal(m.contextSwitches, snapshot.system.contextSwitches)

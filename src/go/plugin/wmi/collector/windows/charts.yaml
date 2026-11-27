@@ -74,6 +74,229 @@ groups:
             name: used
             options:
               divisor: 1048576
+  - family: overview
+    context_namespace: mem
+    metrics: [memory_available_bytes]
+    charts:
+      - context: available
+        title: Available RAM for applications
+        units: MiB
+        type: area
+        dimensions:
+          - selector: memory_available_bytes
+            name: avail
+            options:
+              divisor: 1048576
+  - family: swap
+    context_namespace: mem
+    metrics:
+      - memory_swap_free_bytes
+      - memory_swap_used_bytes
+      - memory_page_reads
+      - memory_page_writes
+      - memory_pages_input
+      - memory_pages_output
+    charts:
+      - context: swap
+        title: System Swap
+        units: MiB
+        type: stacked
+        dimensions:
+          - selector: memory_swap_free_bytes
+            name: free
+            options:
+              divisor: 1048576
+          - selector: memory_swap_used_bytes
+            name: used
+            options:
+              divisor: 1048576
+      - context: swap_iops
+        title: Swap Operations
+        units: operations/s
+        type: stacked
+        dimensions:
+          - selector: memory_page_reads
+            name: read
+          # The native chart negates writes with its divisor.
+          - selector: memory_page_writes
+            name: write
+            options:
+              divisor: -1
+      - context: swapio
+        title: Swap I/O
+        units: KiB/s
+        type: area
+        # The counters count 4 KiB pages.
+        dimensions:
+          - selector: memory_pages_input
+            name: in
+            options:
+              multiplier: 4096
+              divisor: 1024
+          - selector: memory_pages_output
+            name: out
+            options:
+              multiplier: -4096
+              divisor: 1024
+  - family: mem
+    context_namespace: mem
+    metrics:
+      - memory_committed_bytes
+      - memory_commit_limit_bytes
+      - memory_system_cache_bytes
+      - memory_system_cache_peak_bytes
+      - memory_system_cache_resident_bytes
+      - memory_free_and_zero_page_list_bytes
+      - memory_modified_page_list_bytes
+      - memory_standby_cache_core_bytes
+      - memory_standby_cache_normal_priority_bytes
+      - memory_standby_cache_reserve_bytes
+      - memory_pool_paged_bytes
+      - memory_pool_nonpaged_bytes
+      - memory_pool_paged_resident_bytes
+      - memory_pool_paged_allocations
+      - memory_pool_nonpaged_allocations
+      - memory_free_system_page_table_entries
+      - memory_system_code_resident_bytes
+      - memory_system_code_total_bytes
+      - memory_system_driver_resident_bytes
+      - memory_system_driver_total_bytes
+    charts:
+      - context: committed
+        title: Committed Memory
+        units: bytes
+        dimensions:
+          - selector: memory_committed_bytes
+            name: committed
+          - selector: memory_commit_limit_bytes
+            name: limit
+      - context: system_cache
+        title: System Cache Memory
+        units: bytes
+        dimensions:
+          - selector: memory_system_cache_bytes
+            name: cache
+          - selector: memory_system_cache_peak_bytes
+            name: peak
+          - selector: memory_system_cache_resident_bytes
+            name: resident
+      - context: page_lists
+        title: Memory Page Lists
+        units: bytes
+        type: stacked
+        dimensions:
+          - selector: memory_free_and_zero_page_list_bytes
+            name: free
+          - selector: memory_modified_page_list_bytes
+            name: modified
+          - selector: memory_standby_cache_core_bytes
+            name: standby_core
+          - selector: memory_standby_cache_normal_priority_bytes
+            name: standby_normal
+          - selector: memory_standby_cache_reserve_bytes
+            name: standby_reserve
+      - context: system_pool_size
+        title: System Memory Pool
+        units: bytes
+        type: stacked
+        dimensions:
+          - selector: memory_pool_paged_bytes
+            name: paged
+          - selector: memory_pool_nonpaged_bytes
+            name: non-paged
+      - context: system_pool_paged
+        title: Paged System Memory Pool
+        units: bytes
+        dimensions:
+          - selector: memory_pool_paged_resident_bytes
+            name: resident
+      # The counters are the current numbers of outstanding allocations; the
+      # native chart charts their rate of change.
+      - context: system_pool_allocs
+        title: System Pool Allocations
+        units: allocations/s
+        algorithm: incremental
+        dimensions:
+          - selector: memory_pool_paged_allocations
+            name: paged
+          - selector: memory_pool_nonpaged_allocations
+            name: non-paged
+      - context: system_page_table_entries
+        title: Unused page table entries.
+        units: pages
+        dimensions:
+          - selector: memory_free_system_page_table_entries
+            name: free
+      - context: system_code
+        title: System Code Memory
+        units: bytes
+        dimensions:
+          - selector: memory_system_code_resident_bytes
+            name: resident
+          - selector: memory_system_code_total_bytes
+            name: total
+      - context: system_drivers
+        title: System Driver Memory
+        units: bytes
+        dimensions:
+          - selector: memory_system_driver_resident_bytes
+            name: resident
+          - selector: memory_system_driver_total_bytes
+            name: total
+  - family: page faults
+    context_namespace: mem
+    metrics:
+      - memory_page_faults_minor
+      - memory_page_faults_major
+      - memory_cache_faults
+      - memory_demand_zero_faults
+      - memory_transition_faults
+      - memory_write_copy_faults
+      - memory_transition_pages_repurposed
+    charts:
+      - context: pgfaults
+        title: Memory Page Faults
+        units: faults/s
+        dimensions:
+          - selector: memory_page_faults_minor
+            name: minor
+          - selector: memory_page_faults_major
+            name: major
+            options:
+              multiplier: -1
+      - context: page_faults_breakdown
+        title: Memory Page Fault Breakdown
+        units: faults/s
+        dimensions:
+          - selector: memory_cache_faults
+            name: cache
+          - selector: memory_demand_zero_faults
+            name: demand_zero
+          - selector: memory_transition_faults
+            name: transition
+          - selector: memory_write_copy_faults
+            name: write_copies
+      - context: transition_repurposed
+        title: Transition Pages Repurposed
+        units: pages/s
+        dimensions:
+          - selector: memory_transition_pages_repurposed
+            name: repurposed
+  - family: pagefile
+    context_namespace: mem
+    metrics: [pagefile_free_bytes, pagefile_used_bytes]
+    charts:
+      - context: pagefile_usage
+        title: Paging file usage
+        units: bytes
+        type: stacked
+        instances:
+          by_labels: [pagefile]
+        dimensions:
+          - selector: pagefile_free_bytes
+            name: free
+          - selector: pagefile_used_bytes
+            name: used
   - family: processes
     context_namespace: system
     metrics: [system_processes, system_threads, system_context_switches]

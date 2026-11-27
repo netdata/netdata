@@ -15,8 +15,14 @@ type observations struct {
 	cpu        cpuUtilization
 	memoryFree sample
 	memoryUsed sample
-	system     systemCounters
-	interfaces []networkInterface
+	// swapFree and swapUsed are the available commit and the commit charge.
+	swapFree       sample
+	swapUsed       sample
+	memoryCounters [len(memoryCounters)]sample
+	pageFaults     pageFaults
+	pagingFiles    []pagingFile
+	system         systemCounters
+	interfaces     []networkInterface
 	// netTotalReceived and netTotalSent sum the byte totals of the Network
 	// Interface instances; physicalInterfaces names them.
 	netTotalReceived   sample
@@ -41,20 +47,6 @@ type diskSpace struct {
 
 // Win32_LogicalDisk Access value of media that can only be read.
 const accessReadOnly = 1
-
-// readMemory converts Win32_OperatingSystem's KiB values to bytes. Free
-// physical memory is the memory available to processes, as the native Windows
-// Agent's free dimension.
-func (o *observations) readMemory(rows []map[string]any) bool {
-	if len(rows) != 1 {
-		return false
-	}
-	total := kibToBytes(readUnsigned(rows[0]["totalvisiblememorysize"]))
-	free := kibToBytes(readUnsigned(rows[0]["freephysicalmemory"]))
-	o.memoryFree = free
-	o.memoryUsed = used(total, free)
-	return free.valid
-}
 
 // readDisks leaves out read-only drives, as the native Windows Agent does, so
 // a full read-only volume does not hold a disk space alert forever.
