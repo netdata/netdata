@@ -48,6 +48,7 @@ struct physical_disk {
     usec_t first_seen_ut;
     usec_t wmi_retry_after_ut;
     usec_t wmi_retry_every_ut;  // doubles after each miss, up to DISK_WMI_RETRY_MAX_UT
+    uint64_t wmi_checked_seq;   // the newest probe result this disk was looked up in
 
     STRING *device;
     STRING *mount_point;
@@ -171,6 +172,7 @@ static void physical_disk_cleanup(struct physical_disk *d)
     d->first_seen_ut = 0;
     d->wmi_retry_after_ut = 0;
     d->wmi_retry_every_ut = 0;
+    d->wmi_checked_seq = 0;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_io.st_io);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_ops.st_ops);
@@ -355,12 +357,15 @@ typedef enum {
     DISK_WMI_MISSING,
 } DISK_WMI_LOOKUP;
 
-static DISK_WMI_LOOKUP disk_wmi_lookup(uint64_t seq, int index, DiskDriveInfoWMI *out)
+// Looks the disk up in the latest probe result, when that result is at least probe 'seq'; *checked_seq is set to
+// the result looked in.
+static DISK_WMI_LOOKUP disk_wmi_lookup(uint64_t seq, int index, DiskDriveInfoWMI *out, uint64_t *checked_seq)
 {
     DISK_WMI_LOOKUP rc = DISK_WMI_PENDING;
 
     netdata_mutex_lock(&disk_wmi.mutex);
     if (disk_wmi.completed_seq >= seq) {
+        *checked_seq = disk_wmi.completed_seq;
         rc = DISK_WMI_MISSING;
         for (size_t k = 0; k < disk_wmi.count; k++) {
             if (disk_wmi.rows[k].Index != index)
@@ -3524,9 +3529,32 @@ static void physical_disk_add_wmi_labels(struct physical_disk *d)
         physical_disk_chart_add_wmi_labels(charts[i], d);
 }
 
+static void physical_disk_wmi_found(struct physical_disk *d, const DiskDriveInfoWMI *info)
+{
+    string_freez(d->model);
+    d->model = string_strdupz(info->Model);
+    string_freez(d->device_id);
+    d->device_id = string_strdupz(info->DeviceID);
+    d->wmi_pending = false;
+
+    // Charts created before the metadata arrived get the labels now.
+    if (d->charts_ready)
+        physical_disk_add_wmi_labels(d);
+
+    d->charts_ready = true;
+}
+
 static void physical_disk_wmi_update(struct physical_disk *d, int device_index, usec_t now_ut)
 {
+    DiskDriveInfoWMI info;
+
     if (!d->wmi_seq) {
+        // While waiting to retry, use a newer result that another disk asked for, without asking for one.
+        if (disk_wmi_lookup(d->wmi_checked_seq + 1, device_index, &info, &d->wmi_checked_seq) == DISK_WMI_FOUND) {
+            physical_disk_wmi_found(d, &info);
+            return;
+        }
+
         if (now_ut < d->wmi_retry_after_ut)
             return;
 
@@ -3536,8 +3564,7 @@ static void physical_disk_wmi_update(struct physical_disk *d, int device_index, 
             disk_wmi_wanted_seq = d->wmi_seq;
     }
 
-    DiskDriveInfoWMI info;
-    switch (disk_wmi_lookup(d->wmi_seq, device_index, &info)) {
+    switch (disk_wmi_lookup(d->wmi_seq, device_index, &info, &d->wmi_checked_seq)) {
         case DISK_WMI_PENDING:
             if (now_ut - d->first_seen_ut >= DISK_WMI_WAIT_UT)
                 d->charts_ready = true;
@@ -3552,17 +3579,7 @@ static void physical_disk_wmi_update(struct physical_disk *d, int device_index, 
             break;
 
         case DISK_WMI_FOUND:
-            string_freez(d->model);
-            d->model = string_strdupz(info.Model);
-            string_freez(d->device_id);
-            d->device_id = string_strdupz(info.DeviceID);
-            d->wmi_pending = false;
-
-            // Charts created before the metadata arrived get the labels now.
-            if (d->charts_ready)
-                physical_disk_add_wmi_labels(d);
-
-            d->charts_ready = true;
+            physical_disk_wmi_found(d, &info);
             break;
     }
 }
@@ -3646,16 +3663,21 @@ static int physical_disk_wmi_unittest_run(void)
     }
     errors += mount_points_unittest_expect("the retry wait is capped", d1.wmi_retry_every_ut == DISK_WMI_RETRY_MAX_UT);
 
-    // a later result with the disk labels it
-    usec_t t4 = d1.wmi_retry_after_ut;
-    physical_disk_wmi_update(&d1, 1, t4);
-    disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 1, .Model = "model-1", .DeviceID = "id-1" };
-    disk_wmi_posted_seq = d1.wmi_seq;
-    disk_wmi.requested_seq = d1.wmi_seq;
-    disk_wmi.completed_seq = d1.wmi_seq;
-    physical_disk_wmi_update(&d1, 1, t4 + USEC_PER_SEC);
-    errors += mount_points_unittest_expect("a disk found after retries is labelled",
-                                           !d1.wmi_pending && strcmp(string2str(d1.model), "model-1") == 0);
+    // while waiting to retry, an unchanged result is not used again and asks for no probe
+    usec_t waiting = d1.wmi_retry_after_ut - USEC_PER_SEC;
+    uint64_t wanted = disk_wmi_wanted_seq;
+    physical_disk_wmi_update(&d1, 1, waiting);
+    errors += mount_points_unittest_expect("a waiting disk asks for no probe",
+                                           d1.wmi_pending && d1.wmi_seq == 0 && disk_wmi_wanted_seq == wanted);
+
+    // a newer result, asked for by another disk, labels the waiting disk before its retry time
+    disk_wmi.rows[0] = (DiskDriveInfoWMI){ .Index = 1, .Model = "model-1b", .DeviceID = "id-1b" };
+    disk_wmi.completed_seq++;
+    disk_wmi.requested_seq = disk_wmi.completed_seq;
+    disk_wmi_posted_seq = disk_wmi.completed_seq;
+    physical_disk_wmi_update(&d1, 1, waiting);
+    errors += mount_points_unittest_expect("a waiting disk uses a newer result",
+                                           !d1.wmi_pending && strcmp(string2str(d1.model), "model-1b") == 0);
 
     string_freez(d0.model);
     string_freez(d0.device_id);
