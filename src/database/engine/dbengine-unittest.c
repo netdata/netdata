@@ -1099,6 +1099,138 @@ static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
     return errors;
 }
 
+static size_t dbengine_crc_test_valid_points(RRDDIM *rd, time_t start_time_s, time_t end_time_s) {
+    struct storage_engine_query_handle seqh = { 0 };
+    unittest_storage_engine_query_init(
+        rd->tiers[0].seb, rd->tiers[0].smh, &seqh, start_time_s, end_time_s, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    size_t points = 0;
+    for(size_t safety = 0; safety < 16 && !unittest_storage_engine_query_is_finished(&seqh); safety++) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        if(!storage_point_is_gap(sp))
+            points++;
+    }
+
+    unittest_storage_engine_query_finalize(&seqh);
+    return points;
+}
+
+// a buffered write is visible to the engine's O_DIRECT reads (the kernel writes the range back first), so no fsync
+static bool dbengine_crc_test_flip_byte(const char *path, uint64_t offset) {
+    int fd = open(path, O_RDWR | O_CLOEXEC);
+    if(fd == -1)
+        return false;
+
+    uint8_t byte;
+    bool ok = pread(fd, &byte, 1, (off_t)offset) == 1;
+    if(ok) {
+        byte ^= 0xFF;
+        ok = pwrite(fd, &byte, 1, (off_t)offset) == 1;
+    }
+    close(fd);
+    return ok;
+}
+
+// A CRC-failing extent read from disk must not be cached: neither the extent (extent cache) nor empty pages for it
+// (main cache). Otherwise a transient bad read stays sticky and the good bytes on disk are never read again.
+// Flip a byte of a flushed extent on disk, query it (it must fail, once), restore the byte and query again: the
+// second query must read the extent from disk again and return the original samples.
+static size_t test_dbengine_corrupt_extent_is_not_cached(RRDHOST *host) {
+    const time_t t = START_TIMESTAMP + 4500000;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
+    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-corrupt-extent", 1);
+    if(!rd)
+        return 1;
+
+    const DBENGINE_CADENCE_EXPECTED_POINT expected[] = {
+        { t + 0, t + 1, 1 },
+        { t + 1, t + 2, 2 },
+        { t + 2, t + 3, 3 },
+        { t + 3, t + 4, 4 },
+        { t + 4, t + 5, 5 },
+    };
+    for(size_t i = 0; i < _countof(expected); i++)
+        dbengine_cadence_test_store_point(rd, expected[i].end_time_s, expected[i].value);
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+
+    // write the page to disk; the extent is on disk once the page is in the open cache (the background flusher may
+    // have claimed the page first, so the flush below can return before that write completes)
+    Word_t metric_id = mrg_metric_id(main_mrg, (METRIC *)rd->tiers[0].smh);
+    PGC_PAGE *open_page = NULL;
+    for(size_t i = 0; i < 100 && !open_page; i++) {
+        if(i)
+            sleep_usec(100 * USEC_PER_MS);
+
+        pgc_flush_dirty_pages(main_cache, (Word_t)ctx);
+        open_page = pgc_page_get_and_acquire(open_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_CLOSEST);
+    }
+    if(!open_page) {
+        fprintf(stderr, " >>> DBENGINE: corrupt-extent page did not reach the open cache\n");
+        return 1;
+    }
+
+    char path[RRDENG_PATH_MAX];
+    generate_datafilepath(pgc_page_data(open_page), path, sizeof(path));
+    struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(open_cache, open_page);
+    unsigned fileno = xio->fileno;
+    uint32_t block = xio->block;
+    // the last payload byte: covered by the CRC, and the header stays valid
+    uint64_t offset = BLOCK_TO_OFFSET(block) + xio->bytes - sizeof(struct rrdeng_df_extent_trailer) - 1;
+    pgc_page_release(open_cache, open_page);
+
+    // drop the clean page from the main cache (unless already evicted), so that the query reads the extent; a
+    // background flusher drops its reference to the page just after the open cache entry appears, so retry
+    bool evicted = false;
+    for(size_t i = 0; i < 100 && !evicted; i++) {
+        if(i)
+            sleep_usec(10 * USEC_PER_MS);
+
+        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, t + 1, PGC_SEARCH_EXACT);
+        evicted = !page || pgc_page_to_clean_evict_or_release(main_cache, page);
+    }
+    if(!evicted) {
+        fprintf(stderr, " >>> DBENGINE: corrupt-extent page could not be evicted from the main cache\n");
+        return 1;
+    }
+
+    size_t errors = 0;
+    if(!dbengine_crc_test_flip_byte(path, offset)) {
+        fprintf(stderr, " >>> DBENGINE: corrupt-extent cannot modify '%s'\n", path);
+        return 1;
+    }
+
+    rrdeng_stats_t io_errors_before = __atomic_load_n(&ctx->stats.io_errors, __ATOMIC_RELAXED);
+    size_t points = dbengine_crc_test_valid_points(rd, t + 1, t + 5);
+    rrdeng_stats_t io_errors_after = __atomic_load_n(&ctx->stats.io_errors, __ATOMIC_RELAXED);
+    if(points || io_errors_after != io_errors_before + 1) {
+        fprintf(stderr, " >>> DBENGINE: corrupt extent returned %zu points and %zu io errors, expected 0 and 1\n",
+                points, (size_t)(io_errors_after - io_errors_before));
+        errors++;
+    }
+
+    PGC_PAGE *extent_page = pgc_page_get_and_acquire(extent_cache, (Word_t)ctx, fileno, (time_t)block, PGC_SEARCH_EXACT);
+    if(extent_page) {
+        pgc_page_release(extent_cache, extent_page);
+        fprintf(stderr, " >>> DBENGINE: a CRC-failing extent was added to the extent cache\n");
+        errors++;
+    }
+
+    if(!dbengine_crc_test_flip_byte(path, offset)) {
+        fprintf(stderr, " >>> DBENGINE: corrupt-extent cannot restore '%s'\n", path);
+        return errors + 1;
+    }
+
+    errors += dbengine_cadence_test_query_points(
+        rd, t + 1, t + 5, expected, _countof(expected), "corrupt-extent-restored");
+
+    if(__atomic_load_n(&ctx->stats.io_errors, __ATOMIC_RELAXED) != io_errors_after) {
+        fprintf(stderr, " >>> DBENGINE: restored extent reported io errors\n");
+        errors++;
+    }
+
+    return errors;
+}
+
 static size_t test_dbengine_datafile_names(void) {
     static const struct {
         const char *name;
@@ -1202,6 +1334,7 @@ int test_dbengine(void) {
 #endif
 
     errors += test_dbengine_single_missing_sample_reuse(host);
+    errors += test_dbengine_corrupt_extent_is_not_cached(host);
 
     // prevent closing the database before the test is finished
     sleep(5);

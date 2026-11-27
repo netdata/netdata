@@ -1151,9 +1151,7 @@ static bool epdl_populate_pages_from_extent_data(
     bool have_read_error = false;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
-    struct rrdeng_df_extent_trailer *trailer;
     struct extent_buffer *eb = NULL;
-    uLong crc;
 
     bool can_use_data = true;
     if(!rrdeng_valid_extent_disk_size(data_length)) {
@@ -1165,15 +1163,13 @@ static bool epdl_populate_pages_from_extent_data(
         trailer_offset = 0;
         count = 0;
         header = NULL;
-        trailer = NULL;
     }
     else {
         header = data;
         payload_length = header->payload_length;
         count = header->number_of_pages;
         payload_offset = sizeof(*header) + sizeof(header->descr[0]) * count;
-        trailer_offset = data_length - sizeof(*trailer);
-        trailer = data + trailer_offset;
+        trailer_offset = data_length - sizeof(struct rrdeng_df_extent_trailer);
     }
 
     if( !can_use_data ||
@@ -1181,18 +1177,10 @@ static bool epdl_populate_pages_from_extent_data(
         count > MAX_PAGES_PER_EXTENT ||
         !dbengine_valid_compression_algorithm(header->compression_algorithm) ||
         (payload_length != trailer_offset - payload_offset) ||
-        (data_length != payload_offset + payload_length + sizeof(*trailer))
+        (data_length != payload_offset + payload_length + sizeof(struct rrdeng_df_extent_trailer))
         ) {
         epdl_extent_loading_error_log(ctx, epdl, NULL, "header is INVALID", NDLP_ERR);
         return false;
-    }
-
-    crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, data, data_length - sizeof(*trailer));
-    if (unlikely(crc32cmp(trailer->checksum, crc))) {
-        ctx_io_error(ctx);
-        have_read_error = true;
-        epdl_extent_loading_error_log(ctx, epdl, NULL, "CRC32 checksum FAILED", NDLP_ERR);
     }
 
     if(worker)
@@ -1470,6 +1458,15 @@ static inline void datafile_extent_read_free(void *buffer) {
     posix_memalign_freez(buffer);
 }
 
+// data_length has passed rrdeng_valid_extent_disk_size(), so it is larger than the trailer
+static bool extent_checksum_is_valid(void *data, size_t data_length) {
+    struct rrdeng_df_extent_trailer *trailer = (struct rrdeng_df_extent_trailer *)((uint8_t *)data + data_length - sizeof(*trailer));
+
+    uLong crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, data, data_length - sizeof(*trailer));
+    return !crc32cmp(trailer->checksum, crc);
+}
+
 // epdl is always the head of the list of the epdls merged onto this extent (only the head is
 // dispatched for loading). More epdls keep being appended to it until the list is detached, so
 // see epdl_pending_add() for the rules of traversing it.
@@ -1508,6 +1505,20 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instanc
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_MMAP);
 
         void *extent_data = datafile_extent_read(ctx, epdl->datafile->file, epdl->extent_block, epdl->extent_size);
+
+        // The checksum is verified once, here, so the extent cache holds only verified extents and its hits skip it.
+        // A failing extent is not cached: the next query reads it from disk again, so a transient bad read recovers.
+        if(extent_data != NULL && unlikely(!extent_checksum_is_valid(extent_data, epdl->extent_size))) {
+            ctx_io_error(ctx);
+            epdl_extent_loading_error_log(ctx, epdl, NULL, "CRC32 checksum FAILED", NDLP_ERR);
+            datafile_extent_read_free(extent_data);
+
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.extents_loaded_from_disk, 1, __ATOMIC_RELAXED);
+            not_loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_DISK | PDC_PAGE_FAILED_INVALID_EXTENT;
+            statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_invalid_extent;
+            goto cleanup;
+        }
+
         if(extent_data != NULL) {
 
             void *tmp = dbengine_extent_alloc(epdl->extent_size);
