@@ -347,6 +347,7 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords:
+        - windows
         - memory
         - ram
         - commit charge
@@ -403,7 +404,7 @@ modules:
         enabled: false
       description: |
         - `system.ram`: `free` is the available memory (free and zeroed pages plus the standby cache), and `used` is the rest of the physical memory.
-        - `mem.swap`: the commit limit, which is RAM plus the paging files. `used` is the commit charge, and `free` the commit still available.
+        - `mem.swap`: the chart total is the commit limit (RAM plus the paging files). `used` is the commit charge, and `free` the commit still available.
       availability: []
       scopes:
         - name: System
@@ -498,6 +499,12 @@ modules:
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
+            - name: mem.available
+              description: Available RAM for applications
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: avail
             - name: mem.swap_iops
               description: Swap Operations
               unit: "operations/s"
