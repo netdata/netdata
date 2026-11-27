@@ -106,18 +106,6 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 			query:   queryPhysicalDisks,
 			read:    snapshot.readPhysicalDisks,
 		},
-		{
-			name:    "disk drive",
-			enabled: groupEnabled(c.Collectors.Disk),
-			// Like the native Windows Agent, read a disk's model and device ID
-			// once, when it first appears.
-			needs: func() bool { return snapshot.unknownDiskDrive(c.diskDrives) },
-			query: queryDiskDrives,
-			read: func(rows []map[string]any) bool {
-				c.diskDrives = snapshot.diskDrivesOf(rows)
-				return true
-			},
-		},
 	}
 
 	// reached: a query got an answer from the host. sessionLost: the session
@@ -175,6 +163,11 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		c.lastCPU = snapshot.cpuTimes
 	}
 	if snapshot.physicalDisksRead {
+		// Like the native Windows Agent, read a disk's model and device ID
+		// once, when it first appears.
+		if !sessionLost && snapshot.unknownDiskDrive(c.diskDrives) {
+			sessionLost = c.lookupDiskDrives(ctx, session, &snapshot)
+		}
 		c.updatePhysicalDisks(previousDisks, snapshot.physicalDisks)
 	}
 	if inventoryDue && !sessionLost {
@@ -182,6 +175,23 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	}
 	// Exhausting the optional inventory budget must not discard successful samples.
 	return snapshot, parent.Err()
+}
+
+// lookupDiskDrives reads the model and device ID of this poll's disks. The
+// labels are optional, so the lookup has a budget of its own, as the inventory
+// has, and a lookup that fails or runs out of it only leaves them out until a
+// later poll reads them. It reports whether the session failed.
+func (c *Collector) lookupDiskDrives(ctx context.Context, session querySession, snapshot *observations) bool {
+	deadline, _ := ctx.Deadline()
+	ctx, cancel := context.WithTimeout(ctx, min(diskDriveBudget, time.Until(deadline)/2))
+	defer cancel()
+	rows, err := session.Query(ctx, queryDiskDrives)
+	if err != nil {
+		c.Limit("wmi:disk drive", 1, time.Minute).Warning(safeTransportError("disk drive WMI query failed", err))
+		return wmiquery.SessionFailed(err)
+	}
+	c.diskDrives = snapshot.diskDrivesOf(rows)
+	return false
 }
 
 // updatePhysicalDisks completes this poll's disks with their cached model and

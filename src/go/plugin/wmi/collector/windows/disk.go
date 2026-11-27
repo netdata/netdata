@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const queryDisk = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
@@ -14,6 +15,11 @@ const queryDisk = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNum
 // queryDiskDrives reads each physical disk's model and device ID, the labels
 // the native Windows Agent adds to its disk charts.
 const queryDiskDrives = "SELECT Index, Model, DeviceID FROM Win32_DiskDrive"
+
+// diskDriveBudget caps the disk drive lookup within a poll; it also takes at
+// most half of the remaining poll time, leaving room for the inventory and for
+// closing the session.
+const diskDriveBudget = 5 * time.Second
 
 // diskCounter is a raw counter of the PhysicalDisk counter set that feeds one
 // dimension of the native Windows Agent's disk charts.

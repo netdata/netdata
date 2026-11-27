@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -253,6 +254,47 @@ func TestCollector_DiskIntervalsSpanConsecutivePolls(t *testing.T) {
 		assert.Equal(t, want, intervalValues(metrics), "collection %d", i)
 	}
 	assert.Empty(t, polls)
+}
+
+// stalledDriveSession answers every query except the disk drive lookup, which
+// waits until its context ends.
+type stalledDriveSession struct{ fakeSession }
+
+func (s *stalledDriveSession) Query(ctx context.Context, wql string) ([]map[string]any, error) {
+	if wql == queryDiskDrives {
+		s.queries = append(s.queries, wql)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return s.fakeSession.Query(ctx, wql)
+}
+
+// TestCollector_DiskDriveLookupBudget keeps a disk drive lookup that does not
+// answer from discarding the poll: the samples are published without the
+// labels, and the next poll looks the disk up again.
+func TestCollector_DiskDriveLookupBudget(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "manual"
+		var sessions []*stalledDriveSession
+		c.newSession = func(context.Context) (querySession, error) {
+			session := &stalledDriveSession{
+				fakeSession: fakeSession{
+					results: validQueryResults(),
+				},
+			}
+			sessions = append(sessions, session)
+			return session, nil
+		}
+		require.NoError(t, c.Init(t.Context()))
+		for poll := range 2 {
+			metrics, err := collecttest.CollectScalarSeries(c)
+			require.NoError(t, err, "poll %d", poll)
+			assert.Equal(t, metrix.SampleValue(218802), metrics[`disk_reads{device="Disk 0",mount_point="C:"}`])
+			assert.Equal(t, metrix.SampleValue(3), metrics["system_processor_queue_length"])
+			assert.Contains(t, sessions[poll].queries, queryDiskDrives, "poll %d", poll)
+		}
+	})
 }
 
 func TestAverageMicroseconds(t *testing.T) {
