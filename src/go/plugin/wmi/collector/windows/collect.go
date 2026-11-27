@@ -35,6 +35,11 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	ctx, cancel := context.WithTimeout(parent, c.Timeout.Duration())
 	defer cancel()
 
+	// Disk intervals span consecutive polls only: across a failed poll, a
+	// 32-bit operation count could wrap unnoticed.
+	previousDisks := c.lastDisks
+	c.lastDisks = nil
+
 	session, err := c.newSession(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -170,7 +175,7 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		c.lastCPU = snapshot.cpuTimes
 	}
 	if snapshot.physicalDisksRead {
-		c.updatePhysicalDisks(snapshot.physicalDisks)
+		c.updatePhysicalDisks(previousDisks, snapshot.physicalDisks)
 	}
 	if inventoryDue && !sessionLost {
 		c.refreshInventory(ctx, session, fixedDrives, fixedDrivesRead)
@@ -180,11 +185,10 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 }
 
 // updatePhysicalDisks completes this poll's disks with their cached model and
-// device ID and the values of the interval since their previous sample, which
-// a failed query keeps for the next interval. Disks that disappeared are
+// device ID and the values of the interval since the previous poll's sample,
+// and keeps the samples for the next poll. Disks that disappeared are
 // forgotten.
-func (c *Collector) updatePhysicalDisks(disks []physicalDisk) {
-	previous := c.lastDisks
+func (c *Collector) updatePhysicalDisks(previous map[string]physicalDisk, disks []physicalDisk) {
 	c.lastDisks = make(map[string]physicalDisk, len(disks))
 	drives := make(map[string]diskDrive, len(disks))
 	for i := range disks {

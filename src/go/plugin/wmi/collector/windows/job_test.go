@@ -68,14 +68,16 @@ func timedQueryResults() map[string]queryResult {
 
 // timedDiskRow is a PhysicalDisk instance whose counters have grown at fixed
 // rates since the host started a day ago: per second, 20,000 reads of
-// scale * 4 KiB taking scale ms each, 50 writes of scale * 64 KiB taking
+// scale * 4 KiB taking scale ms each, 2,000 writes of scale * 64 KiB taking
 // scale * 4 ms each and 7 split I/Os, with the disk idle 3/5 of the time at
 // scale 1 and 1/5 at scale 2. The performance counter runs at 10 MHz, so each
-// 32-bit average timer is the low half of its 100 ns queue-length integral; the
-// read time wraps it more than once in a 30-second interval.
+// 32-bit average timer is the low half of its 100 ns queue-length integral. In
+// a 30-second interval the read time wraps it more than once, and the read,
+// write and total times differ by more than 2^31 ticks, so each timer needs its
+// own integral to count its wraps.
 func timedDiskRow(name string, scale uint64) map[string]any {
 	uptime := uint64(time.Now().Unix()%1000000) + 86400
-	reads, writes := 20000*uptime, 50*uptime
+	reads, writes := 20000*uptime, 2000*uptime
 	readTime, writeTime := reads*10000*scale, writes*40000*scale
 	idleFifths := map[uint64]uint64{1: 3, 2: 1}[scale]
 	return map[string]any{
@@ -968,8 +970,8 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			)
 		}
 		// The native agent labels the device ID with slashes for backslashes
-		// too, and gives a disk without a lettered volume an empty mount point,
-		// which the Agent stores as [none].
+		// too, and leaves out the empty mount point of a disk without a
+		// lettered volume (string_strdupz returns NULL for an empty string).
 		if strings.HasPrefix(context, "disk.") && context != "disk.space" {
 			want = append(want,
 				instance(context, map[string]string{
@@ -979,10 +981,9 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 					"device_id":   "//./PHYSICALDRIVE0",
 				}),
 				instance(context, map[string]string{
-					"device":      "Disk 1",
-					"mount_point": "",
-					"model":       "Virtual Disk",
-					"device_id":   "//./PHYSICALDRIVE1",
+					"device":    "Disk 1",
+					"model":     "Virtual Disk",
+					"device_id": "//./PHYSICALDRIVE1",
 				}),
 			)
 		}
@@ -1103,14 +1104,14 @@ func TestCollector_DiskCountersFeedNativeDimensions(t *testing.T) {
 			totalWritten += float64(row["DiskWriteBytesPersec"].(uint64))
 		}
 		// Utilization: 100 less the idle share. Times: reads take scale ms,
-		// writes 4 * scale ms, and a transfer (20000 * scale + 50 * 4 * scale) /
-		// 20050 ms on average, all sent in whole microseconds. Sizes in bytes.
+		// writes 4 * scale ms, and a transfer (20000 * scale + 2000 * 4 * scale) /
+		// 22000 ms on average, all sent in whole microseconds. Sizes in bytes.
 		for device, values := range map[string]map[nativeDimension]float64{
 			"Disk 0": {
 				{"disk.util", "utilization"}: 40,
 				{"disk.await", "reads"}:      1000,
 				{"disk.await", "writes"}:     4000,
-				{"disk.svctm", "svctm"}:      1007,
+				{"disk.svctm", "svctm"}:      1272,
 				{"disk.avgsz", "reads"}:      4096,
 				{"disk.avgsz", "writes"}:     65536,
 			},
@@ -1118,7 +1119,7 @@ func TestCollector_DiskCountersFeedNativeDimensions(t *testing.T) {
 				{"disk.util", "utilization"}: 80,
 				{"disk.await", "reads"}:      2000,
 				{"disk.await", "writes"}:     8000,
-				{"disk.svctm", "svctm"}:      2014,
+				{"disk.svctm", "svctm"}:      2545,
 				{"disk.avgsz", "reads"}:      8192,
 				{"disk.avgsz", "writes"}:     131072,
 			},
@@ -1354,16 +1355,19 @@ func parseSamples(t *testing.T, output string) map[string]map[string]float64 {
 }
 
 // TestMetadataDocumentsChartLabels requires every metadata scope to document
-// exactly the labels the job publishes on the charts of its metrics.
+// exactly the labels the job publishes on the charts of its metrics. A label
+// that some instances leave out, such as a disk's mount point, counts once.
 func TestMetadataDocumentsChartLabels(t *testing.T) {
 	published := make(map[string][]string)
 	for _, chart := range publishedCharts(t) {
-		keys := slices.AppendSeq([]string{}, maps.Keys(chart.labels))
+		keys := slices.AppendSeq(published[chart.context], maps.Keys(chart.labels))
 		slices.Sort(keys)
-		if previous, ok := published[chart.context]; ok {
-			require.Equal(t, previous, keys, "labels of %s instances", chart.context)
+		published[chart.context] = slices.Compact(keys)
+	}
+	for context, keys := range published {
+		if keys == nil {
+			published[context] = []string{}
 		}
-		published[chart.context] = keys
 	}
 
 	data, err := os.ReadFile("metadata.yaml")

@@ -161,7 +161,7 @@ func physicalDiskRow(name string) map[string]any {
 // Label sets of the physical disks of validQueryResults.
 const (
 	disk0Labels = `{device="Disk 0",device_id="\\\\.\\PHYSICALDRIVE0",model="QEMU HARDDISK",mount_point="C:"}`
-	disk1Labels = `{device="Disk 1",device_id="\\\\.\\PHYSICALDRIVE1",model="Virtual Disk",mount_point=""}`
+	disk1Labels = `{device="Disk 1",device_id="\\\\.\\PHYSICALDRIVE1",model="Virtual Disk"}`
 )
 
 // withDiskCounters adds the raw counter metrics of the physical disks and the
@@ -488,9 +488,9 @@ func TestCollector_Collect(t *testing.T) {
 		"disk_avail_bytes" + driveC: 300,
 	}), second)
 
-	// The failed CPU and physical disk queries keep the first samples, so the
-	// shares span both intervals. The disks did no I/O since then; their idle
-	// time has the first sample's timestamp, so it gives no utilization.
+	// The failed CPU query keeps the first sample, so the shares span both
+	// intervals. The failed physical disk query leaves the disks without a
+	// previous sample, so they have no interval values yet.
 	recovered, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	for metric, value := range map[string]metrix.SampleValue{
@@ -511,17 +511,6 @@ func TestCollector_Collect(t *testing.T) {
 		`cpu_core_idle_percent{cpu="cpu1"}`:   94,
 	} {
 		first[metric] = value
-	}
-	for _, labels := range []string{disk0Labels, disk1Labels} {
-		for _, metric := range []string{
-			"disk_read_await_microseconds",
-			"disk_write_await_microseconds",
-			"disk_service_time_microseconds",
-			"disk_read_average_bytes",
-			"disk_write_average_bytes",
-		} {
-			first[metric+labels] = 0
-		}
 	}
 	assert.Equal(t, first, recovered)
 

@@ -140,6 +140,121 @@ func TestCollector_PhysicalDiskIntervals(t *testing.T) {
 	assert.Empty(t, sessions)
 }
 
+// TestCollector_DiskIntervalsSpanConsecutivePolls forms disk intervals only
+// between polls that both read the disks. Across a failed poll, 2^32 + 1000
+// reads of 1 ms each look like 1000 reads to the 32-bit count, while their
+// time is unwrapped in full, so the interval would claim reads of 4295 s.
+func TestCollector_DiskIntervalsSpanConsecutivePolls(t *testing.T) {
+	first, second := labDiskRows()
+	// advance adds a delta to each counter, in the counter's own width.
+	advance := func(row map[string]any, delta func(property string) uint64) map[string]any {
+		next := make(map[string]any, len(row))
+		for property, value := range row {
+			switch v := value.(type) {
+			case uint32:
+				next[property] = uint32(uint64(v) + delta(property))
+			case uint64:
+				next[property] = v + delta(property)
+			default:
+				next[property] = v
+			}
+		}
+		return next
+	}
+	const reads = counter32Range + 1000
+	readTime := map[string]uint64{
+		"DiskReadsPersec":          reads,
+		"AvgDisksecPerRead_Base":   reads,
+		"AvgDiskBytesPerRead_Base": reads,
+		// 1 ms each, in 100 ns units and in ticks of the 10 MHz counter.
+		"AvgDisksecPerRead":      reads * 10000,
+		"AvgDiskReadQueueLength": reads * 10000,
+		"PercentDiskReadTime":    reads * 10000,
+		"AvgDiskBytesPerRead":    reads * 4096,
+		"DiskReadBytesPersec":    reads * 4096,
+	}
+	afterGap := advance(first, func(property string) uint64 { return readTime[property] })
+	// The lab's own 2.2-second interval follows.
+	labDelta := func(property string) uint64 {
+		switch v := second[property].(type) {
+		case uint32:
+			return uint64(v - first[property].(uint32))
+		case uint64:
+			return v - first[property].(uint64)
+		}
+		return 0
+	}
+	next := advance(afterGap, labDelta)
+
+	results := func(rows ...map[string]any) queryResult {
+		if len(rows) == 0 {
+			return queryResult{
+				err: errors.New("invalid class"),
+			}
+		}
+		return fixtureRows(rows...)
+	}
+	polls := []queryResult{results(first), results(), results(afterGap), results(next)}
+	c := configuredCollector()
+	c.Collectors = Collectors{
+		CPU:     new(false),
+		Memory:  new(false),
+		System:  new(false),
+		Network: new(false),
+	}
+	c.newSession = func(context.Context) (querySession, error) {
+		session := &fakeSession{
+			results: map[string]queryResult{
+				queryDisk:          fixtureRows(),
+				queryPhysicalDisks: polls[0],
+				queryDiskDrives:    fixtureRows(),
+			},
+		}
+		polls = polls[1:]
+		return session, nil
+	}
+	require.NoError(t, c.Init(t.Context()))
+	require.NoError(t, c.Check(t.Context()))
+
+	const disk = `{device="Disk 0",mount_point="C:"}`
+	intervalValues := func(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+		got := make(map[string]metrix.SampleValue)
+		for _, metric := range []string{
+			"disk_utilization_percent",
+			"disk_read_await_microseconds",
+			"disk_write_await_microseconds",
+			"disk_service_time_microseconds",
+			"disk_read_average_bytes",
+			"disk_write_average_bytes",
+		} {
+			if value, ok := metrics[metric+disk]; ok {
+				got[metric] = value
+			}
+		}
+		return got
+	}
+	for i, want := range []map[string]metrix.SampleValue{
+		// The physical disk query fails; the drive space query succeeds.
+		{},
+		// No interval across the gap.
+		{},
+		// The lab interval, as in TestCollector_PhysicalDiskIntervals.
+		{
+			"disk_utilization_percent":       1,
+			"disk_read_await_microseconds":   0,
+			"disk_write_await_microseconds":  372,
+			"disk_service_time_microseconds": 372,
+			"disk_read_average_bytes":        0,
+			"disk_write_average_bytes":       5916,
+		},
+	} {
+		metrics, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
+		assert.Equal(t, want, intervalValues(metrics), "collection %d", i)
+	}
+	assert.Empty(t, polls)
+}
+
 func TestAverageMicroseconds(t *testing.T) {
 	const tenMHz = 10000000
 	timer := func(ticks, operations, queueTime uint64) averageTimer {
@@ -477,13 +592,13 @@ func TestCollector_DiskDriveLookup(t *testing.T) {
 			wantLookup: true,
 			wantReads: map[string]metrix.SampleValue{
 				`{device="Disk 0",device_id="\\\\.\\PHYSICALDRIVE0",model="Disk Model A",mount_point="C:"}`: 3,
-				`{device="Disk 1",mount_point=""}`: 4,
+				`{device="Disk 1"}`: 4,
 			},
 		},
 		{
 			disks: fixtureRows(disk1),
 			wantReads: map[string]metrix.SampleValue{
-				`{device="Disk 1",mount_point=""}`: 4,
+				`{device="Disk 1"}`: 4,
 			},
 		},
 		{
@@ -492,7 +607,7 @@ func TestCollector_DiskDriveLookup(t *testing.T) {
 			wantLookup: true,
 			wantReads: map[string]metrix.SampleValue{
 				`{device="Disk 0",device_id="\\\\.\\PHYSICALDRIVE0",model="Disk Model A",mount_point="C:"}`: 3,
-				`{device="Disk 1",mount_point=""}`: 4,
+				`{device="Disk 1"}`: 4,
 			},
 		},
 	}

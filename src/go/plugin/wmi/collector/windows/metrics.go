@@ -287,18 +287,22 @@ func (d diskSpace) labels() []metrix.Label {
 	}
 }
 
-// labels are the native Windows Agent's physical disk labels: the model and
-// device ID only when Windows lists the disk among its disk drives.
+// labels are the native Windows Agent's physical disk labels, each left out
+// when its value is empty, as the native agent does: the mount point for a
+// disk without a lettered volume, the model and device ID for a disk Windows
+// does not list among its disk drives.
 func (d physicalDisk) labels() []metrix.Label {
 	labels := []metrix.Label{
 		{
 			Key:   deviceLabel,
 			Value: d.device,
 		},
-		{
+	}
+	if d.mountPoint != "" {
+		labels = append(labels, metrix.Label{
 			Key:   mountPointLabel,
 			Value: d.mountPoint,
-		},
+		})
 	}
 	if d.drive.model != "" {
 		labels = append(labels, metrix.Label{
