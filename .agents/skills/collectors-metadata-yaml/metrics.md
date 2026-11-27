@@ -20,6 +20,8 @@ Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
   exactly as defined in the code (V2 `charts.yaml` `title`, V1 chart definition): title case, no trailing period, no
   added sentence. `unit` is the code's unit string verbatim. `chart_type` is the code's type. `dimensions[].name` are
   the code's dimension names, all of them, in the code's order.
+- In C plugins the emitted context is the `context` argument of the `rrdset_create*` call, or the chart ID (`type.id`)
+  when that argument is `NULL`. Read it at the call: a table field named `context` proves nothing until it is passed.
 - The row is a drift check, not a place to explain: a description that is a sentence rather than the code's title is
   a defect. Anything a reader needs beyond the title (what a dimension means, how a value is derived, why it can be
   empty) goes to `metrics.description` when it applies to every chart, to the `detailed_description` of the option

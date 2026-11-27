@@ -32,11 +32,6 @@ permanent outside an approved change. The explicit V1-to-V2 migration exception 
 `src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`: normal V2 IDs are allowed while contexts and
 dimension names remain stable.
 
-A context rename on an existing chart starts new series: chart and dimension UUIDs are found through the current
-context (`rrdcontext_find_chart_uuid`, `rrdcontext_find_dimension_uuid` in `src/database/contexts/rrdcontext.c`), so
-earlier samples stay queryable only under the archived old context until retention drops them. Prometheus exporter
-metric names follow the context; the `chart` label follows the chart ID. State these effects when proposing a rename.
-
 ### 1.4 Gaps are data
 
 When you cannot measure a value this iteration, emit nothing for that dimension. The dashboard renders the gap; the user

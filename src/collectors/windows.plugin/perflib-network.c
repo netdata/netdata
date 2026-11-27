@@ -109,7 +109,6 @@ struct network_protocol {
         const char *type;
         const char *id;
         const char *family;
-        const char *context;
         const char *title;
         long priority;
     } packets;
@@ -126,7 +125,6 @@ struct network_protocol {
                 .type = "ipv4",
                 .id = "packets",
                 .family = "packets",
-                .context = "ipv4.packets",
                 .title = "IPv4 Packets",
                 .priority = NETDATA_CHART_PRIO_IPV4_PACKETS,
             },
@@ -142,7 +140,6 @@ struct network_protocol {
                 .type = "ipv6",
                 .id = "packets",
                 .family = "packets",
-                .context = "ipv6.packets",
                 .title = "IPv6 Packets",
                 .priority = NETDATA_CHART_PRIO_IPV6_PACKETS,
             },
@@ -156,7 +153,6 @@ struct network_protocol {
                 .type = "ipv4",
                 .id = "tcppackets",
                 .family = "tcp",
-                .context = "ipv4.tcppackets",
                 .title = "IPv4 TCP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV4_TCP_PACKETS,
             },
@@ -170,7 +166,6 @@ struct network_protocol {
                 .type = "ipv6",
                 .id = "tcppackets",
                 .family = "tcp6",
-                .context = "ipv6.tcppackets",
                 .title = "IPv6 TCP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV6_TCP_PACKETS,
             },
@@ -184,7 +179,6 @@ struct network_protocol {
                 .type = "ipv4",
                 .id = "udppackets",
                 .family = "udp",
-                .context = "ipv4.udppackets",
                 .title = "IPv4 UDP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV4_UDP_PACKETS,
             },
@@ -198,7 +192,6 @@ struct network_protocol {
                 .type = "ipv6",
                 .id = "udppackets",
                 .family = "udp6",
-                .context = "ipv6.udppackets",
                 .title = "IPv6 UDP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV6_UDP_PACKETS,
             },
@@ -212,7 +205,6 @@ struct network_protocol {
                 .type = "ipv4",
                 .id = "icmp",
                 .family = "icmp",
-                .context = "ipv4.icmp",
                 .title = "IPv4 ICMP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV4_ICMP_PACKETS,
             },
@@ -226,7 +218,6 @@ struct network_protocol {
                 .type = "ipv6",
                 .id = "icmp",
                 .family = "icmp6",
-                .context = "ipv6.icmp",
                 .title = "IPv6 ICMP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV6_ICMP_PACKETS,
             },
@@ -245,7 +236,6 @@ struct network_protocol {
                 .type = "ipv4",
                 .id = "errors",
                 .family = "errors",
-                .context = "ipv4.errors",
                 .title = "IPv4 Errors",
                 .priority = NETDATA_CHART_PRIO_IPV4_ERRORS,
             },
@@ -263,7 +253,6 @@ struct network_protocol {
                 .type = "ipv6",
                 .id = "errors",
                 .family = "errors",
-                .context = "ipv6.errors",
                 .title = "IPv6 Errors",
                 .priority = NETDATA_CHART_PRIO_IPV6_ERRORS,
             },
@@ -296,7 +285,6 @@ struct network_protocol {
                 .type = "ipv4",
                 .id = "icmpmsg",
                 .family = "icmp",
-                .context = "ipv4.icmpmsg",
                 .title = "IPv4 ICMP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV4_ICMP_MESSAGES,
             },
@@ -329,7 +317,6 @@ struct network_protocol {
                 .type = "ipv6",
                 .id = "icmpmsg",
                 .family = "icmp",
-                .context = "ipv6.icmpmsg",
                 .title = "IPv6 ICMP Packets",
                 .priority = NETDATA_CHART_PRIO_IPV6_ICMP_MESSAGES,
             },
@@ -345,7 +332,6 @@ struct network_protocol tcp46 = {
         .type = "ip",
         .id = "tcppackets",
         .family = "tcp",
-        .context = "ip.tcppackets",
         .title = "TCP Packets",
         .priority = NETDATA_CHART_PRIO_IP_TCP_PACKETS,
     }};
