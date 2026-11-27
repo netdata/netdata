@@ -84,6 +84,48 @@ func systemRow() map[string]any {
 	}
 }
 
+// smbServerRow is the Server counter set's row as DCOM decodes it: byte totals
+// as uint64, the other counters as uint32. Every value is distinct.
+func smbServerRow() map[string]any {
+	return map[string]any{
+		"BytesReceivedPersec":      uint64(3288867940),
+		"BytesTransmittedPersec":   uint64(119347308),
+		"ServerSessions":           uint32(3),
+		"SessionsLoggedOff":        uint32(8),
+		"SessionsTimedOut":         uint32(11),
+		"SessionsErroredOut":       uint32(2),
+		"SessionsForcedOff":        uint32(1),
+		"LogonPersec":              uint32(18),
+		"ErrorsLogon":              uint32(4),
+		"ErrorsAccessPermissions":  uint32(5),
+		"ErrorsGrantedAccess":      uint32(6),
+		"FilesOpen":                uint32(7),
+		"FilesOpenedTotal":         uint32(20764),
+		"ErrorsSystem":             uint32(9),
+		"WorkItemShortages":        uint32(10),
+		"BlockingRequestsRejected": uint32(12),
+		"PoolPagedFailures":        uint32(13),
+		"PoolNonpagedFailures":     uint32(14),
+	}
+}
+
+// smbShareRow is an SMB Server Shares instance as DCOM decodes it: the read
+// and write requests as uint32, the other counters as uint64. Every value is
+// distinct.
+func smbShareRow(name string) map[string]any {
+	return map[string]any{
+		"Name":                   name,
+		"CurrentOpenFileCount":   uint64(15),
+		"TreeConnectCount":       uint64(16),
+		"ReadRequestsPersec":     uint32(394),
+		"WriteRequestsPersec":    uint32(3072),
+		"MetadataRequestsPersec": uint64(366),
+		"FilesOpenedPersec":      uint64(57),
+		"ReceivedBytesPersec":    uint64(3221619890),
+		"SentBytesPersec":        uint64(332094),
+	}
+}
+
 // memoryCountersRow is a Memory counter set instance as DCOM decodes it: byte
 // counts as uint64, per-second counters and counts as uint32. Every value is
 // distinct; Pages/sec is the sum of the pages read and written.
@@ -214,6 +256,56 @@ func withProtocolCounters(metrics map[string]metrix.SampleValue) map[string]metr
 		"ipv6_udp_datagrams_sent":        1411,
 		"ipv6_udp_receive_errors":        0,
 		"ipv6_udp_no_port_datagrams":     822,
+	} {
+		metrics[metric] = value
+	}
+	return metrics
+}
+
+// Label sets of the shares of validQueryResults.
+const (
+	shareC   = `{share="\\\\*\\C$"}`
+	shareIPC = `{share="\\\\*\\IPC$"}`
+)
+
+// withSMBCounters adds the metrics of smbServerRow and of the shares of
+// validQueryResults to a collection's metrics.
+func withSMBCounters(metrics map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	for metric, value := range map[string]metrix.SampleValue{
+		"smb_server_received_bytes":              3288867940,
+		"smb_server_sent_bytes":                  119347308,
+		"smb_server_sessions":                    3,
+		"smb_server_sessions_logged_off":         8,
+		"smb_server_sessions_timed_out":          11,
+		"smb_server_sessions_errored_out":        2,
+		"smb_server_sessions_forced_off":         1,
+		"smb_server_logons":                      18,
+		"smb_server_logon_errors":                4,
+		"smb_server_access_permission_errors":    5,
+		"smb_server_granted_access_errors":       6,
+		"smb_server_open_files":                  7,
+		"smb_server_files_opened":                20764,
+		"smb_server_system_errors":               9,
+		"smb_server_work_item_shortages":         10,
+		"smb_server_blocking_requests_rejected":  12,
+		"smb_server_paged_pool_failures":         13,
+		"smb_server_nonpaged_pool_failures":      14,
+		"smb_share_open_files" + shareC:          15,
+		"smb_share_tree_connects" + shareC:       16,
+		"smb_share_read_requests" + shareC:       394,
+		"smb_share_write_requests" + shareC:      3072,
+		"smb_share_metadata_requests" + shareC:   366,
+		"smb_share_files_opened" + shareC:        57,
+		"smb_share_received_bytes" + shareC:      3221619890,
+		"smb_share_sent_bytes" + shareC:          332094,
+		"smb_share_open_files" + shareIPC:        0,
+		"smb_share_tree_connects" + shareIPC:     2,
+		"smb_share_read_requests" + shareIPC:     0,
+		"smb_share_write_requests" + shareIPC:    0,
+		"smb_share_metadata_requests" + shareIPC: 13,
+		"smb_share_files_opened" + shareIPC:      0,
+		"smb_share_received_bytes" + shareIPC:    1494,
+		"smb_share_sent_bytes" + shareIPC:        1392,
 	} {
 		metrics[metric] = value
 	}
@@ -390,6 +482,24 @@ func validQueryResults() map[string]queryResult {
 			map[string]any{"Index": uint32(1), "Model": "Virtual Disk", "DeviceID": `\\.\PHYSICALDRIVE1`},
 			map[string]any{"Index": uint32(0), "Model": "QEMU HARDDISK", "DeviceID": `\\.\PHYSICALDRIVE0`},
 		),
+		querySMBServer: fixtureRows(smbServerRow()),
+		// Shares under the counter set's instance names; WinRM reports the
+		// numbers as text. _Total is not a share.
+		querySMBShares: fixtureRows(
+			smbShareRow(`\\*\C$`),
+			map[string]any{
+				"Name":                   `\\*\IPC$`,
+				"CurrentOpenFileCount":   "0",
+				"TreeConnectCount":       "2",
+				"ReadRequestsPersec":     "0",
+				"WriteRequestsPersec":    "0",
+				"MetadataRequestsPersec": "13",
+				"FilesOpenedPersec":      "0",
+				"ReceivedBytesPersec":    "1494",
+				"SentBytesPersec":        "1392",
+			},
+			map[string]any{"Name": "_Total", "CurrentOpenFileCount": uint64(15), "TreeConnectCount": uint64(18)},
+		),
 	}
 }
 
@@ -505,6 +615,20 @@ func TestCollector_Collect(t *testing.T) {
 	sessions[1].results[queryPhysicalDisks] = queryResult{
 		err: errors.New("invalid class"),
 	}
+	// WinRM text, a malformed value and missing counters; a share without a
+	// usable value and an unnamed instance are left out.
+	sessions[1].results[querySMBServer] = fixtureRows(map[string]any{
+		"BytesReceivedPersec": "3288900000",
+		"ServerSessions":      "0",
+		"ErrorsLogon":         "malformed",
+	})
+	sessions[1].results[querySMBShares] = fixtureRows(
+		map[string]any{"Name": `\\*\C$`, "CurrentOpenFileCount": "0", "ReadRequestsPersec": "malformed",
+			"SentBytesPersec": "332500"},
+		map[string]any{"Name": `\\*\ADMIN$`, "TreeConnectCount": "malformed"},
+		map[string]any{"TreeConnectCount": uint64(1)},
+		map[string]any{"Name": "_Total", "TreeConnectCount": uint64(1)},
+	)
 
 	next := 0
 	c.newSession = func(ctx context.Context) (querySession, error) {
@@ -531,30 +655,32 @@ func TestCollector_Collect(t *testing.T) {
 	)
 	assert.Equal(
 		t,
-		withProtocolCounters(withDiskCounters(withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
-			"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
-			"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
-			"memory_swap_used_bytes":             3 * 1024 * 1024 * 1024,
-			"memory_swap_free_bytes":             9 * 1024 * 1024 * 1024,
-			"system_processes":                   69,
-			"system_threads":                     951,
-			"system_context_switches":            4294967000,
-			"system_processor_queue_length":      3,
-			"system_uptime_milliseconds":         86401234,
-			"system_clock_offset_microseconds":   1500000,
-			"network_received_bytes" + ethernet:  190,
-			"network_received_bytes" + ethernet1: 0,
-			"network_sent_bytes" + ethernet:      30,
-			"network_sent_bytes" + ethernet1:     70,
-			"network_received_bytes" + member:    400,
-			"network_sent_bytes" + member:        5,
-			"network_total_received_bytes":       190,
-			"network_total_sent_bytes":           100,
-			"disk_used_bytes" + driveC:           80000000000,
-			"disk_avail_bytes" + driveC:          420000000000,
-			"disk_used_bytes" + driveD:           4294967296,
-			"disk_avail_bytes" + driveD:          0,
-		})))),
+		withSMBCounters(
+			withProtocolCounters(withDiskCounters(withMemoryCounters(withAnsweredPing(map[string]metrix.SampleValue{
+				"memory_used_bytes":                  6 * 1024 * 1024 * 1024,
+				"memory_free_bytes":                  2 * 1024 * 1024 * 1024,
+				"memory_swap_used_bytes":             3 * 1024 * 1024 * 1024,
+				"memory_swap_free_bytes":             9 * 1024 * 1024 * 1024,
+				"system_processes":                   69,
+				"system_threads":                     951,
+				"system_context_switches":            4294967000,
+				"system_processor_queue_length":      3,
+				"system_uptime_milliseconds":         86401234,
+				"system_clock_offset_microseconds":   1500000,
+				"network_received_bytes" + ethernet:  190,
+				"network_received_bytes" + ethernet1: 0,
+				"network_sent_bytes" + ethernet:      30,
+				"network_sent_bytes" + ethernet1:     70,
+				"network_received_bytes" + member:    400,
+				"network_sent_bytes" + member:        5,
+				"network_total_received_bytes":       190,
+				"network_total_sent_bytes":           100,
+				"disk_used_bytes" + driveC:           80000000000,
+				"disk_avail_bytes" + driveC:          420000000000,
+				"disk_used_bytes" + driveD:           4294967296,
+				"disk_avail_bytes" + driveD:          0,
+			})))),
+		),
 		first,
 	)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
@@ -582,6 +708,10 @@ func TestCollector_Collect(t *testing.T) {
 		"ipv6_udp_no_port_datagrams":                                           822,
 		"disk_used_bytes" + driveC:                                             0,
 		"disk_avail_bytes" + driveC:                                            300,
+		"smb_server_received_bytes":                                            3288900000,
+		"smb_server_sessions":                                                  0,
+		"smb_share_open_files" + shareC:                                        0,
+		"smb_share_sent_bytes" + shareC:                                        332500,
 	}), second)
 
 	// The failed CPU query keeps the first sample, so the shares span both
@@ -627,6 +757,8 @@ func TestCollector_Collect(t *testing.T) {
 			queryUDPv6,
 			queryDisk,
 			queryPhysicalDisks,
+			querySMBServer,
+			querySMBShares,
 		}
 		if i == 0 {
 			want = append(want, queryDiskDrives)
@@ -672,6 +804,7 @@ func TestCollector_NetworkAdapterQuery(t *testing.T) {
 			c.Collectors.Memory = new(false)
 			c.Collectors.System = new(false)
 			c.Collectors.Disk = new(false)
+			c.Collectors.SMB = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
 					queryNetworkInterfaces: tc.interfaces,
@@ -711,6 +844,7 @@ func TestCollector_CheckFailure(t *testing.T) {
 			c.Collectors.System = new(false)
 			c.Collectors.Network = new(false)
 			c.Collectors.Disk = new(false)
+			c.Collectors.SMB = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
 					queryCPU:            {err: tc.queryErr},
@@ -819,7 +953,9 @@ func metricQueries(queries []string) []string {
 			queryUDPv6,
 			queryDisk,
 			queryPhysicalDisks,
-			queryDiskDrives:
+			queryDiskDrives,
+			querySMBServer,
+			querySMBShares:
 			metrics = append(metrics, query)
 		}
 	}
@@ -894,6 +1030,8 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryUDPv6:             lost,
 				queryDisk:              lost,
 				queryPhysicalDisks:     lost,
+				querySMBServer:         lost,
+				querySMBShares:         lost,
 			},
 			wantMetrics: withAnsweredPing(map[string]metrix.SampleValue{
 				"memory_used_bytes":      6 * 1024 * 1024 * 1024,
@@ -917,6 +1055,8 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 				queryUDPv6:             lost,
 				queryDisk:              lost,
 				queryPhysicalDisks:     lost,
+				querySMBServer:         lost,
+				querySMBShares:         lost,
 			},
 			wantErr: "no enabled WMI query group succeeded",
 		},
@@ -953,6 +1093,8 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 					queryUDPv6,
 					queryDisk,
 					queryPhysicalDisks,
+					querySMBServer,
+					querySMBShares,
 				},
 				session.queries,
 			)
@@ -1083,6 +1225,7 @@ func TestCollector_SumsBothIPVersions(t *testing.T) {
 			c.Collectors.Memory = new(false)
 			c.Collectors.System = new(false)
 			c.Collectors.Disk = new(false)
+			c.Collectors.SMB = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
 					queryNetworkInterfaces: fixtureRows(),

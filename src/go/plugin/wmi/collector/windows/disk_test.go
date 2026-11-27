@@ -202,6 +202,7 @@ func TestCollector_DiskIntervalsSpanConsecutivePolls(t *testing.T) {
 		Memory:  new(false),
 		System:  new(false),
 		Network: new(false),
+		SMB:     new(false),
 	}
 	c.newSession = func(context.Context) (querySession, error) {
 		session := &fakeSession{
@@ -659,6 +660,7 @@ func TestCollector_DiskDriveLookup(t *testing.T) {
 		Memory:  new(false),
 		System:  new(false),
 		Network: new(false),
+		SMB:     new(false),
 	}
 	var current *fakeSession
 	c.newSession = func(context.Context) (querySession, error) { return current, nil }

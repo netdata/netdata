@@ -27,7 +27,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor CPU, memory, processes, network interfaces, TCP, UDP and disks on Windows hosts remotely over WMI, and ping them, without installing anything on them.
+          Monitor CPU, memory, processes, network, TCP, UDP, disks and SMB shares on Windows hosts remotely over WMI, and ping them, without installing anything on them.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
@@ -39,13 +39,14 @@ modules:
           - TCP and UDP packets per IP version, TCP connections, connection opens, failures and resets, TCP retransmissions, and UDP errors;
           - available and used space per fixed drive;
           - bandwidth, operations, latency, utilization and queue per physical disk, and the total disk I/O of the host;
+          - the SMB file server's traffic, sessions, logons, open files, logon and access errors and resource shortages, and the open files, requests, connections and traffic of each share;
           - round-trip time and packet loss of ICMP ping from the poller;
           - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
           - host status: when the poller can no longer collect from the host, its node turns Stale and an alert on the poller notifies you.
 
-          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions and UDP errors, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset, which no other collector measures this way, has a context of its own.
+          The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions and UDP errors, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset, which no other collector measures this way, and the SMB server's server-wide counters, which the Netdata Agent on Windows does not chart, have contexts of their own.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the disk group, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the disk and SMB groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -69,6 +70,7 @@ modules:
           | System | `Win32_PerfRawData_PerfOS_System` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter`, `Win32_PerfRawData_Tcpip_TCPv4`, `Win32_PerfRawData_Tcpip_TCPv6`, `Win32_PerfRawData_Tcpip_UDPv4`, `Win32_PerfRawData_Tcpip_UDPv6` |
           | Disk | `Win32_LogicalDisk`, `Win32_PerfRawData_PerfDisk_PhysicalDisk`, `Win32_DiskDrive` |
+          | SMB | `Win32_PerfRawData_PerfNet_Server`, `Win32_PerfRawData_Counters_SMBServerShares` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
       supported_platforms:
         include: [Linux, Windows]
@@ -99,6 +101,7 @@ modules:
             - Rates, such as traffic, packets and errors, appear from the second collection after a job starts, because a rate needs two readings.
             - When a host restarts, counters that Windows keeps in 32 bits, such as context switches, start again from zero. If such a counter was close to its 32-bit maximum before the restart, the Agent reads the drop as a counter wrap and its chart shows one spike.
             - Disk space covers fixed drives that have a drive letter. Volumes mounted only into a folder, removable drives and network drives are not charted.
+            - Every share of the host gets seven charts, as on the Netdata Agent running on Windows, including the hidden administrative shares that every Windows host has (`C$` and one for each other drive, `ADMIN$`, `IPC$`). A file server with 200 shares gets 1,400 share charts; switch off `collectors.smb` for a host whose SMB charts you do not need.
             - Some stock packet alerts expect the one-second collection of the Netdata Agent running on Windows. At the default `update_every` of 30, `10s_received_packets_storm` cannot reach its thresholds; `net_interface_inbound_packets` and `net_interface_outbound_packets` add up per-second rates, so they show the packets divided by `update_every`; and the drop-ratio alerts evaluate only interfaces that average more than about 500 received or 50 sent packets per second, and report 0 below that.
             - Every job pings its host; ping cannot be switched off. A host that does not answer ICMP echo requests, for example because Windows Firewall blocks them, shows 100% packet loss in every collection and raises the `ping_host_reachable` alert.
             - Ping charts update only in collections whose WMI queries succeed. A host that is down leaves a gap in the ping charts instead of 100% packet loss, so the ping alerts do not report it; its node turns Stale and the `wmi_host_last_collected_secs` alert reports it instead.
@@ -113,7 +116,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to fourteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to sixteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -236,7 +239,7 @@ modules:
               required: false
               group: Collection
             - name: collectors
-              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six and the disk group two. Keep at least one group enabled."
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six, and the disk and SMB groups two. Keep at least one group enabled."
               default_value: ''
               required: false
               group: Collection
@@ -264,6 +267,11 @@ modules:
               group: Collection
             - name: collectors.disk
               description: "Collect available and used space per fixed drive, and bandwidth, operations, latency, utilization and queue per physical disk."
+              default_value: true
+              required: false
+              group: Collection
+            - name: collectors.smb
+              description: "Collect the SMB file server's traffic, sessions, logons, open files, logon and access errors and resource shortages, and the open files, requests, connections and traffic of each share."
               default_value: true
               required: false
               group: Collection
@@ -313,7 +321,7 @@ modules:
                     username: 'EXAMPLE\monitor'
                     password: '${env:WMI_PASSWORD}'
             - name: CPU and memory only
-              description: Skip the system, network and disk queries.
+              description: Skip the system, network, disk and SMB queries.
               config: |
                 jobs:
                   - name: fileserver
@@ -325,6 +333,7 @@ modules:
                       system: false
                       network: false
                       disk: false
+                      smb: false
             - name: Multi-instance
               description: Monitor several Windows hosts with one account. Each job creates its own node.
               config: |
@@ -378,7 +387,7 @@ modules:
             fix: Remove `timeout` to use the default of 15 seconds, or set a positive number of seconds.
           - error: 'at least one collector group must be enabled'
             cause: Every group under `collectors` is set to `false`.
-            fix: Enable at least one of `cpu`, `memory`, `system`, `network` or `disk`, or remove `collectors` to collect them all.
+            fix: Enable at least one of `cpu`, `memory`, `system`, `network`, `disk` or `smb`, or remove `collectors` to collect them all.
           - error: 'failed to open WMI session: open DCOM object resolver interface: connection refused'
             when: '`transport: dcom`'
             cause: Nothing accepts connections on TCP 135 at the configured `host`, or a firewall rejects them.
@@ -467,6 +476,7 @@ modules:
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue; the `ip.*` TCP charts need both the IPv4 and the IPv6 query. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
         - `wmi.clock_offset` is the host's clock minus the poller's: a positive value means the host's clock is ahead.
+        - The `wmi.smb_server_*` charts cover the host's whole SMB file service, as Windows' Server counters count it; the `smb.server_shares_*` charts show it per share, as on the Netdata Agent running on Windows. `wmi.smb_server_logons` counts every logon attempt, failed ones included. In `wmi.smb_server_access_errors`, `logon` counts failed logons, `access_permissions` file opens refused with access denied, and `granted_access` denied accesses to files already open. In `wmi.smb_server_resource_errors`, `system` counts internal server errors, `work_item_shortages` and `blocking_requests_rejected` requests the server had no free work item for, and the pool failures failed kernel memory allocations.
       availability: []
       scopes:
         - name: global
@@ -729,6 +739,64 @@ modules:
               dimensions:
                 - name: InErrors
                 - name: NoPorts
+            - name: wmi.smb_server_traffic
+              description: SMB Server Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: wmi.smb_server_sessions
+              description: SMB Server Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: wmi.smb_server_sessions_ended
+              description: SMB Server Sessions Ended
+              unit: sessions/s
+              chart_type: line
+              dimensions:
+                - name: logged_off
+                - name: timed_out
+                - name: errored_out
+                - name: forced_off
+            - name: wmi.smb_server_logons
+              description: SMB Server Logons
+              unit: logons/s
+              chart_type: line
+              dimensions:
+                - name: logons
+            - name: wmi.smb_server_access_errors
+              description: SMB Server Logon and Access Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: logon
+                - name: access_permissions
+                - name: granted_access
+            - name: wmi.smb_server_open_files
+              description: SMB Server Open Files
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: wmi.smb_server_files_opened
+              description: SMB Server Files Opened
+              unit: files/s
+              chart_type: line
+              dimensions:
+                - name: opened
+            - name: wmi.smb_server_resource_errors
+              description: SMB Server Internal Errors and Resource Shortages
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: system
+                - name: work_item_shortages
+                - name: blocking_requests_rejected
+                - name: paged_pool_failures
+                - name: nonpaged_pool_failures
         - name: paging file
           description: A paging file of the host. Windows creates one, `C:\pagefile.sys`, by default.
           labels:
@@ -953,6 +1021,55 @@ modules:
               chart_type: line
               dimensions:
                 - name: discards
+        - name: SMB share
+          description: A share the host's SMB server serves, including the hidden administrative shares such as `C$`, `ADMIN$` and `IPC$`.
+          labels:
+            - name: share
+              description: Share as the Windows performance counters name it, for example `//*/C$`. Backslashes are shown as forward slashes.
+          metrics:
+            - name: smb.server_shares_current_open_file_count
+              description: Current open file count on the SMB share
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: smb.server_shares_write_requests
+              description: Write requests on the SMB share
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: writes
+            - name: smb.server_shares_read_requests
+              description: Read requests on the SMB share
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: reads
+            - name: smb.server_shares_metadata_requests
+              description: Metadata requests on the SMB share
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: metadata
+            - name: smb.server_shares_files_opened
+              description: Files opened on the SMB share
+              unit: files/s
+              chart_type: line
+              dimensions:
+                - name: opened
+            - name: smb.server_shares_tree_connects
+              description: Tree connects on the SMB share
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connects
+            - name: smb.server_shares_traffic
+              description: Traffic on the SMB share
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
         - name: ping target
           description: The Windows host as the poller pings it.
           labels:

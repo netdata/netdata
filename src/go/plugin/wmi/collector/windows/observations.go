@@ -39,6 +39,8 @@ type observations struct {
 	// _Total byte counts.
 	diskTotalRead    sample
 	diskTotalWritten sample
+	smbServer        [len(smbServerCounters)]sample
+	smbShares        []smbShare
 }
 
 // rawCounter is a raw performance counter that feeds one chart dimension.

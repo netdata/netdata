@@ -21,6 +21,7 @@ const (
 	modelLabel         = "model"
 	deviceIDLabel      = "device_id"
 	numaNodeLabel      = "node"
+	shareLabel         = "share"
 	// The go.d ping collector's label: the target as configured.
 	hostLabel = "host"
 
@@ -69,6 +70,8 @@ type collectorMetrics struct {
 	diskServiceTime  metrix.SnapshotGauge
 	diskReadSize     metrix.SnapshotGauge
 	diskWriteSize    metrix.SnapshotGauge
+	smbServer        [len(smbServerCounters)]counterInstrument
+	smbShare         [len(smbShareCounters)]counterInstrument
 	pingRTTMin       metrix.SnapshotGauge
 	pingRTTMax       metrix.SnapshotGauge
 	pingRTTAvg       metrix.SnapshotGauge
@@ -132,6 +135,12 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	}
 	for i, counter := range diskCounters {
 		metrics.disk[i] = newCounterInstrument(m, counter.metric, counter.total)
+	}
+	for i, counter := range smbServerCounters {
+		metrics.smbServer[i] = newCounterInstrument(m, counter.metric, counter.total)
+	}
+	for i, counter := range smbShareCounters {
+		metrics.smbShare[i] = newCounterInstrument(m, counter.metric, counter.total)
 	}
 	// Chart variables are sent unscaled, so the speed variable has its own gauge.
 	metrics.netSpeedKbps = m.Gauge("network_speed_kilobits_per_second", metrix.WithFloat(true))
@@ -199,9 +208,9 @@ func (p protocolInstruments) observe(values [ipVersions]sample) {
 }
 
 // write records the valid samples. Label sets are built per poll, so a
-// processor, paging file, NUMA node, interface, drive or disk that disappears
-// stops being observed. Raw totals are counters: Netdata computes their rate over each
-// collection interval.
+// processor, paging file, NUMA node, interface, drive, disk or share that
+// disappears stops being observed. Raw totals are counters: Netdata computes
+// their rate over each collection interval.
 func (m collectorMetrics) write(snapshot observations) {
 	if snapshot.cpu.hasTotal {
 		observeShares(m.cpuTotal, snapshot.cpu.total)
@@ -300,6 +309,18 @@ func (m collectorMetrics) write(snapshot observations) {
 		observe(m.diskServiceTime, disk.interval.serviceTime, labels)
 		observe(m.diskReadSize, disk.interval.readSize, labels)
 		observe(m.diskWriteSize, disk.interval.writeSize, labels)
+	}
+	for i, s := range snapshot.smbServer {
+		m.smbServer[i].observe(s)
+	}
+	for _, share := range snapshot.smbShares {
+		labels := m.meter.LabelSet(metrix.Label{
+			Key:   shareLabel,
+			Value: share.name,
+		})
+		for i, s := range share.values {
+			m.smbShare[i].observe(s, labels)
+		}
 	}
 }
 

@@ -75,7 +75,9 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 			wantErr:    "failed to open WMI session",
 		},
 		"no group succeeded": {
-			options: map[string]any{"collectors": map[string]any{"system": false, "network": false, "disk": false}},
+			options: map[string]any{
+				"collectors": map[string]any{"system": false, "network": false, "disk": false, "smb": false},
+			},
 			newSession: sessionWith(map[string]queryResult{
 				queryCPU:    {err: classified},
 				queryMemory: {},
