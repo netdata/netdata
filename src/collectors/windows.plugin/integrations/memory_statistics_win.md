@@ -99,7 +99,12 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ committed_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.committed | Commit charge as a percentage of the commit limit (RAM plus paging files). Allocations fail when it reaches the limit and the paging files cannot grow |
 
 
 
@@ -122,6 +127,7 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
+| mem.available | Available RAM for applications | avail | MiB |
 | mem.swap_iops | Swap Operations | read, write | operations/s |
 | mem.swapio | Swap I/O | in, out | KiB/s |
 | mem.system_pool_size | System Memory Pool | paged, non-paged | bytes |
