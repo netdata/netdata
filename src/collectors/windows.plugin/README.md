@@ -84,8 +84,9 @@ sums the remaining queues into an `Other (aggregated)` series. Configure it in `
 `queues to ignore` drops matching queues completely: they get no charts and are not added to `Other`. It is empty by
 default, so no queue is ignored. Use it for queues you never want to see, such as temporary queues whose names change.
 For example, `queues to ignore = *dbsync-*,*\private$\scratch` ignores every queue whose name contains `dbsync-` and
-the private queue `scratch`. The first matching pattern wins, so a leading `!` exempts a queue from the list:
-`!*dbsync-keep,*dbsync-*` ignores every `dbsync-` queue except `dbsync-keep`. A negative-only list ignores nothing.
+the private queue `scratch`. The first matching pattern wins, so a leading `!` exempts queues from the list:
+`!*dbsync-keep,*dbsync-*` ignores every `dbsync-` queue except those whose names end in `dbsync-keep`. A
+negative-only list ignores nothing.
 
 Ignored queues are removed first. The remaining queues are then routed by `queues to chart individually` and the cap.
 
