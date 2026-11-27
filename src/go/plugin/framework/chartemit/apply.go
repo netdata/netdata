@@ -202,6 +202,10 @@ func normalizeActions(actions []EngineAction) normalizedActions {
 		case UpdateChartLabelsAction:
 			out.updateLabels = append(out.updateLabels, v)
 		case UpdateChartAction:
+			if out.updateCharts == nil {
+				// Steady plans are mostly value updates; one block avoids append growth.
+				out.updateCharts = make([]UpdateChartAction, 0, len(actions))
+			}
 			out.updateCharts = append(out.updateCharts, v)
 		case RemoveDimensionAction:
 			out.removeDimensions = append(out.removeDimensions, v)
