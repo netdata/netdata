@@ -20,57 +20,82 @@ const (
 	// The go.d ping collector's label: the target as configured.
 	hostLabel = "host"
 
-	// The Network Interface counter set lists the interfaces the native agent
-	// calls real; it calls the extra Network Adapter instances virtual.
-	realInterface = "real"
+	realInterface    = "real"
+	virtualInterface = "virtual"
 	// The disk query reads fixed drives only and leaves out read-only ones.
 	fixedDrive    = "fixed"
 	readWriteMode = "rw"
 )
 
 type collectorMetrics struct {
-	meter       metrix.SnapshotMeter
-	cpuTotal    [len(cpuModes)]metrix.SnapshotGauge
-	cpuCore     [len(cpuModes)]metrix.SnapshotGauge
-	memoryFree  metrix.SnapshotGauge
-	memoryUsed  metrix.SnapshotGauge
-	netReceived metrix.SnapshotCounter
-	netSent     metrix.SnapshotCounter
-	diskAvail   metrix.SnapshotGauge
-	diskUsed    metrix.SnapshotGauge
-	pingRTTMin  metrix.SnapshotGauge
-	pingRTTMax  metrix.SnapshotGauge
-	pingRTTAvg  metrix.SnapshotGauge
-	pingRTTDev  metrix.SnapshotGauge
-	pingLoss    metrix.SnapshotGauge
+	meter            metrix.SnapshotMeter
+	cpuTotal         [len(cpuModes)]metrix.SnapshotGauge
+	cpuCore          [len(cpuModes)]metrix.SnapshotGauge
+	memoryFree       metrix.SnapshotGauge
+	memoryUsed       metrix.SnapshotGauge
+	netInterface     [len(interfaceCounters)]interfaceInstrument
+	netSpeedKbps     metrix.SnapshotGauge
+	netTotalReceived metrix.SnapshotCounter
+	netTotalSent     metrix.SnapshotCounter
+	diskAvail        metrix.SnapshotGauge
+	diskUsed         metrix.SnapshotGauge
+	pingRTTMin       metrix.SnapshotGauge
+	pingRTTMax       metrix.SnapshotGauge
+	pingRTTAvg       metrix.SnapshotGauge
+	pingRTTDev       metrix.SnapshotGauge
+	pingLoss         metrix.SnapshotGauge
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	m := store.Write().SnapshotMeter("")
 	metrics := collectorMetrics{
-		meter:       m,
-		memoryFree:  m.Gauge("memory_free_bytes"),
-		memoryUsed:  m.Gauge("memory_used_bytes"),
-		netReceived: m.Counter("network_received_bytes"),
-		netSent:     m.Counter("network_sent_bytes"),
-		diskAvail:   m.Gauge("disk_avail_bytes"),
-		diskUsed:    m.Gauge("disk_used_bytes"),
-		pingRTTMin:  m.Gauge("ping_rtt_min"),
-		pingRTTMax:  m.Gauge("ping_rtt_max"),
-		pingRTTAvg:  m.Gauge("ping_rtt_avg"),
-		pingRTTDev:  m.Gauge("ping_rtt_std_dev"),
-		pingLoss:    m.Gauge("ping_packet_loss"),
+		meter:            m,
+		memoryFree:       m.Gauge("memory_free_bytes"),
+		memoryUsed:       m.Gauge("memory_used_bytes"),
+		netTotalReceived: m.Counter("network_total_received_bytes"),
+		netTotalSent:     m.Counter("network_total_sent_bytes"),
+		diskAvail:        m.Gauge("disk_avail_bytes"),
+		diskUsed:         m.Gauge("disk_used_bytes"),
+		pingRTTMin:       m.Gauge("ping_rtt_min"),
+		pingRTTMax:       m.Gauge("ping_rtt_max"),
+		pingRTTAvg:       m.Gauge("ping_rtt_avg"),
+		pingRTTDev:       m.Gauge("ping_rtt_std_dev"),
+		pingLoss:         m.Gauge("ping_packet_loss"),
 	}
 	for i, mode := range cpuModes {
 		metrics.cpuTotal[i] = m.Gauge("cpu_total_"+mode+"_percent", metrix.WithFloat(true))
 		metrics.cpuCore[i] = m.Gauge("cpu_core_"+mode+"_percent", metrix.WithFloat(true))
 	}
+	for i, counter := range interfaceCounters {
+		if counter.total {
+			metrics.netInterface[i].total = m.Counter(counter.metric)
+		} else {
+			metrics.netInterface[i].gauge = m.Gauge(counter.metric)
+		}
+	}
+	// Chart variables are sent unscaled, so the speed variable has its own gauge.
+	metrics.netSpeedKbps = m.Gauge("network_speed_kilobits_per_second", metrix.WithFloat(true))
 	return metrics
 }
 
+// interfaceInstrument records one interface counter: a count since the counter
+// started, or a current value.
+type interfaceInstrument struct {
+	total metrix.SnapshotCounter
+	gauge metrix.SnapshotGauge
+}
+
+func (i interfaceInstrument) observe(s sample, labels metrix.LabelSet) {
+	if i.total != nil {
+		observeTotal(i.total, s, labels)
+	} else {
+		observe(i.gauge, s, labels)
+	}
+}
+
 // write records the valid samples. Label sets are built per poll, so a
-// processor, interface or drive that disappears stops being observed. Byte
-// totals are counters: Netdata computes the traffic rate over each collection
+// processor, interface or drive that disappears stops being observed. Raw
+// totals are counters: Netdata computes their rate over each collection
 // interval.
 func (m collectorMetrics) write(snapshot observations) {
 	if snapshot.cpu.hasTotal {
@@ -85,7 +110,13 @@ func (m collectorMetrics) write(snapshot observations) {
 	}
 	observe(m.memoryFree, snapshot.memoryFree)
 	observe(m.memoryUsed, snapshot.memoryUsed)
+	observeTotal(m.netTotalReceived, snapshot.netTotalReceived)
+	observeTotal(m.netTotalSent, snapshot.netTotalSent)
 	for _, nic := range snapshot.interfaces {
+		interfaceType := realInterface
+		if nic.virtual {
+			interfaceType = virtualInterface
+		}
 		labels := m.meter.LabelSet(
 			metrix.Label{
 				Key:   deviceLabel,
@@ -93,11 +124,15 @@ func (m collectorMetrics) write(snapshot observations) {
 			},
 			metrix.Label{
 				Key:   interfaceTypeLabel,
-				Value: realInterface,
+				Value: interfaceType,
 			},
 		)
-		observeTotal(m.netReceived, nic.received, labels)
-		observeTotal(m.netSent, nic.sent, labels)
+		for i, s := range nic.values {
+			m.netInterface[i].observe(s, labels)
+		}
+		if speed := nic.values[currentBandwidth]; speed.valid {
+			m.netSpeedKbps.Observe(float64(speed.value)/1000, labels)
+		}
 	}
 	for _, drive := range snapshot.drives {
 		labels := m.meter.LabelSet(drive.labels()...)

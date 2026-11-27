@@ -8,28 +8,26 @@ import (
 	"strings"
 )
 
-// observations holds one poll's values in base units: bytes, byte counters,
+// observations holds one poll's values in base units: bytes, raw counters,
 // raw processor times and percent.
 type observations struct {
 	cpuTimes   cpuSample
 	cpu        cpuUtilization
 	memoryFree sample
 	memoryUsed sample
-	interfaces []networkTraffic
-	drives     []diskSpace
+	interfaces []networkInterface
+	// netTotalReceived and netTotalSent sum the byte totals of the Network
+	// Interface instances; physicalInterfaces names them.
+	netTotalReceived   sample
+	netTotalSent       sample
+	physicalInterfaces map[string]bool
+	drives             []diskSpace
 }
 
 // sample distinguishes a reported zero from a missing or malformed value.
 type sample struct {
 	value uint64
 	valid bool
-}
-
-// networkTraffic holds an interface's byte totals since its counters started.
-type networkTraffic struct {
-	device   string
-	received sample
-	sent     sample
 }
 
 type diskSpace struct {
@@ -55,34 +53,6 @@ func (o *observations) readMemory(rows []map[string]any) bool {
 	o.memoryFree = free
 	o.memoryUsed = used(total, free)
 	return free.valid
-}
-
-// readNetwork keeps the interfaces that have carried traffic. Like the native
-// Windows Agent, it does not chart an interface whose counters show no byte
-// since they started, such as an unused tunnel adapter.
-func (o *observations) readNetwork(rows []map[string]any) bool {
-	var usable bool
-	for _, row := range rows {
-		name, _ := row["name"].(string)
-		if strings.TrimSpace(name) == "" || name == "_Total" {
-			continue
-		}
-		received := readUnsigned(row["bytesreceivedpersec"])
-		sent := readUnsigned(row["bytessentpersec"])
-		if !received.valid && !sent.valid {
-			continue
-		}
-		usable = true
-		if received.value == 0 && sent.value == 0 {
-			continue
-		}
-		o.interfaces = append(o.interfaces, networkTraffic{
-			device:   name,
-			received: received,
-			sent:     sent,
-		})
-	}
-	return len(rows) == 0 || usable
 }
 
 // readDisks leaves out read-only drives, as the native Windows Agent does, so

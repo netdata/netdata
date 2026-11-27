@@ -45,7 +45,57 @@ func timedQueryResults() map[string]queryResult {
 		processorRow("0,0", 0, user, 0, 0, idle),
 		processorRow("0,1", 0, user, 0, 0, idle),
 	)
+	// Uplink and the virtual Team Member report every counter, the other
+	// interfaces only their byte totals.
+	interfaces := slices.Concat(
+		results[queryNetworkInterfaces].rows,
+		fixtureRows(nativeInterfaceRow("Uplink", 1000)).rows,
+	)
+	results[queryNetworkInterfaces] = queryResult{
+		rows: interfaces,
+	}
+	results[queryNetworkAdapters] = queryResult{
+		rows: slices.Concat(interfaces, fixtureRows(nativeInterfaceRow("Team Member", 2000)).rows),
+	}
 	return results
+}
+
+type nativeDimension struct {
+	context   string
+	dimension string
+}
+
+// nativeInterfaceCounters maps the WMI property of each counter the native
+// Windows Agent reads for an interface to the chart context and dimension it
+// feeds there (src/collectors/windows.plugin/perflib-network.c,
+// network_interface_init and do_network_interface).
+var nativeInterfaceCounters = map[string]nativeDimension{
+	"BytesReceivedPersec":          {"net.net", "received"},
+	"BytesSentPersec":              {"net.net", "sent"},
+	"PacketsReceivedPersec":        {"net.packets", "received"},
+	"PacketsSentPersec":            {"net.packets", "sent"},
+	"CurrentBandwidth":             {"net.speed", "speed"},
+	"PacketsReceivedErrors":        {"net.errors", "inbound"},
+	"PacketsOutboundErrors":        {"net.errors", "outbound"},
+	"PacketsReceivedDiscarded":     {"net.drops", "inbound"},
+	"PacketsOutboundDiscarded":     {"net.drops", "outbound"},
+	"PacketsReceivedUnknown":       {"net.unknown_protocol_packets", "inbound"},
+	"OutputQueueLength":            {"net.queue_length", "length"},
+	"TCPActiveRSCConnections":      {"net.rsc_connections", "connections"},
+	"TCPRSCCoalescedPacketsPersec": {"net.rsc_packets", "packets"},
+	"TCPRSCExceptionsPersec":       {"net.rsc_exceptions", "exceptions"},
+	"TCPRSCAveragePacketSize":      {"net.rsc_average_packet_size", "average"},
+	"OffloadedConnections":         {"net.chimney_connections", "connections"},
+}
+
+// nativeInterfaceRow gives every counter of nativeInterfaceCounters a distinct
+// value from base up, in property name order.
+func nativeInterfaceRow(name string, base uint64) map[string]any {
+	row := map[string]any{"Name": name}
+	for i, property := range slices.Sorted(maps.Keys(nativeInterfaceCounters)) {
+		row[property] = base + uint64(i)
+	}
+	return row
 }
 
 // startJob runs the collector as a V2 job, inside a synctest bubble, and
@@ -230,6 +280,8 @@ type wireChart struct {
 	chartType  string
 	labels     map[string]string
 	dimensions []wireDimension
+	// variables are the chart variables the definition declares.
+	variables []string
 }
 
 var protocolField = regexp.MustCompile(`'([^']*)'|(\S+)`)
@@ -287,6 +339,15 @@ func parseCharts(t *testing.T, output string) map[string]*wireChart {
 			if !strings.HasPrefix(fields[1], "_") {
 				current.labels[fields[1]] = fields[2]
 			}
+		case "VARIABLE":
+			// VARIABLE CHART name = value; a definition declares each one once.
+			require.Len(t, fields, 5, line)
+			if current != nil && !slices.Contains(current.variables, fields[2]) {
+				current.variables = append(current.variables, fields[2])
+			}
+		case "BEGIN":
+			// Updates follow; a VARIABLE line there carries a value.
+			current = nil
 		}
 	}
 	return charts
@@ -328,7 +389,8 @@ func publishedCharts(t *testing.T) []wireChart {
 // contexts are the native Windows Agent's
 // src/collectors/windows.plugin/perflib-processor.c (system.cpu, cpu.cpu),
 // src/collectors/common-contexts/system-ram.h (system.ram),
-// src/collectors/windows.plugin/perflib-network.c (net.net) and
+// src/collectors/windows.plugin/perflib-network.c (system.net and the net.*
+// interface charts) and
 // src/collectors/windows.plugin/perflib-storage.c (disk.space). The ping.*
 // entries are the wire form of the go.d ping collector's definitions, which
 // TestPingChartsMatchPingCollector compares with that collector's template.
@@ -342,6 +404,17 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		{name: "system", algorithm: "absolute", multiplier: 1, divisor: 1},
 		{name: "dpc", algorithm: "absolute", multiplier: 1, divisor: 1},
 		{name: "idle", algorithm: "absolute", multiplier: 1, divisor: 1, hidden: true},
+	}
+	bandwidth := []wireDimension{
+		{name: "received", algorithm: "incremental", multiplier: 8, divisor: 1000},
+		{name: "sent", algorithm: "incremental", multiplier: -8, divisor: 1000},
+	}
+	inboundOutbound := []wireDimension{
+		{name: "inbound", algorithm: "incremental", multiplier: 1, divisor: 1},
+		{name: "outbound", algorithm: "incremental", multiplier: -1, divisor: 1},
+	}
+	single := func(name, algorithm string, divisor int) []wireDimension {
+		return []wireDimension{{name: name, algorithm: algorithm, multiplier: 1, divisor: divisor}}
 	}
 	native := map[string]wireChart{
 		"system.cpu": {
@@ -365,14 +438,87 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 				{name: "used", algorithm: "absolute", multiplier: 1, divisor: 1048576},
 			},
 		},
+		"system.net": {
+			title:      "Physical Network Interfaces Aggregated Bandwidth",
+			units:      "kilobits/s",
+			chartType:  "area",
+			dimensions: bandwidth,
+		},
 		"net.net": {
-			title:     "Bandwidth",
-			units:     "kilobits/s",
-			chartType: "area",
+			title:      "Bandwidth",
+			units:      "kilobits/s",
+			chartType:  "area",
+			dimensions: bandwidth,
+			variables:  []string{"nic_speed_max"},
+		},
+		"net.packets": {
+			title:     "Packets",
+			units:     "packets/s",
+			chartType: "line",
 			dimensions: []wireDimension{
-				{name: "received", algorithm: "incremental", multiplier: 8, divisor: 1000},
-				{name: "sent", algorithm: "incremental", multiplier: -8, divisor: 1000},
+				{name: "received", algorithm: "incremental", multiplier: 1, divisor: 1},
+				{name: "sent", algorithm: "incremental", multiplier: -1, divisor: 1},
 			},
+		},
+		"net.speed": {
+			title:      "Interface Speed",
+			units:      "kilobits/s",
+			chartType:  "line",
+			dimensions: single("speed", "absolute", 1000),
+		},
+		"net.errors": {
+			title:      "Interface Errors",
+			units:      "errors/s",
+			chartType:  "line",
+			dimensions: inboundOutbound,
+		},
+		"net.drops": {
+			title:      "Interface Drops",
+			units:      "drops/s",
+			chartType:  "line",
+			dimensions: inboundOutbound,
+		},
+		"net.unknown_protocol_packets": {
+			title:      "Packets Received with Unknown Protocol",
+			units:      "packets/s",
+			chartType:  "line",
+			dimensions: single("inbound", "incremental", 1),
+		},
+		"net.queue_length": {
+			title:      "Interface Output Queue Length",
+			units:      "packets",
+			chartType:  "line",
+			dimensions: single("length", "absolute", 1),
+		},
+		"net.rsc_connections": {
+			title:      "Active TCP Connections Offloaded by RSC",
+			units:      "connections",
+			chartType:  "line",
+			dimensions: single("connections", "absolute", 1),
+		},
+		"net.rsc_packets": {
+			title:      "TCP RSC Coalesced Packets",
+			units:      "packets/s",
+			chartType:  "line",
+			dimensions: single("packets", "incremental", 1),
+		},
+		"net.rsc_exceptions": {
+			title:      "TCP RSC Exceptions",
+			units:      "exceptions/s",
+			chartType:  "line",
+			dimensions: single("exceptions", "incremental", 1),
+		},
+		"net.rsc_average_packet_size": {
+			title:      "TCP RSC Average Packet Size",
+			units:      "bytes",
+			chartType:  "line",
+			dimensions: single("average", "absolute", 1),
+		},
+		"net.chimney_connections": {
+			title:      "Active TCP Connections Offloaded with Chimney",
+			units:      "connections",
+			chartType:  "line",
+			dimensions: single("connections", "absolute", 1),
 		},
 		"disk.space": {
 			title:     "Disk Space Usage",
@@ -417,12 +563,15 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		return chart
 	}
 
-	// One chart per instance in the fixture; the interface without traffic has none.
-	assert.ElementsMatch(t, []wireChart{
+	// One chart per instance in the fixture. Ethernet and Ethernet#1 report
+	// only their byte totals; the interface without traffic has none, and the
+	// adapters that are also interfaces are charted once, as real.
+	want := []wireChart{
 		instance("system.cpu", map[string]string{}),
 		instance("cpu.cpu", map[string]string{"cpu": "cpu0"}),
 		instance("cpu.cpu", map[string]string{"cpu": "cpu1"}),
 		instance("system.ram", map[string]string{}),
+		instance("system.net", map[string]string{}),
 		instance("net.net", map[string]string{"device": "Ethernet", "interface_type": "real"}),
 		instance("net.net", map[string]string{"device": "Ethernet#1", "interface_type": "real"}),
 		instance("disk.space", map[string]string{
@@ -442,7 +591,92 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("ping.host_rtt", map[string]string{"host": "windows.example.com"}),
 		instance("ping.host_std_dev_rtt", map[string]string{"host": "windows.example.com"}),
 		instance("ping.host_packet_loss", map[string]string{"host": "windows.example.com"}),
-	}, publishedCharts(t))
+	}
+	for context := range native {
+		if strings.HasPrefix(context, "net.") {
+			want = append(want,
+				instance(context, map[string]string{"device": "Uplink", "interface_type": "real"}),
+				instance(context, map[string]string{"device": "Team Member", "interface_type": "virtual"}),
+			)
+		}
+	}
+	assert.ElementsMatch(t, want, publishedCharts(t))
+}
+
+// TestCollector_InterfaceCountersFeedNativeDimensions checks that each WMI
+// counter reaches the native chart dimension that reads it.
+func TestCollector_InterfaceCountersFeedNativeDimensions(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := configuredCollector()
+		c.Vnode = "fixture"
+		c.newSession = func(context.Context) (querySession, error) {
+			return &fakeSession{
+				results: timedQueryResults(),
+			}, nil
+		}
+		collect := startJob(t, c, vnodes.VirtualNode{
+			Name:     "fixture",
+			Hostname: "fixture",
+			GUID:     "245dea48-ae2a-4697-a22e-050e7e358afb",
+		})
+		output := collect(c.UpdateEvery)
+		charts := parseCharts(t, output)
+		samples := parseSamples(t, output)
+
+		want := make(map[string]map[nativeDimension]float64)
+		got := make(map[string]map[nativeDimension]float64)
+		for device, base := range map[string]uint64{"Uplink": 1000, "Team Member": 2000} {
+			want[device] = make(map[nativeDimension]float64)
+			row := nativeInterfaceRow(device, base)
+			for property, value := range row {
+				if property != "Name" {
+					want[device][nativeInterfaceCounters[property]] = float64(value.(uint64))
+				}
+			}
+			// The native agent sets net.net's nic_speed_max to the speed in kilobits/s.
+			want[device][nativeDimension{"net.net", "$nic_speed_max"}] = float64(row["CurrentBandwidth"].(uint64)) / 1000
+			got[device] = make(map[nativeDimension]float64)
+			for id, chart := range charts {
+				if chart.labels["device"] != device {
+					continue
+				}
+				for dimension, value := range samples[id] {
+					got[device][nativeDimension{chart.context, dimension}] = value
+				}
+			}
+		}
+		assert.Equal(t, want, got)
+	})
+}
+
+// parseSamples reads the collected values from plugin protocol output, by
+// chart ID and dimension name, or by $name for a chart variable.
+func parseSamples(t *testing.T, output string) map[string]map[string]float64 {
+	t.Helper()
+	samples := make(map[string]map[string]float64)
+	var current map[string]float64
+	for line := range strings.Lines(output) {
+		var fields []string
+		for _, match := range protocolField.FindAllStringSubmatch(line, -1) {
+			fields = append(fields, match[1]+match[2])
+		}
+		switch {
+		case len(fields) >= 2 && fields[0] == "BEGIN":
+			current = make(map[string]float64)
+			samples[fields[1]] = current
+		case len(fields) >= 1 && fields[0] == "END":
+			current = nil
+		case len(fields) == 4 && fields[0] == "SET" && current != nil:
+			value, err := strconv.ParseInt(fields[3], 10, 64)
+			require.NoError(t, err, line)
+			current[fields[1]] = float64(value)
+		case len(fields) == 5 && fields[0] == "VARIABLE" && current != nil:
+			value, err := strconv.ParseFloat(fields[4], 64)
+			require.NoError(t, err, line)
+			current["$"+fields[2]] = value
+		}
+	}
+	return samples
 }
 
 // TestMetadataDocumentsChartLabels requires every metadata scope to document

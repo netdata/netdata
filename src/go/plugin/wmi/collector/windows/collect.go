@@ -18,17 +18,19 @@ const (
 	// each query, not the interval between polls.
 	queryCPU = "SELECT Name, PercentInterruptTime, PercentUserTime, PercentPrivilegedTime, PercentDPCTime, " +
 		"PercentIdleTime FROM Win32_PerfRawData_Counters_ProcessorInformation"
-	queryMemory  = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
-	queryNetwork = "SELECT Name, BytesReceivedPersec, BytesSentPersec FROM Win32_PerfRawData_Tcpip_NetworkInterface"
-	queryDisk    = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
+	queryMemory = "SELECT TotalVisibleMemorySize, FreePhysicalMemory FROM Win32_OperatingSystem"
+	queryDisk   = "SELECT DeviceID, Size, FreeSpace, FileSystem, VolumeSerialNumber, Access FROM Win32_LogicalDisk " +
 		"WHERE DriveType = 3"
 )
 
 type metricGroup struct {
 	name    string
 	enabled bool
-	query   string
-	read    func([]map[string]any) bool
+	// needs, when set, reports whether the earlier queries of this poll gave the
+	// observations this query's rows depend on; the query is skipped otherwise.
+	needs func() bool
+	query string
+	read  func([]map[string]any) bool
 }
 
 // poll opens one session, queries every enabled metric group and, when due,
@@ -55,7 +57,21 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	groups := [...]metricGroup{
 		{name: "CPU", enabled: groupEnabled(c.Collectors.CPU), query: queryCPU, read: snapshot.readCPU},
 		{name: "memory", enabled: groupEnabled(c.Collectors.Memory), query: queryMemory, read: snapshot.readMemory},
-		{name: "network", enabled: groupEnabled(c.Collectors.Network), query: queryNetwork, read: snapshot.readNetwork},
+		{
+			name:    "network",
+			enabled: groupEnabled(c.Collectors.Network),
+			query:   queryNetworkInterfaces,
+			read:    snapshot.readNetworkInterfaces,
+		},
+		{
+			name:    "network adapter",
+			enabled: groupEnabled(c.Collectors.Network),
+			// Adapters are virtual only when this poll's interface list lacks
+			// them; a host reached over the network lists at least one interface.
+			needs: func() bool { return len(snapshot.physicalInterfaces) > 0 },
+			query: queryNetworkAdapters,
+			read:  snapshot.readNetworkAdapters,
+		},
 		{
 			name:    "disk",
 			enabled: groupEnabled(c.Collectors.Disk),
@@ -72,7 +88,7 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 	var succeeded, reached, sessionLost bool
 	var failures [len(groups)]error
 	for i, group := range groups {
-		if !group.enabled {
+		if !group.enabled || (group.needs != nil && !group.needs()) {
 			continue
 		}
 		if ctx.Err() != nil {
