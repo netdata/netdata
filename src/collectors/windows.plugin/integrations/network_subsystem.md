@@ -158,14 +158,14 @@ Metrics:
 | ipv4.tcppackets | IPv4 TCP Packets | received, sent | packets/s |
 | ipv4.udppackets | IPv4 UDP Packets | received, sent | packets/s |
 | ipv4.icmp | IPv4 ICMP Packets | received, sent | packets/s |
-| ipv4.errors | IPv4 Errors | InDiscards, OutDiscards, OutNoRoutes, InAddrErrors, InHdrErrors, InUnknownProtos | packets/s |
-| ipv4.icmpmsg | IPv4 ICMP Packets | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
+| ipv4.errors | IPv4 Errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, OutNoRoutes | packets/s |
+| ipv4.icmpmsg | IPv4 ICMP Packets | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
 | ipv6.packets | IPv6 Packets | received, sent, forwarded, delivered | packets/s |
 | ipv6.tcppackets | IPv6 TCP Packets | received, sent | packets/s |
 | ipv6.udppackets | IPv6 UDP Packets | received, sent | packets/s |
 | ipv6.icmp | IPv6 ICMP Packets | received, sent | packets/s |
-| ipv6.errors | IPv6 Errors | InDiscards, OutDiscards, OutNoRoutes, InAddrErrors, InHdrErrors, InUnknownProtos | packets/s |
-| ipv6.icmpmsg | IPv6 ICMP Packets | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
+| ipv6.errors | IPv6 Errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, OutNoRoutes | packets/s |
+| ipv6.icmpmsg | IPv6 ICMP Packets | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
 
 
 ### Per network device
