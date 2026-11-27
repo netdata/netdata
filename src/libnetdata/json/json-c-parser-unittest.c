@@ -2414,6 +2414,99 @@ static int test_json_walk_boolean_names(void) {
     return failed;
 }
 
+struct json_walk_array_elements_capture {
+    size_t objects;
+    size_t strings;
+    size_t other;
+    bool member_saw_object_data;
+};
+
+static int json_walk_array_elements_callback(JSON_ENTRY *e) {
+    struct json_walk_array_elements_capture *capture = e->callback_data;
+
+    switch(e->type) {
+        case JSON_OBJECT:
+            capture->objects++;
+            break;
+
+        case JSON_STRING:
+            capture->strings++;
+            break;
+
+        default:
+            capture->other++;
+            break;
+    }
+
+    return 0;
+}
+
+static int json_walk_array_elements_object_callback(JSON_ENTRY *e) {
+    struct json_walk_array_elements_capture *capture = e->callback_data;
+
+    if(e->type == JSON_OBJECT) {
+        capture->objects++;
+        e->callback_data = &capture[1];
+    }
+    else if(e->type == JSON_STRING && !strcmp(e->name, "k") && !strcmp(e->data.string, "v")) {
+        // capture is the per-object slot the JSON_OBJECT callback installed
+        capture->member_saw_object_data = true;
+        capture->strings++;
+    }
+    else
+        capture->other++;
+
+    return 0;
+}
+
+static int test_json_walk_array_elements(void) {
+    int failed = 0;
+
+    static const struct {
+        const char *payload;
+        size_t objects;
+        size_t strings;
+    } cases[] = {
+        { "{\"a\":[1]}",      0, 0 },
+        { "{\"a\":[\"x\"]}",  0, 0 },
+        { "{\"a\":[true]}",   0, 0 },
+        { "{\"a\":[1.5]}",    0, 0 },
+        { "{\"a\":[null]}",   0, 0 },
+        { "{\"a\":[[1]]}",    0, 0 },
+        { "{\"a\":[[{}]]}",   1, 0 },
+        { "{\"a\":[[{\"k\":\"v\"}]]}", 1, 1 },
+        { "{\"type\":\"http\",\"a\":[1,\"x\",false,null,[2]]}", 0, 1 },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char payload[128];
+        strncpyz(payload, cases[i].payload, sizeof(payload) - 1);
+
+        struct json_walk_array_elements_capture capture = { 0 };
+        int rc = json_parse(payload, &capture, json_walk_array_elements_callback);
+        int before = failed;
+        T(rc == JSON_OK, "json_walk_array_elements: parse succeeds");
+        T(capture.objects == cases[i].objects, "json_walk_array_elements: object callbacks match");
+        T(capture.strings == cases[i].strings, "json_walk_array_elements: string callbacks match");
+        T(capture.other == 0, "json_walk_array_elements: no scalar element callbacks");
+        if(failed != before)
+            fprintf(stderr, "  ... for payload %s\n", cases[i].payload);
+    }
+
+    // an object element between scalars still gets its callbacks, with the callback_data its object callback set
+    char payload[] = "{\"a\":[1,{\"k\":\"v\"},\"x\",[true]]}";
+    struct json_walk_array_elements_capture capture[2] = { 0 };
+    int rc = json_parse(payload, capture, json_walk_array_elements_object_callback);
+    T(rc == JSON_OK, "json_walk_array_elements: mixed array parses");
+    T(capture[0].objects == 1, "json_walk_array_elements: one object callback for the mixed array");
+    T(capture[1].member_saw_object_data && capture[1].strings == 1,
+      "json_walk_array_elements: object member delivered with the object's callback_data");
+    T(capture[0].strings == 0 && capture[0].other == 0 && capture[1].other == 0,
+      "json_walk_array_elements: no stray callbacks for the mixed array");
+
+    return failed;
+}
+
 // ============================================================================
 // Entry point
 // ============================================================================
@@ -2447,6 +2540,7 @@ int json_c_parser_unittest(void) {
         { "FUNCTION_PAYLOAD_ERROR_CAP", test_parse_function_payload_error_cap },
         { "FUNCTION_PAYLOAD_EMPTY_ERROR_FALLBACK", test_parse_function_payload_empty_error_fallback },
         { "JSON_WALK_BOOLEAN_NAMES", test_json_walk_boolean_names },
+        { "JSON_WALK_ARRAY_ELEMENTS", test_json_walk_array_elements },
         { NULL, NULL }
     };
 

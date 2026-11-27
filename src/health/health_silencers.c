@@ -125,23 +125,10 @@ static int health_silencers_json_read_callback(JSON_ENTRY *e)
 {
     switch(e->type) {
         case JSON_OBJECT:
-#ifndef ENABLE_JSONC
-            e->callback_function = health_silencers_json_read_callback;
-            if(strcmp(e->name,"")) {
-                // init silencer
-                netdata_log_debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
-#endif
-                e->callback_data = create_silencer();
-                if(e->callback_data) {
-                    health_silencers_add_unsafe(e->callback_data);
-                }
-#ifndef ENABLE_JSONC
+            e->callback_data = create_silencer();
+            if(e->callback_data) {
+                health_silencers_add_unsafe(e->callback_data);
             }
-#endif
-            break;
-
-        case JSON_ARRAY:
-            e->callback_function = health_silencers_json_read_callback;
             break;
 
         case JSON_STRING:
@@ -161,6 +148,7 @@ static int health_silencers_json_read_callback(JSON_ENTRY *e)
             silencers->all_alarms=e->data.boolean?1:0;
             break;
 
+        case JSON_ARRAY:
         case JSON_NUMBER:
         case JSON_NULL:
             break;

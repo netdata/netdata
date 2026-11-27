@@ -587,7 +587,7 @@ class StaticOverlayTests(unittest.TestCase):
             for relative in ('etc/netdata', 'var/lib/netdata', 'system', 'bin', 'usr/share/netdata'):
                 (base / relative).mkdir(parents=True)
         (self.stage / 'bin/bash').symlink_to(shutil.which('bash'))
-        (self.stage / 'system/functions.sh').write_text('')
+        shutil.copyfile(HELPER.parent / 'functions.sh', self.stage / 'system/functions.sh')
         shutil.copyfile(HELPER, self.stage / 'system/netdata-dem-pair.sh')
         (self.stage / 'system/install-or-update.sh').write_text(
             '#!/bin/sh\nprintf completed > ' + shlex.quote(str(self.marker)) + '\n')
@@ -655,6 +655,48 @@ class StaticOverlayTests(unittest.TestCase):
                 self.assertEqual((target / 'go.d').stat().st_mode & 0o777, 0o711)
                 self.assertEqual((target / 'local.conf').read_text(), 'administrator config')
                 self.assertFalse((target / 'stock.conf').exists())
+
+    def test_dashboard_overlay_reclaims_only_stale_v3_files(self):
+        web = Path('usr/share/netdata/web')
+        for base in (self.stage, self.target):
+            (base / web / 'v3/nested').mkdir(parents=True)
+        (self.target / 'bin/netdata').symlink_to(shutil.which('true'))
+        (self.stage / web / 'v3/index.html').write_text('new dashboard')
+        (self.stage / web / 'v3/nested/current.js').write_text('new asset')
+        (self.target / web / 'v3/nested/obsolete.gif').write_text('old asset')
+        (self.target / web / 'custom.html').write_text('local dashboard')
+        shutil.copyfile(HELPER.parent / 'cleanup-dashboard.sh', self.stage / 'system/cleanup-dashboard.sh')
+        result = self.run_static()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.target / web / 'v3/nested/obsolete.gif').exists())
+        self.assertEqual((self.target / web / 'v3/index.html').read_text(), 'new dashboard')
+        self.assertEqual((self.target / web / 'v3/nested/current.js').read_text(), 'new asset')
+        self.assertEqual((self.target / web / 'custom.html').read_text(), 'local dashboard')
+
+    def test_dashboard_cleanup_failure_allows_paired_activation(self):
+        (self.target / 'bin/netdata').symlink_to(shutil.which('true'))
+        (self.stage / 'system/cleanup-dashboard.sh').write_text('exit 37\n')
+        with (self.stage / 'system/netdata-dem-pair.sh').open('a') as helper:
+            helper.write('''
+dem_pair_plan() { DP_ENABLED=1; DP_MODE=managed; }
+dem_pair_begin() { DP_ACTIVE=1; DP_WAS_RUNNING=1; DP_KEEP_RUNTIME=0; }
+dem_pair_runtime() { echo "$1" >> "$EVENTS"; return "$ACTIVATION_STATUS"; }
+dem_pair_owner_start() { echo start >> "$EVENTS"; }
+''')
+        events = self.root / 'events'
+        for options, activation, expected in (
+            ((), 0, ['activate', 'start']),
+            (('--dont-start-it',), 0, ['activate']),
+            ((), 43, ['activate']),
+        ):
+            with self.subTest(options=options, activation=activation):
+                events.write_text('')
+                self.marker.write_text('pending')
+                result = self.run_static(options=options, EVENTS=str(events), ACTIVATION_STATUS=str(activation))
+                self.assertEqual(self.marker.read_text(), 'completed')
+                self.assertEqual(events.read_text().splitlines(), expected)
+                self.assertIn('Dashboard cleanup failed: 37', result.stderr)
+                self.assertEqual(result.returncode, activation, result.stderr)
 
     def test_relocated_state_parents_remain_symlinks_after_overlay(self):
         self.check_relocated_state_parents()

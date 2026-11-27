@@ -44,6 +44,12 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     if(!qt || qt->request.cardinality_limit == 0 || r->d <= qt->request.cardinality_limit)
         return r;
 
+    // a cancelled query stops before every column is filled in (v1 leaves
+    // the flags of the columns it did not reach uninitialized) and its
+    // result is not returned - do not rank it
+    if(r->view.flags & RRDR_RESULT_FLAG_CANCEL)
+        return r;
+
     ONEWAYALLOC *owa = r->internal.owa;
 
     // Calculate contribution of each dimension using dview statistics (sum of values)
@@ -132,6 +138,13 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     // Copy timestamps
     memcpy(new_r->t, r->t, r->n * sizeof(time_t));
 
+    // v1 result columns are query metrics in query order, and the v1
+    // wrapper describes each column with its metric (chart id, chart labels,
+    // latest collected value): record where every column came from
+    if(qt->request.version < 2)
+        new_r->cardinality.source_metric = onewayalloc_mallocz(
+            owa, onewayalloc_mul_or_fatal(new_d, sizeof(*new_r->cardinality.source_metric), "RRDR source metrics"));
+
     // Setup the arrays of the new RRDR, mirroring the arrays present in the
     // source RRDR: the formatters expect the reduced result to be
     // structurally identical to the original one - a missing array either
@@ -199,6 +212,9 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         if(new_r->result_units)
             new_r->result_units[i] = string_dup(r->result_units[src_d]);
 
+        if(new_r->cardinality.source_metric)
+            new_r->cardinality.source_metric[i] = src_d;
+
         if(new_r->dp)
             new_r->dp[i] = r->dp[src_d];
 
@@ -246,6 +262,9 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         new_r->di[remaining_idx] = string_strdupz(remaining_name);
         new_r->dn[remaining_idx] = string_strdupz(remaining_name);
         new_r->od[remaining_idx] = RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO;
+
+        if(new_r->cardinality.source_metric)
+            new_r->cardinality.source_metric[remaining_idx] = SIZE_MAX;
 
         // Use the units and priority from the first remaining dimension
         size_t first_remaining_d = sorted_dims[kept_dimensions].dim_idx;
@@ -382,7 +401,26 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         }
     }
 
+    // re-point the grouped metrics to the dimensions of the reduced RRDR:
+    // kept dimensions move to their new index, folded ones to the remaining
+    // bucket, and dimensions dropped by the reduction (not queried) to none
+    uint32_t *new_slot = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal(r->d, sizeof(*new_slot), "RRDR cardinality slots"));
+
+    for (size_t d = 0; d < r->d; d++)
+        new_slot[d] = QUERY_METRIC_NOT_GROUPED_SLOT;
+
+    for (size_t i = 0; i < queried_count; i++)
+        new_slot[sorted_dims[i].dim_idx] = (uint32_t)(i < kept_dimensions ? i : kept_dimensions);
+
+    for (size_t m = 0; m < qt->query.used; m++) {
+        QUERY_METRIC *qm = query_metric(qt, m);
+        if (qm->status & RRDR_DIMENSION_GROUPED)
+            qm->grouped_as.slot = qm->grouped_as.slot < r->d ? new_slot[qm->grouped_as.slot] : QUERY_METRIC_NOT_GROUPED_SLOT;
+    }
+
     // Cleanup
+    onewayalloc_freez(owa, new_slot);
     onewayalloc_freez(owa, contributions);
     onewayalloc_freez(owa, sorted_dims);
 

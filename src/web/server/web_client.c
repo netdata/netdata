@@ -335,36 +335,44 @@ static int append_slash_to_url_and_redirect(struct web_client *w) {
     //
     // It adds a Location header like this:
     //
-    //       Location: file/?query_string\r\n
+    //       Location: ./file/?query_string\r\n
     //
     // The web browser already knows that it is inside /path/to/
     // so it converts the path to /path/to/file/ and executes the
     // request again.
+    //
+    // The component is taken from the URL as received, while the directory
+    // was found from the decoded path, so it is not always a directory name:
+    // "/v3%3F/https:evil.example" serves /v3 and its last component is
+    // "https:evil.example". The leading "./" keeps a component with a colon
+    // from being read as a URL scheme (RFC 3986, section 4.2).
+    //
+    // When the URL as received already ends in a slash ("/v3%3F/"), its last
+    // component is empty: appending a slash does not change the decoded path,
+    // so a browser following the redirect is redirected again, in a loop.
 
-    buffer_strcat(w->response.header, "Location: ");
     const char *b = buffer_tostring(w->url_as_received);
-    size_t url_len = buffer_strlen(w->url_as_received);
     const char *q = strchr(b, '?');
-    if(q && q > b) {
-        const char *e = q - 1;
-        while(e > b && *e != '/') e--;
-        if(*e == '/') e++;
+    if(!q || q == b)
+        q = b + buffer_strlen(w->url_as_received);
 
-        size_t len = q - e;
-        buffer_strncat(w->response.header, e, len);
-        buffer_strncat(w->response.header, "/", 1);
-        buffer_strcat(w->response.header, q);
-    }
-    else {
-        const char *e = b + url_len;
-        if(e > b) e--;
-        while(e > b && *e != '/') e--;
-        if(*e == '/') e++;
+    const char *e = q;
+    if(e > b) e--;
+    while(e > b && *e != '/') e--;
+    if(*e == '/') e++;
 
-        buffer_strcat(w->response.header, e);
-        buffer_strncat(w->response.header, "/", 1);
+    size_t len = q - e;
+    if(!len) {
+        w->response.data->content_type = CT_TEXT_PLAIN;
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Cannot redirect this path to a trailing slash.");
+        return HTTP_RESP_BAD_REQUEST;
     }
 
+    buffer_strcat(w->response.header, "Location: ./");
+    buffer_strncat(w->response.header, e, len);
+    buffer_strncat(w->response.header, "/", 1);
+    buffer_strcat(w->response.header, q);
     buffer_strncat(w->response.header, "\r\n", 2);
 
     w->response.data->content_type = CT_TEXT_HTML;
@@ -864,8 +872,15 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     //we search for the position where we have " HTTP/", because it finishes the user request
     char *request_line_end = s;
-    while(request_line_end < request_end && *request_line_end && *request_line_end != '\r')
+    while(request_line_end < request_end && *request_line_end && *request_line_end != '\r' && *request_line_end != '\n')
         request_line_end++;
+
+    // a CR or LF that is not part of the terminating CRLF (RFC 9112 2.2) would stay in the request target,
+    // which is echoed as received into the Location header of the HTTPS redirect
+    if(request_line_end < request_end &&
+       (*request_line_end == '\n' ||
+        (*request_line_end == '\r' && request_line_end + 1 < request_end && request_line_end[1] != '\n')))
+        return http_request_malformed_header(w);
 
     s = url_find_protocol(s, request_line_end);
 

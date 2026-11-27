@@ -59,8 +59,13 @@ static int parse_passwd_response(const char *json_str, struct auth_data *auth) {
 
     json = json_tokener_parse(json_str);
     if (!json) {
-        netdata_log_error("ACLK: JSON-C failed to parse the payload of http response of /env endpoint");
+        netdata_log_error("ACLK: JSON-C failed to parse the payload of http response of /password endpoint");
         return 1;
+    }
+
+    if (!json_object_is_type(json, json_type_object)) {
+        netdata_log_error("ACLK: /password response is not a JSON object");
+        goto exit;
     }
 
     it = json_object_iter_begin(json);
@@ -117,6 +122,12 @@ static int parse_passwd_response(const char *json_str, struct auth_data *auth) {
 
     rc = 0;
 exit:
+    if (rc) {
+        freez(auth->client_id);
+        freez(auth->username);
+        freez(auth->passwd);
+        auth->client_id = auth->username = auth->passwd = NULL;
+    }
     json_object_put(json);
     return rc;
 }
@@ -213,6 +224,11 @@ static int aclk_parse_otp_error(const char *json_str) {
         return 1;
     }
 
+    if (!json_object_is_type(json, json_type_object)) {
+        netdata_log_error("ACLK: error response is not a JSON object");
+        goto exit;
+    }
+
     it = json_object_iter_begin(json);
     itEnd = json_object_iter_end(json);
 
@@ -280,6 +296,58 @@ exit:
 #define CHALLENGE_LEN_BASE64 344
 
 #define OTP_URL_PREFIX "/api/v1/auth/node/"
+
+// parses the body of a 200 OK reply to the challenge request
+static https_client_resp_t aclk_parse_otp_challenge(const https_req_response_t *resp, unsigned char **challenge, int *challenge_bytes)
+{
+    https_client_resp_t rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
+
+    if (resp->payload_size == 0 || resp->payload == NULL) {
+        netdata_log_error("ACLK: OTP Challenge response payload is empty despite returning 200 OK");
+        return rc;
+    }
+
+    json_object *json = json_tokener_parse(resp->payload);
+    if (!json) {
+        netdata_log_error("ACLK: couldn't parse HTTP GET challenge payload");
+        return rc;
+    }
+    json_object *challenge_json;
+    if (!json_object_object_get_ex(json, "challenge", &challenge_json)) {
+        netdata_log_error("ACLK: No key named \"challenge\" in the returned JSON");
+        goto cleanup_json;
+    }
+    if (!json_object_is_type(challenge_json, json_type_string)) {
+        netdata_log_error("ACLK: \"challenge\" is not a string JSON type");
+        goto cleanup_json;
+    }
+    const char *challenge_base64;
+    if (!((challenge_base64 = json_object_get_string(challenge_json)))) {
+        netdata_log_error("ACLK: Failed to extract challenge from JSON object");
+        goto cleanup_json;
+    }
+    if (strlen(challenge_base64) != CHALLENGE_LEN_BASE64) {
+        netdata_log_error("ACLK: Received Challenge has unexpected length of %zu (expected %d)", strlen(challenge_base64), CHALLENGE_LEN_BASE64);
+        goto cleanup_json;
+    }
+
+    *challenge = mallocz((CHALLENGE_LEN_BASE64 / 4) * 3 + 1);
+    *challenge_bytes = netdata_base64_decode(*challenge, (const unsigned char *) challenge_base64, CHALLENGE_LEN_BASE64);
+
+    if (*challenge_bytes != CHALLENGE_LEN) {
+        netdata_log_error("ACLK: Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
+        freez(*challenge);
+        *challenge = NULL;
+        goto cleanup_json;
+    }
+
+    rc = HTTPS_CLIENT_RESP_OK;
+
+cleanup_json:
+    json_object_put(json);
+    return rc;
+}
+
 static https_client_resp_t aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **challenge, int *challenge_bytes, bool *fallback_ipv4)
 {
     https_client_resp_t rc;
@@ -294,66 +362,20 @@ static https_client_resp_t aclk_get_otp_challenge(url_t *target, const char *age
     req.url = (char *)buffer_tostring(url);
 
     rc = aclk_https_request(&req, &resp, fallback_ipv4);
+    buffer_free(url);
     if (rc != HTTPS_CLIENT_RESP_OK) {
         netdata_log_error("ACLK: OTP Challenge failed");
-        buffer_free(url);
         return rc;
     }
     if (resp.http_code != 200) {
         rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_NOT_200;
         netdata_log_error("ACLK: OTP Challenge HTTP code not 200 OK (got %d)", resp.http_code);
-        buffer_free(url);
         if (resp.payload_size)
             aclk_parse_otp_error(resp.payload);
-        goto cleanup_resp;
     }
-    buffer_free(url);
+    else
+        rc = aclk_parse_otp_challenge(&resp, challenge, challenge_bytes);
 
-    json_object *json = json_tokener_parse(resp.payload);
-    if (!json) {
-        rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
-        netdata_log_error("ACLK: couldn't parse HTTP GET challenge payload");
-        goto cleanup_resp;
-    }
-    json_object *challenge_json;
-    if (!json_object_object_get_ex(json, "challenge", &challenge_json)) {
-        rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
-        netdata_log_error("ACLK: No key named \"challenge\" in the returned JSON");
-        goto cleanup_json;
-    }
-    if (!json_object_is_type(challenge_json, json_type_string)) {
-        rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
-        netdata_log_error("ACLK: \"challenge\" is not a string JSON type");
-        goto cleanup_json;
-    }
-    const char *challenge_base64;
-    if (!((challenge_base64 = json_object_get_string(challenge_json)))) {
-        rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
-        netdata_log_error("ACLK: Failed to extract challenge from JSON object");
-        goto cleanup_json;
-    }
-    if (strlen(challenge_base64) != CHALLENGE_LEN_BASE64) {
-        rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
-        netdata_log_error("ACLK: Received Challenge has unexpected length of %zu (expected %d)", strlen(challenge_base64), CHALLENGE_LEN_BASE64);
-        goto cleanup_json;
-    }
-
-    *challenge = mallocz((CHALLENGE_LEN_BASE64 / 4) * 3 + 1);
-    *challenge_bytes = netdata_base64_decode(*challenge, (const unsigned char *) challenge_base64, CHALLENGE_LEN_BASE64);
-
-    if (*challenge_bytes != CHALLENGE_LEN) {
-        rc = HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID;
-        netdata_log_error("ACLK: Unexpected challenge length of %d instead of %d", *challenge_bytes, CHALLENGE_LEN);
-        freez(*challenge);
-        *challenge = NULL;
-        goto cleanup_json;
-    }
-
-    rc = HTTPS_CLIENT_RESP_OK;
-
-cleanup_json:
-    json_object_put(json);
-cleanup_resp:
     https_req_response_free(&resp);
     return rc;
 }
@@ -523,9 +545,17 @@ https_client_resp_t aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_us
 #define JSON_KEY_BACKOFF_MIN "minSeconds"
 #define JSON_KEY_CAPS "capabilities"
 
+#define TRP_PARSE_OK            0
+#define TRP_PARSE_ERROR         1
+#define TRP_PARSE_UNKNOWN_TYPE  2
+
+// returns TRP_PARSE_UNKNOWN_TYPE for a well-formed transport this agent does not know,
+// so that the caller can skip it; on any result other than TRP_PARSE_OK trp owns nothing
 static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *trp) {
     struct json_object_iterator it;
     struct json_object_iterator itEnd;
+    bool type_seen = false;
+    const char *type_str = NULL;
 
     it = json_object_iter_begin(json);
     itEnd = json_object_iter_end(json);
@@ -533,15 +563,13 @@ static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *tr
     while (!json_object_iter_equal(&it, &itEnd)) {
         if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_TRP_TYPE)) {
             PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_TRP_TYPE)
-            if (trp->type != ACLK_TRP_UNKNOWN) {
+            if (type_seen) {
                 netdata_log_error("ACLK: " JSON_KEY_TRP_TYPE " set already");
                 goto exit;
             }
-            trp->type = aclk_transport_type_t_from_str(json_object_get_string(json_object_iter_peek_value(&it)));
-            if (trp->type == ACLK_TRP_UNKNOWN) {
-                netdata_log_error("ACLK: " JSON_KEY_TRP_TYPE " unknown type \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
-                goto exit;
-            }
+            type_seen = true;
+            type_str = json_object_get_string(json_object_iter_peek_value(&it));
+            trp->type = aclk_transport_type_t_from_str(type_str);
             json_object_iter_next(&it);
             continue;
         }
@@ -566,43 +594,77 @@ static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *tr
         goto exit;
     }
 
-    if (trp->type == ACLK_TRP_UNKNOWN) {
+    if (!type_seen) {
         netdata_log_error("ACLK: transport type not set");
         goto exit;
     }
 
-    return 0;
+    if (trp->type == ACLK_TRP_UNKNOWN) {
+        netdata_log_info("ACLK: ignoring transport of unknown type \"%s\"", type_str);
+        aclk_transport_desc_t_destroy(trp);
+        return TRP_PARSE_UNKNOWN_TYPE;
+    }
+
+    return TRP_PARSE_OK;
 
 exit:
     aclk_transport_desc_t_destroy(trp);
-    return 1;
+    return TRP_PARSE_ERROR;
 }
 
 static int parse_json_env_transports(json_object *json_array, aclk_env_t *env) {
-    aclk_transport_desc_t *trp;
-    json_object *obj;
-
     if (env->transports) {
         netdata_log_error("ACLK: transports have been set already");
         return 1;
     }
 
-    env->transport_count = json_object_array_length(json_array);
-
-    env->transports = callocz(env->transport_count , sizeof(aclk_transport_desc_t *));
-
-    for (size_t i = 0; i < env->transport_count; i++) {
-        trp = callocz(1, sizeof(aclk_transport_desc_t));
-        obj = json_object_array_get_idx(json_array, i);
-        if (parse_json_env_transport(obj, trp)) {
-            netdata_log_error("ACLK: error parsing transport idx %d", (int)i);
-            freez(trp);
-            return 1;
-        }
-        env->transports[i] = trp;
+    size_t count = json_object_array_length(json_array);
+    if (!count) {
+        netdata_log_error("ACLK: transports list is empty");
+        return 1;
     }
 
+    // keeps the order of the list (highest priority first), without the transports this agent does not know
+    aclk_transport_desc_t **transports = callocz(count, sizeof(aclk_transport_desc_t *));
+    size_t used = 0;
+
+    for (size_t i = 0; i < count; i++) {
+        json_object *obj = json_object_array_get_idx(json_array, i);
+        if (!json_object_is_type(obj, json_type_object)) {
+            netdata_log_error("ACLK: transport idx %d is not a JSON object", (int)i);
+            goto failed;
+        }
+
+        aclk_transport_desc_t *trp = callocz(1, sizeof(aclk_transport_desc_t));
+        int rc = parse_json_env_transport(obj, trp);
+        if (rc == TRP_PARSE_OK) {
+            transports[used++] = trp;
+            continue;
+        }
+
+        freez(trp);
+        if (rc != TRP_PARSE_UNKNOWN_TYPE) {
+            netdata_log_error("ACLK: error parsing transport idx %d", (int)i);
+            goto failed;
+        }
+    }
+
+    if (!used) {
+        netdata_log_error("ACLK: transports list has no transport this agent knows");
+        goto failed;
+    }
+
+    env->transports = transports;
+    env->transport_count = used;
     return 0;
+
+failed:
+    for (size_t i = 0; i < used; i++) {
+        aclk_transport_desc_t_destroy(transports[i]);
+        freez(transports[i]);
+    }
+    freez(transports);
+    return 1;
 }
 
 #define MATCHED_CORRECT  1
@@ -712,6 +774,11 @@ static int parse_json_env(const char *json_str, aclk_env_t *env) {
         return 1;
     }
 
+    if (!json_object_is_type(json, json_type_object)) {
+        netdata_log_error("ACLK: /env response is not a JSON object");
+        goto exit;
+    }
+
     it = json_object_iter_begin(json);
     itEnd = json_object_iter_end(json);
 
@@ -741,8 +808,10 @@ static int parse_json_env(const char *json_str, aclk_env_t *env) {
         if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_TRP)) {
             PARSE_ENV_JSON_CHK_TYPE(&it, json_type_array, JSON_KEY_TRP)
 
-            json_object *now = json_object_iter_peek_value(&it);
-            parse_json_env_transports(now, env);
+            if (parse_json_env_transports(json_object_iter_peek_value(&it), env)) {
+                netdata_log_error("ACLK: Error parsing transports list");
+                goto exit;
+            }
 
             json_object_iter_next(&it);
             continue;
@@ -857,4 +926,159 @@ https_client_resp_t aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int
     https_req_response_free(&resp);
     buffer_free(buf);
     return HTTPS_CLIENT_RESP_OK;
+}
+
+#define ACLK_OTP_TEST(condition, msg) do {                                      \
+        if (!(condition)) {                                                     \
+            fprintf(stderr, "aclk otp unittest FAILED: %s (%s:%d)\n",          \
+                    (msg), __FUNCTION__, __LINE__);                             \
+            errors++;                                                           \
+        }                                                                       \
+    } while(0)
+
+#define ACLK_OTP_TEST_ENV_HEAD "{\"authEndpoint\":\"https://localhost/api/v1/auth/node\",\"encoding\":\"proto\"," \
+                               "\"backoff\":{\"base\":2,\"minSeconds\":0,\"maxSeconds\":1200},"
+
+static int aclk_otp_unittest_env_rejected(const char *name, const char *json)
+{
+    int errors = 0;
+    aclk_env_t env = { 0 };
+
+    ACLK_OTP_TEST(parse_json_env(json, &env) != 0, name);
+    ACLK_OTP_TEST(env.transports == NULL && env.transport_count == 0, name);
+
+    aclk_env_t_destroy(&env);
+    return errors;
+}
+
+static int aclk_otp_unittest_env(void)
+{
+    int errors = 0;
+
+    aclk_env_t env = { 0 };
+    ACLK_OTP_TEST(parse_json_env(ACLK_OTP_TEST_ENV_HEAD
+                                 "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"}]}",
+                                 &env) == 0,
+                  "valid /env is accepted");
+    ACLK_OTP_TEST(env.transport_count == 1 && env.transports && env.transports[0] &&
+                      env.transports[0]->type == ACLK_TRP_MQTT_5 &&
+                      !strcmp(env.transports[0]->endpoint, "wss://localhost/mqtt"),
+                  "valid /env transport is parsed");
+    aclk_env_t_destroy(&env);
+
+    // transports this agent does not know are skipped, the rest keep their order
+    memset(&env, 0, sizeof(env));
+    ACLK_OTP_TEST(parse_json_env(ACLK_OTP_TEST_ENV_HEAD
+                                 "\"transports\":[{\"type\":\"bogus\",\"endpoint\":\"wss://localhost/new\"},"
+                                 "{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/first\"},"
+                                 "{\"endpoint\":\"wss://localhost/newer\",\"type\":\"bogus2\"},"
+                                 "{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/second\"}]}",
+                                 &env) == 0,
+                  "/env with unknown transport types next to known ones is accepted");
+    ACLK_OTP_TEST(env.transport_count == 2 && env.transports &&
+                      env.transports[0] && env.transports[0]->type == ACLK_TRP_MQTT_5 &&
+                      !strcmp(env.transports[0]->endpoint, "wss://localhost/first") &&
+                      env.transports[1] && env.transports[1]->type == ACLK_TRP_MQTT_5 &&
+                      !strcmp(env.transports[1]->endpoint, "wss://localhost/second"),
+                  "/env unknown transport types are skipped and the order is kept");
+    aclk_env_t_destroy(&env);
+
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with an unknown transport type without endpoint is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"type\":\"bogus\"}]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a transport without endpoint after a good one is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"type\":\"MQTTv5\"}]}");
+
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with only an unknown transport type is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"bogus\",\"endpoint\":\"x\"}]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a transport without type after a good one is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"endpoint\":\"wss://localhost/x\"}]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a malformed transport type after a good one is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"endpoint\":\"wss://localhost/x\",\"type\":1}]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with an empty transport list is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a null transport is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[null]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a non-object transport is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[1]}");
+    errors += aclk_otp_unittest_env_rejected("/env array body is rejected", "[]");
+    errors += aclk_otp_unittest_env_rejected("/env string body is rejected", "\"x\"");
+
+    return errors;
+}
+
+static int aclk_otp_unittest_passwd(void)
+{
+    int errors = 0;
+
+    struct auth_data auth = { 0 };
+    ACLK_OTP_TEST(parse_passwd_response("[]", &auth) != 0, "/password array body is rejected");
+    ACLK_OTP_TEST(!auth.client_id && !auth.username && !auth.passwd, "/password array body sets nothing");
+
+    ACLK_OTP_TEST(parse_passwd_response("{\"clientID\":\"c\",\"username\":\"u\"}", &auth) != 0,
+                  "/password without password is rejected");
+    ACLK_OTP_TEST(!auth.client_id && !auth.username && !auth.passwd,
+                  "/password without password releases the parsed fields");
+
+    return errors;
+}
+
+static int aclk_otp_unittest_challenge(void)
+{
+    int errors = 0;
+    unsigned char *challenge = NULL;
+    int challenge_bytes = 0;
+
+    // no body: the HTTPS client leaves the payload unset
+    https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
+    resp.http_code = 200;
+    ACLK_OTP_TEST(aclk_parse_otp_challenge(&resp, &challenge, &challenge_bytes) == HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID,
+                  "challenge without a body is rejected");
+    ACLK_OTP_TEST(challenge == NULL, "challenge without a body sets nothing");
+
+    // empty chunked body: a terminating NUL and zero payload bytes
+    char empty[1] = { 0 };
+    resp.payload = empty;
+    resp.payload_size = 0;
+    ACLK_OTP_TEST(aclk_parse_otp_challenge(&resp, &challenge, &challenge_bytes) == HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID,
+                  "challenge with an empty body is rejected");
+    ACLK_OTP_TEST(challenge == NULL, "challenge with an empty body sets nothing");
+
+    char not_object[] = "[]";
+    resp.payload = not_object;
+    resp.payload_size = strlen(not_object);
+    ACLK_OTP_TEST(aclk_parse_otp_challenge(&resp, &challenge, &challenge_bytes) == HTTPS_CLIENT_RESP_OTP_CHALLENGE_INVALID,
+                  "challenge array body is rejected");
+    ACLK_OTP_TEST(challenge == NULL, "challenge array body sets nothing");
+
+    return errors;
+}
+
+int aclk_otp_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning aclk otp unittest\n");
+
+    errors += aclk_otp_unittest_challenge();
+    errors += aclk_otp_unittest_env();
+    errors += aclk_otp_unittest_passwd();
+
+    if (errors)
+        fprintf(stderr, "aclk otp unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "aclk otp unittest: OK\n");
+
+    return errors;
 }

@@ -204,49 +204,6 @@ function(extract_gzipped_tarball tarball target)
   endif()
 endfunction()
 
-# Get a recursive list of all sub-directories of the specified directory,
-# relative to that directory.
-function(subdirlist result curdir)
-  file(GLOB_RECURSE children
-       LIST_DIRECTORIES TRUE
-       RELATIVE ${curdir}
-       ${curdir}/*)
-
-  set(dirlist "")
-
-  foreach(child ${children})
-    if(IS_DIRECTORY ${curdir}/${child})
-      list(APPEND dirlist ${child})
-    endif()
-  endforeach()
-
-  set(${result} ${dirlist} PARENT_SCOPE)
-endfunction()
-
-# Precompile python code in the specified directory relative to the
-# CMake install prefix at install time.
-# This must be called _after_ the install directive for the python code
-# in the specified directory
-function(precompile_python dir component)
-  find_package(Python3)
-
-  if(NOT Python3_Interpreter_FOUND)
-    message(STATUS "Could not find Python3, skipping precompilation of Python code.")
-    return()
-  endif()
-
-  set(prefix [=[${CMAKE_INSTALL_PREFIX}]=])
-
-  install(
-    CODE "message(STATUS \"Precompiling Python3 code in ${prefix}/${dir}\")"
-    COMPONENT ${component}
-  )
-  install(
-    CODE "execute_process(COMMAND \"${Python3_EXECUTABLE}\" -O -m compileall -j0 -o2 \"${prefix}/${dir}\" WORKING_DIRECTORY \"${prefix}/${dir}\")"
-    COMPONENT ${component}
-  )
-endfunction()
-
 # Load the URL and hash for a vendored component
 function(get_vendored_url_and_hash component prefix)
   set(url_file "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.url")

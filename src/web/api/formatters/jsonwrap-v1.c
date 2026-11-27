@@ -4,19 +4,31 @@
 #include "jsonwrap-internal.h"
 #include "libnetdata/json/json-keys.h"
 
+// the query metric behind result column c: v1 columns are query metrics in
+// query order, unless a cardinality fold reordered them; NULL for the
+// 'remaining' column of a fold, which has no single metric behind it
+static inline QUERY_METRIC *jsonwrap_v1_column_metric(RRDR *r, size_t c) {
+    QUERY_TARGET *qt = r->internal.qt;
+    size_t m = r->cardinality.source_metric ? r->cardinality.source_metric[c] : c;
+    return (m < qt->query.used) ? query_metric(qt, m) : NULL;
+}
+
 static inline long jsonwrap_v1_chart_ids(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-    long c, i;
+    long i = 0;
 
     buffer_json_member_add_array(wb, key);
-    for (c = 0, i = 0; c < query_used; c++) {
+    for (size_t c = 0; c < r->d; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        QUERY_METRIC *qm = query_metric(qt, c);
-        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(qi->ria));
+        QUERY_METRIC *qm = jsonwrap_v1_column_metric(r, c);
+        if(qm) {
+            QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+            buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(qi->ria));
+        }
+        else
+            buffer_json_add_array_item_string(wb, NULL);
         i++;
     }
     buffer_json_array_close(wb);
@@ -26,8 +38,7 @@ static inline long jsonwrap_v1_chart_ids(BUFFER *wb, const char *key, RRDR *r, R
 
 static inline long query_target_chart_labels_filter_v1(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-    long c, i = 0;
+    long i = 0;
 
     buffer_json_member_add_object(wb, key);
 
@@ -36,13 +47,18 @@ static inline long query_target_chart_labels_filter_v1(BUFFER *wb, const char *k
     while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
         buffer_json_member_add_array(wb, label_key);
 
-        for (c = 0, i = 0; c < query_used; c++) {
+        i = 0;
+        for (size_t c = 0; c < r->d; c++) {
             if(!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
 
-            QUERY_METRIC *qm = query_metric(qt, c);
-            QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-            rrdlabels_value_to_buffer_array_item_or_null(query_instance_labels(qi), wb, label_key);
+            QUERY_METRIC *qm = jsonwrap_v1_column_metric(r, c);
+            if(qm) {
+                QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+                rrdlabels_value_to_buffer_array_item_or_null(query_instance_labels(qi), wb, label_key);
+            }
+            else
+                buffer_json_add_array_item_string(wb, NULL);
             i++;
         }
         buffer_json_array_close(wb);
@@ -55,18 +71,21 @@ static inline long query_target_chart_labels_filter_v1(BUFFER *wb, const char *k
 
 static inline long query_target_metrics_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-    long c, i;
+    long i = 0;
 
     buffer_json_member_add_array(wb, key);
 
-    for(c = 0, i = 0; c < query_used ;c++) {
+    for (size_t c = 0; c < r->d; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        QUERY_METRIC *qm = query_metric(qt, c);
-        QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
-        buffer_json_add_array_item_double(wb, rrdmetric_acquired_last_stored_value(qd->rma));
+        QUERY_METRIC *qm = jsonwrap_v1_column_metric(r, c);
+        if(qm) {
+            QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
+            buffer_json_add_array_item_double(wb, rrdmetric_acquired_last_stored_value(qd->rma));
+        }
+        else
+            buffer_json_add_array_item_double(wb, NAN);
         i++;
     }
 

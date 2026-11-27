@@ -26,6 +26,7 @@ int command_argument_sanitization_tests(void);
 
 #ifdef OS_WINDOWS
 int perflibnamestest_main(void);
+int cached_sid_username_unittest(void);
 int unit_test_windows_virt_normalize(void);
 int unit_test_windows_virt_resolution(void);
 int unit_test_windows_container(void);

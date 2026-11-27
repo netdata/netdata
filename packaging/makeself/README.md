@@ -23,9 +23,12 @@ runtime state and directory symlinks are retained; a failed update leaves the in
 ## State permissions during updates
 
 Installation makes package directories traversable and initializes the service's library, cache and log roots.
-A build-generated inventory identifies the exact shipped paths; updates never discover directories by walking
-the installed tree. Application state directories outside shipped package paths retain their modes, including custom
-state paths outside the standard roots and execution-completion records. Paths occupied by shipped content remain
+A build-generated inventory identifies the exact shipped paths for permission changes. Dashboard cleanup uses the
+staged payload to identify obsolete files under the installed `web/v3/` after the overlay. It skips redirected
+web directories, symlinks and mounts within that subtree. See [updating the Agent](/packaging/installer/UPDATE.md#update-methods-by-platform).
+
+Application state directories outside shipped package paths retain their modes, including custom state paths
+outside the standard roots and execution-completion records. Paths occupied by shipped content remain
 installer-owned, including when a package directory is relocated through a symlink. Shared root initialization does
 not recursively change file owners. The eBPF ownership adjustment also targets exact shipped entries. Fleet preparation
 filters the inventory to match retained package content. The source installer's fallback directory setup uses the same
@@ -41,6 +44,10 @@ Explicit systemd-tmpfiles policies for database/claiming files and the historica
 apply; an update is not a general recursive permission repair. Modes or owners changed by earlier updates are not
 automatically restored: recovery requires the affected application's intended permissions, which the installer cannot
 infer from the current state.
+
+On fresh installs, the archive can be extracted before the local `netdata` group exists. On install and update,
+the installer assigns `scripts.d.plugin` and `dem.plugin` to `root:netdata` using the local group ID. Their static
+file modes are `0750` and `0755`, respectively.
 
 The isolated regression suite exercises both directory-setup paths and actual makeself archive overlays:
 
