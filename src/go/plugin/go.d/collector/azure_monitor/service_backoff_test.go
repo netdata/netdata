@@ -219,6 +219,41 @@ func TestCollectARMBackoffIgnoresReadsStartedBeforeHold(t *testing.T) {
 	}
 }
 
+// The only slot stays busy from before a hold expires until after the recovery
+// deadline. The held request is dropped for this poll and the poll ends.
+func TestCollectEndsPollWhenHoldExpiresWhileSlotsAreBusy(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		rows := []map[string]any{
+			testResource(recoveryTestNamespace, "held", nil),
+			testResource(recoveryTestNamespace, "slow", nil),
+		}
+		c := newTestCollectorWithMocks(&mockResourceGraph{resources: rows}, &mockMetricsClient{})
+		c.Config = testConfig()
+		c.Timeout = confopt.Duration(90 * time.Second)
+		c.Limits.MaxConcurrency = 1
+		c.Limits.MaxBatchResources = 1
+		useRecoveryTestProfile(t, c, []string{"A"}, nil)
+		start := time.Now()
+		var sends []time.Duration
+		initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+			return nil, fmt.Errorf("unexpected definitions read: %s", req.URL.Path)
+		}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+			sends = append(sends, time.Since(start))
+			if len(sends) == 1 {
+				resp, err := recoveryWireError(req, http.StatusTooManyRequests, "TooManyRequests")
+				resp.Header.Set("Retry-After", "10")
+				return resp, err
+			}
+			time.Sleep(56 * time.Second)
+			return recoveryWireTotals(req, query, 5)
+		})
+		series := collectRecoveryCounters(t, c)
+		assert.Equal(t, 56*time.Second, time.Since(start))
+		assert.Equal(t, []time.Duration{0, 0}, sends, "nothing is sent again after the recovery deadline")
+		assert.Len(t, series, 1, "one resource has its window and the held one is a gap")
+	})
+}
+
 func waitForAdmissionSignal(ctx context.Context, signal <-chan struct{}) error {
 	select {
 	case <-signal:

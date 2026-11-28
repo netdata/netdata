@@ -471,18 +471,25 @@ func (p *queryPoll) releaseHeld() {
 	}
 	held := p.held
 	p.held, p.heldUntil, p.heldStale = nil, time.Time{}, false
+	late := !time.Now().Before(p.deadline)
 	for _, r := range held {
+		if late && (r.resent || !r.deadline.IsZero()) {
+			// Work that was throttled or waited is not sent after the deadline.
+			p.held = append(p.held, r)
+			continue
+		}
 		b := r.batch
 		free, blocked := metricParts(b, func(row resourceInfo) uint32 {
 			mask, expiry := p.state.holds.resourceMetricHolds(b, row, at)
 			p.heldUntil = earliestDeadline(p.heldUntil, expiry)
 			return b.mask &^ mask
 		})
-		r.deadline = p.deadline
 		for _, part := range free {
 			r.batch = part
 			p.primary = append(p.primary, r)
 		}
+		// Work that waited for a hold ends with the poll's recovery deadline.
+		r.deadline = p.deadline
 		for _, part := range blocked {
 			r.batch = part
 			p.held = append(p.held, r)
@@ -492,10 +499,11 @@ func (p *queryPoll) releaseHeld() {
 
 // The wall-clock time to wake an otherwise idle poll for held ordinary work.
 func (p *queryPoll) heldWake() time.Time {
-	if len(p.held) == 0 || p.heldStale {
+	now := time.Now()
+	if len(p.held) == 0 || p.heldStale || p.heldUntil.IsZero() || !now.Before(p.deadline) {
 		return time.Time{}
 	}
-	wake := time.Now().Add(p.heldUntil.Sub(p.c.now()))
+	wake := now.Add(p.heldUntil.Sub(p.c.now()))
 	if !wake.Before(p.deadline) {
 		return time.Time{}
 	}
@@ -592,7 +600,9 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 			continue
 		default:
 		}
-		if ctx.Err() == nil && len(p.held) > 0 && time.Now().Before(deadline) {
+		// Unheld cells of newly held work are sent at any time. Past the
+		// recovery deadline nothing waits for an expiry any more.
+		if ctx.Err() == nil && len(p.held) > 0 && (p.heldStale || time.Now().Before(deadline)) {
 			p.releaseHeld()
 		}
 		if ctx.Err() == nil && p.active < slots {
