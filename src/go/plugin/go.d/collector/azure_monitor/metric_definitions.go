@@ -12,7 +12,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 )
@@ -35,9 +34,11 @@ type metricDefinitions map[string]metricDefinition
 
 type metricDefinitionsClient struct{ *arm.Client }
 
-func newMetricDefinitionsClient(cred azcore.TokenCredential, cloud azcloud.Configuration) (*metricDefinitionsClient, error) {
-	opts := armClientOptions{Cloud: cloud}.toARM()
-	opts.ClientOptions = withAzureRequestTransport(opts.ClientOptions)
+func newMetricDefinitionsClient(cred azcore.TokenCredential, options azcore.ClientOptions) (*metricDefinitionsClient, error) {
+	opts := &arm.ClientOptions{
+		ClientOptions:         withAzureRequestTransport(options),
+		DisableRPRegistration: true, // Definition lookups are read-only and must preserve ARM's error.
+	}
 	client, err := arm.NewClient("azure_monitor", "v1.0.0", cred, opts)
 	if err != nil {
 		return nil, err

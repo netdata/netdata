@@ -6,11 +6,17 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -30,7 +36,7 @@ const emptyMetricDefinitions = `{"value":[]}`
 type wireDefinitionRead struct {
 	method, path, host, authorization string
 	contentLength, transferEncoding   string
-	bodyBytes                         int
+	body                              string
 }
 
 func TestARMTransportChecksAdmissionOnAutomaticGETReplay(t *testing.T) {
@@ -133,8 +139,13 @@ func TestARMTransportChecksAdmissionOnAutomaticGETReplay(t *testing.T) {
 
 func definitionReplayClient(t *testing.T, ctx context.Context, protocol string, reads chan<- wireDefinitionRead, replay func() bool) *http.Client {
 	t.Helper()
+	if protocol == "HTTP/2" {
+		return replayHTTP2Client(t, ctx, func(peer net.Conn) {
+			serveDefinitionReplayHTTP2(peer, reads, replay)
+		})
+	}
 	var peers sync.WaitGroup
-	dial := func(serve func(net.Conn, chan<- wireDefinitionRead, func() bool)) (net.Conn, error) {
+	dial := func(context.Context, string, string) (net.Conn, error) {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -143,20 +154,11 @@ func definitionReplayClient(t *testing.T, ctx context.Context, protocol string, 
 		_ = peer.SetDeadline(deadline)
 		peers.Go(func() {
 			defer peer.Close()
-			serve(peer, reads, replay)
+			serveDefinitionReplayHTTP1(peer, reads, replay)
 		})
 		return client, nil
 	}
-	if protocol == "HTTP/2" {
-		rt := &http2.Transport{DialTLSContext: func(context.Context, string, string, *tls.Config) (net.Conn, error) {
-			return dial(serveDefinitionReplayHTTP2)
-		}}
-		t.Cleanup(func() { rt.CloseIdleConnections(); peers.Wait() })
-		return &http.Client{Transport: rt}
-	}
-	rt := &http.Transport{DialTLSContext: func(context.Context, string, string) (net.Conn, error) {
-		return dial(serveDefinitionReplayHTTP1)
-	}}
+	rt := &http.Transport{DialTLSContext: dial}
 	t.Cleanup(func() { rt.CloseIdleConnections(); peers.Wait() })
 	client := &http.Client{Transport: rt}
 	// Go retries a transmitted HTTP/1.1 GET after EOF on a reused connection.
@@ -180,7 +182,7 @@ func serveDefinitionReplayHTTP1(peer net.Conn, reads chan<- wireDefinitionRead, 
 			_, _ = io.WriteString(peer, "HTTP/1.1 204 No Content\r\n\r\n")
 			continue
 		}
-		body, err := io.Copy(io.Discard, req.Body)
+		body, err := io.ReadAll(req.Body)
 		_ = req.Body.Close()
 		if err != nil {
 			return
@@ -192,7 +194,7 @@ func serveDefinitionReplayHTTP1(peer net.Conn, reads chan<- wireDefinitionRead, 
 			authorization:    req.Header.Get("Authorization"),
 			contentLength:    req.Header.Get("Content-Length"),
 			transferEncoding: strings.Join(req.TransferEncoding, ","),
-			bodyBytes:        int(body),
+			body:             string(body),
 		}
 		if warmed {
 			replay() // EOF after the server has read the entire request.
@@ -202,7 +204,79 @@ func serveDefinitionReplayHTTP1(peer net.Conn, reads chan<- wireDefinitionRead, 
 	}
 }
 
+func replayHTTP2Client(t *testing.T, ctx context.Context, serve func(net.Conn)) *http.Client {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		DNSNames:     []string{"management.azure.com", "eastus.metrics.monitor.azure.com"},
+		NotBefore:    time.Now().Add(-time.Minute),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
+	require.NoError(t, err)
+	signed, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	ca := x509.NewCertPool()
+	ca.AddCert(signed)
+	serverTLS := &tls.Config{
+		NextProtos:   []string{"h2"},
+		Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}},
+	}
+
+	rt := newAzureRequestHTTPTransport()
+	rt.Proxy = nil
+	rt.TLSClientConfig.RootCAs = ca
+	var peers sync.WaitGroup
+	rt.DialTLSContext = func(dialCtx context.Context, _, addr string) (net.Conn, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		tlsCfg := rt.TLSClientConfig.Clone()
+		tlsCfg.ServerName, _, _ = net.SplitHostPort(addr)
+		client, peer := net.Pipe()
+		deadline, _ := ctx.Deadline()
+		_ = peer.SetDeadline(deadline)
+		peers.Go(func() {
+			defer peer.Close()
+			serve(tls.Server(peer, serverTLS))
+		})
+		conn := tls.Client(client, tlsCfg)
+		if err := conn.HandshakeContext(dialCtx); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return conn, nil
+	}
+	t.Cleanup(func() { rt.CloseIdleConnections(); peers.Wait() })
+	return &http.Client{Transport: rt}
+}
+
+type wireReplayResponse struct {
+	status  int // Zero refuses the stream instead of writing HTTP headers.
+	headers []hpack.HeaderField
+	body    string
+}
+
 func serveDefinitionReplayHTTP2(peer net.Conn, reads chan<- wireDefinitionRead, replay func() bool) {
+	first := true
+	serveAzureReplayHTTP2(peer, nil, func(req wireDefinitionRead) *wireReplayResponse {
+		reads <- req
+		if first {
+			first = false
+			if !replay() {
+				return nil
+			}
+			return &wireReplayResponse{}
+		}
+		return &wireReplayResponse{status: http.StatusOK, body: emptyMetricDefinitions}
+	})
+}
+
+func serveAzureReplayHTTP2(peer net.Conn, onHeaders func(), respond func(wireDefinitionRead) *wireReplayResponse) {
 	if _, err := io.CopyN(io.Discard, peer, int64(len(http2.ClientPreface))); err != nil {
 		return
 	}
@@ -230,15 +304,20 @@ func serveDefinitionReplayHTTP2(peer net.Conn, reads chan<- wireDefinitionRead, 
 		_ = peer.Close()
 		<-writerDone
 	}()
-	var req wireDefinitionRead
+	requests := make(map[uint32]wireDefinitionRead)
 	for {
 		frame, err := incoming.ReadFrame()
 		if err != nil {
 			return
 		}
+		id := frame.Header().StreamID
+		req := requests[id]
 		var end bool
 		switch frame := frame.(type) {
 		case *http2.MetaHeadersFrame:
+			if onHeaders != nil {
+				onHeaders()
+			}
 			req = wireDefinitionRead{
 				method: frame.PseudoValue("method"), path: frame.PseudoValue("path"), host: frame.PseudoValue("authority"),
 			}
@@ -254,29 +333,36 @@ func serveDefinitionReplayHTTP2(peer net.Conn, reads chan<- wireDefinitionRead, 
 			}
 			end = frame.StreamEnded()
 		case *http2.DataFrame:
-			req.bodyBytes += len(frame.Data())
+			req.body += string(frame.Data())
 			end = frame.StreamEnded()
-		}
-		if !end {
+		default:
 			continue
 		}
-		reads <- req
-		id := frame.Header().StreamID
-		if id == 1 {
-			if !replay() {
-				return
-			}
+		if !end {
+			requests[id] = req
+			continue
+		}
+		delete(requests, id)
+		resp := respond(req)
+		if resp == nil {
+			return
+		}
+		if resp.status == 0 {
 			writes <- func() error { return outgoing.WriteRSTStream(id, http2.ErrCodeRefusedStream) }
 			continue
 		}
 		writes <- func() error {
 			var block bytes.Buffer
-			_ = hpack.NewEncoder(&block).WriteField(hpack.HeaderField{Name: ":status", Value: "200"})
+			encoder := hpack.NewEncoder(&block)
+			_ = encoder.WriteField(hpack.HeaderField{Name: ":status", Value: strconv.Itoa(resp.status)})
+			for _, field := range resp.headers {
+				_ = encoder.WriteField(field)
+			}
 			headers := http2.HeadersFrameParam{StreamID: id, BlockFragment: block.Bytes(), EndHeaders: true}
 			if err := outgoing.WriteHeaders(headers); err != nil {
 				return err
 			}
-			return outgoing.WriteData(id, true, []byte(emptyMetricDefinitions))
+			return outgoing.WriteData(id, true, []byte(resp.body))
 		}
 	}
 }

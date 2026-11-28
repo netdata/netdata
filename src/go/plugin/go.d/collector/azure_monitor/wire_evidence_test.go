@@ -106,7 +106,7 @@ func TestRetryAfterUsesRawHeaderReceiptOnBothAzureAPIs(t *testing.T) {
 							})
 							result := executor.executeQueryBatch(ctx, batch, start, 0, false)
 							require.ErrorIs(t, result.Err, context.DeadlineExceeded)
-							holds.recordMetrics(batch, throttleFromError(result.Err, now()))
+							holds.recordMetrics(batch, throttleFromError(result.Err, now()), start)
 							isHeld = func(at time.Time) bool { return holds.metricMask(batch, at) != 0 }
 						case "ARM":
 							ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -116,7 +116,7 @@ func TestRetryAfterUsesRawHeaderReceiptOnBothAzureAPIs(t *testing.T) {
 							key := definitionKey{batch.Resources[0].ID, batch.Profile.MetricNamespace}
 							_, err = (&metricDefinitionsClient{client}).list(ctx, key)
 							require.ErrorIs(t, err, context.DeadlineExceeded)
-							holds.recordARM(key, batch.SubscriptionID, throttleFromError(err, now()))
+							holds.recordARM(key, batch.SubscriptionID, throttleFromError(err, now()), start)
 							isHeld = func(at time.Time) bool { return holds.armHeld(key, batch.SubscriptionID, at) }
 						}
 						require.Equal(t, 30*time.Second, now().Sub(start))
@@ -328,7 +328,7 @@ func TestServiceHoldsBackOffHeaderlessThrottlesAndMatchWireIdentity(t *testing.T
 	at := start
 	for _, delay := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 5 * time.Minute, 5 * time.Minute} {
 		holds.expire(at)
-		holds.recordMetrics(batch, throttleReceipt{status: 529, at: at})
+		holds.recordMetrics(batch, throttleReceipt{status: 529, at: at}, at)
 		// Rediscovery and another compiled ordering leave the wire name unchanged.
 		rediscovered := testWireEvidenceBatch("b", "a")
 		rediscovered.Resources[0].ID = strings.ToUpper(rediscovered.Resources[0].ID)
@@ -337,8 +337,8 @@ func TestServiceHoldsBackOffHeaderlessThrottlesAndMatchWireIdentity(t *testing.T
 		assert.False(t, holds.armHeld(batch.Resources[0].definitionKey(batch.Profile), batch.SubscriptionID, at))
 		at = at.Add(delay)
 	}
-	holds.recordMetrics(batch, throttleReceipt{at: at})
-	holds.recordMetrics(batch, throttleReceipt{status: 529, at: at})
+	holds.recordMetrics(batch, throttleReceipt{at: at}, at)
+	holds.recordMetrics(batch, throttleReceipt{status: 529, at: at}, at)
 	assert.Zero(t, holds.metricMask(batch, at.Add(time.Minute)), "successful retry reset the overload streak")
 }
 

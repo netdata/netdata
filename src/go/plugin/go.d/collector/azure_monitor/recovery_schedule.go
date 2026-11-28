@@ -36,6 +36,7 @@ type queryPoll struct {
 	hasDueRecovery              bool
 	sleepers                    map[definitionKey][]*metricQuestion
 	prepared                    []*metricQuestion
+	preparedUntil               time.Time // First hold or recheck expiry among skipped questions.
 	preparedValid, afterCutoff  bool
 	ordinaryActive, readsActive int
 	c                           *Collector
@@ -238,6 +239,30 @@ func (p *queryPoll) allowRecovery(at time.Time) {
 	}
 }
 
+// A zero deadline imposes no limit.
+func earliestDeadline(a, b time.Time) time.Time {
+	if a.IsZero() || (!b.IsZero() && b.Before(a)) {
+		return b
+	}
+	return a
+}
+
+// Wake a poll that still has workers in flight when a free slot can do new work.
+func (p *queryPoll) nextRecoveryWake() time.Time {
+	now := time.Now()
+	var wake time.Time
+	if now.Before(p.armUntil) {
+		wake = p.armUntil
+	}
+	if p.preparedValid && !p.preparedUntil.IsZero() && p.supplementalUsed < maxRecoveryMetricsCalls && now.Before(p.dataUntil) {
+		expiry := now.Add(p.preparedUntil.Sub(p.c.now()))
+		if expiry.Before(p.dataUntil) {
+			wake = earliestDeadline(wake, expiry)
+		}
+	}
+	return wake
+}
+
 func (p *queryPoll) startRecovery() bool {
 	now := time.Now()
 	if p.dataUntil.IsZero() {
@@ -247,9 +272,10 @@ func (p *queryPoll) startRecovery() bool {
 		return false
 	}
 	if p.supplementalUsed < maxRecoveryMetricsCalls {
-		pastCutoff := !time.Now().Before(p.armUntil)
-		if !p.preparedValid || pastCutoff != p.afterCutoff {
-			p.prepared = p.readyQuestions(p.c.now())
+		pastCutoff := !now.Before(p.armUntil)
+		at := p.c.now()
+		if !p.preparedValid || pastCutoff != p.afterCutoff || (!p.preparedUntil.IsZero() && !at.Before(p.preparedUntil)) {
+			p.prepared = p.readyQuestions(at)
 			p.preparedValid = true
 			p.afterCutoff = pastCutoff
 		}
@@ -553,17 +579,19 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 		if p.active == 0 {
 			break
 		}
-		if p.active < slots && time.Now().Before(p.armUntil) {
-			timer := time.NewTimer(time.Until(p.armUntil))
-			select {
-			case <-timer.C:
-			case e := <-p.events:
-				p.onEvent(e)
+		if p.active < slots && ctx.Err() == nil {
+			if wake := p.nextRecoveryWake(); !wake.IsZero() {
+				timer := time.NewTimer(time.Until(wake))
+				select {
+				case <-timer.C:
+				case e := <-p.events:
+					p.onEvent(e)
+				}
+				timer.Stop()
+				continue
 			}
-			timer.Stop()
-		} else {
-			p.onEvent(<-p.events)
 		}
+		p.onEvent(<-p.events)
 	}
 	s.pruneAdvice()
 	if p.failed > 0 && p.succeeded == 0 {

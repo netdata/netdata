@@ -68,7 +68,7 @@ modules:
             - **Minimum collection interval:** 60 seconds (enforced). Azure Monitor metrics granularity is typically 1 minute.
             - **Metrics reporting delay:** Azure Monitor metrics have a 1-3 minute reporting delay. The collector uses `query_offset` (default: 180s) as a minimum offset and automatically uses a larger effective offset for slower time-grain batches when needed.
             - For time grains longer than the collection interval, Netdata carries a value forward only when the last scheduled query returned a sample.
-            - A 429 or 529 response from the regional Metrics API pauses requests for the affected resources and metrics. If Azure Resource Manager (ARM) reports an exhausted subscription or tenant quota, the collector also pauses definition lookups in that scope. It honors the server’s retry interval and backs off when the response omits it.
+            - A 429 or 529 response from the regional Metrics API pauses requests for the affected resources and metrics. When Azure Resource Manager (ARM) throttles a metric-definition lookup and reports an exhausted subscription or tenant quota, the collector pauses definition lookups in that scope. It honors the server’s retry interval and backs off when the response omits it.
         performance_impact:
           description: |
             :::caution
@@ -79,7 +79,7 @@ modules:
 
             After a metric incompatibility, the collector can read resource-specific metric definitions from Azure Resource Manager (ARM) and send additional metered requests to the Metrics API. Each job can send up to eight additional Metrics queries per poll, including retries with compatible names, smaller batches, checks of names ARM omits, and later rechecks. A repeated Metrics POST after an authentication challenge or redirect also counts toward the eight. These queries share the job's remaining time and concurrency limits. ARM reads use the management API. The Azure SDK may also retry ordinary scheduled queries automatically.
 
-            When more batches need recovery than a poll can handle, work that had fewer chances to run gets priority in later eligible polls. If the Metrics API keeps rejecting a name, the collector waits longer between rechecks. With the default settings, the wait increases from 5 to 10, 20, 40, and then 60 minutes. The actual recheck can be later if Azure requests a longer wait, the time grain is slower, or the job reaches a collection limit.
+            When more batches need recovery than a poll can handle, work that had fewer chances to run gets priority in later eligible polls. If the Metrics API keeps rejecting a name and its definition stays unchanged, the default wait between rechecks increases from 5 to 10, 20, 40, and then 60 minutes. If refreshed definitions start listing the metric as supported, the collector can recheck it sooner within the same eight-query limit. A recheck can be later if Azure requests a longer wait, the time grain is slower, or the job reaches a collection limit.
 
             **Estimate before enabling.** Multiply the expected requests per poll by the number of polls in a month. Count each slower time grain only when it is due. For example, the stock Stream Analytics profile uses four aggregations every minute. Six regions in one subscription, each fitting in one resource batch, use 24 requests per minute. At continuous collection that is 1,036,800 scheduled requests in 30 days, before recovery or SDK retries.
 

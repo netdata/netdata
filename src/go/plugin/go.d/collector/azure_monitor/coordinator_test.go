@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
@@ -40,7 +39,7 @@ func initRecoveryWire(
 ) {
 	t.Helper()
 	cred := new(fake.TokenCredential)
-	opts := withAzureRequestTransport(azcore.ClientOptions{Transport: azureTestTransport(func(req *http.Request) (*http.Response, error) {
+	opts := azcore.ClientOptions{Transport: azureTestTransport(func(req *http.Request) (*http.Response, error) {
 		switch req.Method {
 		case http.MethodGet:
 			return get(req)
@@ -53,14 +52,14 @@ func initRecoveryWire(
 		default:
 			return nil, fmt.Errorf("unexpected request method %s", req.Method)
 		}
-	})})
+	})}
 	c.newMetricsClient = func(endpoint string, _ azcore.TokenCredential, _ azcloud.Configuration) (metricsQueryClient, error) {
-		return azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: opts})
+		return azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: withAzureRequestTransport(opts)})
 	}
 	require.NoError(t, c.Init(t.Context()))
-	armClient, err := arm.NewClient("test", "v1.0.0", cred, &arm.ClientOptions{ClientOptions: opts})
+	definitions, err := newMetricDefinitionsClient(cred, opts)
 	require.NoError(t, err)
-	c.queryExecutor.lookupDefinitions = (&metricDefinitionsClient{armClient}).list
+	c.queryExecutor.lookupDefinitions = definitions.list
 	require.NoError(t, c.Check(t.Context()))
 }
 
@@ -304,7 +303,7 @@ func TestCollectDecodesMetricErrorsAndDuplicateRows(t *testing.T) {
 			assert.False(t, ok, "unexpected sample for %s", key)
 		}
 		if poll == 0 {
-			require.NotEmpty(t, requests)
+			require.Greater(t, len(requests), 1, "the embedded sampling error must trigger a corrective request")
 			for _, query := range requests[1:] {
 				// Empty, missing and unrelated errors should never trigger isolation.
 				assert.Equal(t, recoveryWireQuery{
@@ -315,6 +314,47 @@ func TestCollectDecodesMetricErrorsAndDuplicateRows(t *testing.T) {
 		}
 	}
 	assert.LessOrEqual(t, reads, 1)
+}
+
+func TestCollectRecoversWhenHoldExpiresDuringOrdinaryQuery(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		row := testResource(recoveryTestNamespace, "edge", nil)
+		c := newTestCollectorWithMocks(&mockResourceGraph{resources: []map[string]any{row}}, &mockMetricsClient{})
+		c.Config = testConfig()
+		c.Limits.MaxConcurrency = 2
+		useRecoveryTestProfile(t, c, []string{"A", "B"}, nil)
+		start := time.Now()
+		c.now = time.Now
+		var attemptsB []time.Duration
+		initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+			return recoveryWireDefinitions(req, "A")
+		}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+			if len(query.Names) > 1 {
+				return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
+			}
+			switch query.Names[0] {
+			case "B":
+				elapsed := time.Since(start)
+				attemptsB = append(attemptsB, elapsed)
+				if elapsed < 80*time.Second {
+					resp, err := recoveryWireError(req, http.StatusTooManyRequests, "TooManyRequests")
+					resp.Header.Set("Retry-After", "80")
+					return resp, err
+				}
+			case "A":
+				if time.Since(start) >= time.Minute {
+					time.Sleep(25 * time.Second)
+				}
+			}
+			return recoveryWireTotals(req, query, 5)
+		})
+		requireRecoveryCounter(t, collectRecoveryCounters(t, c), "A", "edge", 5)
+		time.Sleep(time.Minute)
+		series := collectRecoveryCounters(t, c)
+		requireRecoveryCounter(t, series, "A", "edge", 10)
+		requireRecoveryCounter(t, series, "B", "edge", 5)
+		assert.Equal(t, []time.Duration{0, 80 * time.Second}, attemptsB, "an open slot can recover B while A is still running")
+	})
 }
 
 func TestCollectScopedMetricsHoldPreservesDisjointCounter(t *testing.T) {
@@ -463,21 +503,29 @@ func TestCollectPacksCompatibleCorrectionsAcrossTwelveResources(t *testing.T) {
 				var mu sync.Mutex
 				var reads, active, maxActive int
 				var corrections [][]string
-				initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+				enter := func() {
 					mu.Lock()
-					reads++
 					active++
 					maxActive = max(maxActive, active)
 					mu.Unlock()
-					time.Sleep(10 * time.Millisecond)
+				}
+				leave := func() {
 					mu.Lock()
 					active--
 					mu.Unlock()
+				}
+				initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+					enter()
+					defer leave()
+					mu.Lock()
+					reads++
+					mu.Unlock()
+					time.Sleep(10 * time.Millisecond)
 					return recoveryWireDefinitions(req, "A")
 				}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
-					mu.Lock()
-					maxActive = max(maxActive, active+1)
-					mu.Unlock()
+					enter()
+					defer leave()
+					time.Sleep(10 * time.Millisecond)
 					if !slices.Equal(query.Names, []string{"A"}) {
 						return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
 					}

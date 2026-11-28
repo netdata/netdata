@@ -138,7 +138,7 @@ func (c *Collector) prepareInitClients(cfg Config) (resourceGraphClient, *queryE
 		return nil, nil, fmt.Errorf("create resource graph client: %w", err)
 	}
 
-	definitions, err := newMetricDefinitionsClient(credential, cloudCfg)
+	definitions, err := newMetricDefinitionsClient(credential, azcore.ClientOptions{Cloud: cloudCfg})
 	if err != nil {
 		return nil, nil, fmt.Errorf("create Azure metric definitions client: %w", err)
 	}

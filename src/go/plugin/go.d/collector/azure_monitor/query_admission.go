@@ -32,6 +32,7 @@ type queryOperation struct {
 
 	// The coordinator alone owns admission and any hold deferral.
 	attempted, received, deferred bool
+	admittedAt                    time.Time
 	available                     map[string]uint32
 }
 
@@ -86,7 +87,13 @@ func (p *queryPoll) takeOperation() *queryOperation {
 	} else {
 		op = &queryOperation{reply: make(chan error, 1)}
 	}
-	*op = queryOperation{events: p.events, reply: op.reply, now: p.c.now}
+	// Clients that bypass the wire gate use dispatch as their admission time.
+	*op = queryOperation{
+		events:     p.events,
+		reply:      op.reply,
+		now:        p.c.now,
+		admittedAt: p.c.now(),
+	}
 	return op
 }
 
@@ -109,8 +116,9 @@ func (p *queryPoll) authorizeSend(op *queryOperation, ctx context.Context, post 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	at := p.c.now()
 	if read := op.read; read != nil {
-		if len(p.state.holds.arm) != 0 && p.state.holds.armHeld(read.key, read.subscription, p.c.now()) {
+		if len(p.state.holds.arm) != 0 && p.state.holds.armHeld(read.key, read.subscription, at) {
 			op.deferred = true
 			return errHeldAzureRequest
 		}
@@ -120,7 +128,6 @@ func (p *queryPoll) authorizeSend(op *queryOperation, ctx context.Context, post 
 	} else {
 		b := op.request.batch
 		if p.state.holds.hasMetrics() {
-			at := p.c.now()
 			if p.state.holds.metricMask(b, at) != 0 {
 				op.deferred = true
 				op.available = make(map[string]uint32, len(b.Resources))
@@ -143,6 +150,7 @@ func (p *queryPoll) authorizeSend(op *queryOperation, ctx context.Context, post 
 			p.markMetricsAdmission(op.request.questions)
 		}
 	}
+	op.admittedAt = at
 	op.attempted = true
 	return nil
 }
@@ -160,9 +168,9 @@ func (p *queryPoll) markMetricsAdmission(questions []*metricQuestion) {
 
 func (p *queryPoll) recordServiceResponse(op *queryOperation, receipt throttleReceipt) {
 	if r := op.read; r != nil {
-		p.state.holds.recordARM(r.key, r.subscription, receipt)
+		p.state.holds.recordARM(r.key, r.subscription, receipt, op.admittedAt)
 	} else {
-		p.state.holds.recordMetrics(op.request.batch, receipt)
+		p.state.holds.recordMetrics(op.request.batch, receipt, op.admittedAt)
 	}
 }
 

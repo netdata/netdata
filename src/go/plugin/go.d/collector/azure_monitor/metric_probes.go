@@ -204,9 +204,9 @@ func (p *queryPoll) splitHeld(q *metricQuestion, at time.Time) ([]*metricQuestio
 	}
 	b := q.batch
 	free, held := metricParts(b, func(r resourceInfo) uint32 {
-		one := b
-		one.Resources = []resourceInfo{r}
-		return b.mask &^ p.state.holds.metricMask(one, at)
+		mask, expiry := p.state.holds.resourceMetricHolds(b, r, at)
+		p.preparedUntil = earliestDeadline(p.preparedUntil, expiry)
+		return b.mask &^ mask
 	})
 	if len(held) == 0 {
 		return nil, false
@@ -227,12 +227,20 @@ func (p *queryPoll) splitHeld(q *metricQuestion, at time.Time) ([]*metricQuestio
 
 func (p *queryPoll) readyQuestions(at time.Time) []*metricQuestion {
 	var ready []*metricQuestion
+	p.preparedUntil = time.Time{}
 	// Refinement only creates strictly smaller rectangles. Process children
 	// in this pass without mutating the slice being iterated.
 	queue := slices.Collect(maps.Keys(p.state.questions))
 	for i := 0; i < len(queue); i++ {
 		q := queue[i]
-		if !p.due[q.batch.chunk] || q.lastPoll == p.state.poll || (at.Before(q.nextCheck) && !q.recheckEarly) || p.waitingForAdvice(q) {
+		if !p.due[q.batch.chunk] || q.lastPoll == p.state.poll {
+			continue
+		}
+		if at.Before(q.nextCheck) && !q.recheckEarly {
+			p.preparedUntil = earliestDeadline(p.preparedUntil, q.nextCheck)
+			continue
+		}
+		if p.waitingForAdvice(q) {
 			continue
 		}
 		if parts, held := p.splitHeld(q, at); held {

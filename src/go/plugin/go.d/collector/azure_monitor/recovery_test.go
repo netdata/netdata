@@ -215,7 +215,7 @@ func TestCollectKeepsWorkingMetricsWhileARMThrottles(t *testing.T) {
 		require.NoError(t, err)
 		_, ok := seriesValue(series, "origin_latency_average", "edge")
 		assert.True(t, ok, "working Average must survive a rejected Total or unavailable ARM")
-		_, ok = seriesValue(series, "request_count_total", "edge")
+		_, ok = seriesValue(series, ".request_count_total", "edge")
 		assert.Equal(t, wantTotal, ok)
 		assert.Equal(t, wantReads, reads)
 	}
@@ -403,7 +403,7 @@ func testFleetProbeBudget(t *testing.T, allChanged bool) {
 		}
 		for _, row := range rows {
 			name := row["name"].(string)
-			value, ok := seriesValue(series, "request_count_total", name)
+			value, ok := seriesValue(series, ".request_count_total", name)
 			if cycle >= 10 {
 				require.True(t, ok, "resource %s must progress while ARM is still throttled", name)
 			}
@@ -485,6 +485,7 @@ func TestCollectEarlyRefreshRecoversNewNamesInTheSameWindow(t *testing.T) {
 	c.Profiles.ModeExact = testProfilesModeEntries("front_door")
 	c.Limits.MaxConcurrency = 1
 	now := time.Now().Truncate(time.Minute)
+	var pollAt time.Time
 	c.now = func() time.Time { return now }
 	changed := false
 	activeNames := func() string {
@@ -500,11 +501,18 @@ func TestCollectEarlyRefreshRecoversNewNamesInTheSameWindow(t *testing.T) {
 			var values []azmetrics.Metric
 			if *opts.Aggregation == "total" {
 				totalQueries = append(totalQueries, slices.Clone(names))
+				end := pollAt.Add(-time.Duration(c.QueryOffset) * time.Second)
+				assert.Equal(t, end.Add(-time.Minute).UTC().Format(time.RFC3339), derefOrZero(opts.StartTime))
+				assert.Equal(t, end.UTC().Format(time.RFC3339), derefOrZero(opts.EndTime))
+				pointTime, err := time.Parse(time.RFC3339, derefOrZero(opts.EndTime))
+				if err != nil {
+					return result, err
+				}
 				for _, name := range names {
 					if name != "RequestCount" && name != activeNames() {
 						return result, &azcore.ResponseError{StatusCode: http.StatusBadRequest}
 					}
-					values = append(values, metricWithTotal(name, now, 5))
+					values = append(values, metricWithTotal(name, pointTime.Add(-time.Second), 5))
 				}
 			} else {
 				values = append(values, metricWithAvg("OriginLatency", now, 3))
@@ -517,10 +525,15 @@ func TestCollectEarlyRefreshRecoversNewNamesInTheSameWindow(t *testing.T) {
 	definitionReads := 0
 	c.queryExecutor.lookupDefinitions = func(context.Context, definitionKey) (metricDefinitions, error) {
 		definitionReads++
+		if changed {
+			// Recovery must use the original poll's window after the refresh.
+			now = now.Add(time.Minute)
+		}
 		return metricDefinitions{"requestcount": {}, strings.ToLower(activeNames()): {}}, nil
 	}
 	at := func(expectRequestCount int, expectIntroduced bool) {
 		t.Helper()
+		pollAt = now
 		series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 		require.NoError(t, err)
 		value, ok := seriesValue(series, ".request_count_total", "edge")

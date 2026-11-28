@@ -28,25 +28,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMetricDefinitionsDoesNotRegisterProviders(t *testing.T) {
+	const resource = "/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Cdn/profiles/edge"
+	var requests []string
+	client, err := newMetricDefinitionsClient(new(fake.TokenCredential), azcore.ClientOptions{
+		Transport: azureTestTransport(func(req *http.Request) (*http.Response, error) {
+			requests = append(requests, req.Method+" "+req.URL.Path)
+			if req.Method == http.MethodGet {
+				return recoveryWireError(req, http.StatusConflict, "MissingSubscriptionRegistration")
+			}
+			return recoveryWireError(req, http.StatusForbidden, "AuthorizationFailed")
+		}),
+	})
+	require.NoError(t, err)
+	_, err = client.list(t.Context(), definitionKey{resourceID: resource, namespace: recoveryTestNamespace})
+	var response *azcore.ResponseError
+	require.ErrorAs(t, err, &response)
+	assert.Equal(t, "MissingSubscriptionRegistration", response.ErrorCode)
+	assert.Equal(t, []string{"GET " + resource + "/providers/Microsoft.Insights/metricDefinitions"}, requests)
+}
+
 func TestCollectRequestsOnlyCompatibleAggregations(t *testing.T) {
 	rg := &mockResourceGraph{resources: []map[string]any{testResource("Microsoft.Cdn/profiles", "edge", nil)}}
 	mx := &mockMetricsClient{}
 	c := newTestCollectorWithMocks(rg, mx)
 	c.Config = testConfig()
 	c.Profiles.ModeExact = testProfilesModeEntries("front_door")
-	require.NoError(t, c.Init(t.Context()))
-	_, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	catalog, err := c.loadProfileCatalog()
 	require.NoError(t, err)
-	seen := map[string]string{}
+	profiles, err := catalog.ResolveBaseNames([]string{"front_door"})
+	require.NoError(t, err)
+	require.Len(t, profiles, 1)
+	type metricAggregation struct{ name, aggregation string }
+	var want []metricAggregation
+	for _, metric := range profiles[0].Metrics {
+		for _, series := range metric.Series {
+			want = append(want, metricAggregation{metric.AzureName, series.Aggregation})
+		}
+	}
+
+	require.NoError(t, c.Init(t.Context()))
+	_, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	var seen []metricAggregation
 	for _, call := range mx.queryCalls() {
 		require.NotEmpty(t, call.Aggregation)
 		require.False(t, strings.Contains(call.Aggregation, ","), "request mixes aggregations: %v", call)
 		for _, name := range call.MetricNames {
-			seen[name] = call.Aggregation
+			seen = append(seen, metricAggregation{name, call.Aggregation})
 		}
 	}
-	require.Equal(t, "average", seen["ByteHitRatio"])
-	require.Equal(t, "total", seen["RequestCount"])
+	assert.ElementsMatch(t, want, seen)
 }
 
 type azureTestTransport func(*http.Request) (*http.Response, error)
@@ -206,16 +238,25 @@ func TestCollectSeparatesUnreadableMetricDefinitions(t *testing.T) {
 	var mu sync.Mutex
 	lookups := map[string]int{}
 	var rejectedNames []string
+	var readablePeerRequests [][]string
 	c.newMetricsClient = func(_ string, _ azcore.TokenCredential, _ azcloud.Configuration) (metricsQueryClient, error) {
 		return metricsTestFunc(func(names, ids []string, options *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			var result azmetrics.QueryResourcesResponse
-			if *options.Aggregation == "total" && badResource && slices.Contains(ids, idB) {
-				if rejectedNames == nil {
-					rejectedNames = slices.Clone(names)
+			if *options.Aggregation == "total" && badResource {
+				if slices.Contains(ids, idB) {
+					if rejectedNames == nil {
+						rejectedNames = slices.Clone(names)
+						slices.Sort(rejectedNames)
+					}
+					return result, &azcore.ResponseError{StatusCode: http.StatusBadRequest, ErrorCode: "BadRequest"}
 				}
-				return result, &azcore.ResponseError{StatusCode: http.StatusBadRequest, ErrorCode: "BadRequest"}
+				if slices.Equal(ids, []string{idA}) {
+					requested := slices.Clone(names)
+					slices.Sort(requested)
+					readablePeerRequests = append(readablePeerRequests, requested)
+				}
 			}
 			for _, id := range ids {
 				if slices.Contains(names, "RequestCount") {
@@ -251,6 +292,8 @@ func TestCollectSeparatesUnreadableMetricDefinitions(t *testing.T) {
 	_, ok = seriesValue(series, ".request_count_total", "edge-b")
 	assert.False(t, ok)
 	assert.Equal(t, map[string]int{idA: 1, idB: 1}, lookups)
+	require.Greater(t, len(rejectedNames), 1)
+	assert.Contains(t, readablePeerRequests, rejectedNames, "recover the readable peer with the original metric names")
 	badResource = false
 	now = now.Add(time.Minute)
 	series, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())

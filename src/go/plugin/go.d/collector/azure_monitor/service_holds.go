@@ -54,8 +54,8 @@ func expireServiceHolds[K comparable](holds map[K]serviceHold, now time.Time) {
 	}
 }
 
-func recordServiceHold[K comparable](holds *map[K]serviceHold, key K, until, at time.Time) {
-	if !until.IsZero() && !at.Before(until) {
+func recordServiceHold[K comparable](holds *map[K]serviceHold, key K, until, receivedAt, admittedAt time.Time) {
+	if !until.IsZero() && !receivedAt.Before(until) {
 		return
 	}
 	if *holds == nil {
@@ -63,13 +63,12 @@ func recordServiceHold[K comparable](holds *map[K]serviceHold, key K, until, at 
 	}
 	hold := (*holds)[key]
 	if until.IsZero() {
-		// Multiple requests may have been in flight before this scope was held.
-		// Advance backoff only on a subsequent eligible attempt.
-		if at.Before(hold.until) {
+		// A request already in flight when a hold began cannot advance its backoff.
+		if admittedAt.Before(hold.until) {
 			return
 		}
 		hold.backoff = min(maxServiceBackoff, max(initialServiceBackoff, 2*hold.backoff))
-		until = at.Add(hold.backoff)
+		until = receivedAt.Add(hold.backoff)
 	}
 	if until.After(hold.until) {
 		hold.until = until
@@ -77,9 +76,12 @@ func recordServiceHold[K comparable](holds *map[K]serviceHold, key K, until, at 
 	(*holds)[key] = hold
 }
 
-func clearServiceBackoff[K comparable](holds map[K]serviceHold, key K, at time.Time) {
-	if hold, exists := holds[key]; exists && !at.Before(hold.until) {
-		delete(holds, key)
+func clearServiceBackoff[K comparable](holds map[K]serviceHold, key K, admittedAt time.Time) {
+	if hold := holds[key]; hold.backoff != 0 && !admittedAt.Before(hold.until) {
+		// Keep the expired deadline until the next poll so responses from older
+		// in-flight attempts cannot recreate the streak after this success.
+		hold.backoff = 0
+		holds[key] = hold
 	}
 }
 
@@ -100,19 +102,33 @@ func (h *serviceHolds) metricMask(batch queryBatch, now time.Time) uint32 {
 	}
 	var held uint32
 	for _, resource := range batch.Resources {
-		key := metricHoldKey(batch, resource)
-		for remaining := batch.mask &^ held; remaining != 0; remaining &= remaining - 1 {
-			index := bits.TrailingZeros32(remaining)
-			key.name = stringsLowerTrim(batch.chunk.metrics[index].AzureName)
-			if now.Before(h.metrics[key].until) {
-				held |= 1 << index
-			}
+		row, _ := h.resourceMetricHolds(batch, resource, now)
+		held |= row
+		batch.mask &^= row
+		if batch.mask == 0 {
+			break
 		}
 	}
 	return held
 }
 
-func (h *serviceHolds) recordMetrics(batch queryBatch, receipt throttleReceipt) {
+// Return the held names and the first time any of them becomes eligible.
+func (h *serviceHolds) resourceMetricHolds(batch queryBatch, resource resourceInfo, now time.Time) (uint32, time.Time) {
+	key := metricHoldKey(batch, resource)
+	var held uint32
+	var firstExpiry time.Time
+	for remaining := batch.mask; remaining != 0; remaining &= remaining - 1 {
+		index := bits.TrailingZeros32(remaining)
+		key.name = stringsLowerTrim(batch.chunk.metrics[index].AzureName)
+		if until := h.metrics[key].until; now.Before(until) {
+			held |= 1 << index
+			firstExpiry = earliestDeadline(firstExpiry, until)
+		}
+	}
+	return held, firstExpiry
+}
+
+func (h *serviceHolds) recordMetrics(batch queryBatch, receipt throttleReceipt, admittedAt time.Time) {
 	if receipt.status == 0 && !h.hasMetrics() {
 		return
 	}
@@ -124,9 +140,9 @@ func (h *serviceHolds) recordMetrics(batch queryBatch, receipt throttleReceipt) 
 		for remaining := batch.mask; remaining != 0; remaining &= remaining - 1 {
 			key.name = stringsLowerTrim(batch.chunk.metrics[bits.TrailingZeros32(remaining)].AzureName)
 			if receipt.status != 0 {
-				recordServiceHold(&h.metrics, key, until, receipt.at)
+				recordServiceHold(&h.metrics, key, until, receipt.at, admittedAt)
 			} else {
-				clearServiceBackoff(h.metrics, key, receipt.at)
+				clearServiceBackoff(h.metrics, key, admittedAt)
 			}
 		}
 	}
@@ -138,28 +154,28 @@ func (h *serviceHolds) armHeld(wire definitionKey, subscription string, now time
 		now.Before(h.arm[definitionKey{}].until)
 }
 
-func (h *serviceHolds) recordARM(wire definitionKey, subscription string, receipt throttleReceipt) {
+func (h *serviceHolds) recordARM(wire definitionKey, subscription string, receipt throttleReceipt, admittedAt time.Time) {
 	resource := wire.canonical()
 	sub := definitionKey{resourceID: stringsLowerTrim(subscription)}
 	tenant := definitionKey{}
 	if receipt.status == 0 {
-		clearServiceBackoff(h.arm, resource, receipt.at)
-		clearServiceBackoff(h.arm, sub, receipt.at)
-		clearServiceBackoff(h.arm, tenant, receipt.at)
+		clearServiceBackoff(h.arm, resource, admittedAt)
+		clearServiceBackoff(h.arm, sub, admittedAt)
+		clearServiceBackoff(h.arm, tenant, admittedAt)
 		return
 	}
 
 	until := retryAfterTime(receipt.headers, receipt.at)
-	recordServiceHold(&h.arm, resource, until, receipt.at)
+	recordServiceHold(&h.arm, resource, until, receipt.at, admittedAt)
 	// These reads share the Microsoft.Insights metricDefinitions operation.
 	// ARM's resource-type quota headers can therefore apply to its other reads.
 	if receipt.headers.Get("x-ms-ratelimit-remaining-subscription-reads") == "0" ||
 		receipt.headers.Get("x-ms-ratelimit-remaining-subscription-resource-requests") == "0" {
-		recordServiceHold(&h.arm, sub, until, receipt.at)
+		recordServiceHold(&h.arm, sub, until, receipt.at, admittedAt)
 	}
 	if receipt.headers.Get("x-ms-ratelimit-remaining-tenant-reads") == "0" ||
 		receipt.headers.Get("x-ms-ratelimit-remaining-tenant-resource-requests") == "0" {
-		recordServiceHold(&h.arm, tenant, until, receipt.at)
+		recordServiceHold(&h.arm, tenant, until, receipt.at, admittedAt)
 	}
 }
 
