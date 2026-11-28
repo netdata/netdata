@@ -15,6 +15,8 @@ modules:
         - windows server
         - wmi
         - windows management instrumentation
+        - terminal services
+        - remote desktop services
         - wql
         - dcom
         - winrm
@@ -27,13 +29,14 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor Windows hosts remotely over WMI without installing anything on them: CPU, memory, processes, network, TCP, UDP, disks, SMB shares, time sync and ping.
+          Monitor Windows hosts remotely over WMI without installing anything on them: CPU, memory, processes, RDP sessions, network, disks, SMB, time sync and ping.
 
           A Netdata Agent on another machine reads each host's built-in Windows Management Instrumentation (WMI) data. Use it where the Netdata Agent cannot be installed on the Windows hosts themselves. For each host you get:
 
           - CPU utilization by mode (user, privileged, interrupts and DPCs), in total and per logical processor;
           - physical and available memory, commit charge, paging activity, page faults, kernel memory pools, the system cache and page lists, the usage of each paging file, and the free and standby memory of each NUMA node;
           - the number of processes and threads, context switches, processor queue length and uptime;
+          - active and inactive Remote Desktop (Terminal Services) sessions;
           - how far the host's clock is ahead of or behind the poller's;
           - how the Windows Time service keeps the host's clock synchronized: its offset from the host's time source, the round trip of its latest NTP request and the number of time sources that answer it;
           - traffic, packets, errors, drops, speed and output queue length per network interface, and the total traffic of the host;
@@ -47,7 +50,7 @@ modules:
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions, UDP errors and the Windows Time service's offset from the time source, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset from the poller, the NTP round trip and time sources, and the SMB server's server-wide counters, which no other collector charts this way, have contexts of their own.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the disk and SMB groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the system, disk and SMB groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -68,7 +71,7 @@ modules:
           |---|---|
           | CPU | `Win32_PerfRawData_Counters_ProcessorInformation` |
           | Memory | `Win32_OperatingSystem`, `Win32_PerfRawData_PerfOS_Memory`, `Win32_PerfRawData_PerfOS_PagingFile`, `Win32_PerfRawData_PerfOS_NUMANodeMemory` |
-          | System | `Win32_PerfRawData_PerfOS_System` |
+          | System | `Win32_PerfRawData_PerfOS_System`, `Win32_PerfRawData_LocalSessionManager_TerminalServices` |
           | Network | `Win32_PerfRawData_Tcpip_NetworkInterface`, `Win32_PerfRawData_Tcpip_NetworkAdapter`, `Win32_PerfRawData_Tcpip_TCPv4`, `Win32_PerfRawData_Tcpip_TCPv6`, `Win32_PerfRawData_Tcpip_UDPv4`, `Win32_PerfRawData_Tcpip_UDPv6` |
           | Disk | `Win32_LogicalDisk`, `Win32_PerfRawData_PerfDisk_PhysicalDisk`, `Win32_DiskDrive` |
           | SMB | `Win32_PerfRawData_PerfNet_Server`, `Win32_PerfRawData_Counters_SMBServerShares` |
@@ -119,7 +122,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to seventeen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to eighteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -242,7 +245,7 @@ modules:
               required: false
               group: Collection
             - name: collectors
-              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six, and the disk and SMB groups two. Keep at least one group enabled."
+              description: "Metric groups to collect. Each enabled group runs one WMI query per collection, the memory group four, the network group six, and the system, disk and SMB groups two. Keep at least one group enabled."
               default_value: ''
               required: false
               group: Collection
@@ -259,7 +262,7 @@ modules:
               required: false
               group: Collection
             - name: collectors.system
-              description: "Collect the number of processes and threads, context switches, processor queue length, uptime and the host's clock offset."
+              description: "Collect the number of processes and threads, context switches, processor queue length, uptime, the host's clock offset and its Remote Desktop sessions."
               default_value: true
               required: false
               group: Collection
@@ -491,6 +494,7 @@ modules:
         - The `ip.*` TCP charts add up IPv4 and IPv6, as the Netdata Agent on Linux counts TCP and as the Netdata Agent on Windows charts `ip.tcppackets`; `ipv4.*` and `ipv6.*` charts show one version. The charts that use Linux contexts have only the dimensions Windows counts: `ip.tcphandshake` has no `OutRsts` or `SynRetrans`, `ip.tcperrors` only `RetransSegs`, and the `udperrors` charts only `InErrors` and `NoPorts`.
         - A metric group whose query fails leaves a gap in its charts for that collection, while the other groups continue; the `ip.*` TCP charts need both the IPv4 and the IPv6 query. A zero is always a reported value.
         - Ping packet loss is the share of the three echo requests of a collection that got no reply. Round-trip times come from the replies, so a collection without any reply has packet loss but no round-trip time.
+        - `terminal_services.sessions` counts the host's Remote Desktop sessions at the moment of the collection, as Windows does: `active` sessions have a connected user, `inactive` ones do not, such as disconnected sessions, the services session and the console's logon screen. Even a host nobody is logged on to has inactive sessions.
         - `wmi.clock_offset` is the host's clock minus the poller's: a positive value means the host's clock is ahead.
         - `system.clock_sync_offset` is how far the host's clock is from its own time source, as the Windows Time service computes it from each NTP answer; it falls while the service corrects the clock. Windows reports only its size, so unlike on the Netdata Agent on Linux it is never negative. Between answers it only falls, so it does not show the drift of a host whose time source stopped answering; `wmi.clock_offset` does.
         - `wmi.clock_sync_roundtrip_delay` is the round trip of the Windows Time service's latest NTP request and changes only with its next request. `wmi.clock_sync_sources` counts the time servers that answer the host's NTP client; it is 0 on a host that keeps time without NTP.
@@ -662,6 +666,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: terminal_services.sessions
+              description: Terminal Services sessions
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: inactive
             - name: wmi.clock_offset
               description: Clock Offset From the Collecting Agent
               unit: milliseconds

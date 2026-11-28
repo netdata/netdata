@@ -469,7 +469,10 @@ func publishedCharts(t *testing.T) []wireChart {
 // physical disk charts; the native disk.split dimension is named discards) and
 // src/collectors/windows.plugin/perflib-smb.c (the smb.server_shares_* charts;
 // a counts dimension is incremental, the open files and tree connects absolute,
-// as perflib_rrddim_add derives them from the counter types).
+// as perflib_rrddim_add derives them from the counter types) and
+// src/collectors/windows.plugin/perflib-terminal-services.c
+// (terminal_services.sessions; both session counts are raw counts, so
+// perflib_rrddim_add makes them absolute).
 // Native average times are sent in microseconds with a divisor of 1000, as
 // common_disk_await and common_disk_svctm do. The ping.*
 // entries are the wire form of the go.d ping collector's definitions, which
@@ -1032,6 +1035,13 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 			chartType:  "area",
 			dimensions: receivedSent,
 		},
+		"terminal_services.sessions": {
+			family:     "sessions",
+			title:      "Terminal Services sessions",
+			units:      "sessions",
+			chartType:  "stacked",
+			dimensions: unscaled("absolute", "active", "inactive"),
+		},
 		"ping.host_rtt": {
 			family:    "latency",
 			title:     "Ping round-trip time",
@@ -1089,6 +1099,7 @@ func TestCollector_PublishesSharedContexts(t *testing.T) {
 		instance("system.processor_queue_length", map[string]string{}),
 		instance("system.uptime", map[string]string{}),
 		instance("system.clock_sync_offset", map[string]string{}),
+		instance("terminal_services.sessions", map[string]string{}),
 		instance("system.net", map[string]string{}),
 		instance("net.net", map[string]string{"device": "Ethernet", "interface_type": "real"}),
 		instance("net.net", map[string]string{"device": "Ethernet#1", "interface_type": "real"}),
@@ -1420,11 +1431,11 @@ func TestCollector_DiskCountersFeedNativeDimensions(t *testing.T) {
 	})
 }
 
-// TestCollector_SystemCountersFeedNativeDimensions checks that each System
-// counter reaches the native chart dimension that reads it
+// TestCollector_SystemCountersFeedNativeDimensions checks that each counter of
+// the system group reaches the native chart dimension that reads it
 // (src/collectors/windows.plugin/perflib-processes.c, do_processes and
-// do_processor_queue), and that uptime arrives in milliseconds since boot, as
-// GetSystemUptime.c sends GetTickCount64().
+// do_processor_queue, and perflib-terminal-services.c), and that uptime arrives
+// in milliseconds since boot, as GetSystemUptime.c sends GetTickCount64().
 func TestCollector_SystemCountersFeedNativeDimensions(t *testing.T) {
 	native := map[string]nativeDimension{
 		"Processes":             {"system.processes", "running"},
@@ -1439,6 +1450,15 @@ func TestCollector_SystemCountersFeedNativeDimensions(t *testing.T) {
 	}
 	for property, dimension := range native {
 		want[dimension] = float64(row[property].(uint32))
+	}
+	// The system group also reads the Terminal Services counter set, whose
+	// counters src/collectors/windows.plugin/perflib-terminal-services.c charts.
+	sessions := terminalServicesRow()
+	for property, dimension := range map[string]nativeDimension{
+		"ActiveSessions":   {"terminal_services.sessions", "active"},
+		"InactiveSessions": {"terminal_services.sessions", "inactive"},
+	} {
+		want[dimension] = float64(sessions[property].(uint32))
 	}
 
 	synctest.Test(t, func(t *testing.T) {

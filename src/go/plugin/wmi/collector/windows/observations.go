@@ -16,15 +16,16 @@ type observations struct {
 	memoryFree sample
 	memoryUsed sample
 	// swapFree and swapUsed are the available commit and the commit charge.
-	swapFree       sample
-	swapUsed       sample
-	memoryCounters [len(memoryCounters)]sample
-	pageFaults     pageFaults
-	pagingFiles    []pagingFile
-	numaNodes      []numaNode
-	system         systemCounters
-	timeService    [len(timeServiceCounters)]sample
-	interfaces     []networkInterface
+	swapFree         sample
+	swapUsed         sample
+	memoryCounters   [len(memoryCounters)]sample
+	pageFaults       pageFaults
+	pagingFiles      []pagingFile
+	numaNodes        []numaNode
+	system           systemCounters
+	terminalServices [len(terminalServicesCounters)]sample
+	timeService      [len(timeServiceCounters)]sample
+	interfaces       []networkInterface
 	// netTotalReceived and netTotalSent sum the byte totals of the Network
 	// Interface instances; physicalInterfaces names them.
 	netTotalReceived   sample

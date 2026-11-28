@@ -363,6 +363,19 @@ groups:
             name: uptime
             options:
               divisor: 1000
+  - family: sessions
+    context_namespace: terminal_services
+    metrics: [terminal_services_active_sessions, terminal_services_inactive_sessions]
+    charts:
+      - context: sessions
+        title: Terminal Services sessions
+        units: sessions
+        type: stacked
+        dimensions:
+          - selector: terminal_services_active_sessions
+            name: active
+          - selector: terminal_services_inactive_sessions
+            name: inactive
   - family: clock
     context_namespace: wmi
     metrics:
