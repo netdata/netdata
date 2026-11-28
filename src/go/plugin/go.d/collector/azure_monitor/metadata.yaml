@@ -6090,7 +6090,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-virtual_wan_vpn_gateway
       monitored_instance:
         name: Azure Virtual WAN Site-to-Site VPN Gateway
-        description: Monitor tunnel traffic, packet drops, BGP routes, and changes to IPsec security associations on Azure Virtual WAN site-to-site VPN gateways.
+        description: Monitor bandwidth, tunnel traffic, packet drops, gateway flows, and BGP peer status on Azure Virtual WAN site-to-site VPN gateways.
         link: https://learn.microsoft.com/azure/virtual-wan/
         icon_filename: azure.svg
         categories:
@@ -6106,15 +6106,15 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor site-to-site tunnel traffic, packet drops, NAT, BGP, and IPsec security associations on an Azure Virtual WAN VPN gateway.
+          Monitor gateway bandwidth, peak inbound and outbound flows, tunnel traffic, packet drops, and BGP peer status for each Azure Virtual WAN site-to-site VPN gateway.
 
-          In auto mode, the collector selects the `virtual_wan_vpn_gateway` profile for `Microsoft.Network/vpnGateways`. Each chart shows one gateway, with Azure aggregating across its tunnels, peers, or instances. See [Azure Monitor setup](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md).
+          In auto mode, the collector selects the `virtual_wan_vpn_gateway` profile for `Microsoft.Network/vpnGateways`. It queries eight metrics every five minutes. Tunnel traffic and drop rates are averages over the five-minute Azure interval. With the default limits, up to 50 gateways in the same subscription and region share three scheduled Metrics API requests every five minutes.
 
-          BGP peer status averages Azure's connectivity values (1 for connected, 0 for disconnected). Azure includes each gateway instance paired with itself at 0, so the average can fall below 1 even when all remote peers are connected. Route counts include the routes reported by each peer and gateway instance. See [Microsoft's guidance on site-to-site VPN gateway metrics](https://learn.microsoft.com/en-us/azure/virtual-wan/monitor-virtual-wan#site-to-site-vpn-gateway).
+          BGP peer status averages Azure's connectivity values (1 for connected, 0 for disconnected). Azure includes each gateway instance paired with itself at 0, so the average can fall below 1 even when all remote peers are connected. See [Microsoft's guidance on site-to-site VPN gateway metrics](https://learn.microsoft.com/en-us/azure/virtual-wan/monitor-virtual-wan#site-to-site-vpn-gateway).
 
-          IPsec counts show how many main mode and quick mode security associations were created or deleted in each five-minute interval. NAT flow and allocation counts show the total Azure reports in each one-minute interval.
+          For more detail, the [full profile example](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/examples/virtual_wan_vpn_gateway.yaml) adds tunnel packet rates, NAT, IPsec association changes, and BGP route counts. It queries 22 metrics every minute and five every five minutes. With the same limits, that is three scheduled requests each minute plus two every five minutes.
 
-          With default settings, up to 50 gateways in one subscription and region share three scheduled Metrics API requests each minute. Two additional scheduled requests run every five minutes for gateway flows, IPsec security associations, and VNet address prefixes.
+          To enable the example, copy `go.d/azure_monitor.profiles/examples/virtual_wan_vpn_gateway.yaml` from the stock configuration directory to `go.d/azure_monitor.profiles/virtual_wan_vpn_gateway.yaml` in the user configuration directory, then restart the Agent. The user file replaces the entire stock profile for jobs that use it. To collect only selected extras, copy the default profile to the same user path and add the desired entries from the example under `metrics` and `template.charts`. See [Netdata configuration directories](/docs/netdata-agent/configuration/README.md).
         method_description: *method_description
     metrics:
       folding:
@@ -6154,12 +6154,6 @@ modules:
               dimensions:
                 - name: inbound
                 - name: outbound
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_bandwidth
-              description: Azure Virtual WAN Average Tunnel Bandwidth
-              unit: bytes/s
-              chart_type: line
-              dimensions:
-                - name: average
             - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_traffic
               description: Azure Virtual WAN Tunnel Traffic
               unit: bytes/s
@@ -6167,25 +6161,6 @@ modules:
               dimensions:
                 - name: ingress
                 - name: egress
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_packets
-              description: Azure Virtual WAN Tunnel Packet Rate
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: ingress
-                - name: egress
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_peak_packet_rate
-              description: Azure Virtual WAN Peak Tunnel Packet Rate
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: peak
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_flow_creation
-              description: Azure Virtual WAN Tunnel Flow Creation Rate
-              unit: flows/s
-              chart_type: line
-              dimensions:
-                - name: created
             - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_packet_drops
               description: Azure Virtual WAN Tunnel Packet Drops
               unit: packets/s
@@ -6193,71 +6168,12 @@ modules:
               dimensions:
                 - name: ingress
                 - name: egress
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_traffic_selector_mismatch_drops
-              description: Azure Virtual WAN Tunnel Packet Drops from Traffic Selector Mismatches
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: ingress
-                - name: egress
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_nat_packet_drops
-              description: Azure Virtual WAN Tunnel NAT Packet Drops
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: dropped
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_nat_allocations
-              description: Azure Virtual WAN Tunnel NAT Allocations
-              unit: allocations
-              chart_type: line
-              dimensions:
-                - name: allocations
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_nat_flows
-              description: Azure Virtual WAN Tunnel NAT Flows
-              unit: flows
-              chart_type: line
-              dimensions:
-                - name: flows
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_nat_traffic
-              description: Azure Virtual WAN Tunnel NAT Traffic
-              unit: bytes/s
-              chart_type: line
-              dimensions:
-                - name: translated
-                - name: reverse_translated
-            - name: azure_monitor.virtual_wan_vpn_gateway.tunnel_nat_packets
-              description: Azure Virtual WAN Tunnel NAT Packet Rate
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: translated
-                - name: reverse_translated
-            - name: azure_monitor.virtual_wan_vpn_gateway.ipsec_security_association_changes
-              description: Azure Virtual WAN IPsec Security Association Changes
-              unit: changes
-              chart_type: line
-              dimensions:
-                - name: main_mode
-                - name: quick_mode
             - name: azure_monitor.virtual_wan_vpn_gateway.bgp_peer_status
               description: Azure Virtual WAN Average BGP Peer Status
               unit: ratio
               chart_type: line
               dimensions:
                 - name: average
-            - name: azure_monitor.virtual_wan_vpn_gateway.bgp_routes
-              description: Azure Virtual WAN BGP Routes
-              unit: routes
-              chart_type: line
-              dimensions:
-                - name: advertised
-                - name: learned
-            - name: azure_monitor.virtual_wan_vpn_gateway.vnet_address_prefixes
-              description: Azure Virtual WAN Virtual Network Address Prefixes
-              unit: prefixes
-              chart_type: line
-              dimensions:
-                - name: prefixes
   - <<: *module
     meta:
       <<: *meta

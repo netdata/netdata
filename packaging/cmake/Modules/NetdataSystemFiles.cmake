@@ -760,6 +760,9 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_AZURE_MON_PROFILE_FILES}
             COMPONENT plugin-go
             DESTINATION ${LIBCONFIG_DEST}/go.d/azure_monitor.profiles/default)
+    install(FILES src/go/plugin/go.d/config/go.d/azure_monitor.profiles/examples/virtual_wan_vpn_gateway.yaml
+            COMPONENT plugin-go
+            DESTINATION ${LIBCONFIG_DEST}/go.d/azure_monitor.profiles/examples)
 
     install(DIRECTORY
             COMPONENT plugin-go
