@@ -7,7 +7,14 @@
 #include "sqlite_functions.h"
 
 // the schema version an agent migrates its metadata database to on startup
-#define DB_METADATA_VERSION 19
+#define DB_METADATA_VERSION 20
+
+// interned health_log_detail info/summary text, and the indexes its orphan sweep probes (see database_config[])
+#define SQL_CREATE_HEALTH_LOG_TEXT "CREATE TABLE IF NOT EXISTS health_log_text (id INTEGER PRIMARY KEY, text TEXT NOT NULL UNIQUE)"
+#define SQL_CREATE_HEALTH_LOG_D_INFO_ID_INDEX                                                                          \
+    "CREATE INDEX IF NOT EXISTS health_log_d_info_id ON health_log_detail (info_id) WHERE info_id IS NOT NULL"
+#define SQL_CREATE_HEALTH_LOG_D_SUMMARY_ID_INDEX                                                                       \
+    "CREATE INDEX IF NOT EXISTS health_log_d_summary_id ON health_log_detail (summary_id) WHERE summary_id IS NOT NULL"
 
 typedef enum event_log_type {
     EVENT_AGENT_START_TIME  = 1,

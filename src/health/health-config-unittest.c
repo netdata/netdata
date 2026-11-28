@@ -2370,6 +2370,7 @@ int health_config_unittest(void) {
     // instead of the parser - counted BEFORE the summary, or a failure here
     // is printed above a line claiming nothing failed
     failed += sql_alert_config_unittest();
+    failed += sql_health_text_unittest();
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);

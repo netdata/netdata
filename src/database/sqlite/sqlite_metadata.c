@@ -75,7 +75,21 @@ const char *database_config[] = {
     "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
     "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
     "info text, exec_code int, new_status real, old_status real, delay int, "
-    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text, "
+    "info_id int, summary_id int)",
+
+    // info and summary are a function of (alert config, chart labels) only - they are never
+    // interpolated with metric values - so every transition of the same alert on the same chart
+    // repeats the same two strings. On an 808-node parent that was 2.62 GB of literal repetition
+    // across 25.6M rows drawn from 3612 distinct values. health_log_detail now stores ids into
+    // this table instead, and the readers resolve them with COALESCE(t.text, hld.<col>) so rows
+    // written before the v19->v20 migration keep rendering from their inline text.
+    //
+    // Texts include chart label values, so hosts whose labels churn (containers, k8s pods) keep
+    // adding new ones. Texts no transition refers to any more are removed by the health log
+    // cleanup (sql_health_text_cleanup()), which probes the two partial indexes below; they hold
+    // only interned rows, so rows written before the migration add nothing to them.
+    SQL_CREATE_HEALTH_LOG_TEXT,
 
     "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
     "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
@@ -84,6 +98,8 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
+    SQL_CREATE_HEALTH_LOG_D_INFO_ID_INDEX,
+    SQL_CREATE_HEALTH_LOG_D_SUMMARY_ID_INDEX,
 
     "CREATE TABLE IF NOT EXISTS agent_event_log (id INTEGER PRIMARY KEY, version TEXT, event_type INT, value, date_created INT)",
     "CREATE INDEX IF NOT EXISTS idx_agent_event_log1 on agent_event_log (event_type)",
@@ -1718,6 +1734,7 @@ static void cleanup_health_log(struct meta_config_s *config)
     (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
     (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
     (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
+    sql_health_text_cleanup();
     worker_is_idle();
 }
 

@@ -541,10 +541,12 @@ void health_alarm_log_populate(
 #define SQL_SELECT_ALERT_TO_PUSH                                                                                       \
     "SELECT aq.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key,"          \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,"    \
-    " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status,"                  \
+    " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, COALESCE(ti.text, hld.info), hld.exec_code, hld.new_status,"\
     " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id,"  \
-    " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, hld.when_key"                                 \
+    " hld.alarm_event_id, hl.chart_name, COALESCE(ts.text, hld.summary), hld.health_log_id, hld.when_key"              \
     " FROM health_log hl, aclk_queue aq, alert_hash ah, health_log_detail hld"                                         \
+    " LEFT JOIN health_log_text ti ON ti.id = hld.info_id"                                                             \
+    " LEFT JOIN health_log_text ts ON ts.id = hld.summary_id"                                                          \
     " WHERE hld.unique_id = aq.unique_id AND hld.health_log_id = aq.health_log_id"                                     \
     " AND hl.config_hash_id = ah.hash_id"                                                                              \
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
@@ -1335,10 +1337,13 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
     " WITH snapshot AS MATERIALIZED ("                                                                                 \
     " SELECT 0, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, "                     \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "  \
-    " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "                \
-    " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, " \
-    " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, av.version "                                  \
+    " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, COALESCE(ti.text, hld.info), hld.exec_code, "              \
+    " hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, "     \
+    " hld.transition_id, hld.alarm_event_id, hl.chart_name, COALESCE(ts.text, hld.summary), hld.health_log_id, "        \
+    " av.version "                                                                                                     \
     " FROM health_log hl, alert_hash ah, health_log_detail hld, alert_version av "                                     \
+    " LEFT JOIN health_log_text ti ON ti.id = hld.info_id"                                                             \
+    " LEFT JOIN health_log_text ts ON ts.id = hld.summary_id"                                                          \
     " WHERE hl.config_hash_id = ah.hash_id"                                                                            \
     " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "                                             \
     " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id AND av.status <> -2)"                  \
