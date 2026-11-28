@@ -9282,7 +9282,7 @@ components:
       name: cardinality_limit
       in: query
       description: |
-        Limits the number of unique items returned, to prevent excessive memory usage and response sizes when a request matches a large number of items. For data queries, the query engine keeps the top contributing dimensions and folds the rest into one `remaining` aggregate dimension, so the total number of returned dimensions equals this limit; the `jsonwrap` summary metadata (nodes, instances, dimensions, labels) stays complete unless the `cardinality-limit-all` option is also given. Other endpoints (alerts, contexts) apply this limit to their own result items. Weights endpoints define separate result-limit semantics.
+        Limits the number of unique items returned, to prevent excessive memory usage and response sizes when a request matches a large number of items. For data queries, the query engine keeps the top contributing dimensions and folds the rest into one `remaining` aggregate dimension, so a data query returns at most this many dimensions (fewer when `nonzero` hides all-zero ones); the `jsonwrap` summary metadata (nodes, instances, dimensions, labels) stays complete unless the `cardinality-limit-all` option is also given. Other endpoints (alerts, contexts) apply this limit to their own result items. Weights endpoints define separate result-limit semantics.
       required: false
       schema:
         type: integer
