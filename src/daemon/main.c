@@ -523,6 +523,10 @@ int netdata_main(int argc, char **argv) {
                             inicfg_set(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
 #ifdef ENABLE_DBENGINE
                             default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
+
+                            // enough libuv pool threads for the dbengine tests: set before anything starts the pool,
+                            // which the in-memory instance of the unittest localhost (db = ram) does in rrd_init()
+                            setenv("UV_THREADPOOL_SIZE", "48", 1);
 #endif
 
                             if (sqlite_library_init())

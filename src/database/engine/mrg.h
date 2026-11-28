@@ -75,6 +75,8 @@ time_t mrg_metric_get_first_time_s(MRG *mrg, METRIC *metric);
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
 void mrg_metric_clear_hot_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
+bool mrg_metric_latest_time_is(MRG *mrg, METRIC *metric, time_t latest_time_s);
+bool mrg_metric_replace_clean_latest_time_s(MRG *mrg, METRIC *metric, time_t expected_s, time_t latest_time_s);
 time_t mrg_metric_get_latest_time_s(MRG *mrg, METRIC *metric);
 time_t mrg_metric_get_latest_clean_time_s(MRG *mrg, METRIC *metric);
 

@@ -34,6 +34,10 @@ if(ENABLE_DBENGINE)
     list(APPEND RRD_PLUGIN_FILES
             ${RRD_DBENGINE_FILES}
     )
+else()
+    list(APPEND RRD_PLUGIN_FILES
+            ${RRD_RING_FILES}
+    )
 endif()
 
 set(NETDATA_FILES

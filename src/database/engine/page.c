@@ -15,6 +15,9 @@ typedef enum __attribute__((packed)) {
     PGD_STATE_CREATED_FROM_DISK             = (1 << 1),
     PGD_STATE_SCHEDULED_FOR_FLUSHING        = (1 << 2),
     PGD_STATE_FLUSHED_TO_DISK               = (1 << 3),
+
+    // with CREATED_FROM_DISK: an in-memory gorilla page packed by pgd_compact(); raw.data is mallocz()ed
+    PGD_STATE_COMPACTED                     = (1 << 4),
 } PGD_STATES;
 
 typedef struct {
@@ -578,6 +581,30 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
     return pg;
 }
 
+// frees the buffers and the writer of a gorilla page that was created by a collector
+static void pgd_free_gorilla_writer(PGD *pg) {
+    internal_fatal(pg->gorilla.num_buffers == 0,
+                   "PGD does not have any gorilla buffers allocated");
+
+    while (true) {
+        gorilla_buffer_t *gbuf = gorilla_writer_drop_head_buffer(pg->gorilla.writer);
+        if (!gbuf)
+            break;
+        aral_freez(pgd_alloc_globals.aral_gorilla_buffer[pg->partition], gbuf);
+        pg->gorilla.num_buffers -= 1;
+    }
+
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GLIVE);
+
+    internal_fatal(pg->gorilla.num_buffers != 0,
+                   "Could not free all gorilla writer buffers");
+
+    aral_freez(pgd_alloc_globals.aral_gorilla_writer[pg->partition], pg->gorilla.writer);
+    pg->gorilla.writer = NULL;
+
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GWORKER);
+}
+
 void pgd_free(PGD *pg) {
     if (!pg || pg == PGD_EMPTY)
         return;
@@ -588,7 +615,13 @@ void pgd_free(PGD *pg) {
     switch (pg->type)
     {
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
-            if (pg->states & PGD_STATE_CREATED_FROM_DISK)
+            if (pg->states & PGD_STATE_COMPACTED)
+            {
+                freez(pg->raw.data);
+                pg->raw.data = NULL;
+                pg->raw.size = 0;
+            }
+            else if (pg->states & PGD_STATE_CREATED_FROM_DISK)
             {
                 internal_fatal(pg->raw.data == NULL, "Tried to free gorilla PGD loaded from disk with NULL data");
 
@@ -605,26 +638,7 @@ void pgd_free(PGD *pg) {
                 internal_fatal(pg->gorilla.writer == NULL,
                                "PGD does not have an active gorilla writer");
 
-                internal_fatal(pg->gorilla.num_buffers == 0,
-                               "PGD does not have any gorilla buffers allocated");
-
-                while (true) {
-                    gorilla_buffer_t *gbuf = gorilla_writer_drop_head_buffer(pg->gorilla.writer);
-                    if (!gbuf)
-                        break;
-                    aral_freez(pgd_alloc_globals.aral_gorilla_buffer[pg->partition], gbuf);
-                    pg->gorilla.num_buffers -= 1;
-                }
-
-                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GLIVE);
-
-                internal_fatal(pg->gorilla.num_buffers != 0,
-                               "Could not free all gorilla writer buffers");
-
-                aral_freez(pgd_alloc_globals.aral_gorilla_writer[pg->partition], pg->gorilla.writer);
-                pg->gorilla.writer = NULL;
-
-                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GWORKER);
+                pgd_free_gorilla_writer(pg);
             } else {
                 fatal("pgd_free() called on gorilla page with unsupported state");
                 // TODO: should we support any other states?
@@ -763,7 +777,10 @@ ALWAYS_INLINE uint32_t pgd_memory_footprint(PGD *pg)
 
     switch (pg->type) {
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
-            if (pg->states & PGD_STATE_CREATED_FROM_DISK)
+            if (pg->states & PGD_STATE_COMPACTED)
+                footprint += pg->raw.size;
+
+            else if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 footprint += pgd_data_footprint(pg->raw.size, pg->partition);
 
             else {
@@ -1032,6 +1049,60 @@ size_t pgd_append_point(
     }
 
     return 0;
+}
+
+// ----------------------------------------------------------------------------
+// in-memory dbengine
+
+// A closed gorilla page of an in-memory tier is never written to disk, so its buffer chain can be packed
+// into one allocation that keeps only the bits the last buffer uses. The page then reads exactly like a
+// page loaded from disk.
+//
+// The caller MUST have exclusive access to the page: readers keep pointers into the buffers while they
+// hold the page (see pgc_page_hot_resize_exclusive()).
+//
+// Returns the bytes released, 0 when the page was left as it was.
+size_t pgd_compact(PGD *pg) {
+    if (!pg || pg == PGD_EMPTY ||
+        pg->type != RRDENG_PAGE_TYPE_GORILLA_32BIT ||
+        pg->states != PGD_STATE_CREATED_FROM_COLLECTOR ||
+        !pg->gorilla.writer)
+        return 0;
+
+    gorilla_writer_t *gw = pg->gorilla.writer;
+    uint32_t size = gorilla_writer_compact_nbytes(gw);
+    if (!size)
+        return 0;
+
+    size_t before = pgd_alloc_globals.sizeof_gorilla_writer_t +
+                    pg->gorilla.num_buffers * pgd_alloc_globals.sizeof_gorilla_buffer_32bit;
+    if (size >= before)
+        return 0;
+
+    uint8_t *data = mallocz(size);
+    if (!gorilla_writer_compact(gw, data, size)) {
+        freez(data);
+        return 0;
+    }
+
+    uint32_t entries = gorilla_writer_entries(gw);
+
+    // the buffers go back to ARAL as ordinary (unmarked) allocations
+    pgd_aral_unmark(pg);
+    pgd_free_gorilla_writer(pg);
+
+    pg->raw.data = data;
+    pg->raw.size = size;
+    pg->used = entries;
+    pg->slots = entries;
+    pg->states = PGD_STATE_CREATED_FROM_DISK | PGD_STATE_COMPACTED;
+
+    return before - size;
+}
+
+// was the page packed by pgd_compact()?
+bool pgd_is_compacted(PGD *pg) {
+    return pg && pg != PGD_EMPTY && (pg->states & PGD_STATE_COMPACTED);
 }
 
 // ----------------------------------------------------------------------------

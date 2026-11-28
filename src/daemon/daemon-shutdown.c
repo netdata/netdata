@@ -363,6 +363,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             freez(th);
 
+            rrdeng_in_memory_quiesce_all();
             dbengine_drained = dbengine_shutdown();
             if(!dbengine_drained) {
                 __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
@@ -371,8 +372,17 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
-            // Skip these steps
+            // no disk tiers to flush; in-memory instances (db = ram / alloc) may still have started the event loop
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
+
+            if(rrdeng_dbengine_spawned()) {
+                rrdeng_in_memory_quiesce_all();
+                dbengine_drained = dbengine_shutdown();
+                if(!dbengine_drained) {
+                    __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+                    daemon_status_file_shutdown_gave_up("DBENGINE ", "pool work may still be running");
+                }
+            }
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
 #else
@@ -517,6 +527,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         pgc_destroy(open_cache, false);
         fprintf(stderr, "Destroying main cache (PGC)...\n");
         pgc_destroy(main_cache, false);
+        // its free callback updates the MRG: before the MRG goes
+        fprintf(stderr, "Destroying in-memory cache (PGC)...\n");
+        pgc_destroy(ram_cache, false);
 
         fprintf(stderr, "Destroying metrics registry (MRG)...\n");
         size_t metrics_referenced = mrg_destroy(main_mrg);

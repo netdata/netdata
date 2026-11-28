@@ -3,7 +3,9 @@
 #include "rrd.h"
 #include "storage-engine.h"
 #include "rrddim-collection.h"
+#ifndef ENABLE_DBENGINE
 #include "ram/rrddim_mem.h"
+#endif
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -34,11 +36,13 @@ static inline int32_t rrddim_normalize_divisor(int32_t divisor) {
     return divisor ? divisor : 1;
 }
 
+#ifndef ENABLE_DBENGINE
 // isolated call to appear
 // separate in statistics
 static void *rrddim_alloc_db(size_t entries) {
     return callocz(entries, sizeof(storage_number));
 }
+#endif
 
 static void rrddim_reinitialize_collection(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
@@ -78,6 +82,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
 
+    rd->db.data = NULL;
+    rd->db.memsize = 0;
+
+#ifndef ENABLE_DBENGINE
+    // with dbengine, ram and alloc store in an in-memory dbengine instance (the host's db[0]), not in a ring
     if(ctr->memory_mode == RRD_DB_MODE_RAM) {
         size_t entries = st->db.entries;
         if(!entries) entries = 5;
@@ -93,7 +102,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    if(ctr->memory_mode == RRD_DB_MODE_ALLOC || ctr->memory_mode == RRD_DB_MODE_NONE) {
+    // alloc, and ram when its mmap() failed
+    if(!rd->db.data && ctr->memory_mode == RRD_DB_MODE_ALLOC) {
         size_t entries = st->db.entries;
         if(entries < 5) entries = 5;
 
@@ -101,6 +111,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         rd->db.memsize = entries * sizeof(storage_number);
         pulse_db_rrd_memory_add(rd->db.memsize);
     }
+#endif
 
     rd->rrd_memory_mode = ctr->memory_mode;
 
@@ -224,9 +235,11 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // Delete the dimension's SQLite metadata when freeing it leaves no queryable
     // data behind:
     //   - dbengine: only when no on-disk retention remains;
-    //   - ram/alloc/none: all use the in-memory rrddim storage backend, so data
-    //     lives only in RAM and a freed dimension is always orphaned (the
-    //     retention check above misreports these modes as retained).
+    //   - ram/alloc: data lives only in RAM (an in-memory dbengine instance, or
+    //     the in-memory ring), so it does not survive a restart and a freed
+    //     dimension is always orphaned (the retention check above reports the
+    //     data still in memory as retained);
+    //   - none: no data at all.
     if ((rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE && !has_db_retention) ||
         rd->rrd_memory_mode == RRD_DB_MODE_RAM ||
         rd->rrd_memory_mode == RRD_DB_MODE_ALLOC ||
@@ -234,21 +247,24 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
 
-    bool db_data_lifetime_transferred = false;
+    bool db_data_lifetime_transferred __maybe_unused = false;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
+#ifndef ENABLE_DBENGINE
             if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
                 db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
             else
+#endif
                 eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
         }
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 
+#ifndef ENABLE_DBENGINE
     if(rd->db.data && !db_data_lifetime_transferred) {
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
@@ -257,6 +273,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         else
             freez(rd->db.data);
     }
+#endif
 
     string_freez(rd->id);
     string_freez(rd->name);

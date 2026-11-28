@@ -10,10 +10,10 @@ For lightweight devices, keep a recovery buffer in RAM. Set these values in the 
 [db]
     db = ram
     update every = 300
-    retention = 120
+    retention = 1024
 ```
 
-On devices with 4 KiB memory pages, `retention = 120` rounds up to 1,024 samples per dimension. At five-minute collection, this covers about 3.6 days; at ten-minute collection, about 7.1 days. Size this window for the outages your devices encounter; each chart's own interval determines its coverage, and larger memory pages retain more samples.
+`retention = 1024` asks for 1,024 samples per dimension. At five-minute collection, this covers about 3.6 days; at ten-minute collection, about 7.1 days. Size this window for the outages your devices encounter; each chart's own interval determines its coverage. It is a target, not an exact window: samples are released in whole pages, so a chart can keep more, and when the system runs low on memory the oldest pages are released early, so it can keep less.
 
 Enable replication in the Parent's API-key section of `stream.conf`:
 
@@ -25,18 +25,18 @@ Enable replication in the Parent's API-key section of `stream.conf`:
     replication step = 10m
 ```
 
-Add these settings to your existing receiver configuration. After reconnection, the Parent requests available history within the replication period and fills the gap in steps. Four days covers the five-minute example above on 4 KiB-page devices; use `replication period = 8d` for ten-minute collection. Match the replication period to the history you want to recover, including any additional retention on devices with larger memory pages.
+Add these settings to your existing receiver configuration. After reconnection, the Parent requests available history within the replication period and fills the gap in steps. Four days covers the five-minute example above; use `replication period = 8d` for ten-minute collection. Match the replication period to the history you want to recover.
 
 Choose the storage mode that matches the device's recovery needs:
 
 | Child storage | Recovery capability |
 |:--|:--|
 | `ram` | Backfills network outages while the Agent stays running, with metric history kept off the SD card |
-| `alloc` | Backfills from memory with a smaller allocation and shorter recovery window at low retention settings |
+| `alloc` | The same as `ram` (Agents built without the Database Engine keep older fixed-size buffers for both) |
 | `dbengine` | Backfills from persistent history that survives Agent restarts and device power loss |
-| `none` | Resumes current monitoring on reconnection, with the smallest local history footprint |
+| `none` | Resumes current monitoring on reconnection; keeps no local history, so data collected while disconnected is lost |
 
-Use local retention to cover outages. The streaming send buffer handles short sending delays. See [CPU and memory settings](./minimize-cpu-and-memory.md#choose-local-history) for retention choices and the [streaming reference](../../src/streaming/README.md) for replication settings.
+Use local retention to cover outages, even short ones: reconnecting takes several seconds, and the streaming send buffer only absorbs slow sending while connected. For a device that only needs to ride out brief network glitches, `ram` with a short `retention` (a few minutes of samples) is enough. See [CPU and memory settings](./minimize-cpu-and-memory.md#choose-local-history) for retention choices and the [streaming reference](../../src/streaming/README.md) for replication settings.
 
 ## Connect automatically to another Parent
 

@@ -83,13 +83,13 @@ Child and Parent storage are independent:
 
 ## `ram`
 
-`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In both of these modes, metric samples exist only in memory, and only while they’re collected.
+`ram` mode can help when Netdata shouldn’t write metric samples to disk. In this mode, metric samples exist only in memory, and only while they’re collected. Netdata can still write its metadata database and logs to disk.
 
-When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The ring buffers available in these modes are used to cache the collected samples for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
+When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The samples kept in memory cache the collected data for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
 
-The memory required per sample is four bytes. RAM allocation is rounded to whole memory pages: on systems with 4 KiB pages, each dimension grows in steps of 1,024 samples. Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
+`ram` (and `alloc`, which is the same) keeps tier 0 of the Database Engine in memory, without files. On a Parent with Database Engine tiers, a `ram` Child's higher tiers are still stored on disk. Samples are compressed in memory pages, so the memory used depends on how compressible each metric is, and it grows with the samples actually stored instead of being allocated up front. Whole pages are released once they fall out of the retention, so a dimension can hold up to one page more than requested. When Netdata can detect the system memory and the system has less free memory than `[db].dbengine out of memory protection` (by default 10% of RAM, up to 5 GiB), the Database Engine releases pages early, the oldest that are not being queried first, and the retention gets shorter. Agents built without the Database Engine (`--disable-dbengine`) keep the older buffers instead: four bytes per sample, allocated up front, with `ram` rounded up to whole memory pages and `alloc` exact.
 
 **Configuring ram mode and retention**:
 
 - Enable ram mode: To use in-memory storage, set `[db].db` to ram in your `netdata.conf` file. Remember, this mode won't retain historical data after restarts.
-- Adjust retention (optional): Set `[db].retention` in `netdata.conf` to the requested number of samples per dimension. Netdata rounds this up to whole memory pages—1,024 samples per page on 4 KiB-page systems. The retained time is the allocated sample count multiplied by each chart's collection interval.
+- Adjust retention (optional): Set `[db].retention` in `netdata.conf` to the number of samples per dimension. The retained time is that count multiplied by each chart's collection interval.

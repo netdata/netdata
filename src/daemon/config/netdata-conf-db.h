@@ -17,6 +17,7 @@ size_t get_tier_grouping(size_t tier);
 
 void netdata_conf_section_db(void);
 void netdata_conf_dbengine_init(const char *hostname);
+void netdata_conf_dbengine_memory_protection_init(void);
 
 #include "netdata-conf.h"
 

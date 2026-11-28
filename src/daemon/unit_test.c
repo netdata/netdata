@@ -1336,6 +1336,30 @@ struct test test15 = {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// The values tier 0 holds for a dimension, oldest first, read back with a query: it works for every backend, the ring
+// of db = ram / alloc (in builds without dbengine) and the in-memory dbengine of db = ram / alloc. Gaps are skipped:
+// the ring reports an empty interval before its first point. Returns how many values it read.
+static size_t unittest_stored_values(RRDSET *st, RRDDIM *rd, NETDATA_DOUBLE *values, size_t max) {
+    size_t n = 0;
+
+    struct storage_engine_query_handle seqh;
+    unittest_storage_engine_query_init(
+        rd->tiers[0].seb, rd->tiers[0].smh, &seqh,
+        rrdset_first_entry_s(st) - st->update_every, rrdset_last_entry_s(st), STORAGE_PRIORITY_SYNCHRONOUS);
+
+    while(n < max && !unittest_storage_engine_query_is_finished(&seqh)) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        if(!storage_point_is_gap(sp) && sp.count)
+            values[n++] = sp.sum / (NETDATA_DOUBLE)sp.count;
+    }
+    unittest_storage_engine_query_finalize(&seqh);
+
+    for(size_t i = n; i < max; i++)
+        values[i] = NAN;
+
+    return n;
+}
+
 int run_test(struct test *test)
 {
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
@@ -1390,8 +1414,11 @@ int run_test(struct test *test)
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
+        // only the first collection takes its time from here (the next ones add the faked microseconds to it): start
+        // 10 minutes ago, so that the whole test is in the past, where every backend can query it
         struct timeval now;
         now_realtime_timeval(&now);
+        now.tv_sec -= 600;
         rrdset_timed_done(st, now, false);
 
         // align the first entry to second boundary
@@ -1412,8 +1439,14 @@ int run_test(struct test *test)
     }
 
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
+    NETDATA_DOUBLE *stored = callocz(max + 1, sizeof(NETDATA_DOUBLE));
+    NETDATA_DOUBLE *stored2 = callocz(max + 1, sizeof(NETDATA_DOUBLE));
+    unittest_stored_values(st, rd, stored, max);
+    if(rd2)
+        unittest_stored_values(st, rd2, stored2, max);
+
     for(c = 0 ; c < max ; c++) {
-        NETDATA_DOUBLE v = unpack_storage_number(rd->db.data[c]);
+        NETDATA_DOUBLE v = stored[c];
         NETDATA_DOUBLE n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
         int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1425,7 +1458,7 @@ int run_test(struct test *test)
         if(!same) errors++;
 
         if(rd2) {
-            v = unpack_storage_number(rd2->db.data[c]);
+            v = stored2[c];
             n = test->results2[c];
             same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1437,6 +1470,8 @@ int run_test(struct test *test)
         }
     }
 
+    freez(stored);
+    freez(stored2);
     return errors;
 }
 
@@ -1589,6 +1624,9 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     return rc;
 }
 
+#ifndef ENABLE_DBENGINE
+// The gap filling of the ring (src/database/ram/), the engine of db = ram / alloc in builds without dbengine (with
+// dbengine, they store in an in-memory dbengine instance; db = none is src/database/storage-none.c in both).
 static RRDSET *ram_gap_chart(const char *name, RRDDIM **rd) {
     RRDSET *st = rrdset_create_localhost(
         "netdata", name, name, "netdata", NULL, "Unit Testing", "value", "unittest", NULL, 1,
@@ -1680,6 +1718,8 @@ static int test_ram_engine_gap_fills_only_missed_intervals(void) {
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc ? 1 : 0;
 }
+
+#endif // !ENABLE_DBENGINE
 
 static int test_rrdmetric_algorithm_follows_rrddim(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
@@ -3576,8 +3616,10 @@ int run_all_mockup_tests(void)
     if(test_incremental_sum_lookup_respects_update_every())
         return 1;
 
+#ifndef ENABLE_DBENGINE
     if(test_ram_engine_gap_fills_only_missed_intervals())
         return 1;
+#endif
 
     if(test_rrdmetric_algorithm_follows_rrddim())
         return 1;
@@ -3701,112 +3743,6 @@ int run_all_mockup_tests(void)
 
 
     return 0;
-}
-
-int unit_test(long delay, long shift)
-{
-    fprintf(stderr, "%s() running...\n", __FUNCTION__ );
-    static int repeat = 0;
-    repeat++;
-
-    char name[101];
-    snprintfz(name, sizeof(name) - 1, "unittest-%d-%ld-%ld", repeat, delay, shift);
-
-    //debug_flags = 0xffffffff;
-    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
-    nd_profile.update_every = 1;
-
-    int do_abs = 1;
-    int do_inc = 1;
-    int do_abst = 0;
-    int do_absi = 0;
-
-    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1, 1
-                                         , RRDSET_TYPE_LINE);
-    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
-
-    RRDDIM *rdabs = NULL;
-    RRDDIM *rdinc = NULL;
-    RRDDIM *rdabst = NULL;
-    RRDDIM *rdabsi = NULL;
-
-    if(do_abs) rdabs = rrddim_add(st, "absolute", "absolute", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    if(do_inc) rdinc = rrddim_add(st, "incremental", "incremental", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    if(do_abst) rdabst = rrddim_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
-    if(do_absi) rdabsi = rrddim_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-
-    long increment = 1000;
-    collected_number i = 0;
-
-    unsigned long c, dimensions = rrdset_number_of_dimensions(st);
-    RRDDIM *rd;
-
-    for(c = 0; c < 20 ;c++) {
-        i += increment;
-
-        fprintf(stderr, "\n\nLOOP = %lu, DELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", c, delay, i);
-        if(c) {
-            // rrdset_next_usec_unfiltered(st, delay);
-            st->usec_since_last_update = delay;
-        }
-        if(do_abs) rrddim_set(st, "absolute", i);
-        if(do_inc) rrddim_set(st, "incremental", i);
-        if(do_abst) rrddim_set(st, "percentage-of-absolute-row", i);
-        if(do_absi) rrddim_set(st, "percentage-of-incremental-row", i);
-
-        if(!c) {
-            now_realtime_timeval(&st->last_collected_time);
-            st->last_collected_time.tv_usec = shift;
-        }
-
-        // prevent it from deleting the dimensions
-        rrddim_foreach_read(rd, st) {
-            rd->collector.last_collected_time.tv_sec = st->last_collected_time.tv_sec;
-        }
-        rrddim_foreach_done(rd);
-
-        rrdset_done(st);
-    }
-
-    unsigned long oincrement = increment;
-    increment = increment * st->update_every * 1000000 / delay;
-    fprintf(stderr, "\n\nORIGINAL INCREMENT: %lu, INCREMENT %ld, DELAY %ld, SHIFT %ld\n", oincrement * 10, increment * 10, delay, shift);
-
-    int ret = 0;
-    storage_number sn;
-    NETDATA_DOUBLE cn, v;
-    for(c = 0 ; c < st->counter ; c++) {
-        fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
-
-        rrddim_foreach_read(rd, st) {
-            sn = rd->db.data[c];
-            cn = unpack_storage_number(sn);
-            fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
-
-            if(rd == rdabs) v =
-                (     oincrement
-                    // + (increment * (1000000 - shift) / 1000000)
-                    + (c + 1) * increment
-                );
-
-            else if(rd == rdinc) v = (c?(increment):(increment * (1000000 - shift) / 1000000));
-            else if(rd == rdabst) v = oincrement / dimensions / 10;
-            else if(rd == rdabsi) v = oincrement / dimensions / 10;
-            else v = 0;
-
-            if(v == cn) fprintf(stderr, "passed.\n");
-            else {
-                fprintf(stderr, "ERROR! (expected " NETDATA_DOUBLE_FORMAT ")\n", v);
-                ret = 1;
-            }
-        }
-        rrddim_foreach_done(rd);
-    }
-
-    if(ret)
-        fprintf(stderr, "\n\nUNIT TEST(%ld, %ld) FAILED\n\n", delay, shift);
-
-    return ret;
 }
 
 int test_sqlite(void) {

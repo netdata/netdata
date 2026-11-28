@@ -38,8 +38,7 @@ Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/con
     # https://github.com/netdata/netdata/blob/master/src/database/README.md
     # none = no retention, ram = some retention in ram
     db = ram
-    # Sample entries per dimension for RAM mode, rounded to allocation pages.
-    # On 4 KiB-page devices, 1200 rounds to 2048 entries (~34 minutes at 1s).
+    # Samples kept per dimension in RAM mode (1200 = 20 minutes at 1s).
     # The retained time depends on each chart's collection interval.
     # See the fleet guide before reducing this or changing the cadence.
     retention = 1200

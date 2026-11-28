@@ -379,7 +379,8 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
         PGC_PAGE *page;
         PGC_SEARCH method = PGC_SEARCH_FIRST;
         time_t page_first_time_s = 0;
-        while ((page = pgc_page_get_and_acquire(main_cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
+        PGC *cache = ctx_page_cache((struct rrdengine_instance *)section);
+        while ((page = pgc_page_get_and_acquire(cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
             method = PGC_SEARCH_NEXT;
 
             bool is_hot = pgc_is_page_hot(page);
@@ -402,7 +403,7 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
             if (counts && page_end_time_s > max_end_time_s)
                 max_end_time_s = page_end_time_s;
 
-            pgc_page_release(main_cache, page);
+            pgc_page_release(cache, page);
         }
 
         // pages already written to a datafile whose journal is not indexed yet: they are on disk. Scanned after
@@ -465,6 +466,17 @@ bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, t
 ALWAYS_INLINE
 void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     __atomic_compare_exchange_n(&metric->latest_time_s_hot, &latest_time_s, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+}
+
+// is latest_time_s the metric's clean or hot latest time?
+bool mrg_metric_latest_time_is(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    return __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED) == latest_time_s ||
+           __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED) == latest_time_s;
+}
+
+// sets the clean latest time, back or forward, only while it is still expected_s (a page whose data is gone set it)
+bool mrg_metric_replace_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t expected_s, time_t latest_time_s) {
+    return __atomic_compare_exchange_n(&metric->latest_time_s_clean, &expected_s, latest_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
 ALWAYS_INLINE

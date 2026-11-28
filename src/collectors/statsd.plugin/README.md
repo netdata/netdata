@@ -269,8 +269,6 @@ You can find the StatsD configuration in `/etc/netdata/netdata.conf`:
 	# create private charts for metrics matching = *
 	# max private charts hard limit = 1000
 	# set charts as obsolete after = 0
-	# private charts memory mode = save
-	# private charts history = 3996
 	# histograms and timers percentile (percentThreshold) = 95.00000
 	# add dimension for number of events received = no
 	# gaps on gauges (deleteGauges) = no
@@ -424,10 +422,7 @@ Example: To create charts for all `myapp.*` metrics except `myapp.*.badmetric`:
 create private charts for metrics matching = !myapp.*.badmetric myapp.*
 ```
 
-You can configure a different memory mode specifically for StatsD charts:
-
-- `private charts memory mode`
-- `private charts history`
+Private charts use the host's memory mode and retention.
 
 <details>
 <summary><strong>Private Chart Examples</strong></summary>
@@ -568,7 +563,7 @@ Settings like `private charts`, `gaps when not collected`, and `history` configu
 - **private charts** - Enable/disable private charts for matched metrics (yes|no)
 - **gaps when not collected** - Show gaps when no metrics are collected (yes|no)
 - **memory mode** - Ignored in the `[app]` section; application charts use the host's default memory mode
-- **history** - Size of round-robin database for application charts (optional, minimum 5)
+- **history** - Requested number of points kept for the application charts by `ram` and `alloc` on agents built without the Database Engine (optional, minimum 5). On agents built with it (the default), the charts keep the host's retention, set in the `[db]` section; with `ram` and `alloc`, `history` then only sets how long a collection gap may be before the chart is reset
 
 :::
 

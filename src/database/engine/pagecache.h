@@ -9,6 +9,7 @@ extern struct mrg *main_mrg;
 extern struct pgc *main_cache;
 extern struct pgc *open_cache;
 extern struct pgc *extent_cache;
+extern struct pgc *ram_cache;
 
 /* Forward declarations */
 struct rrdengine_instance;
@@ -47,7 +48,19 @@ void rrdeng_prep_wait(struct page_details_control *pdc);
 void rrdeng_prep_query(struct page_details_control *pdc, bool worker);
 void pg_cache_preload(struct rrdeng_query_handle *handle);
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct page_details_control *pdc, time_t now_s, uint32_t last_update_every_s, size_t *entries);
-void pgc_and_mrg_initialize(void);
+void pgc_and_mrg_initialize(bool in_memory_only);
+void pgc_ram_cache_initialize(void);
+void rrdeng_in_memory_enforce_retention(time_t now_s);
+bool rrdeng_in_memory_take_lost_retention(void);
+
+// the unit tests pause the retention decision of an in-memory page's free callback at these points (no hook otherwise)
+struct pgc_entry;
+typedef enum {
+    RAM_CACHE_RETENTION_HOOK_ENTER,     // the page is out of the index; the callback has not waited for the others yet
+    RAM_CACHE_RETENTION_HOOK_SCANNED,   // the callback scanned the pages that remain, and holds the decision lock
+} RAM_CACHE_RETENTION_HOOK_POINT;
+typedef void (*ram_cache_retention_hook_t)(const struct pgc_entry *entry, RAM_CACHE_RETENTION_HOOK_POINT point);
+void rrdeng_in_memory_set_retention_test_hook(ram_cache_retention_hook_t hook);
 
 void pgc_open_add_hot_page(
     Word_t section,

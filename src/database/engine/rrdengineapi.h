@@ -75,6 +75,9 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_ctx_free(struct rrdengine_instance *ctx);
+struct rrdengine_instance *rrdeng_in_memory_instance(size_t points);
+void rrdeng_in_memory_quiesce_all(void);
+bool rrdeng_dbengine_spawned(void);
 void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
 void rrdeng_flush_all(struct rrdengine_instance *ctx);

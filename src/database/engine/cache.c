@@ -343,30 +343,31 @@ static inline size_t pgc_size_histogram_slot(struct pgc_size_histogram *h, size_
     return low - 1;
 }
 
-static inline void pgc_size_histogram_add(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
-    size_t size;
+// the size a page is counted with in the histograms
+static inline size_t pgc_page_nominal_size(PGC *cache, PGC_PAGE *page) {
     if(cache->config.nominal_page_size_cb)
-        size = cache->config.nominal_page_size_cb(page->data);
-    else
-        size = page_size_from_assumed_size(cache, page->assumed_size);
+        return cache->config.nominal_page_size_cb(page->data);
 
-    size_t slot = pgc_size_histogram_slot(h, size);
+    return page_size_from_assumed_size(cache, page->assumed_size);
+}
+
+static inline void pgc_size_histogram_add(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
+    size_t slot = pgc_size_histogram_slot(h, pgc_page_nominal_size(cache, page));
     internal_fatal(slot >= _countof(h->array), "hey!");
 
     __atomic_add_fetch(&h->array[slot].count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
-    size_t size;
-    if(cache->config.nominal_page_size_cb)
-        size = cache->config.nominal_page_size_cb(page->data);
-    else
-        size = page_size_from_assumed_size(cache, page->assumed_size);
-
-    size_t slot = pgc_size_histogram_slot(h, size);
+// nominal_size: the size the page was added to the histogram with
+static inline void pgc_size_histogram_del_size(struct pgc_size_histogram *h, size_t nominal_size) {
+    size_t slot = pgc_size_histogram_slot(h, nominal_size);
     internal_fatal(slot >= _countof(h->array), "hey!");
 
     __atomic_sub_fetch(&h->array[slot].count, 1, __ATOMIC_RELAXED);
+}
+
+static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
+    pgc_size_histogram_del_size(h, pgc_page_nominal_size(cache, page));
 }
 
 // ----------------------------------------------------------------------------
@@ -525,6 +526,7 @@ static inline bool cache_pressure(PGC *cache, ssize_t limit) {
 
 typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
+static void page_size_set_while_referenced(PGC *cache, PGC_PAGE *page, size_t size, size_t old_nominal_size);
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
 static inline bool flushing_critical(PGC *cache);
@@ -2102,8 +2104,9 @@ static void pgc_evict_thread(void *ptr) {
 
     while (true) {
         worker_is_idle();
-        unsigned new_job_id = completion_wait_for_a_job_with_timeout(
-            &cache->evictor.completion, job_id, 1000);
+        unsigned new_job_id = (cache->config.options & PGC_OPTIONS_EVICT_ON_SIGNAL_ONLY) ?
+            completion_wait_for_a_job(&cache->evictor.completion, job_id) :
+            completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 1000);
 
         worker_is_busy(new_job_id > job_id ? 1 : 0);
         job_id = new_job_id;
@@ -2351,6 +2354,64 @@ ALWAYS_INLINE void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page,
         flush_on_page_hot_release(cache);
 }
 
+void pgc_page_hot_to_clean_and_release(PGC *cache, PGC_PAGE *page) {
+    internal_fatal(cache->config.pgc_save_dirty_cb,
+                   "DBENGINE CACHE: hot to clean on a cache that saves its dirty pages");
+
+    // the hot lock before the page transition, like page_set_dirty() and all_hot_to_dirty()
+    pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_COLLECTORS);
+    page_transition_lock(cache, page);
+
+    PGC_PAGE_FLAGS flags = page_get_status_flags(page);
+    if(likely(flags & PGC_PAGE_HOT))
+        pgc_queue_del(cache, &cache->hot, page, true, PGC_QUEUE_LOCK_PRIO_COLLECTORS);
+
+    pgc_queue_unlock(cache, &cache->hot);
+
+    if(likely(!(flags & PGC_PAGE_CLEAN))) {
+        // queued as accessed, at the end of the clean queue: the out of memory protection evicts from its start, so
+        // it loses the oldest closed pages first, not the newest
+        page_flag_set(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+
+        // the flag must be set before pgc_queue_add(): it reads it to append the page (instead of prepending it) and
+        // clears it
+        pgc_queue_add(cache, &cache->clean, page, false, PGC_QUEUE_LOCK_PRIO_COLLECTORS);
+    }
+
+    page_transition_unlock(cache, page);
+
+    page_release(cache, page, true);
+    // page ptr may be invalid now
+}
+
+// New references to a page come only from index lookups, and the index write lock blocks them: with the caller's
+// reference being the only one, cb has the page data to itself. Only hot pages: the evictors and the flushers take
+// references to clean and dirty pages from their queues, without the index lock.
+bool pgc_page_hot_resize_exclusive(PGC *cache, PGC_PAGE *page, pgc_page_exclusive_callback cb, void *arg) {
+    internal_fatal(!is_page_hot(page), "DBENGINE CACHE: exclusive access to a page that is not hot");
+
+    size_t partition = pgc_indexing_partition(cache, page->metric_id);
+    size_t new_size = 0;
+    bool ran = false;
+
+    // the histograms count the page by its nominal size, which cb may change: keep the one it was counted with
+    size_t old_nominal_size = 0;
+
+    pgc_index_write_lock(cache, partition);
+    if(__atomic_load_n(&page->refcount, __ATOMIC_ACQUIRE) == 1) {
+        old_nominal_size = pgc_page_nominal_size(cache, page);
+        new_size = cb(page->data, arg);
+        ran = true;
+    }
+    pgc_index_write_unlock(cache, partition);
+
+    // not under the index lock: the transition lock is taken before the index lock elsewhere
+    if(new_size)
+        page_size_set_while_referenced(cache, page, new_size, old_nominal_size);
+
+    return ran;
+}
+
 bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page) {
     bool ret;
 
@@ -2483,6 +2544,54 @@ bool pgc_flush_pages(PGC *cache) {
     return flush_pages(cache, 0, PGC_SECTION_ALL, true, false);
 }
 
+// Changes the size the cache accounts for a page its caller holds a reference on (so the referenced size moves too).
+// old_nominal_size: the size the histograms count the page with, when its data has changed already; 0 = its data's.
+static void page_size_set_while_referenced(PGC *cache, PGC_PAGE *page, size_t size, size_t old_nominal_size) {
+    page_transition_lock(cache, page);
+
+    struct pgc_queue_statistics *queue_stats = NULL;
+    if(page->flags & PGC_PAGE_HOT)
+        queue_stats = cache->hot.stats;
+    else if(page->flags & PGC_PAGE_DIRTY)
+        queue_stats = cache->dirty.stats;
+    else if(page->flags & PGC_PAGE_CLEAN)
+        queue_stats = cache->clean.stats;
+
+    if(queue_stats && cache->config.stats) {
+        if(old_nominal_size)
+            pgc_size_histogram_del_size(&queue_stats->size_histogram, old_nominal_size);
+        else
+            pgc_size_histogram_del(cache, &queue_stats->size_histogram, page);
+    }
+
+    int64_t old_assumed_size = page->assumed_size;
+    page->assumed_size = page_assumed_size(cache, size);
+
+    int64_t delta = page->assumed_size - old_assumed_size;
+    if(delta > 0) {
+        __atomic_add_fetch(&cache->stats.added_size, delta, __ATOMIC_RELAXED);
+        if(queue_stats)
+            __atomic_add_fetch(&queue_stats->added_size, delta, __ATOMIC_RELAXED);
+    }
+    else if(delta < 0) {
+        __atomic_add_fetch(&cache->stats.removed_size, -delta, __ATOMIC_RELAXED);
+        if(queue_stats)
+            __atomic_add_fetch(&queue_stats->removed_size, -delta, __ATOMIC_RELAXED);
+    }
+
+    __atomic_add_fetch(&cache->stats.size, delta, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&cache->stats.referenced_size, delta, __ATOMIC_RELAXED);
+
+    if(queue_stats) {
+        __atomic_add_fetch(&queue_stats->size, delta, __ATOMIC_RELAXED);
+
+        if(cache->config.stats)
+            pgc_size_histogram_add(cache, &queue_stats->size_histogram, page);
+    }
+
+    page_transition_unlock(cache, page);
+}
+
 void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes) {
     internal_fatal(!is_page_hot(page) && !exit_initiated_get(),
                    "DBENGINE CACHE: end_time_s update on non-hot page");
@@ -2493,43 +2602,22 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
     __atomic_store_n(&page->end_time_s, end_time_s, __ATOMIC_RELAXED);
 
     if(additional_bytes) {
-        page_transition_lock(cache, page);
-
-        struct pgc_queue_statistics *queue_stats = NULL;
-        if(page->flags & PGC_PAGE_HOT)
-            queue_stats = cache->hot.stats;
-        else if(page->flags & PGC_PAGE_DIRTY)
-            queue_stats = cache->dirty.stats;
-        else if(page->flags & PGC_PAGE_CLEAN)
-            queue_stats = cache->clean.stats;
-
-        if(queue_stats && cache->config.stats)
-            pgc_size_histogram_del(cache, &queue_stats->size_histogram, page);
-
-        int64_t old_assumed_size = page->assumed_size;
-
-        size_t old_size = page_size_from_assumed_size(cache, old_assumed_size);
+        size_t old_size = page_size_from_assumed_size(cache, page->assumed_size);
         size_t size;
         if(unlikely(__builtin_add_overflow(old_size, additional_bytes, &size)))
             fatal("DBENGINE CACHE: page size growth overflow for cache '%s' (old_size=%zu, additional_bytes=%zu)",
                   cache->config.name, old_size, additional_bytes);
 
-        page->assumed_size = page_assumed_size(cache, size);
-
-        int64_t delta = page->assumed_size - old_assumed_size;
-        __atomic_add_fetch(&cache->stats.size, delta, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&cache->stats.added_size, delta, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&cache->stats.referenced_size, delta, __ATOMIC_RELAXED);
-
-        if(queue_stats) {
-            __atomic_add_fetch(&queue_stats->size, delta, __ATOMIC_RELAXED);
-            __atomic_add_fetch(&queue_stats->added_size, delta, __ATOMIC_RELAXED);
-
-            if(cache->config.stats)
-                pgc_size_histogram_add(cache, &queue_stats->size_histogram, page);
+        // the collector grew the page data by additional_bytes before calling this: the histograms counted it
+        // without them
+        size_t old_nominal_size = 0;
+        if(cache->config.stats && cache->config.nominal_page_size_cb) {
+            size_t nominal_size = pgc_page_nominal_size(cache, page);
+            if(nominal_size > additional_bytes)
+                old_nominal_size = nominal_size - additional_bytes;
         }
 
-        page_transition_unlock(cache, page);
+        page_size_set_while_referenced(cache, page, size, old_nominal_size);
     }
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
@@ -2566,6 +2654,11 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
     p2_sub_fetch(&cache->stats.p2_workers_search, 1);
 
     return page;
+}
+
+// For bookkeeping lookups: the page is not counted as accessed, so it keeps its place in the clean queue.
+PGC_PAGE *pgc_page_get_and_acquire_no_access(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
+    return page_find_and_acquire_once(cache, section, metric_id, start_time_s, method);
 }
 
 struct pgc_statistics pgc_get_statistics(PGC *cache) {
@@ -3065,6 +3158,10 @@ static bool match_page_data(PGC_PAGE *page, void *data) {
 
 void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile) {
     evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
+}
+
+void pgc_evict_clean_pages_matching(PGC *cache, pgc_page_filter filter, void *data) {
+    evict_pages_with_filter(cache, 0, 0, true, true, filter, data);
 }
 
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr) {

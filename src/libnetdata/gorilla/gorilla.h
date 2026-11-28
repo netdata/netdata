@@ -66,6 +66,8 @@ gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw);
 uint32_t gorilla_writer_actual_nbytes(const gorilla_writer_t *gw);
 uint32_t gorilla_writer_optimal_nbytes(const gorilla_writer_t *gw);
 bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size);
+uint32_t gorilla_writer_compact_nbytes(const gorilla_writer_t *gw);
+bool gorilla_writer_compact(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size);
 
 bool gorilla_buffer_patch(gorilla_buffer_t *buf, size_t nbuffers, uint32_t *entries);
 gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *buf);

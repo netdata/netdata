@@ -421,7 +421,7 @@ static ALWAYS_INLINE void pdc_destroy(PDC *pdc) {
             cancelled++;
 
         if(pd->page && !(status & PDC_PAGE_RELEASED)) {
-            pgc_page_release(main_cache, pd->page);
+            pgc_page_release(ctx_page_cache(pdc->ctx), pd->page);
             // pdc_page_status_set(pd, PDC_PAGE_RELEASED);
         }
 

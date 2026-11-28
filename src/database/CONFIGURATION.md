@@ -159,9 +159,11 @@ For a detailed breakdown into individual caches, the dedicated dbengine cache ch
 
 [Restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the change to take effect. Once enabled, the following charts appear under the **Netdata** section:
 
-- In the **dbengine memory** family, the **Netdata DB Memory** chart breaks total database memory down by component: main cache, open cache, extent cache, metrics registry, buffers, and allocator bookkeeping (aral structures, aral padding, pgd padding).
+- In the **dbengine memory** family, the **Netdata DB Memory** chart breaks total database memory down by component: main cache, open cache, extent cache, in-memory cache (the samples of `db = ram` / `alloc`), metrics registry, buffers, and allocator bookkeeping (aral structures, aral padding, pgd padding).
 - In the **dbengine main cache**, **dbengine open cache**, and **dbengine extent cache** families:
   - **Netdata main Cache Memory**, **Netdata open Cache Memory**, and **Netdata extent Cache Memory** show how each cache's memory is distributed across its states — hot, dirty, clean, free, index, evicting, and flushing.
   - **Netdata main Target Cache Memory**, **Netdata open Target Cache Memory**, and **Netdata extent Target Cache Memory** show each cache's current memory size alongside its target (wanted) size.
 
 To check whether your configured cache sizes provide enough headroom, compare the **current** value against the **wanted** value in the Target Cache Memory charts. When a cache consistently operates at its target, increasing `dbengine page cache size` or `dbengine extent cache size` may improve caching efficiency.
+
+When there are `db = ram` / `alloc` hosts, in an Agent built with the Database Engine, the **dbengine ram cache** family shows the same charts for the in-memory cache that holds their samples. The cache size settings above do not apply to it: its size follows `[db].retention`, and when the system runs low on memory, pages are released early and the retention gets shorter.

@@ -417,11 +417,12 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 }
 
 void pulse_dbengine_do(bool extended) {
-    static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {}, extent_cache_ptrs = {};
+    static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {}, extent_cache_ptrs = {}, ram_cache_ptrs = {};
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {};
     static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {};
     static struct pgc_statistics pgc_extent_stats = {}, pgc_extent_stats_old = {};
+    static struct pgc_statistics pgc_ram_stats = {}, pgc_ram_stats_old = {};
     static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
@@ -432,6 +433,13 @@ void pulse_dbengine_do(bool extended) {
 
     pgc_extent_stats_old = pgc_extent_stats;
     pgc_extent_stats = pgc_get_statistics(extent_cache);
+
+    // the in-memory instances of db = ram / alloc; it exists once one does
+    PGC *in_memory_cache = __atomic_load_n(&ram_cache, __ATOMIC_ACQUIRE);
+    if(in_memory_cache) {
+        pgc_ram_stats_old = pgc_ram_stats;
+        pgc_ram_stats = pgc_get_statistics(in_memory_cache);
+    }
 
     cache_efficiency_stats_old = cache_efficiency_stats;
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
@@ -454,7 +462,7 @@ void pulse_dbengine_do(bool extended) {
     }
 
     pulse_dbengine_total_memory =
-        pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size +
+        pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size + pgc_ram_stats.size +
         mrg_stats.size +
         buffers_total_size + aral_structures_total_size + aral_padding_total_size + (int64_t)pgd_padding_bytes();
 
@@ -465,6 +473,8 @@ void pulse_dbengine_do(bool extended) {
     dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
     dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
     dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
+    if(in_memory_cache)
+        dbengine2_cache_statistics_charts(&ram_cache_ptrs, &pgc_ram_stats, &pgc_ram_stats_old, "ram", 135350);
 
     int priority = 135000;
     {
@@ -472,6 +482,7 @@ void pulse_dbengine_do(bool extended) {
         static RRDDIM *rd_pgc_memory_main = NULL;
         static RRDDIM *rd_pgc_memory_open = NULL;  // open journal memory
         static RRDDIM *rd_pgc_memory_extent = NULL;  // extent compresses cache memory
+        static RRDDIM *rd_pgc_memory_ram = NULL;  // the data of the in-memory instances (db = ram / alloc)
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
         static RRDDIM *rd_pgc_memory_buffers = NULL;
         static RRDDIM *rd_pgc_memory_aral_padding = NULL;
@@ -496,6 +507,7 @@ void pulse_dbengine_do(bool extended) {
             rd_pgc_memory_main    = rrddim_add(st_pgc_memory, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_open    = rrddim_add(st_pgc_memory, "open cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_extent  = rrddim_add(st_pgc_memory, "extent cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_ram     = rrddim_add(st_pgc_memory, "in-memory cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_buffers = rrddim_add(st_pgc_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_aral_padding = rrddim_add(st_pgc_memory, "aral padding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -508,6 +520,7 @@ void pulse_dbengine_do(bool extended) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_main, (collected_number)pgc_main_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)pgc_open_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_extent, (collected_number)pgc_extent_stats.size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_ram, (collected_number)pgc_ram_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_buffers, (collected_number)buffers_total_size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_aral_padding, (collected_number)aral_padding_total_size);

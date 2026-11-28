@@ -411,6 +411,11 @@ typedef struct tier_config_prototype {
     uint8_t global_compress_alg;                // the wanted compression algorithm
     char dbfiles_path[FILENAME_MAX + 1];
 
+    // an in-memory instance (db = ram / alloc) has no datafiles: its pages live in ram_cache only, and the
+    // retention evicts the pages that ended more than in_memory_points x their update every ago
+    bool in_memory;
+    size_t in_memory_points;
+
     struct {
         uint32_t uses;
         bool enabled;
@@ -472,6 +477,16 @@ struct rrdengine_instance {
 #define ctx_current_disk_space_get(ctx) __atomic_load_n(&(ctx)->atomic.current_disk_space, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_decrease(ctx, size) __atomic_sub_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
+
+// the page cache holding the pages of a ctx
+static inline struct pgc *ctx_page_cache(struct rrdengine_instance *ctx) {
+    return ctx->config.in_memory ? ram_cache : main_cache;
+}
+
+// in-memory instances: pages that ended before this are out of the retention
+static inline time_t rrdeng_in_memory_retention_cutoff_s(struct rrdengine_instance *ctx, uint32_t update_every_s, time_t now_s) {
+    return now_s - (time_t)ctx->config.in_memory_points * (time_t)update_every_s;
+}
 
 static inline void ctx_io_read_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
     __atomic_add_fetch(&ctx->stats.io_read_bytes, bytes, __ATOMIC_RELAXED);
