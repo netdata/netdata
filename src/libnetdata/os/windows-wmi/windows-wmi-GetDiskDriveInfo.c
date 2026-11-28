@@ -5,166 +5,84 @@
 
 #if defined(OS_WINDOWS)
 
-size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
-    HRESULT init_hr = InitializeWMI();
-    if (FAILED(init_hr) || !nd_wmi.pSvc) return 0;
+// Total time allowed for enumerating Win32_DiskDrive, across all Next() calls.
+#define WMI_DISKDRIVE_ENUM_TIMEOUT_MS 5000
 
-    HRESULT hr;
-    IEnumWbemClassObject* pEnumerator = NULL;
+size_t GetDiskDriveInfo(ND_WMI *wmi, DiskDriveInfoWMI *diskInfoArray, size_t array_size,
+                        ND_LOG_FIELD_PRIORITY error_priority, bool *failed) {
+    const char *failed_step = NULL;
+    *failed = true;
 
-    // Execute the query, including new properties
-    BSTR query = SysAllocString(L"SELECT DeviceID, Model, Caption, Name, Partitions, Size, Status, Availability, Index, Manufacturer, InstallDate, MediaType, NeedsCleaning FROM WIN32_DiskDrive");
-    BSTR wql = SysAllocString(L"WQL");
-    hr = nd_wmi.pSvc->lpVtbl->ExecQuery(
-            nd_wmi.pSvc,
-            wql,
-            query,
-            WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-            NULL,
-            &pEnumerator
-    );
-    SysFreeString(query);
-    SysFreeString(wql);
-
+    HRESULT hr = nd_wmi_connect(wmi, L"ROOT\\CIMV2", &failed_step);
     if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetDiskDriveInfo() WMI query failed. Error code = 0x%X", hr);
+        nd_log(NDLS_COLLECTORS, error_priority, "GetDiskDriveInfo() %s. Error code = 0x%X",
+               failed_step ? failed_step : "WMI connect failed", hr);
+        // A cancelled handle fails here while still holding an earlier connection.
+        nd_wmi_disconnect(wmi);
         return 0;
     }
 
-    // Iterate through the results
-    IWbemClassObject *pclsObj = NULL;
-    ULONG uReturn = 0;
+    IEnumWbemClassObject *pEnumerator = NULL;
+    hr = nd_wmi_exec_query(wmi->pSvc, L"SELECT Index, Model, DeviceID FROM Win32_DiskDrive", &pEnumerator);
+    if (FAILED(hr)) {
+        nd_log(NDLS_COLLECTORS, error_priority, "GetDiskDriveInfo() WMI query failed. Error code = 0x%X", hr);
+        nd_wmi_disconnect(wmi);
+        return 0;
+    }
+
+    usec_t deadline_ut = now_monotonic_usec() + WMI_DISKDRIVE_ENUM_TIMEOUT_MS * USEC_PER_MS;
     size_t index = 0;
-    while (pEnumerator && index < array_size) {
-        hr = pEnumerator->lpVtbl->Next(pEnumerator, WBEM_INFINITE, 1, &pclsObj, &uReturn);
-        if (0 == uReturn) break;
-
-        VARIANT vtProp;
-        VariantInit(&vtProp);
-
-        // Extract DeviceID
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"DeviceID", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].DeviceID,
-                sizeof(diskInfoArray[index].DeviceID),
-                vtProp.bstrVal);
+    bool enum_failed = false;
+    while (index < array_size) {
+        usec_t now_ut = now_monotonic_usec();
+        if (now_ut >= deadline_ut) {
+            nd_log(NDLS_COLLECTORS, error_priority,
+                   "GetDiskDriveInfo() WMI enumeration timed out after %d ms; using %zu disk(s)",
+                   WMI_DISKDRIVE_ENUM_TIMEOUT_MS, index);
+            enum_failed = true;
+            break;
         }
-        VariantClear(&vtProp);
+        long remaining_ms = (long)((deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
 
-        // Extract Model
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Model", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].Model,
-                sizeof(diskInfoArray[index].Model),
-                vtProp.bstrVal);
+        IWbemClassObject *pclsObj = NULL;
+        ULONG uReturn = 0;
+        hr = pEnumerator->lpVtbl->Next(pEnumerator, remaining_ms, 1, &pclsObj, &uReturn);
+        if (FAILED(hr)) {
+            nd_log(NDLS_COLLECTORS, error_priority,
+                   "GetDiskDriveInfo() WMI enumeration failed. Error code = 0x%X; using %zu disk(s)", hr, index);
+            enum_failed = true;
+            break;
         }
-        VariantClear(&vtProp);
-
-        // Extract Caption
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Caption", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].Caption,
-                sizeof(diskInfoArray[index].Caption),
-                vtProp.bstrVal);
+        if (0 == uReturn || !pclsObj) {
+            if (hr == WBEM_S_TIMEDOUT)
+                continue;
+            break;
         }
-        VariantClear(&vtProp);
 
-        // Extract Name
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Name", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].Name,
-                sizeof(diskInfoArray[index].Name),
-                vtProp.bstrVal);
+        // Fill a fresh row: the caller's array is reused across calls, and a property missing now must not
+        // keep the value of an earlier call.
+        DiskDriveInfoWMI info = { 0 };
+        uint64_t disk_index;
+        bool has_index = nd_wmi_get_uint64_property(pclsObj, L"Index", &disk_index) && disk_index <= INT_MAX;
+        if (has_index) {
+            info.Index = (int)disk_index;
+            nd_wmi_get_string_property(pclsObj, L"Model", info.Model, sizeof(info.Model));
+            nd_wmi_get_string_property(pclsObj, L"DeviceID", info.DeviceID, sizeof(info.DeviceID));
         }
-        VariantClear(&vtProp);
-
-        // Extract Partitions
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Partitions", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && (vtProp.vt == VT_I4 || vtProp.vt == VT_UI4)) {
-            diskInfoArray[index].Partitions = vtProp.intVal;
-        }
-        VariantClear(&vtProp);
-
-        // Extract Size (convert BSTR to uint64)
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Size", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            char sizeStr[64];
-            wmi_bstr_to_multibyte(sizeStr, sizeof(sizeStr), vtProp.bstrVal);
-            diskInfoArray[index].Size = strtoull(sizeStr, NULL, 10);
-        }
-        VariantClear(&vtProp);
-
-        // Extract Status
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Status", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].Status,
-                sizeof(diskInfoArray[index].Status),
-                vtProp.bstrVal);
-        }
-        VariantClear(&vtProp);
-
-        // Extract Availability
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Availability", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && (vtProp.vt == VT_I4 || vtProp.vt == VT_UI4)) {
-            diskInfoArray[index].Availability = vtProp.intVal;
-        }
-        VariantClear(&vtProp);
-
-        // Extract Index
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Index", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && (vtProp.vt == VT_I4 || vtProp.vt == VT_UI4)) {
-            diskInfoArray[index].Index = vtProp.intVal;
-        }
-        VariantClear(&vtProp);
-
-        // Extract Manufacturer
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"Manufacturer", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].Manufacturer,
-                sizeof(diskInfoArray[index].Manufacturer),
-                vtProp.bstrVal);
-        }
-        VariantClear(&vtProp);
-
-        // Extract InstallDate
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"InstallDate", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].InstallDate,
-                sizeof(diskInfoArray[index].InstallDate),
-                vtProp.bstrVal);
-        }
-        VariantClear(&vtProp);
-
-        // Extract MediaType
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"MediaType", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wmi_bstr_to_multibyte(
-                diskInfoArray[index].MediaType,
-                sizeof(diskInfoArray[index].MediaType),
-                vtProp.bstrVal);
-        }
-        VariantClear(&vtProp);
-
-        // Extract NeedsCleaning
-        hr = pclsObj->lpVtbl->Get(pclsObj, L"NeedsCleaning", 0, &vtProp, 0, 0);
-        if (SUCCEEDED(hr) && (vtProp.vt == VT_BOOL)) {
-            diskInfoArray[index].NeedsCleaning = vtProp.boolVal;
-        }
-        VariantClear(&vtProp);
-
         pclsObj->lpVtbl->Release(pclsObj);
-        index++;
+
+        // The caller matches rows by Index; a row without one would match the wrong disk.
+        if (has_index)
+            diskInfoArray[index++] = info;
     }
 
     pEnumerator->lpVtbl->Release(pEnumerator);
 
+    // A broken connection is not reused: the next call reconnects.
+    if (enum_failed)
+        nd_wmi_disconnect(wmi);
+
+    *failed = enum_failed;
     return index;
 }
 

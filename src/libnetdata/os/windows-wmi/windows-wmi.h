@@ -18,12 +18,6 @@ typedef struct {
     bool cancelled;          // nd_wmi_cancel() was called; every later connect fails
 } ND_WMI;
 
-// Thread-local ROOT\CIMV2 connection used by InitializeWMI()/CleanupWMI().
-extern __thread ND_WMI nd_wmi;
-
-HRESULT InitializeWMI(void);
-void CleanupWMI(void);
-
 // Connect a caller-owned handle to any WMI namespace; must be used and disconnected on the same thread.
 // Returns S_OK when already connected to the same namespace; a different namespace reconnects. On failure, *failed_step (optional) names the step that failed.
 // ConnectServer() cannot be bounded below ~2 minutes (only cancelled, see nd_wmi_cancel()), so never call this
