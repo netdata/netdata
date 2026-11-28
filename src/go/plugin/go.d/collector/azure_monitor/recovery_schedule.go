@@ -385,6 +385,9 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 	throttled := p.recordServiceResponse(op, res.Err)
 	if m := req.merge; m != nil {
 		if res.Err != nil {
+			// Counted like any failed request. Its members usually succeed in
+			// this poll; if they cannot run, the poll must not look healthy.
+			p.failed++
 			p.rejectMerge(m, res.Err, op.at, throttled)
 			return
 		}
@@ -618,6 +621,8 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 						continue
 					}
 					p.supplementalUsed++
+					// A stalled trial must leave time for its members.
+					r.deadline = p.deadline
 					p.startMetrics(r, p.single)
 					continue
 				}

@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -1020,5 +1021,78 @@ func TestCollectThrottledMergeSendsItsMembersOnce(t *testing.T) {
 		}
 		assert.Equal(t, []send{{0, 49}, {2 * time.Second, 6}}, throttled,
 			"the merge and one re-send of the members after its hold, not a second re-send")
+	})
+}
+
+// Two resources that Azure accepts only in separate requests end up as two
+// scheduled requests, and from minute six as one merge trial per attempt.
+func initUnmergeablePair(t *testing.T, c *Collector, minute func() int, trial func(*http.Request) (*http.Response, error)) {
+	t.Helper()
+	rows := []map[string]any{
+		testResource(recoveryTestNamespace, "edge-a", nil),
+		testResource(recoveryTestNamespace, "edge-b", nil),
+	}
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return &mockResourceGraph{resources: rows}, nil
+	}
+	useRecoveryTestProfile(t, c, []string{"A"}, nil)
+	initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+		return recoveryWireDefinitions(req, "A")
+	}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+		switch {
+		case len(query.ResourceIDs) == 1:
+			return recoveryWireTotals(req, query, 5)
+		case minute() == 6:
+			return trial(req)
+		default:
+			return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
+		}
+	})
+}
+
+func TestCollectReportsFailureWhenOnlyAMergeRanAndItsMembersAreHeld(t *testing.T) {
+	c := newTestCollectorWithMocks(&mockResourceGraph{}, &mockMetricsClient{})
+	c.Config = testConfig()
+	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	now := start
+	c.now = func() time.Time { return now }
+	initUnmergeablePair(t, c, func() int { return int(now.Sub(start) / time.Minute) }, func(req *http.Request) (*http.Response, error) {
+		resp, err := recoveryWireError(req, http.StatusTooManyRequests, "TooManyRequests")
+		resp.Header.Set("Retry-After", "120")
+		return resp, err
+	})
+	for minute := range 7 {
+		now = start.Add(time.Duration(minute) * time.Minute)
+		series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+		if minute < 6 {
+			require.NoError(t, err, "minute %d", minute)
+			requireRecoveryCounter(t, series, "A", "edge-a", 5*(minute+1))
+			continue
+		}
+		assert.Error(t, err, "the throttled merge was the poll's only request and its members stay held")
+	}
+}
+
+func TestCollectEndsMergeTrialAtRecoveryDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := newTestCollectorWithMocks(&mockResourceGraph{}, &mockMetricsClient{})
+		c.Config = testConfig()
+		c.Timeout = confopt.Duration(90 * time.Second)
+		start := time.Now()
+		initUnmergeablePair(t, c, func() int { return int(time.Since(start) / time.Minute) }, func(req *http.Request) (*http.Response, error) {
+			<-req.Context().Done()
+			return nil, req.Context().Err()
+		})
+		for minute := range 7 {
+			time.Sleep(time.Duration(minute)*time.Minute - time.Since(start))
+			began := time.Now()
+			series := collectRecoveryCounters(t, c)
+			requireRecoveryCounter(t, series, "A", "edge-a", 5*(minute+1))
+			requireRecoveryCounter(t, series, "A", "edge-b", 5*(minute+1))
+			if minute == 6 {
+				assert.Equal(t, 54*time.Second, time.Since(began),
+					"the stalled trial ends at the recovery deadline and its members are then queried")
+			}
+		}
 	})
 }
