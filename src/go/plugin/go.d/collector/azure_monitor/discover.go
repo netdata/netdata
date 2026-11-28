@@ -84,6 +84,7 @@ func (c *Collector) applyDiscovery(fetched discoveryFetchResult, now time.Time) 
 		logSummary("resource discovery: mode=%s profile_mode=%s profile=%s candidates=%d matched=%d",
 			stringsLowerTrim(c.Discovery.Mode), stringsLowerTrim(c.Profiles.Mode), profile.Name, len(candidates), len(matched))
 	}
+	c.recovery.reconcile(state.ByProfile)
 	c.discovery = state
 	c.warnDiscoveryScopeFallbacks(state, c.runtime)
 }
@@ -218,6 +219,7 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 			result = append(result, resourceInfo{
 				SubscriptionID: subscriptionID,
 				ID:             id,
+				idKey:          strings.ToLower(id),
 				UID:            hashShort(id),
 				Name:           stringsTrim(asString(row["name"])),
 				Type:           resourceType,
@@ -631,6 +633,7 @@ func parseStrictQueryDiscoveryRow(row map[string]any) (resourceInfo, queryTagsSh
 	return resourceInfo{
 		SubscriptionID: subscriptionID,
 		ID:             id,
+		idKey:          strings.ToLower(id),
 		UID:            hashShort(id),
 		Name:           name,
 		Type:           resourceType,

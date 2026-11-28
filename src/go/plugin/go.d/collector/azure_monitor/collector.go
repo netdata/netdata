@@ -77,6 +77,7 @@ type Collector struct {
 	supportedResourceTypes map[string]struct{}
 
 	discovery discoveryState
+	recovery  recoveryState
 
 	tagsColumnMissingWarned   bool
 	tagsColumnMissingWarnedAt uint64
@@ -106,6 +107,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.runtime = nil
 	c.observations = nil
 	c.discovery = discoveryState{}
+	c.recovery = recoveryState{}
 	c.tagsColumnMissingWarned = false
 	c.tagsColumnMissingWarnedAt = 0
 	c.tagsWrongShapeWarned = false
@@ -123,6 +125,7 @@ func (c *Collector) Check(ctx context.Context) error {
 func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
 func (c *Collector) Cleanup(context.Context) {
+	c.recovery = recoveryState{}
 	if c.queryExecutor != nil {
 		c.queryExecutor.reset()
 	}

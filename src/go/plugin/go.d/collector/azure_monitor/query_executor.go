@@ -5,7 +5,8 @@ package azure_monitor
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"math/bits"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -13,8 +14,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
-	"github.com/netdata/netdata/go/plugins/logger"
 )
 
 type queryExecutor struct {
@@ -23,6 +24,8 @@ type queryExecutor struct {
 	cloudCfg       azcloud.Configuration
 	credential     azcore.TokenCredential
 	newClient      func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
+
+	lookupDefinitions func(context.Context, definitionKey) (metricDefinitions, error)
 
 	clientsMu sync.Mutex
 	clients   map[string]metricsQueryClient
@@ -45,32 +48,30 @@ func (e *queryExecutor) reset() {
 	e.clients = make(map[string]metricsQueryClient)
 }
 
-func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatch, queryNow time.Time, queryOffsetSeconds int) []queryBatchResult {
-	workers := min(max(e.maxConcurrency, 1), len(batches))
-
-	// Each worker owns its result slot. The caller can correlate the result
-	// with its request even when batches complete out of order.
-	input := make(chan int)
-	results := make([]queryBatchResult, len(batches))
-	debug := logger.Level.Enabled(slog.LevelDebug)
-	var wg sync.WaitGroup
-	for range workers {
-		wg.Go(func() {
-			for i := range input {
-				results[i] = e.executeQueryBatch(ctx, batches[i], queryNow, queryOffsetSeconds, debug)
-			}
-		})
+// The coordinator handles throttling between dispatches. Preserve azcore's
+// network and other transient HTTP retries for ordinary requests.
+func retryPrimaryMetrics(resp *http.Response, err error) bool {
+	if resp != nil && throttleStatus(resp.StatusCode) {
+		return false
 	}
-	for i := range batches {
-		input <- i
+	if err != nil {
+		return true
 	}
-	close(input)
-	wg.Wait()
-
-	return results
+	if resp == nil {
+		return false
+	}
+	switch resp.StatusCode {
+	case http.StatusRequestTimeout, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch, queryNow time.Time, queryOffsetSeconds int, debug bool) queryBatchResult {
+	if err := ctx.Err(); err != nil {
+		return queryBatchResult{Err: err}
+	}
 	client, err := e.getMetricsClient(batch.Region)
 	if err != nil {
 		return queryBatchResult{Err: err}
@@ -99,17 +100,24 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 		return queryBatchResult{Err: err}
 	}
 
-	result := queryBatchResult{Samples: samplesFromQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch.Metrics), resourceByID)}
+	result := reduceQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch), resourceByID)
 	if debug {
 		result.Diagnostics = summarizeBatchResponse(batch.Resources, resourceByID, resp.Values, result.Samples)
 	}
 	return result
 }
 
-func queryBatchMetricIndex(metrics []*metricRuntime) map[string]*metricRuntime {
-	result := make(map[string]*metricRuntime, len(metrics))
-	for _, metric := range metrics {
-		result[stringsLowerTrim(metric.AzureName)] = metric
+type queryMetricMatch struct {
+	series *metricRuntime
+	bit    uint32
+}
+
+func queryBatchMetricIndex(batch queryBatch) map[string]queryMetricMatch {
+	result := make(map[string]queryMetricMatch, bits.OnesCount32(batch.mask))
+	for remaining := batch.mask; remaining != 0; remaining &= remaining - 1 {
+		index := bits.TrailingZeros32(remaining)
+		series := batch.chunk.metrics[index]
+		result[stringsLowerTrim(series.AzureName)] = queryMetricMatch{series: series, bit: 1 << index}
 	}
 	return result
 }
@@ -119,7 +127,7 @@ func queryBatchResourceIndex(resources []resourceInfo) ([]string, map[string]res
 	resourceByID := make(map[string]resourceInfo, len(resources))
 	for _, resource := range resources {
 		resourceIDs = append(resourceIDs, resource.ID)
-		resourceByID[stringsLowerTrim(resource.ID)] = resource
+		resourceByID[resource.idKey] = resource
 	}
 	return resourceIDs, resourceByID
 }
@@ -128,7 +136,7 @@ func queryBatchWindow(batch queryBatch, queryNow time.Time, queryOffsetSeconds i
 	queryEnd := queryEndForBatch(queryNow, queryOffsetSeconds, batch.TimeGrainEvery)
 	start := queryEnd.Add(-batch.TimeGrainEvery).UTC().Format(time.RFC3339)
 	end := queryEnd.UTC().Format(time.RFC3339)
-	return start, end, batch.TimeGrain, strings.Join(batch.Aggregations, ",")
+	return start, end, batch.TimeGrain, batch.Aggregation
 }
 
 func queryEndForBatch(now time.Time, queryOffsetSeconds int, batchTimeGrainEvery time.Duration) time.Time {
@@ -148,41 +156,122 @@ func effectiveQueryOffset(queryOffsetSeconds int, batchTimeGrainEvery time.Durat
 	return offset
 }
 
-func samplesFromQueryResponse(metricData []azmetrics.MetricData, profile *profileRuntime, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
-	samples := make([]metricSample, 0, len(metricData))
+func reduceQueryResponse(metricData []azmetrics.MetricData, profile *profileRuntime, metrics map[string]queryMetricMatch, resourceByID map[string]resourceInfo) queryBatchResult {
+	result := queryBatchResult{Samples: make([]metricSample, 0, len(metricData))}
 	for _, data := range metricData {
-		resource, ok := resourceByID[stringsLowerTrim(derefOrZero(data.ResourceID))]
+		id := stringsLowerTrim(derefOrZero(data.ResourceID))
+		resource, ok := resourceByID[id]
 		if !ok {
 			continue
 		}
-		samples = append(samples, samplesFromMetricValues(data.Values, resourceIdentityFor(resource, profile.Name), metricToRuntime)...)
-	}
-	return samples
-}
-
-func samplesFromMetricValues(metrics []azmetrics.Metric, resource resourceIdentity, metricToRuntime map[string]*metricRuntime) []metricSample {
-	samples := make([]metricSample, 0, len(metrics))
-	for _, metric := range metrics {
-		if metric.Name == nil {
-			continue
-		}
-		runtimeMetric, ok := metricToRuntime[stringsLowerTrim(derefOrZero(metric.Name.Value))]
-		if !ok {
-			continue
-		}
-		for _, series := range runtimeMetric.Series {
-			value, found := sumLatestAggregate(metric.TimeSeries, series.Aggregation)
-			if !found {
+		identity := resourceIdentityFor(resource, profile.Name)
+		for _, metric := range data.Values {
+			if metric.Name == nil {
 				continue
 			}
-			samples = append(samples, metricSample{
-				Instrument: series.Instrument,
-				Resource:   resource,
-				Value:      value,
-			})
+			match, ok := metrics[stringsLowerTrim(derefOrZero(metric.Name.Value))]
+			if !ok {
+				continue
+			}
+			if code := metricErrorCode(metric); code != "" {
+				if result.metricErrors == nil {
+					result.metricErrors = make(map[string]uint32)
+				}
+				result.metricErrors[id] |= match.bit
+				if strings.EqualFold(code, "InvalidSamplingType") {
+					if result.incompatible == nil {
+						result.incompatible = make(map[string]uint32)
+					}
+					result.incompatible[id] |= match.bit
+				}
+				continue
+			}
+			value, found := sumLatestAggregate(metric.TimeSeries, match.series.Aggregation)
+			if found {
+				result.Samples = append(result.Samples, metricSample{
+					Instrument: match.series.Instrument,
+					Resource:   identity,
+					Value:      value,
+				})
+			}
 		}
 	}
-	return samples
+	if len(result.metricErrors) != 0 && len(result.Samples) != 0 {
+		discardMeasuredErrors(&result, metricData, metrics)
+	}
+	return result
+}
+
+// If the service sends conflicting rows, a valid observation takes precedence.
+func discardMeasuredErrors(result *queryBatchResult, data []azmetrics.MetricData, metrics map[string]queryMetricMatch) {
+	for _, row := range data {
+		id := stringsLowerTrim(derefOrZero(row.ResourceID))
+		errorMask := result.metricErrors[id]
+		if errorMask == 0 {
+			continue
+		}
+		var measured uint32
+		for _, metric := range row.Values {
+			if metric.Name == nil || metricErrorCode(metric) != "" {
+				continue
+			}
+			match := metrics[stringsLowerTrim(derefOrZero(metric.Name.Value))]
+			if match.bit&errorMask == 0 {
+				continue
+			}
+			if _, found := sumLatestAggregate(metric.TimeSeries, match.series.Aggregation); found {
+				measured |= match.bit
+			}
+		}
+		if measured == 0 {
+			continue
+		}
+		if mask := errorMask &^ measured; mask == 0 {
+			delete(result.metricErrors, id)
+		} else {
+			result.metricErrors[id] = mask
+		}
+		if mask := result.incompatible[id] &^ measured; mask == 0 {
+			delete(result.incompatible, id)
+		} else {
+			result.incompatible[id] = mask
+		}
+	}
+}
+
+// Azure uses BadRequest for both metric incompatibility and request-wide
+// validation failures. Only the ambiguous responses get bounded isolation.
+func rejectedMetrics(err error) bool {
+	var response *azcore.ResponseError
+	if !errors.As(err, &response) || response.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	switch stringsLowerTrim(response.ErrorCode) {
+	case "invalidapiversionparameter", "missingapiversionparameter", "invalidsubscriptionid",
+		"subscriptionnotfound", "invalidtimerange", "invalidstarttime", "invalidendtime":
+		return false
+	}
+	if response.RawResponse == nil || response.RawResponse.Body == nil {
+		return true
+	}
+	var envelope struct {
+		Error struct {
+			Target  string
+			Message string
+		}
+	}
+	if err := runtime.UnmarshalAsJSON(response.RawResponse, &envelope); err != nil {
+		return true
+	}
+	switch stringsLowerTrim(envelope.Error.Target) {
+	case "api-version", "subscriptionid", "starttime", "endtime", "timespan":
+		return false
+	}
+	// The Metrics Batch REST examples use an unqualified BadRequest for both
+	// malformed time parameters and windows outside the retention period.
+	message := stringsLowerTrim(envelope.Error.Message)
+	return !strings.HasPrefix(message, "detected invalid time range parameters") &&
+		!(strings.HasPrefix(message, "query endtime:") && strings.Contains(message, "out of the max metrics retention period"))
 }
 
 func (e *queryExecutor) getMetricsClient(region string) (metricsQueryClient, error) {

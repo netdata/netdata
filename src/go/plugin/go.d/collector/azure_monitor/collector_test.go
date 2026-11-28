@@ -1304,7 +1304,7 @@ template:
 	assert.Equal(t, []string{"UsedCapacity"}, byInterval["PT5M"].MetricNames)
 }
 
-func TestSamplesFromQueryResponse_UsesResourceIdentity(t *testing.T) {
+func TestReduceQueryResponse_UsesResourceIdentity(t *testing.T) {
 	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
 	scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
 	require.Empty(t, unsafeValue)
@@ -1321,7 +1321,7 @@ func TestSamplesFromQueryResponse_UsesResourceIdentity(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			resourceID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"
-			samples := samplesFromQueryResponse(
+			result := reduceQueryResponse(
 				[]azmetrics.MetricData{{
 					ResourceID: new(strings.ToLower(resourceID)),
 					Values: []azmetrics.Metric{
@@ -1329,13 +1329,14 @@ func TestSamplesFromQueryResponse_UsesResourceIdentity(t *testing.T) {
 					},
 				}},
 				&profileRuntime{Name: "postgres_flexible"},
-				map[string]*metricRuntime{
+				map[string]queryMetricMatch{
 					"cpu_percent": {
-						Series: []*seriesRuntime{{
+						series: &metricRuntime{
 							Aggregation: "average",
 							Kind:        azureprofiles.SeriesKindGauge,
 							Instrument:  "postgres_flexible.cpu_percent.average",
-						}},
+						},
+						bit: 1,
 					},
 				},
 				map[string]resourceInfo{
@@ -1352,8 +1353,8 @@ func TestSamplesFromQueryResponse_UsesResourceIdentity(t *testing.T) {
 				},
 			)
 
-			require.Len(t, samples, 1)
-			assert.Equal(t, resourceIdentity{ScopeKey: tc.scope.ScopeKey, Profile: "postgres_flexible", UID: "uid-a"}, samples[0].Resource)
+			require.Len(t, result.Samples, 1)
+			assert.Equal(t, resourceIdentity{ScopeKey: tc.scope.ScopeKey, Profile: "postgres_flexible", UID: "uid-a"}, result.Samples[0].Resource)
 		})
 	}
 }
@@ -2355,7 +2356,7 @@ template:
 `,
 	})
 
-	_, err := buildCollectorRuntimeFromConfig(profileNames, nil, catalog, "")
+	_, err := buildCollectorRuntimeFromConfig(profileNames, nil, catalog, "", defaultMaxMetricsQuery)
 	require.Error(t, err)
 }
 

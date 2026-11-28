@@ -22,8 +22,9 @@ type profileRuntime struct {
 	DisplayName     string
 	ResourceType    string
 	MetricNamespace string
+	namespaceKey    string
 	Filters         *ResourceFiltersConfig
-	Metrics         []*metricRuntime
+	chunks          []*metricChunk
 	ResourceLabels  []azureprofiles.ResourceLabel
 	ResourceStates  []*resourceStateRuntime
 	Template        charttpl.Group
@@ -36,15 +37,23 @@ type resourceStateRuntime struct {
 	Values   map[string]string
 }
 
-type metricRuntime struct {
-	ID             string
-	AzureName      string
-	TimeGrain      string
-	TimeGrainEvery time.Duration
-	Series         []*seriesRuntime
+type metricQueryGroup struct {
+	TimeGrain   string
+	Aggregation string
 }
 
-type seriesRuntime struct {
+// Compiled once per profile. Masks are local to this immutable metric ordering.
+type metricChunk struct {
+	profile *profileRuntime
+	metricQueryGroup
+	metrics []*metricRuntime
+	names   []string
+}
+
+// A query series requests exactly one aggregation of one Azure metric.
+type metricRuntime struct {
+	ID          string
+	AzureName   string
 	Aggregation string
 	Kind        string
 	Instrument  string
@@ -68,6 +77,7 @@ type resourceTag struct {
 }
 
 type resourceInfo struct {
+	idKey          string
 	SubscriptionID string
 	ID             string
 	UID            string
@@ -88,11 +98,13 @@ func (r resourceInfo) diagnosticName() string {
 }
 
 type queryBatch struct {
+	chunk          *metricChunk
+	mask           uint32 // Selected names in the original metric chunk.
 	SubscriptionID string
 	Profile        *profileRuntime
 	Metrics        []*metricRuntime
 	MetricNames    []string
-	Aggregations   []string
+	Aggregation    string
 	TimeGrain      string
 	TimeGrainEvery time.Duration
 	Region         string
@@ -106,7 +118,13 @@ type metricSample struct {
 }
 
 type queryBatchResult struct {
-	Diagnostics *batchDiagnostics
-	Samples     []metricSample
-	Err         error
+	incompatible map[string]uint32
+	metricErrors map[string]uint32
+	Diagnostics  *batchDiagnostics
+	Samples      []metricSample
+	Err          error
+}
+
+func (r resourceInfo) definitionKey(profile *profileRuntime) definitionKey {
+	return definitionKey{r.idKey, profile.namespaceKey}
 }

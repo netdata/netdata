@@ -4,7 +4,6 @@ package azure_monitor
 
 import (
 	"slices"
-	"sort"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
@@ -26,59 +25,44 @@ func (c *Collector) buildProfileQueryBatches(profile *profileRuntime, resources 
 		return nil
 	}
 
-	metricsByGrain := c.dueMetricsByGrain(profile, dueByGrain, now)
-	if len(metricsByGrain) == 0 {
-		return nil
-	}
-
 	var batches []queryBatch
-	for grain, metrics := range metricsByGrain {
-		if len(metrics) == 0 {
-			continue
-		}
-
-		for key, groupedResources := range groupResourcesBySubscriptionRegion(resources) {
-			for metricChunk := range slices.Chunk(metrics, c.Limits.MaxMetricsPerQuery) {
-				names := batchMetricNames(metricChunk)
-				aggregations := batchAggregations(metricChunk)
-				for resourceChunk := range slices.Chunk(groupedResources, c.Limits.MaxBatchResources) {
-					batches = append(batches, queryBatch{
-						SubscriptionID: key.SubscriptionID,
-						Profile:        profile,
-						Metrics:        metricChunk,
-						MetricNames:    append([]string(nil), names...),
-						Aggregations:   append([]string(nil), aggregations...),
-						TimeGrain:      grain,
-						TimeGrainEvery: azureprofiles.SupportedTimeGrains[grain],
-						Region:         key.Region,
-						Resources:      append([]resourceInfo(nil), resourceChunk...),
-					})
-				}
-			}
-		}
-	}
-
-	return batches
-}
-
-func (c *Collector) dueMetricsByGrain(profile *profileRuntime, dueByGrain map[string]bool, now time.Time) map[string][]*metricRuntime {
-	metricsByGrain := make(map[string][]*metricRuntime)
-	for _, metric := range profile.Metrics {
-		due, ok := dueByGrain[metric.TimeGrain]
-		if !ok {
-			next, hasNext := c.nextCollectByGrain[metric.TimeGrain]
-			due = !hasNext || !now.Before(next)
-			dueByGrain[metric.TimeGrain] = due
+	var byRegion map[subscriptionRegionKey][]resourceInfo
+	for _, chunk := range profile.chunks {
+		grain := chunk.TimeGrain
+		due, checked := dueByGrain[grain]
+		if !checked {
+			due = !now.Before(c.nextCollectByGrain[grain])
+			dueByGrain[grain] = due
 			if due {
-				c.nextCollectByGrain[metric.TimeGrain] = now.Add(metric.TimeGrainEvery)
+				c.nextCollectByGrain[grain] = now.Add(azureprofiles.SupportedTimeGrains[grain])
 			}
 		}
 		if !due {
 			continue
 		}
-		metricsByGrain[metric.TimeGrain] = append(metricsByGrain[metric.TimeGrain], metric)
+		if byRegion == nil {
+			byRegion = groupResourcesBySubscriptionRegion(resources)
+		}
+		for key, groupedResources := range byRegion {
+			for resourceChunk := range slices.Chunk(groupedResources, c.Limits.MaxBatchResources) {
+				batches = append(batches, queryBatch{
+					chunk:          chunk,
+					mask:           1<<len(chunk.metrics) - 1,
+					SubscriptionID: key.SubscriptionID,
+					Profile:        profile,
+					Metrics:        chunk.metrics,
+					MetricNames:    chunk.names,
+					Aggregation:    chunk.Aggregation,
+					TimeGrain:      grain,
+					TimeGrainEvery: azureprofiles.SupportedTimeGrains[grain],
+					Region:         key.Region,
+					Resources:      resourceChunk,
+				})
+			}
+		}
 	}
-	return metricsByGrain
+
+	return batches
 }
 
 func batchMetricNames(metrics []*metricRuntime) []string {
@@ -87,22 +71,6 @@ func batchMetricNames(metrics []*metricRuntime) []string {
 		names = append(names, metric.AzureName)
 	}
 	return names
-}
-
-func batchAggregations(metrics []*metricRuntime) []string {
-	seen := make(map[string]struct{})
-	list := make([]string, 0)
-	for _, metric := range metrics {
-		for _, series := range metric.Series {
-			if _, ok := seen[series.Aggregation]; ok {
-				continue
-			}
-			seen[series.Aggregation] = struct{}{}
-			list = append(list, series.Aggregation)
-		}
-	}
-	sort.Strings(list)
-	return list
 }
 
 type subscriptionRegionKey struct {

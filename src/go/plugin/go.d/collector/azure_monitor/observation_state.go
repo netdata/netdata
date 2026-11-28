@@ -38,6 +38,7 @@ type resourceObservations struct {
 }
 
 type metricObservation struct {
+	current bool
 	kind    string
 	value   float64
 	gauge   metrix.SnapshotGauge
@@ -52,8 +53,8 @@ func newObservationState(runtime *collectorRuntime, meter metrix.SnapshotMeter) 
 	}
 	for _, profile := range runtime.Profiles {
 		s.profiles[profile.Name] = profile
-		for _, metric := range profile.Metrics {
-			for _, series := range metric.Series {
+		for _, chunk := range profile.chunks {
+			for _, series := range chunk.metrics {
 				s.kinds[series.Instrument] = series.Kind
 			}
 		}
@@ -66,10 +67,8 @@ func (s *observationState) reset() { s.resources = nil }
 func dueInstrumentsForBatches(batches []queryBatch) map[string]bool {
 	dueInstruments := make(map[string]bool)
 	for _, batch := range batches {
-		for _, metric := range batch.Metrics {
-			for _, series := range metric.Series {
-				dueInstruments[series.Instrument] = true
-			}
+		for _, series := range batch.Metrics {
+			dueInstruments[series.Instrument] = true
 		}
 	}
 	return dueInstruments
@@ -94,24 +93,37 @@ func (s *observationState) observeSamples(samples []metricSample) {
 			}
 			resource.metrics[sample.Instrument] = obs
 		}
+		// reobserveCachedObservations cleared every due instrument for this
+		// window. Its first valid sample owns the delta, including when the
+		// service repeats a row or several requests return the same series.
+		if obs.current {
+			continue
+		}
 		value := sample.Value
 		if kind == azureprofiles.SeriesKindCounter {
 			value += obs.value
 		}
+		obs.current = true
 		obs.value = value
 		obs.observe()
 	}
 }
 
-func (s *observationState) reobserveCachedObservations(due map[string]bool) {
+func (s *observationState) reobserveCachedObservations(due map[string]bool) bool {
+	observed := false
 	for _, resource := range s.resources {
 		for name, obs := range resource.metrics {
 			if due[name] {
-				continue
+				// A due series stays absent until Azure returns a fresh sample.
+				// Keep its numeric history for accumulating counters.
+				obs.current = false
+			} else if obs.current {
+				observed = true
+				obs.observe()
 			}
-			obs.observe()
 		}
 	}
+	return observed
 }
 
 // Reconcile at the discovery boundary: discard departed memberships and replace
