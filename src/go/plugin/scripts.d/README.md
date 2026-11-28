@@ -165,6 +165,32 @@ component or scheduler telemetry surface.
 - Use an executable path, or point `plugin` to an interpreter such as
   `powershell.exe` and pass the script path in `args`.
 
+## Troubleshooting
+
+If `/etc/netdata/scripts.d` does not exist when `scripts.d.plugin` starts, the file
+watcher logs the following message when it tries to attach to it:
+
+```
+start watching '/etc/netdata/scripts.d': no such file or directory
+```
+
+- The message is non-fatal. The plugin keeps running; it is logged at error level
+  but does not stop `scripts.d.plugin` or any other collector.
+- `/etc/netdata/scripts.d` is optional and only holds user-defined Nagios jobs
+  (`*.conf`). The stock `nagios.conf` ships with every job commented out, so no
+  Nagios checks run until you configure one.
+- `scripts.d.plugin` runs only Nagios-style check scripts. It does not collect
+  general system metrics (CPU, disk, network, and so on), so this message alone
+  cannot cause "no metrics are reported". Investigate missing metrics in `go.d` or
+  the other collectors.
+
+To silence the message, create the directory. This is optional and only needed
+once you add a job:
+
+```bash
+mkdir -p /etc/netdata/scripts.d
+```
+
 ## Tests
 
 ```bash
