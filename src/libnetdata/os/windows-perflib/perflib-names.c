@@ -184,8 +184,62 @@ static inline bool registry_multi_sz_strlen(const char *ptr, const char *end, si
     return true;
 }
 
-static inline void readRegistryKeys_unsafe(BOOL helps) {
+// Perflib serves Perflib\009 through a pseudo-key, and the strings it returns can follow the UI
+// language of the calling thread: a LocalSystem service with a non-English display language may get
+// localized names there, and then every lookup by English name misses. Read the table with the
+// thread's preferred UI language set to en-US, and restore the thread's own setting afterwards.
+static bool perflib_thread_ui_language_set_english(WCHAR **saved, ULONG *saved_count) {
+    ULONG count = 0, size = 0, set = 0;
+
+    *saved = NULL;
+    *saved_count = 0;
+
+    if(!GetThreadPreferredUILanguages(MUI_LANGUAGE_NAME | MUI_THREAD_LANGUAGES, &count, NULL, &size))
+        return false;
+
+    if(count) {
+        *saved = mallocz(size * sizeof(WCHAR));
+        if(!GetThreadPreferredUILanguages(MUI_LANGUAGE_NAME | MUI_THREAD_LANGUAGES, &count, *saved, &size)) {
+            freez(*saved);
+            *saved = NULL;
+            return false;
+        }
+    }
+
+    if(!SetThreadPreferredUILanguages(MUI_LANGUAGE_NAME, L"en-US\0", &set)) {
+        freez(*saved);
+        *saved = NULL;
+        return false;
+    }
+
+    *saved_count = count;
+    return true;
+}
+
+static void perflib_thread_ui_language_restore(WCHAR *saved, ULONG saved_count) {
+    ULONG set = 0;
+
+    // with no thread languages saved, clearing them returns the thread to the user's default
+    SetThreadPreferredUILanguages(saved_count ? MUI_LANGUAGE_NAME : 0, saved_count ? saved : NULL, &set);
+    freez(saved);
+}
+
+// English names of base system objects, checked to tell whether the table we loaded is the English one
+static const char *perflib_english_check_names[] = { "System", "Memory", "Process" };
+#define PERFLIB_ENGLISH_CHECK_ALL ((1U << _countof(perflib_english_check_names)) - 1)
+#define PERFLIB_SYSTEM_OBJECT_ID 2
+
+typedef struct {
+    bool loaded;            // the counter names were read
+    unsigned english_found; // bitmap of perflib_english_check_names[] found in the names read
+    char system_name[64];   // the name read for PERFLIB_SYSTEM_OBJECT_ID
+} PERFLIB_NAMES_LOAD;
+
+static inline bool readRegistryKeys_unsafe(BOOL helps, PERFLIB_NAMES_LOAD *load) {
     char *pData = NULL;
+    bool ret = false;
+    WCHAR *saved_languages = NULL;
+    ULONG saved_languages_count = 0;
 
     HKEY hKey;
     DWORD dwType;
@@ -198,28 +252,38 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     else
         valueName = "CounterDefinition";
 
+    bool override_applied = perflib_thread_ui_language_set_english(&saved_languages, &saved_languages_count);
+
     // Open the key for the English counters
     lStatus = RegOpenKeyExA(HKEY_LOCAL_MACHINE, REGISTRY_KEY, 0, KEY_READ, &hKey);
     if (lStatus != ERROR_SUCCESS) {
+        if(override_applied)
+            perflib_thread_ui_language_restore(saved_languages, saved_languages_count);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to open registry key HKEY_LOCAL_MACHINE, subkey '%s', error %ld\n", REGISTRY_KEY, (long)lStatus);
-        return;
+        return false;
     }
 
     // Get the size of the 'Counters' data
     lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, NULL, &dwSize);
-    if (lStatus != ERROR_SUCCESS) {
+    if (lStatus == ERROR_SUCCESS) {
+        // Allocate memory for the data
+        pData = mallocz(dwSize);
+
+        // Read the 'Counters' data
+        lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
+    }
+
+    if(override_applied)
+        perflib_thread_ui_language_restore(saved_languages, saved_languages_count);
+
+    if (!pData) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to get registry key HKEY_LOCAL_MACHINE, subkey '%s', value '%s', size of data, error %ld\n",
                REGISTRY_KEY, (const char *)valueName, (long)lStatus);
         goto cleanup;
     }
 
-    // Allocate memory for the data
-    pData = mallocz(dwSize);
-
-    // Read the 'Counters' data
-    lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
     if (lStatus != ERROR_SUCCESS || dwType != REG_MULTI_SZ) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to get registry key HKEY_LOCAL_MACHINE, subkey '%s', value '%s', data, error %ld\n",
@@ -286,13 +350,25 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
 
         if(helps)
             RegistrySetData_unsafe(id, NULL, name);
-        else
+        else {
             RegistrySetData_unsafe(id, name, NULL);
+
+            for(size_t i = 0; i < _countof(perflib_english_check_names); i++) {
+                if(strcmp(name, perflib_english_check_names[i]) == 0)
+                    load->english_found |= 1U << i;
+            }
+
+            if(id == PERFLIB_SYSTEM_OBJECT_ID)
+                strncpyz(load->system_name, name, sizeof(load->system_name) - 1);
+        }
     }
+
+    ret = true;
 
 cleanup:
     if(pData) freez(pData);
     RegCloseKey(hKey);
+    return ret;
 }
 
 static BOOL RegistryKeyModification(FILETIME *lastWriteTime) {
@@ -322,9 +398,33 @@ static BOOL RegistryKeyModification(FILETIME *lastWriteTime) {
     return ret;
 }
 
-static inline void RegistryFetchAll_unsafe(void) {
-    readRegistryKeys_unsafe(FALSE);
-    readRegistryKeys_unsafe(TRUE);
+static inline void RegistryFetchAll_unsafe(PERFLIB_NAMES_LOAD *load) {
+    load->loaded = readRegistryKeys_unsafe(FALSE, load);
+    readRegistryKeys_unsafe(TRUE, load);
+}
+
+// Collectors find their objects by English name and skip them silently when the name is missing,
+// so a table without the English names would leave every perflib chart empty with nothing logged.
+static void PerflibNamesLogNotEnglish(const PERFLIB_NAMES_LOAD *load) {
+    if(!load->loaded || load->english_found == PERFLIB_ENGLISH_CHECK_ALL)
+        return;
+
+    char missing[64] = "";
+    size_t len = 0;
+    for(size_t i = 0; i < _countof(perflib_english_check_names); i++) {
+        if(load->english_found & (1U << i))
+            continue;
+
+        if(len)
+            len = strcatz(missing, len, ", ", sizeof(missing));
+        len = strcatz(missing, len, perflib_english_check_names[i], sizeof(missing));
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "PERFLIB: the performance counter names read from HKEY_LOCAL_MACHINE\\%s are missing "
+           "the English object names: %s (object %u is named '%s'). The table may be localized or incomplete; "
+           "Windows performance counter collectors that look up these objects by name will not collect them.",
+           REGISTRY_KEY, missing, PERFLIB_SYSTEM_OBJECT_ID, load->system_name[0] ? load->system_name : "(none)");
 }
 
 void PerflibNamesRegistryInitialize(void) {
@@ -341,9 +441,12 @@ void PerflibNamesRegistryInitialize(void) {
         // Continue despite this error - we can still try to fetch registry data
     }
     
-    RegistryFetchAll_unsafe();
+    PERFLIB_NAMES_LOAD load = { 0 };
+    RegistryFetchAll_unsafe(&load);
     
     spinlock_unlock(&names_globals.spinlock);
+
+    PerflibNamesLogNotEnglish(&load);
 }
 
 void PerflibNamesRegistryUpdate(void)
@@ -362,13 +465,16 @@ void PerflibNamesRegistryUpdate(void)
     // The cache reset waits for active collectors, so keep the names lock free.
     bool cacheRefreshed = perflibRefreshPerformanceDataCache();
 
+    PERFLIB_NAMES_LOAD load = { 0 };
     spinlock_lock(&names_globals.spinlock);
     if (lastWriteTimeValid && CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0) {
         names_globals.lastWriteTime = lastWriteTime;
-        RegistryFetchAll_unsafe();
+        RegistryFetchAll_unsafe(&load);
     }
     names_globals.performance_data_cache_refresh_pending = !cacheRefreshed;
     spinlock_unlock(&names_globals.spinlock);
+
+    PerflibNamesLogNotEnglish(&load);
 }
 
 // Helper to free registry entry memory when Judy array is freed
