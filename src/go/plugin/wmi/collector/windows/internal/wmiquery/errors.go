@@ -78,8 +78,10 @@ func statusName(code uint32) string {
 	return ""
 }
 
-// RPC/SSP error chains can contain principal names and server-supplied text.
-func rpcFailure(ctx context.Context, operation string, err error) error {
+// rpcFailure classifies an RPC failure of a session authenticated with the
+// named protocol. RPC/SSP error chains can contain principal names and
+// server-supplied text, so only the classification is kept.
+func rpcFailure(ctx context.Context, auth, operation string, err error) error {
 	if ctx.Err() != nil {
 		return fmt.Errorf("%s: %w", operation, ctx.Err())
 	}
@@ -118,8 +120,10 @@ func rpcFailure(ctx context.Context, operation string, err error) error {
 		return diagnostic(operation + ": " + networkFailure(err))
 	case errors.Is(err, ntlm.ErrConfidentialityNotAvailable), errors.Is(err, ntlm.Err128BitEncryptionNotSupported):
 		return diagnostic(operation + ": server did not negotiate NTLM packet privacy")
-	case errors.Is(err, ntlm.ErrLogonFailure), errors.As(err, &authErr):
+	case errors.Is(err, ntlm.ErrLogonFailure):
 		return diagnostic(operation + ": NTLM authentication failed")
+	case errors.As(err, &authErr):
+		return diagnostic(operation + ": " + auth + " authentication failed")
 	}
 	return diagnostic(operation + ": RPC failed")
 }

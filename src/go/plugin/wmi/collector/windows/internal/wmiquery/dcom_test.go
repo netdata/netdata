@@ -41,7 +41,7 @@ func TestOpenBindsResolverBeforeActivation(t *testing.T) {
 		},
 	}
 	defer c.Close()
-	require.Error(t, c.connect(c.dialer.host, "reader", "synthetic"))
+	require.Error(t, c.connect(c.dialer.host, NewNTLMAuth("reader", "synthetic")))
 
 	r := ndr.NDR20(recorder.packet)
 	var header dcerpc.Header
@@ -163,7 +163,7 @@ func TestScopedIPv6ReachesResolverOnTheSpecifiedInterface(t *testing.T) {
 		},
 	}
 	defer session.Close()
-	err := session.connect(host, "reader", "synthetic")
+	err := session.connect(host, NewNTLMAuth("reader", "synthetic"))
 	require.Error(t, err)
 	require.NotEmpty(t, addresses)
 	for _, address := range addresses {

@@ -32,6 +32,7 @@ const dcomEndpointMapper = "ncacn_ip_tcp:[135]"
 type DCOMSession struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
+	auth        string
 	dialer      rpcDialer
 	resolver    dcerpc.Conn
 	objects     dcerpc.Conn
@@ -43,10 +44,11 @@ type DCOMSession struct {
 	refs        []*dcom.RemoteInterfaceReference
 }
 
-// OpenDCOM activates WMI on host and opens its root/cimv2 namespace with NTLMv2
-// and packet privacy. The caller validates host and credentials. The context
-// deadline bounds activation, every query and the release in Close.
-func OpenDCOM(ctx context.Context, host, username, password string) (*DCOMSession, error) {
+// OpenDCOM activates WMI on host and opens its root/cimv2 namespace with the
+// job's authenticator and packet privacy. The caller validates host and
+// credentials. The context deadline bounds authentication, activation, every
+// query and the release in Close.
+func OpenDCOM(ctx context.Context, host string, auth DCOMAuth) (*DCOMSession, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		return nil, diagnostic("WMI session requires a collection deadline")
 	}
@@ -58,42 +60,57 @@ func OpenDCOM(ctx context.Context, host, username, password string) (*DCOMSessio
 	s := &DCOMSession{
 		ctx:    ctx,
 		cancel: cancel,
+		auth:   auth.protocol(),
 		dialer: rpcDialer{
 			host: host,
 			ctx:  ctx,
 			dial: (&net.Dialer{}).DialContext,
 		},
 	}
-	if err := s.connect(host, username, password); err != nil {
+	if err := s.open(host, auth); err != nil {
 		s.Close()
 		return nil, err
 	}
 	return s, nil
 }
 
-func (s *DCOMSession) connect(host, username, password string) error {
+// open connects and tells auth when the host was reached but the session
+// failed, which may be the host refusing its credentials. A session that
+// failed before any socket opened, or ran out of time, never got an answer.
+func (s *DCOMSession) open(host string, auth DCOMAuth) error {
+	err := s.connect(host, auth)
+	if err != nil && len(s.dialer.sockets) > 0 && s.ctx.Err() == nil {
+		auth.rejected()
+	}
+	return err
+}
+
+func (s *DCOMSession) connect(host string, auth DCOMAuth) error {
 	ctx := s.ctx
 	// An IPv6 zone selects an interface on the poller. Only the socket dialer
-	// needs it; the DCOM address parser and NTLM target use the remote address.
+	// needs it; the DCOM address parser and the authentication target use the
+	// remote address.
 	host, _, _ = strings.Cut(host, "%")
-	security := securityOptions(host, username, password)
+	security, err := auth.bindSecurity(ctx, host)
+	if err != nil {
+		return err
+	}
 	cid, _ := rpcuuid.Parse(uuid.NewString())
 	s.orpc.CID = (*dcom.CID)(dtyp.GUIDFromUUID(cid))
 
-	var err error
 	s.resolver, err = s.dial(host, security, dcerpc.WithEndpoint(dcomEndpointMapper))
 	if err != nil {
-		return rpcFailure(ctx, "open DCOM resolver", err)
+		return rpcFailure(ctx, s.auth, "open DCOM resolver", err)
 	}
 	// Windows can reject additional interfaces in a combined bind. Each generated
 	// client negotiates its own interface on the existing endpoint transport.
 	resolver, err := exporter.NewObjectExporterClient(ctx, s.resolver)
 	if err != nil {
-		return rpcFailure(ctx, "open DCOM object resolver interface", err)
+		return rpcFailure(ctx, s.auth, "open DCOM object resolver interface", err)
 	}
 	alive, err := resolver.ServerAlive2(ctx, &exporter.ServerAlive2Request{})
 	if err != nil {
-		return rpcFailure(ctx, "read DCOM server version", err)
+		return rpcFailure(ctx, s.auth, "read DCOM server version", err)
 	}
 	if alive.COMVersion == nil {
 		return diagnostic("DCOM resolver returned no COM version")
@@ -102,7 +119,7 @@ func (s *DCOMSession) connect(host, username, password string) error {
 
 	activator, err := activation.NewActivationClient(ctx, s.resolver)
 	if err != nil {
-		return rpcFailure(ctx, "open DCOM activation interface", err)
+		return rpcFailure(ctx, s.auth, "open DCOM activation interface", err)
 	}
 	act, err := activator.RemoteActivation(ctx, &activation.RemoteActivationRequest{
 		ORPCThis:                   &s.orpc,
@@ -111,7 +128,7 @@ func (s *DCOMSession) connect(host, username, password string) error {
 		RequestedProtocolSequences: []uint16{uint16(dcetypes.ProtocolTCP)},
 	})
 	if err != nil {
-		return rpcFailure(ctx, "activate WMI", err)
+		return rpcFailure(ctx, s.auth, "activate WMI", err)
 	}
 	if act.HResult != 0 {
 		return statusError("activate WMI", uint32(act.HResult))
@@ -134,7 +151,7 @@ func (s *DCOMSession) connect(host, username, password string) error {
 			RequestedProtocolSequences: []uint16{uint16(dcetypes.ProtocolTCP)},
 		})
 		if err != nil {
-			return rpcFailure(ctx, "resolve WMI exporter endpoint", err)
+			return rpcFailure(ctx, s.auth, "resolve WMI exporter endpoint", err)
 		}
 		endpoints = tcpEndpoints(resolved.OXIDBindings)
 	}
@@ -144,7 +161,7 @@ func (s *DCOMSession) connect(host, username, password string) error {
 
 	s.objects, err = s.dial(host, security, endpoints...)
 	if err != nil {
-		return rpcFailure(ctx, "open WMI object transport", err)
+		return rpcFailure(ctx, s.auth, "open WMI object transport", err)
 	}
 	return s.login(act)
 }
@@ -154,7 +171,7 @@ func (s *DCOMSession) login(act *activation.RemoteActivationResponse) error {
 	var err error
 	s.unknown, err = remoteunknown.NewRemoteUnknownClient(ctx, s.objects, dcom.WithIPID(act.RemoteUnknown))
 	if err != nil {
-		return rpcFailure(ctx, "open WMI release interface", err)
+		return rpcFailure(ctx, s.auth, "open WMI release interface", err)
 	}
 
 	loginRef, err := s.reference(act.InterfaceData[0])
@@ -165,15 +182,16 @@ func (s *DCOMSession) login(act *activation.RemoteActivationResponse) error {
 
 	login, err := level1login.NewLevel1LoginClient(ctx, s.objects, dcom.WithIPID(loginRef.IPID))
 	if err != nil {
-		return rpcFailure(ctx, "open WMI login interface", err)
+		return rpcFailure(ctx, s.auth, "open WMI login interface", err)
 	}
-	// NTLMLogin opens the namespace using the authenticated RPC caller identity.
+	// Despite its name, NTLMLogin opens the namespace as the authenticated RPC
+	// caller, whichever protocol authenticated it.
 	namespace, err := login.NTLMLogin(ctx, &level1login.NTLMLoginRequest{
 		This:            &s.orpc,
 		NetworkResource: "//./root/cimv2",
 	})
 	if err != nil {
-		return rpcFailure(ctx, "open WMI root/cimv2 namespace", err)
+		return rpcFailure(ctx, s.auth, "open WMI root/cimv2 namespace", err)
 	}
 
 	nsRef, err := s.reference(namespace.Namespace.InterfacePointer())
@@ -184,7 +202,7 @@ func (s *DCOMSession) login(act *activation.RemoteActivationResponse) error {
 
 	s.services, err = services.NewServicesClient(ctx, s.objects, dcom.WithIPID(nsRef.IPID))
 	if err != nil {
-		return rpcFailure(ctx, "open WMI services interface", err)
+		return rpcFailure(ctx, s.auth, "open WMI services interface", err)
 	}
 	return nil
 }

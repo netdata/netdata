@@ -6,7 +6,7 @@
     "properties": {
       "host": {
         "title": "Host",
-        "description": "Hostname or IP address of the Windows host.",
+        "description": "Hostname or IP address of the Windows host. Kerberos needs the host's DNS name.",
         "type": "string",
         "minLength": 1
       },
@@ -22,15 +22,16 @@
       },
       "auth": {
         "title": "Authentication",
-        "description": "Authentication protocol for the Windows account. NTLMv2 is the only supported protocol.",
+        "description": "Authentication protocol for the Windows account: NTLMv2, or Kerberos for a domain account over DCOM.",
         "type": "string",
         "enum": [
-          "ntlm"
+          "ntlm",
+          "kerberos"
         ]
       },
       "username": {
         "title": "Username",
-        "description": "Windows account that reads WMI on the host, as `DOMAIN\\user`, `user@domain` or a local account name.",
+        "description": "Windows account that reads WMI on the host, as `DOMAIN\\user`, `user@domain` or a local account name. Kerberos needs `user@domain`, with the Active Directory DNS domain.",
         "type": "string",
         "minLength": 1
       },
@@ -145,8 +146,59 @@
             }
           }
         ]
+      },
+      "auth": {
+        "oneOf": [
+          {
+            "properties": {
+              "auth": {
+                "const": "ntlm"
+              }
+            }
+          },
+          {
+            "properties": {
+              "auth": {
+                "const": "kerberos"
+              },
+              "kdc": {
+                "title": "Kerberos KDCs",
+                "description": "Domain controllers that issue the Kerberos tickets, as host names or IP addresses with an optional port. Leave empty to find them in DNS.",
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "title": "KDC",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
-    }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "auth": {
+              "const": "kerberos"
+            }
+          },
+          "required": [
+            "auth"
+          ]
+        },
+        "then": {
+          "properties": {
+            "transport": {
+              "const": "dcom"
+            }
+          }
+        }
+      }
+    ]
   },
   "uiSchema": {
     "ui:flavour": "tabs",
@@ -157,6 +209,7 @@
       "auth",
       "username",
       "password",
+      "kdc",
       "update_every",
       "autodetection_retry",
       "timeout",
@@ -173,7 +226,8 @@
             "tls_ca",
             "auth",
             "username",
-            "password"
+            "password",
+            "kdc"
           ]
         },
         {
@@ -212,11 +266,15 @@
       "ui:placeholder": "/etc/netdata/ssl/windows-ca.pem"
     },
     "auth": {
+      "ui:widget": "radio",
       "ui:options": {
+        "inline": true,
         "enumNames": [
-          "NTLMv2"
+          "NTLMv2",
+          "Kerberos"
         ]
-      }
+      },
+      "ui:help": "NTLMv2 works with local and domain accounts, any host name or IP address, and both transports.\n\nKerberos needs a domain account, the host's DNS name as Active Directory knows it, the DCOM transport, TCP port 88 from the poller to the domain controllers, and clocks within five minutes of the domain's. Choose it where the domain refuses NTLM."
     },
     "username": {
       "ui:placeholder": "EXAMPLE\\monitor"
@@ -224,6 +282,9 @@
     "password": {
       "ui:widget": "password",
       "ui:placeholder": "${env:WMI_PASSWORD}"
+    },
+    "kdc": {
+      "ui:help": "Each entry is a host name or IP address with an optional port, such as `dc1.example.com` or `dc1.example.com:88`; the port defaults to 88.\n\nWhen empty, the plugin looks up the `_kerberos._tcp` DNS SRV records that Active Directory publishes for the domain. They name every domain controller of the domain, so the poller needs a DNS server that answers for the domain and TCP 88 to those controllers; list the reachable ones here when a firewall blocks the others."
     },
     "vnode": {
       "ui:placeholder": "windows-server",

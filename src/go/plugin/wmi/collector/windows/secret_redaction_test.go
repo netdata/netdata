@@ -4,14 +4,21 @@ package windows
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 
+	"github.com/oiweiwei/gokrb5.fork/v9/iana/errorcode"
+	"github.com/oiweiwei/gokrb5.fork/v9/iana/nametype"
+	"github.com/oiweiwei/gokrb5.fork/v9/messages"
+	"github.com/oiweiwei/gokrb5.fork/v9/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -55,8 +62,20 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 		wantLog []string
 	}{
 		"invalid option": {
-			options: map[string]any{"auth": "kerberos"},
-			wantErr: "auth must be ntlm",
+			options: map[string]any{"auth": resolvedMarker},
+			wantErr: "auth must be ntlm or kerberos",
+		},
+		"invalid Kerberos username": {
+			options: map[string]any{"auth": "kerberos", "username": `EXAMPLE\` + resolvedMarker},
+			wantErr: "auth kerberos requires username as user@domain, with the Active Directory DNS domain",
+		},
+		"invalid KDC": {
+			options: map[string]any{
+				"auth":     "kerberos",
+				"username": "monitor@example.com",
+				"kdc":      []any{"https://" + resolvedMarker},
+			},
+			wantErr: "kdc entries must be host names or IP addresses, each with an optional port",
 		},
 		"invalid transport": {
 			options: map[string]any{"transport": resolvedMarker},
@@ -213,6 +232,73 @@ func assertErrorTreeOmits(t *testing.T, err error, marker string) {
 			assertErrorTreeOmits(t, inner, marker)
 		}
 	}
+}
+
+// A Kerberos failure reaches a reference-bearing job's output as the
+// collector's classification, through the real ticket request.
+func TestCollector_SecretReferenceJobKeepsKerberosMessages(t *testing.T) {
+	t.Setenv(passwordVariable, resolvedMarker)
+	const kdcText = "fixture-kdc-free-text"
+	kdc := kerberosErrorKDC(t, errorcode.KDC_ERR_PREAUTH_FAILED, kdcText)
+	var created func() *Collector
+	openSession := func(ctx context.Context) (querySession, error) { return created().openSession(ctx) }
+	factory, moduleLog, last := referenceJobFactory(t, openSession, (&fakePinger{
+		sample: answeredPing(),
+	}).factory)
+	created = last
+
+	err := factory.Test(t.Context(), referenceJob(map[string]any{
+		"auth":     "kerberos",
+		"username": "monitor@example.com",
+		"kdc":      []any{kdc},
+	}))
+	require.Error(t, err)
+	message, ok := dyncfg.PublicMessage(err)
+	require.True(t, ok, err.Error())
+	assert.Equal(
+		t,
+		"failed to open WMI session: Kerberos login failed: wrong password (KDC_ERR_PREAUTH_FAILED)",
+		message,
+	)
+	assertErrorTreeOmits(t, err, resolvedMarker)
+	assertErrorTreeOmits(t, err, kdcText)
+	logged, err := os.ReadFile(moduleLog)
+	require.NoError(t, err)
+	assert.NotContains(t, string(logged), resolvedMarker)
+	assert.NotContains(t, string(logged), kdcText)
+}
+
+// kerberosErrorKDC answers every Kerberos request on a local TCP port with the
+// error code and free-form text, and returns its address.
+func kerberosErrorKDC(t *testing.T, code int32, text string) string {
+	t.Helper()
+	krbErr := messages.NewKRBError(types.NewPrincipalName(nametype.KRB_NT_PRINCIPAL, text), "EXAMPLE.COM", code, text)
+	reply, err := krbErr.Marshal()
+	require.NoError(t, err)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	var wg sync.WaitGroup
+	t.Cleanup(func() {
+		_ = listener.Close()
+		wg.Wait()
+	})
+	wg.Go(func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			var header [4]byte
+			if _, err := io.ReadFull(conn, header[:]); err == nil {
+				if _, err := io.CopyN(io.Discard, conn, int64(binary.BigEndian.Uint32(header[:]))); err == nil {
+					binary.BigEndian.PutUint32(header[:], uint32(len(reply)))
+					_, _ = conn.Write(append(header[:], reply...))
+				}
+			}
+			_ = conn.Close()
+		}
+	})
+	return listener.Addr().String()
 }
 
 // referenceJobFactory builds the Agent's DynCfg test path for the module: the

@@ -40,7 +40,7 @@ func (s *DCOMSession) Query(ctx context.Context, wql string) ([]map[string]any, 
 		Flags: int32(wmi.GenericFlagTypeReturnImmediately | wmi.GenericFlagTypeForwardOnly),
 	})
 	if err != nil {
-		return nil, rpcFailure(ctx, "execute WMI query", err)
+		return nil, rpcFailure(ctx, s.auth, "execute WMI query", err)
 	}
 	ref, err := s.reference(result.Enum.InterfacePointer())
 	if err != nil {
@@ -54,14 +54,14 @@ func (s *DCOMSession) Query(ctx context.Context, wql string) ([]map[string]any, 
 	if enum == nil {
 		enum, err = enumerator.NewEnumClassObjectClient(ctx, s.objects)
 		if err != nil {
-			return nil, rpcFailure(ctx, "open WMI enumeration interface", err)
+			return nil, rpcFailure(ctx, s.auth, "open WMI enumeration interface", err)
 		}
 	}
 	deadline, _ := s.ctx.Deadline()
 	if queryDeadline, ok := ctx.Deadline(); ok && queryDeadline.Before(deadline) {
 		deadline = queryDeadline
 	}
-	rows, err := readPages(ctx, &s.orpc, deadline, enum.IPID(ctx, ref.IPID).Next)
+	rows, err := readPages(ctx, s.auth, &s.orpc, deadline, enum.IPID(ctx, ref.IPID).Next)
 	if err == nil {
 		// go-msrpc may report a rejected presentation only when Next is called.
 		s.enumeration = enum
@@ -71,7 +71,13 @@ func (s *DCOMSession) Query(ctx context.Context, wql string) ([]map[string]any, 
 
 type nextPage func(context.Context, *enumerator.NextRequest, ...dcerpc.CallOption) (*enumerator.NextResponse, error)
 
-func readPages(ctx context.Context, orpc *dcom.ORPCThis, deadline time.Time, next nextPage) ([]map[string]any, error) {
+func readPages(
+	ctx context.Context,
+	auth string,
+	orpc *dcom.ORPCThis,
+	deadline time.Time,
+	next nextPage,
+) ([]map[string]any, error) {
 	var rows []map[string]any
 	for {
 		if err := ctx.Err(); err != nil {
@@ -90,7 +96,7 @@ func readPages(ctx context.Context, orpc *dcom.ORPCThis, deadline time.Time, nex
 			Count:   rowsPerPage,
 		})
 		if err != nil {
-			return nil, rpcFailure(ctx, "read WMI query results", err)
+			return nil, rpcFailure(ctx, auth, "read WMI query results", err)
 		}
 		if page == nil || int(page.Returned) != len(page.Objects) || page.Returned > rowsPerPage {
 			return nil, diagnostic("WMI returned an invalid enumeration page")

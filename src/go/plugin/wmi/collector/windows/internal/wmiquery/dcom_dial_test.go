@@ -75,14 +75,15 @@ func TestSecurityDoesNotDowngrade(t *testing.T) {
 			require.Error(t, err)
 			assert.Nil(t, token)
 			assert.False(t, security.Established())
-			assert.Contains(t, SafeMessage(rpcFailure(ctx, "bind", err)), "NTLM")
+			assert.Contains(t, SafeMessage(rpcFailure(ctx, "NTLM", "bind", err)), "NTLM")
 		})
 	}
 }
 
 func testSecurity(t *testing.T, host, username, password string) *dcerpc.Security {
 	t.Helper()
-	opts := securityOptions(host, username, password)
+	opts, err := NewNTLMAuth(username, password).bindSecurity(t.Context(), host)
+	require.NoError(t, err)
 	parsed, err := dcerpc.ParseOptions(
 		t.Context(),
 		append(opts, dcerpc.WithAbstractSyntax(activation.ActivationSyntaxV0_0))...)

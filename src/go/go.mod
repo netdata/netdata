@@ -50,6 +50,7 @@ require (
 	github.com/ibm-messaging/mq-golang/v5 v5.7.3
 	github.com/ibmdb/go_ibm_db v0.5.4 // Used by ibm.d.plugin (requires CGO)
 	github.com/jackc/pgx/v5 v5.13.0
+	github.com/jcmturner/gofork v1.7.6
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
 	github.com/klauspost/compress v1.20.5
@@ -67,6 +68,7 @@ require (
 	github.com/netdata/gosnmp v0.0.0-20261112121521-088919090b99
 	github.com/netdata/systemd-journal-sdk/go v0.10.0
 	github.com/oiweiwei/go-msrpc v1.6.7
+	github.com/oiweiwei/gokrb5.fork/v9 v9.0.8
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/prometheus/client_model v0.6.3
@@ -180,7 +182,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
-	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
@@ -203,7 +204,6 @@ require (
 	github.com/oiweiwei/go-math v1.0.0 // indirect
 	github.com/oiweiwei/go-oem v1.0.0 // indirect
 	github.com/oiweiwei/go-smb2.fork v1.0.2 // indirect
-	github.com/oiweiwei/gokrb5.fork/v9 v9.0.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
