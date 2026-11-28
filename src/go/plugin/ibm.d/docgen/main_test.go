@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,6 +78,62 @@ link: https://example.com
 	}
 	if got := metadata.Modules[0].Meta.MonitoredInstance.Description; got != pageDescription {
 		t.Fatalf("generated page description %q, want %q", got, pageDescription)
+	}
+}
+
+func TestGenerateConfigSchemaNilSliceDefault(t *testing.T) {
+	dir := t.TempDir()
+	contextsPath := filepath.Join(dir, "contexts.yaml")
+	configPath := filepath.Join(dir, "config.go")
+	initPath := filepath.Join(dir, "init.go")
+	modulePath := filepath.Join(dir, "module.yaml")
+
+	writeTestFile(t, contextsPath, "{}\n")
+	writeTestFile(t, configPath, "package fixture\n\ntype Config struct {\n"+
+		"\tEndpoint string `yaml:\"endpoint,omitempty\" json:\"endpoint\"`\n"+
+		"\tJobs []string `yaml:\"jobs,omitempty\" json:\"jobs\"`\n"+
+		"}\n")
+	writeTestFile(t, initPath, "package fixture\n\nfunc defaultConfig() Config {\n\treturn Config{Endpoint: \"\", Jobs: nil}\n}\n")
+	writeTestFile(t, modulePath, `name: fixture
+display_name: Fixture
+description: |
+  Monitor fixture service health and performance.
+icon: fixture.svg
+categories:
+  - data-collection.generic
+link: https://example.com
+`)
+
+	generator := &DocGenerator{
+		ModuleName:  "fixture",
+		ContextFile: contextsPath,
+		ConfigFile:  configPath,
+		OutputDir:   dir,
+		ModuleInfo:  modulePath,
+	}
+	if err := generator.Generate(); err != nil {
+		t.Fatalf("docgen failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "config_schema.json"))
+	if err != nil {
+		t.Fatalf("read generated schema: %v", err)
+	}
+	var schema struct {
+		JSONSchema struct {
+			Properties map[string]map[string]any `json:"properties"`
+		} `json:"jsonSchema"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatalf("parse generated schema: %v\n%s", err, data)
+	}
+	jobs, ok := schema.JSONSchema.Properties["jobs"]
+	if !ok {
+		t.Fatalf("jobs property missing from schema:\n%s", data)
+	}
+	def, ok := jobs["default"].([]any)
+	if !ok || len(def) != 0 {
+		t.Fatalf("jobs default = %#v, want an empty array", jobs["default"])
 	}
 }
 

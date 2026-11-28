@@ -559,6 +559,10 @@ func toStringSlice(values []confopt.AutoBool) []string {
 }
 
 func normalizeDefaultValue(field ConfigField, value any) any {
+	if value == nil && field.Type == "array" {
+		// A nil slice is an empty list, not a scalar.
+		return []any{}
+	}
 	if !isAutoBoolType(field.GoType) {
 		return value
 	}
@@ -701,6 +705,12 @@ func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, default
 						}
 					}
 				default:
+					if ident, ok := kv.Value.(*ast.Ident); ok && ident.Name == "nil" {
+						// An explicit nil is still a default; record it so the field is not
+						// reported as missing, and let normalizeDefaultValue shape it.
+						defaults[fieldName] = nil
+						continue
+					}
 					if value := g.extractValue(kv.Value); value != nil {
 						defaults[fieldName] = value
 					}
@@ -734,6 +744,8 @@ func (g *DocGenerator) extractValue(expr ast.Expr) any {
 			return true
 		case "false":
 			return false
+		case "nil":
+			return nil
 		}
 		if g != nil {
 			if val, ok := g.consts[v.Name]; ok {

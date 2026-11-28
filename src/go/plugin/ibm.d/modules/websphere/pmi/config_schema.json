@@ -242,7 +242,7 @@
         "type": "string"
       },
       "pmi_custom_stats_paths": {
-        "default": "nil",
+        "default": [],
         "description": "PMICustomStatsPaths adds extra PMI XML paths when `pmi_stats_type` is set to `custom`.",
         "items": {
           "type": "string"
