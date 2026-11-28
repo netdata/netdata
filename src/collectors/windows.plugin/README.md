@@ -76,21 +76,33 @@ sums the remaining queues into an `Other (aggregated)` series. Configure it in `
 
 ```ini
 [plugin:windows:PerflibMSMQ]
+    queues to ignore =
     queues to chart individually = *
     max individually charted queues = 100
 ```
 
-The selector accepts comma or pipe separated case-insensitive simple patterns. Windows queue paths can be pasted
-verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` matches a literal `!`
-instead of negating the pattern. The selector treats `*` as a wildcard; backslashes elsewhere are treated as Windows
-path separators. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to `0`
-to aggregate all queues. A negative-only selector such as `!*temp*` selects no queues for individual charts, so all
-queues go to `Other`; an empty selector has the same result. Append `*` (`!*temp*,*`) to select every queue except
-those matching `*temp*`.
+`queues to ignore` drops matching queues completely: they get no charts and are not added to `Other`. It is empty by
+default, so no queue is ignored. Use it for queues you never want to see, such as temporary queues whose names change.
+For example, `queues to ignore = *dbsync-*,*\private$\scratch` ignores every queue whose name contains `dbsync-` and
+the private queue `scratch`. The first matching pattern wins, so a leading `!` exempts queues from the list:
+`!*dbsync-keep,*dbsync-*` ignores every `dbsync-` queue except those whose names end in `dbsync-keep`. A
+negative-only list ignores nothing.
 
-Perflib may not report a newly created queue until it becomes active, such as after a message is sent. Selectors match
+Ignored queues are removed first. The remaining queues are then routed by `queues to chart individually` and the cap.
+
+Both lists accept comma or pipe separated case-insensitive simple patterns. Windows queue paths can be pasted
+verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` matches a literal `!`
+instead of negating the pattern. The patterns treat `*` as a wildcard; backslashes elsewhere are treated as Windows
+path separators. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to `0`
+to aggregate all non-ignored queues. A negative-only selector such as `!*temp*` selects no queues for individual
+charts, so all non-ignored queues go to `Other`; an empty selector has the same result. Append `*` (`!*temp*,*`) to
+select every queue except those matching `*temp*`.
+
+The collector reads these options once, when it starts: restart the Agent after changing them.
+
+Perflib may not report a newly created queue until it becomes active, such as after a message is sent. Both lists match
 the raw Perflib instance name. The `queue` chart label is sanitized for display; for example,
-`host\private$\name` appears as `host/private_/name`. Use the original queue path in the selector rather than copying
+`host\private$\name` appears as `host/private_/name`. Use the original queue path in the patterns rather than copying
 the displayed label.
 
 ## GetPrinters

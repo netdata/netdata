@@ -43,6 +43,7 @@ static int msmq_sample_compare(const void *a, const void *b)
 
 static DICTIONARY *msmq_queues = NULL;
 static SIMPLE_PATTERN *queues_to_chart = NULL;
+static SIMPLE_PATTERN *queues_to_ignore = NULL;
 static long long max_individual_queues = MSMQ_DEFAULT_INDIVIDUAL_QUEUES;
 static RRDSET *other_st_messages, *other_st_bytes, *other_st_journal_messages, *other_st_journal_bytes;
 static RRDDIM *other_rd_messages, *other_rd_bytes, *other_rd_journal_messages, *other_rd_journal_bytes;
@@ -77,12 +78,27 @@ static void msmq_queue_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
     mq->bytes_in_journal_queue.key = "Bytes in Journal Queue";
 }
 
+static SIMPLE_PATTERN *msmq_pattern_create(const char *input)
+{
+    char *patterns = windows_plugin_normalize_patterns(input);
+    SIMPLE_PATTERN *pattern = simple_pattern_create(patterns, ",|", SIMPLE_PATTERN_EXACT, false);
+    freez(patterns);
+    return pattern;
+}
+
+// _Total and ignored queues never enter msmq_queues: no charts, no share of Other, no dictionary
+// growth for churning queue names.
+static bool msmq_queue_skipped(const char *name)
+{
+    return strcasecmp(name, "_Total") == 0 || simple_pattern_matches(queues_to_ignore, name);
+}
+
 static void initialize(void)
 {
-    char *patterns = windows_plugin_normalize_patterns(
+    queues_to_chart = msmq_pattern_create(
         inicfg_get(&netdata_config, CONFIG_SECTION_PERFLIB_MSMQ, "queues to chart individually", "*"));
-    queues_to_chart = simple_pattern_create(patterns, ",|", SIMPLE_PATTERN_EXACT, false);
-    freez(patterns);
+    queues_to_ignore =
+        msmq_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_PERFLIB_MSMQ, "queues to ignore", ""));
     max_individual_queues = inicfg_get_number(
         &netdata_config, CONFIG_SECTION_PERFLIB_MSMQ, "max individually charted queues", MSMQ_DEFAULT_INDIVIDUAL_QUEUES);
     if (max_individual_queues < 0)
@@ -347,7 +363,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
             continue;
         }
 
-        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (msmq_queue_skipped(windows_shared_buffer))
             continue;
 
         DICT_ITEM_CONST DICTIONARY_ITEM *item =
@@ -492,5 +508,59 @@ void do_PerflibMSMQ_cleanup(void)
     msmq_queues = NULL;
     simple_pattern_free(queues_to_chart);
     queues_to_chart = NULL;
+    simple_pattern_free(queues_to_ignore);
+    queues_to_ignore = NULL;
     msmq_other_charts_obsolete();
+}
+
+int perflib_msmq_unittest(void)
+{
+    static const struct {
+        const char *ignore;
+        const char *queue;
+        bool skipped;
+    } cases[] = {
+        // the default keeps every queue except _Total
+        { "", "host\\private$\\orders", false },
+        { "", "_total", true },
+        // raw Perflib paths, matched case-insensitively
+        { "*dbsync-*", "host\\private$\\dbsync-0f9c2a1e-6c1b-4f7e-9a0d-3b2c1d4e5f60", true },
+        { "*dbsync-*", "HOST\\PRIVATE$\\DBSYNC-7D3E", true },
+        { "*dbsync-*", "host\\private$\\orders", false },
+        // a pasted queue path, and an escaped comma inside a queue name
+        { "host\\private$\\orders", "host\\private$\\orders", true },
+        { "host\\private$\\a\\,b", "host\\private$\\a,b", true },
+        { "host\\private$\\a\\,b", "host\\private$\\a", false },
+        // the first matching pattern wins, so a negative pattern keeps an exception
+        { "!*dbsync-keep,*dbsync-*", "host\\private$\\dbsync-keep", false },
+        { "!*dbsync-keep,*dbsync-*", "host\\private$\\dbsync-2", true },
+        // a negative-only list ignores nothing
+        { "!*orders", "host\\private$\\billing", false },
+        // pipes separate patterns too
+        { "*orders|*billing", "host\\private$\\billing", true },
+    };
+
+    SIMPLE_PATTERN *previous_ignore = queues_to_ignore;
+    int errors = 0;
+
+    for (size_t i = 0; i < _countof(cases); i++) {
+        queues_to_ignore = msmq_pattern_create(cases[i].ignore);
+        bool skipped = msmq_queue_skipped(cases[i].queue);
+        if (skipped != cases[i].skipped) {
+            fprintf(
+                stderr,
+                "perflib msmq unittest: queues to ignore = '%s', queue '%s': expected skipped=%d, got %d\n",
+                cases[i].ignore,
+                cases[i].queue,
+                cases[i].skipped,
+                skipped);
+            errors++;
+        }
+        simple_pattern_free(queues_to_ignore);
+    }
+
+    queues_to_ignore = previous_ignore;
+    if (!errors)
+        fprintf(stderr, "perflib msmq unittest: %zu cases passed\n", _countof(cases));
+    return errors;
 }
