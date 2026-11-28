@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
-      netflow-only: ${{ steps.netflow-scope.outputs.netflow_only }}
+      package-scope: ${{ steps.package-scope.outputs.scope }}
     steps:
       - name: Checkout
         id: checkout
@@ -91,6 +91,7 @@ jobs:
             .github/data/distros.yml
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py
+            .github/scripts/pr-package-scope.py
             .github/scripts/gen-package-repos.py
             .github/scripts/modules/release_versions.py
             .github/scripts/prepare-release-base.sh
@@ -113,25 +114,16 @@ jobs:
             src/crates/**/*.md
             src/go/tools/topology-ip-intel-downloader/README.md
             src/go/tools/topology-ip-intel-downloader/stock/README.md
-      - name: Check whether the PR changes only NetFlow source and documentation
-        id: netflow-scope
-        if: github.event_name == 'pull_request'
+      - name: Select package coverage for a pull request
+        id: package-scope
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging')
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Inspect both sides of renames and include file type changes in the complete PR diff.
-          git diff --no-renames --ignore-submodules=none --name-only -z "${BASE_SHA}...${HEAD_SHA}" > "${RUNNER_TEMP}/netflow-paths"
-          netflow_only=false
-          while IFS= read -r -d '' path; do
-            case "${path}" in
-              src/crates/netflow-plugin/*.rs) netflow_only=true ;;
-              README.md|docs/*.md|src/crates/*.md|packaging/*.md) ;;
-              *) netflow_only=false; break ;;
-            esac
-          done < "${RUNNER_TEMP}/netflow-paths"
-          echo "netflow_only=${netflow_only}" >> "${GITHUB_OUTPUT}"
+          scope="$(python3 .github/scripts/pr-package-scope.py "${BASE_SHA}" "${HEAD_SHA}")"
+          echo "scope=${scope}" >> "${GITHUB_OUTPUT}"
       - name: List all changed files in pattern
         continue-on-error: true
         env:
@@ -142,8 +134,12 @@ jobs:
           done
       - name: Check Run
         id: check-run
+        env:
+          PACKAGE_SCOPE: ${{ steps.package-scope.outputs.scope }}
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0 }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${PACKAGE_SCOPE}" = skip ]; then
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          elif [ "${{ steps.check-files.outputs.any_modified == 'true' || steps.check-files.outputs.type_changed_files_count > 0 }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
@@ -170,14 +166,14 @@ jobs:
       - name: Read build matrix
         id: set-matrix
         env:
-          NETFLOW_ONLY: ${{ needs.file-check.outputs.netflow-only }}
+          PACKAGE_SCOPE: ${{ needs.file-check.outputs.package-scope }}
         run: |
           mode=0
           if [ "${{ github.event_name }}" = "pull_request" ] && \
              [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
             mode=1
-            if [ "${NETFLOW_ONLY}" = true ]; then
-              mode=netflow
+            if [ "${PACKAGE_SCOPE}" = representative ]; then
+              mode=representative
             fi
           fi
           matrix="$(.github/scripts/gen-matrix-packaging.py "${mode}")"
