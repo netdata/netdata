@@ -37,10 +37,12 @@ The debug output shows the job's checks and collections, and the charts it sends
 
 ## Kerberos
 
-Kerberos jobs (`auth: kerberos`, DCOM only) read no `krb5.conf` and no credentials cache: the realm comes from the
-`username` domain and the domain controllers from `kdc` or the domain's DNS SRV records. Each job requests a service
-ticket for `host/<host>` with AES encryption over TCP 88, keeps it in memory and reuses it until it nears expiry or the
-host refuses a session (`internal/wmiquery/kerberos.go`). The unit tests run these exchanges against an in-process KDC
+Kerberos jobs (`auth: kerberos`, DCOM only) read no `krb5.conf`: the realm comes from the `username` domain and the
+domain controllers from `kdc` or the domain's DNS SRV records. Each job requests a service ticket for `host/<host>` with
+AES encryption over TCP 88, keeps it in memory and reuses it until it nears expiry or a session fails after reaching the
+host (`internal/wmiquery/kerberos.go`). go-msrpc still loads a credentials cache named by the `KRB5_CCACHE` environment
+variable, when the Netdata service has one; leave that variable unset for the plugin, because a cache it cannot parse
+makes every Kerberos session fail. The unit tests run these exchanges against an in-process KDC
 and authenticate the ticket with go-msrpc's own Kerberos acceptor, so they need no domain; a live check needs an Active
 Directory domain with the host as a member.
 

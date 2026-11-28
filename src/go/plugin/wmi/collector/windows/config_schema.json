@@ -274,7 +274,7 @@
           "Kerberos"
         ]
       },
-      "ui:help": "NTLMv2 works with local and domain accounts, any host name or IP address, and both transports.\n\nKerberos needs a domain account, the host's DNS name as Active Directory knows it, the DCOM transport, TCP port 88 from the poller to a domain controller, and clocks within five minutes of the domain's. Choose it where the domain refuses NTLM."
+      "ui:help": "NTLMv2 works with local and domain accounts, any host name or IP address, and both transports.\n\nKerberos needs a domain account, the host's DNS name as Active Directory knows it, the DCOM transport, TCP port 88 from the poller to the domain controllers, and clocks within five minutes of the domain's. Choose it where the domain refuses NTLM."
     },
     "username": {
       "ui:placeholder": "EXAMPLE\\monitor"
@@ -284,7 +284,7 @@
       "ui:placeholder": "${env:WMI_PASSWORD}"
     },
     "kdc": {
-      "ui:help": "Each entry is a host name or IP address with an optional port, such as `dc1.example.com` or `dc1.example.com:88`; the port defaults to 88.\n\nWhen empty, the plugin looks up the `_kerberos._tcp` DNS SRV records that Active Directory publishes for the domain, which needs a DNS server that answers for the domain."
+      "ui:help": "Each entry is a host name or IP address with an optional port, such as `dc1.example.com` or `dc1.example.com:88`; the port defaults to 88.\n\nWhen empty, the plugin looks up the `_kerberos._tcp` DNS SRV records that Active Directory publishes for the domain. They name every domain controller of the domain, so the poller needs a DNS server that answers for the domain and TCP 88 to those controllers; list the reachable ones here when a firewall blocks the others."
     },
     "vnode": {
       "ui:placeholder": "windows-server",

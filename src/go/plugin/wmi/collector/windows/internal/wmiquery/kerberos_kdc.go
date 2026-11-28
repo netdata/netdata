@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
@@ -36,20 +37,27 @@ const (
 // gokrb5 reports a KDC's error only as text that also carries the KDC's
 // free-form message.
 type kdcExchange struct {
-	ctx  context.Context
-	dial func(ctx context.Context, network, address string) (net.Conn, error)
+	ctx context.Context
+	// dialTimeout bounds each connection attempt, so a KDC that drops
+	// connections leaves time to try the next one.
+	dialTimeout time.Duration
+	dial        func(ctx context.Context, network, address string) (net.Conn, error)
 
 	// answered reports that the last KDC contacted sent a reply; reply is that
-	// reply's message when it was complete and within maxKDCReply.
-	answered bool
-	reply    []byte
+	// reply's message when it was complete and within maxKDCReply, and
+	// answeredBy the KDC's address.
+	answered   bool
+	reply      []byte
+	answeredBy string
 }
 
 // Dial implements gokrb5's client.KDCDialer. gokrb5 dials once per KDC
 // attempt and returns after the first KDC that answers.
 func (e *kdcExchange) Dial(network, address string) (net.Conn, error) {
-	e.answered, e.reply = false, nil
-	conn, err := e.dial(e.ctx, network, address)
+	e.answered, e.reply, e.answeredBy = false, nil, ""
+	ctx, cancel := context.WithTimeout(e.ctx, e.dialTimeout)
+	conn, err := e.dial(ctx, network, address)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +65,7 @@ func (e *kdcExchange) Dial(network, address string) (net.Conn, error) {
 	return &kdcConn{
 		Conn:     conn,
 		exchange: e,
+		address:  address,
 		stop:     stop,
 	}, nil
 }
@@ -70,8 +79,13 @@ func (e *kdcExchange) failure(phase kdcPhase) error {
 	if !e.answered {
 		return diagnostic(string(phase) + " failed: could not reach a KDC")
 	}
+	if e.reply == nil {
+		// Not a Kerberos reply: the connection broke, or a service other than a
+		// KDC answered, or the reply exceeded maxKDCReply.
+		return diagnostic(string(phase) + " failed: the KDC's reply was incomplete or too large")
+	}
 	var krbErr messages.KRBError
-	if e.reply != nil && krbErr.Unmarshal(e.reply) == nil {
+	if krbErr.Unmarshal(e.reply) == nil {
 		return diagnostic(string(phase) + " failed: " + kdcErrorText(krbErr.ErrorCode))
 	}
 	if phase == phaseLogin {
@@ -112,13 +126,13 @@ func kdcErrorText(code int32) string {
 	}
 }
 
-// replied records what the last KDC sent over TCP: a 4-byte length, then the
-// message.
-func (e *kdcExchange) replied(received []byte) {
+// replied records what the KDC at address sent over TCP: a 4-byte length,
+// then the message.
+func (e *kdcExchange) replied(address string, received []byte) {
 	if len(received) < 4 {
 		return
 	}
-	e.answered = true
+	e.answered, e.answeredBy = true, address
 	length := binary.BigEndian.Uint32(received)
 	if length <= maxKDCReply && uint64(len(received)-4) >= uint64(length) {
 		e.reply = received[4 : 4+length]
@@ -128,6 +142,7 @@ func (e *kdcExchange) replied(received []byte) {
 type kdcConn struct {
 	net.Conn
 	exchange *kdcExchange
+	address  string
 	stop     func() bool
 	received []byte
 }
@@ -141,7 +156,15 @@ func (c *kdcConn) SetDeadline(t time.Time) error {
 }
 
 func (c *kdcConn) Read(b []byte) (int, error) {
-	n, err := c.Conn.Read(b)
+	var n int
+	var err error
+	if missing := 4 - len(c.received); missing > 0 && len(b) >= missing {
+		// gokrb5 reads the length prefix with one Read and trusts whatever
+		// arrived, so the prefix is read whole before it is checked.
+		n, err = io.ReadFull(c.Conn, b[:missing])
+	} else {
+		n, err = c.Conn.Read(b)
+	}
 	c.received = append(c.received, b[:n]...)
 	if len(c.received) >= 4 && binary.BigEndian.Uint32(c.received) > maxKDCReply {
 		return n, errKDCReplyTooLarge
@@ -151,6 +174,6 @@ func (c *kdcConn) Read(b []byte) (int, error) {
 
 func (c *kdcConn) Close() error {
 	c.stop()
-	c.exchange.replied(c.received)
+	c.exchange.replied(c.address, c.received)
 	return c.Conn.Close()
 }

@@ -104,7 +104,7 @@ modules:
           description: |
             - WinRM authenticates with NTLMv2 only. For a host or domain that refuses NTLM, use DCOM with `auth: kerberos`.
             - With NTLMv2, every collection logs in again; with Kerberos, the job logs in when it needs a new ticket, which is every collection while the login fails. With a wrong or expired password, each collection then adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
-            - With Kerberos, the job keeps its ticket for the ticket's lifetime, 10 hours by default in Active Directory: after you disable the account or change its password, collection continues until the ticket expires.
+            - A Kerberos job keeps using its ticket until the ticket expires (after 10 hours by default in Active Directory), the job restarts, or a collection fails after reaching the host. Disabling the account, changing its password or changing its group memberships takes effect on the host only then.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
             - Rates, such as traffic, packets and errors, appear from the second collection after a job starts, because a rate needs two readings.
             - When a host restarts, counters that Windows keeps in 32 bits, such as context switches, start again from zero. If such a counter was close to its 32-bit maximum before the restart, the Agent reads the drop as a counter wrap and its chart shows one spike.
@@ -125,7 +125,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to eighteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. With Kerberos, each job also sends two requests to a domain controller when it needs a new ticket, about every ten hours with Active Directory's default ticket lifetime. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to eighteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. With Kerberos, each job also sends three requests to a domain controller whenever it needs a new ticket: about every ten hours with Active Directory's default ticket lifetime, and in every collection while collections that reach the host fail. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -180,7 +180,7 @@ modules:
               Kerberos only (`auth: kerberos`, DCOM). The monitoring account must be a domain account, and the poller needs:
 
               - The host's DNS name as Active Directory knows it, such as `fileserver.ad.example.com`, resolvable on the poller. Kerberos cannot authenticate to an IP address.
-              - TCP 88 to a domain controller. Without `kdc`, the poller finds the domain controllers in DNS, so its DNS server must answer for the domain.
+              - TCP 88 to the domain controllers. Without `kdc`, the poller finds them in DNS, which lists every domain controller of the domain, so its DNS server must answer for the domain, and a firewall must let the poller reach them all, or list the reachable ones in `kdc`.
               - A clock within five minutes of the domain controller's. On Linux, keep it synchronized with NTP, for example to the domain controllers.
 
               Check on the poller, with your domain:
@@ -254,7 +254,7 @@ modules:
               required: false
               group: Connection
               detailed_description: |
-                Kerberos only. List the domain controllers of the account's domain, such as `[dc1.ad.example.com, dc2.ad.example.com:88]`; the port defaults to 88. When the list is empty, the poller reads the domain's `_kerberos._tcp` DNS SRV records, which Active Directory publishes. A host in another domain of the forest is reached through that domain's SRV records either way.
+                Kerberos only. List the domain controllers of the account's domain, such as `[dc1.ad.example.com, dc2.ad.example.com:88]`; the port defaults to 88. When the list is empty, the poller reads the domain's `_kerberos._tcp` DNS SRV records, which Active Directory publishes and which name every domain controller of the domain. The poller tries them in random order and moves on from one that does not accept the connection within 2 seconds.
             - name: update_every
               description: "Data collection interval, in seconds."
               default_value: 30
@@ -466,6 +466,10 @@ modules:
             when: '`auth: kerberos`'
             cause: No domain controller accepted a connection on TCP 88, or the poller could not resolve its name.
             fix: Allow TCP 88 from the poller to the domain controllers, and check the names in `kdc` or the domain's SRV records.
+          - error: 'failed to open WMI session: Kerberos login failed: the KDC''s reply was incomplete or too large'
+            when: '`auth: kerberos`'
+            cause: The connection to the domain controller broke during its reply, or a service other than a domain controller answered on the port.
+            fix: Check that `kdc`, or the domain's SRV records, name domain controllers and their Kerberos port, 88 by default.
           - error: 'failed to open WMI session: Kerberos login failed: wrong password (KDC_ERR_PREAUTH_FAILED)'
             when: '`auth: kerberos`'
             cause: The domain controller rejected the password of the account in `username`.
@@ -494,6 +498,22 @@ modules:
             when: '`auth: kerberos`'
             cause: The account has no AES Kerberos keys, which happens to accounts whose password was last set before the domain supported AES. The poller uses AES only.
             fix: Reset the account's password, which creates its AES keys.
+          - error: 'failed to open WMI session: Kerberos service ticket request failed: could not reach a KDC'
+            when: '`auth: kerberos`'
+            cause: The domain controller that accepted the login stopped accepting connections before the poller requested the ticket for the host.
+            fix: Check the domain controller and the network path to it; the next collection logs in again.
+          - error: 'failed to open WMI session: Kerberos service ticket request failed: the KDC''s reply was incomplete or too large'
+            when: '`auth: kerberos`'
+            cause: The connection to the domain controller broke while it sent the ticket for the host.
+            fix: Check the domain controller and the network path to it; the next collection requests the ticket again.
+          - error: 'failed to open WMI session: Kerberos service ticket request failed: the KDC''s reply could not be verified, or its referral to another domain could not be followed'
+            when: '`auth: kerberos`'
+            cause: The host is in another domain of the forest and the poller could not find or reach that domain's domain controllers, or a domain controller sent an invalid reply.
+            fix: Monitor the host with an account of its own domain, or make that domain's `_kerberos._tcp` SRV records resolvable on the poller and allow TCP 88 to its domain controllers.
+          - error: 'failed to open WMI session: Kerberos service ticket request failed: no AES encryption type in common (KDC_ERR_ETYPE_NOSUPP)'
+            when: '`auth: kerberos`'
+            cause: The host's computer account does not allow AES for Kerberos, for example because its `msDS-SupportedEncryptionTypes` attribute lists only RC4. The poller uses AES only.
+            fix: 'Allow AES for the computer account, for example with `Set-ADComputer` and `-KerberosEncryptionType AES128,AES256` in PowerShell on a domain controller.'
           - error: 'failed to open WMI session: Kerberos service ticket request failed: the realm has no service principal for the host name (KDC_ERR_S_PRINCIPAL_UNKNOWN)'
             when: '`auth: kerberos`'
             cause: Active Directory has no computer with the name in `host`, for example because `host` is a DNS alias or a name outside the domain.

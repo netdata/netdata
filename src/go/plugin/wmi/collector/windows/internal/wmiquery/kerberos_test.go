@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jcmturner/gofork/encoding/asn1"
 	"github.com/oiweiwei/go-msrpc/dcerpc"
 	activation "github.com/oiweiwei/go-msrpc/msrpc/dcom/iactivation/v0"
 	"github.com/oiweiwei/go-msrpc/ssp/credential"
@@ -28,6 +30,7 @@ import (
 	"github.com/oiweiwei/gokrb5.fork/v9/iana/keyusage"
 	"github.com/oiweiwei/gokrb5.fork/v9/iana/msgtype"
 	"github.com/oiweiwei/gokrb5.fork/v9/iana/nametype"
+	"github.com/oiweiwei/gokrb5.fork/v9/iana/patype"
 	"github.com/oiweiwei/gokrb5.fork/v9/keytab"
 	"github.com/oiweiwei/gokrb5.fork/v9/messages"
 	"github.com/oiweiwei/gokrb5.fork/v9/types"
@@ -51,10 +54,12 @@ func TestKerberosReusesTheServiceTicketAcrossSessions(t *testing.T) {
 	auth := kdc.auth(testPassword)
 
 	// The first session logs in and requests the ticket; a trailing dot in the
-	// host name is not part of the service principal.
+	// host name is not part of the service principal. Like Active Directory,
+	// the KDC requires preauthentication: a ticket costs two AS requests and
+	// one TGS request.
 	authenticateSession(t, kdc, auth, testHost+".")
 	assert.Equal(t, kdcCounts{
-		as:  1,
+		as:  2,
 		tgs: 1,
 	}, kdc.counts())
 	assert.Equal(t, []string{testSPN}, kdc.requestedSPNs())
@@ -63,7 +68,7 @@ func TestKerberosReusesTheServiceTicketAcrossSessions(t *testing.T) {
 	authenticateSession(t, kdc, auth, testHost)
 	authenticateSession(t, kdc, auth, testHost)
 	assert.Equal(t, kdcCounts{
-		as:  1,
+		as:  2,
 		tgs: 1,
 	}, kdc.counts())
 
@@ -72,7 +77,7 @@ func TestKerberosReusesTheServiceTicketAcrossSessions(t *testing.T) {
 	auth.ticket.endTime = time.Now().Add(maxClockSkew)
 	authenticateSession(t, kdc, auth, testHost)
 	assert.Equal(t, kdcCounts{
-		as:  2,
+		as:  4,
 		tgs: 2,
 	}, kdc.counts())
 
@@ -80,7 +85,7 @@ func TestKerberosReusesTheServiceTicketAcrossSessions(t *testing.T) {
 	auth.rejected()
 	authenticateSession(t, kdc, auth, testHost)
 	assert.Equal(t, kdcCounts{
-		as:  3,
+		as:  6,
 		tgs: 3,
 	}, kdc.counts())
 
@@ -113,7 +118,7 @@ func TestKerberosFindsTheKDCsInDNS(t *testing.T) {
 	authenticateSession(t, kdc, auth, testHost)
 	assert.Equal(t, []string{"kerberos/tcp/" + testRealm}, looked)
 	assert.Equal(t, kdcCounts{
-		as:  1,
+		as:  2,
 		tgs: 1,
 	}, kdc.counts())
 }
@@ -128,11 +133,14 @@ func TestKerberosDiagnostics(t *testing.T) {
 			want:    "Kerberos login failed: the account does not exist in the realm (KDC_ERR_C_PRINCIPAL_UNKNOWN)",
 		},
 		"wrong password": {
-			prepare: func(kdc *testKDC, _ *KerberosAuth) { kdc.asError = errorcode.KDC_ERR_PREAUTH_FAILED },
+			prepare: func(_ *testKDC, auth *KerberosAuth) { auth.password = "another-password" },
 			want:    "Kerberos login failed: wrong password (KDC_ERR_PREAUTH_FAILED)",
 		},
 		"wrong password without preauthentication": {
-			prepare: func(_ *testKDC, auth *KerberosAuth) { auth.password = "another-password" },
+			prepare: func(kdc *testKDC, auth *KerberosAuth) {
+				kdc.noPreauth = true
+				auth.password = "another-password"
+			},
 			want: "Kerberos login failed: the KDC's reply could not be verified " +
 				"(wrong password, or the clocks differ by over five minutes)",
 		},
@@ -181,8 +189,15 @@ func TestKerberosDiagnostics(t *testing.T) {
 		},
 		"oversized reply": {
 			prepare: func(kdc *testKDC, _ *KerberosAuth) { kdc.declareLength = maxKDCReply + 1 },
-			want: "Kerberos login failed: the KDC's reply could not be verified " +
-				"(wrong password, or the clocks differ by over five minutes)",
+			want:    "Kerberos login failed: the KDC's reply was incomplete or too large",
+		},
+		"truncated reply": {
+			prepare: func(kdc *testKDC, _ *KerberosAuth) { kdc.truncate = true },
+			want:    "Kerberos login failed: the KDC's reply was incomplete or too large",
+		},
+		"service ticket from an unreachable KDC": {
+			prepare: func(kdc *testKDC, _ *KerberosAuth) { kdc.closeAfterLogin = true },
+			want:    "Kerberos service ticket request failed: could not reach a KDC",
 		},
 	}
 	for name, tc := range tests {
@@ -212,6 +227,55 @@ func TestKerberosKDCExchangeStaysWithinTheSessionDeadline(t *testing.T) {
 	assert.Equal(t, "WMI collection timed out", SafeMessage(err))
 	// gokrb5 alone would wait five seconds for the silent KDC.
 	assert.Less(t, time.Since(start), 2*time.Second)
+}
+
+func TestKerberosReadsASplitReplyLengthWhole(t *testing.T) {
+	t.Run("valid reply", func(t *testing.T) {
+		kdc := newTestKDC(t)
+		kdc.splitHeader = true
+		authenticateSession(t, kdc, kdc.auth(testPassword), testHost)
+	})
+	t.Run("oversized reply", func(t *testing.T) {
+		kdc := newTestKDC(t)
+		kdc.splitHeader = true
+		kdc.declareLength = 0xF0000000
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		_, err := kdc.auth(testPassword).bindSecurity(sessionContext(t, 3*time.Second), testHost)
+		runtime.ReadMemStats(&after)
+		assert.Equal(t, "Kerberos login failed: the KDC's reply was incomplete or too large", SafeMessage(err))
+		// The declared length is never allocated.
+		assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(64<<20))
+	})
+}
+
+func TestKerberosTriesTheNextKDCWhenOneDropsConnections(t *testing.T) {
+	const unreachable = "dropped.example.test:88"
+	for range 10 {
+		kdc := newTestKDC(t)
+		auth := NewKerberosAuth(testAccount, testRealm, testPassword, []string{unreachable, kdc.address})
+		auth.dialTimeout = 50 * time.Millisecond
+		var afterLogin int
+		auth.dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+			if address == unreachable {
+				if kdc.counts().as == 2 {
+					afterLogin++
+				}
+				// A firewall that drops the connection attempt.
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, address)
+		}
+		_, err := auth.bindSecurity(sessionContext(t, time.Second), testHost)
+		require.NoError(t, err)
+		assert.Equal(t, kdcCounts{
+			as:  2,
+			tgs: 1,
+		}, kdc.counts())
+		// The service ticket request goes to the KDC that issued the TGT.
+		assert.Zero(t, afterLogin)
+	}
 }
 
 func TestKerberosAuthenticationFailureNamesTheProtocol(t *testing.T) {
@@ -271,7 +335,7 @@ func TestDCOMForgetsTheTicketOnlyWhenTheHostWasReached(t *testing.T) {
 			session.Close()
 			assert.Equal(t, tc.wantTicket, auth.ticket != nil)
 			assert.Equal(t, kdcCounts{
-				as:  1,
+				as:  2,
 				tgs: 1,
 			}, kdc.counts())
 		})
@@ -280,8 +344,7 @@ func TestDCOMForgetsTheTicketOnlyWhenTheHostWasReached(t *testing.T) {
 
 // authenticateSession runs the security exchange of one DCOM bind to host:
 // the go-msrpc initiator with the options the session would use, and the
-// go-msrpc Kerberos acceptor with the host's key. It then seals a message
-// each way.
+// go-msrpc Kerberos acceptor with the host's key.
 func authenticateSession(t *testing.T, kdc *testKDC, auth *KerberosAuth, host string) {
 	t.Helper()
 	ctx := sessionContext(t, 3*time.Second)
@@ -344,20 +407,29 @@ type kdcCounts struct{ as, tgs int }
 
 // testKDC is a minimal KDC over TCP that issues real tickets: a TGT for the
 // account and a service ticket for any requested service, encrypted with the
-// keys in serviceKeys. It does not require preauthentication.
+// keys in serviceKeys. Like Active Directory, it requires preauthentication:
+// an AS request without an encrypted timestamp gets KDC_ERR_PREAUTH_REQUIRED.
 type testKDC struct {
 	t           *testing.T
 	address     string
+	listener    net.Listener
 	krbtgtKeys  *keytab.Keytab
 	serviceKeys *keytab.Keytab
 
 	// asError and tgsError make the exchange fail with that Kerberos error;
-	// silent leaves requests unanswered; declareLength sends a reply header
-	// declaring that length and nothing else.
-	asError       int32
-	tgsError      int32
-	silent        bool
-	declareLength uint32
+	// noPreauth answers AS requests without preauthentication; silent leaves
+	// requests unanswered; declareLength sends a reply header declaring that
+	// length and nothing else; truncate sends half the reply; splitHeader sends
+	// the reply length one byte at a time; closeAfterLogin stops accepting
+	// connections once it issued a TGT.
+	asError         int32
+	tgsError        int32
+	noPreauth       bool
+	silent          bool
+	declareLength   uint32
+	truncate        bool
+	splitHeader     bool
+	closeAfterLogin bool
 
 	mu         sync.Mutex
 	n          kdcCounts
@@ -381,6 +453,7 @@ func newTestKDC(t *testing.T) *testKDC {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	kdc.address = listener.Addr().String()
+	kdc.listener = listener
 	var wg sync.WaitGroup
 	t.Cleanup(func() {
 		_ = listener.Close()
@@ -429,14 +502,24 @@ func (kdc *testKDC) serve(conn net.Conn) {
 		_, _ = io.Copy(io.Discard, conn)
 		return
 	}
-	if kdc.declareLength != 0 {
-		binary.BigEndian.PutUint32(header[:], kdc.declareLength)
-		_, _ = conn.Write(header[:])
-		return
-	}
 	reply := kdc.reply(request)
-	binary.BigEndian.PutUint32(header[:], uint32(len(reply)))
-	_, _ = conn.Write(append(header[:], reply...))
+	length := uint32(len(reply))
+	if kdc.declareLength != 0 {
+		length, reply = kdc.declareLength, nil
+	}
+	if kdc.truncate {
+		reply = reply[:len(reply)/2]
+	}
+	binary.BigEndian.PutUint32(header[:], length)
+	if kdc.splitHeader {
+		for _, b := range header {
+			_, _ = conn.Write([]byte{b})
+			time.Sleep(20 * time.Millisecond)
+		}
+	} else {
+		_, _ = conn.Write(header[:])
+	}
+	_, _ = conn.Write(reply)
 }
 
 // reply runs on the KDC's goroutine, so failures are reported with t.Error
@@ -456,6 +539,14 @@ func (kdc *testKDC) reply(request []byte) []byte {
 		if err != nil {
 			kdc.t.Error(err)
 			return nil
+		}
+		if !kdc.noPreauth {
+			if reply, ok := kdc.preauthenticate(as, userKey); !ok {
+				return reply
+			}
+		}
+		if kdc.closeAfterLogin {
+			_ = kdc.listener.Close()
 		}
 		reply, sessionKey := kdc.issue(as.ReqBody.CName, krbtgt, as.ReqBody.Nonce, kdc.krbtgtKeys, userKey,
 			keyusage.AS_REP_ENCPART, msgtype.KRB_AS_REP)
@@ -546,6 +637,48 @@ func (kdc *testKDC) issue(
 		kdc.t.Error(err)
 	}
 	return reply, sessionKey
+}
+
+// preauthenticate answers an AS request without a valid encrypted timestamp
+// as Active Directory does: KDC_ERR_PREAUTH_REQUIRED with the account's
+// encryption type and salt, or KDC_ERR_PREAUTH_FAILED for a wrong key.
+func (kdc *testKDC) preauthenticate(as messages.ASReq, userKey types.EncryptionKey) ([]byte, bool) {
+	for _, pa := range as.PAData {
+		if pa.PADataType != patype.PA_ENC_TIMESTAMP {
+			continue
+		}
+		var timestamp types.EncryptedData
+		if timestamp.Unmarshal(pa.PADataValue) == nil {
+			if _, err := crypto.DecryptEncPart(timestamp, userKey, keyusage.AS_REQ_PA_ENC_TIMESTAMP); err == nil {
+				return nil, true
+			}
+		}
+		return kdc.krbError(errorcode.KDC_ERR_PREAUTH_FAILED), false
+	}
+	info, err := asn1.Marshal([]types.ETypeInfo2Entry{{
+		EType: etypeID.AES256_CTS_HMAC_SHA1_96,
+		Salt:  testRealm + testAccount,
+	}})
+	if err != nil {
+		kdc.t.Error(err)
+		return nil, false
+	}
+	data, err := asn1.Marshal(types.PADataSequence{{
+		PADataType:  patype.PA_ETYPE_INFO2,
+		PADataValue: info,
+	}})
+	if err != nil {
+		kdc.t.Error(err)
+		return nil, false
+	}
+	krbErr := messages.NewKRBError(types.NewPrincipalName(nametype.KRB_NT_SRV_INST, "krbtgt/"+testRealm), testRealm,
+		errorcode.KDC_ERR_PREAUTH_REQUIRED, kdcMarker)
+	krbErr.EData = data
+	b, err := krbErr.Marshal()
+	if err != nil {
+		kdc.t.Error(err)
+	}
+	return b, false
 }
 
 // krbError carries the marker where a KDC puts free-form text and names.

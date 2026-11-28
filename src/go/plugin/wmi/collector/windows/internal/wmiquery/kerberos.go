@@ -29,6 +29,12 @@ import (
 // whose clock runs ahead still accepts it.
 const maxClockSkew = 5 * time.Minute
 
+// kdcDialTimeout bounds each KDC connection attempt. Connecting takes one round
+// trip; a domain controller that drops connections, common for the DNS-listed
+// controllers of other sites behind firewalls, would otherwise use up the
+// whole session deadline before the next KDC is tried.
+const kdcDialTimeout = 2 * time.Second
+
 // kerberosEncTypes are the encryption types the poller requests: AES only.
 // Windows does not support the SHA-2 variants; RC4 is being retired.
 var kerberosEncTypes = []int32{etypeID.AES256_CTS_HMAC_SHA1_96, etypeID.AES128_CTS_HMAC_SHA1_96}
@@ -53,8 +59,9 @@ type KerberosAuth struct {
 	// KDC, so go-msrpc cannot contact one.
 	sessionConfig *config.Config
 
-	lookupSRV func(ctx context.Context, service, proto, name string) (string, []*net.SRV, error)
-	dial      func(ctx context.Context, network, address string) (net.Conn, error)
+	lookupSRV   func(ctx context.Context, service, proto, name string) (string, []*net.SRV, error)
+	dial        func(ctx context.Context, network, address string) (net.Conn, error)
+	dialTimeout time.Duration
 
 	ticket *serviceTicket
 }
@@ -81,6 +88,7 @@ func NewKerberosAuth(account, realm, password string, kdcs []string) *KerberosAu
 		sessionConfig: kerberosConfig(realm, nil, false),
 		lookupSRV:     net.DefaultResolver.LookupSRV,
 		dial:          (&net.Dialer{}).DialContext,
+		dialTimeout:   kdcDialTimeout,
 	}
 }
 
@@ -151,8 +159,9 @@ func (k *KerberosAuth) requestTicket(ctx context.Context, spn string) (*serviceT
 	}
 	cfg := kerberosConfig(k.realm, kdcs, true)
 	exchange := &kdcExchange{
-		ctx:  ctx,
-		dial: k.dial,
+		ctx:         ctx,
+		dialTimeout: k.dialTimeout,
+		dial:        k.dial,
 	}
 	cl := client.NewWithPassword(k.account, k.realm, k.password, cfg,
 		client.DisablePAFXFAST(true), client.Dialer(exchange))
@@ -167,6 +176,11 @@ func (k *KerberosAuth) requestTicket(ctx context.Context, spn string) (*serviceT
 	asRep, err := cl.ASExchange(k.realm, asReq, 0)
 	if err != nil {
 		return nil, exchange.failure(phaseLogin)
+	}
+	if asRep.CRealm == k.realm && exchange.answeredBy != "" {
+		// gokrb5 picks a KDC at random for each exchange; the one that issued
+		// the TGT is known to answer.
+		cfg.Realms[0].KDC = []string{exchange.answeredBy}
 	}
 	principal := types.NewPrincipalName(nametype.KRB_NT_SRV_INST, spn)
 	_, tgsRep, err := cl.TGSREQGenerateAndExchange(principal, k.realm, asRep.Ticket, asRep.DecryptedEncPart.Key, false)
