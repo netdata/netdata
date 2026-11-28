@@ -83,6 +83,12 @@ jobs:
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system. Netdata should pick up your web server's access log and begin showing real-time charts!
 
+### Monitor multiple log files
+
+Each `web_log` job follows one file. A wildcard (glob) can select a file, but it does not merge all matching files into one stream. Create a separate job for each file you want to monitor.
+
+For the complete configuration, including a per-account example, see the [collector reference](/src/go/plugin/go.d/collector/weblog/README.md).
+
 ### Custom log formats and fields
 
 The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll leave that topic for a separate guide.
