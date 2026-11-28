@@ -1,4 +1,7 @@
 ---
+# Optional full profile (27 metrics)
+#   wget https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/examples/virtual_wan_vpn_gateway.yaml
+# Save it as go.d/azure_monitor.profiles/virtual_wan_vpn_gateway.yaml in your user configuration directory and restart the Agent.
 display_name: Azure Virtual WAN Site-to-Site VPN Gateway
 resource_type: Microsoft.Network/vpnGateways
 metrics:
