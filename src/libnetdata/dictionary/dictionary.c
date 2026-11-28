@@ -213,10 +213,8 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
     // re-enters the garbage collector then walks a list these victims are no longer part of, so it
     // can neither see nor free them again.
     //
-    // That re-entry is safe on a MASTER, whose items lock is recursive. On a view it is not: delivery
-    // below still runs under the view's index write lock, a plain rw_spinlock, so a callback that
-    // re-enters the view through anything taking that lock would deadlock on it. That is a pre-existing limitation of running
-    // callbacks under the locks at all, which this ordering fix does not change.
+    // The re-entry is safe on views too: the items lock is recursive, and a view's index write lock - a
+    // plain rw_spinlock - is released before delivery (below).
     DICTIONARY_ITEM *detached = NULL, *detached_last = NULL;
 
     size_t deleted = 0, pending = 0, examined = 0;
@@ -272,16 +270,19 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
         item = item_next;
     }
 
-    // the traversal is over - deliver the victims
-    // (still under the same locks; moving delivery outside them is a separate change)
+    // A view needs its index write lock only for the walk, which unindexed every victim. Release it
+    // before delivery: a view shares its master's hooks, so delivering a victim that held the last link
+    // runs the master's delete callback - for the chart name index that is the whole chart teardown -
+    // and every lookup on the view would wait for it.
+    if(is_view)
+        dictionary_index_wrlock_unlock(dict);
+
+    // the traversal is over - deliver the victims, still under the items write lock
     while(detached) {
         DICTIONARY_ITEM *next = detached->next;
         dict_item_free_with_hooks(dict, detached);
         detached = next;
     }
-
-    if(is_view)
-        dictionary_index_wrlock_unlock(dict);
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 

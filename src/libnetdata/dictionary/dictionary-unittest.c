@@ -1214,6 +1214,150 @@ static size_t dictionary_gc_view_orphans_unittest(void) {
     return errors;
 }
 
+// A view shares its master's hooks, so when a view item holds the last link of an item, the view's
+// garbage collection runs the master's delete callback. For the chart name index that is the whole
+// chart teardown. Lookups on the view must not wait for it: the GC used to keep the view's index write
+// lock through delivery, so every lookup by name blocked for as long as the callback ran.
+//
+// The setup follows rrdset_free(): the name is deleted while referenced, the id item is then freed on
+// the master (which drops only its own link), and a later view collection runs the callback. Inside it,
+// a lookup thread started before the collection looks up a live name on the view, and must finish while
+// the callback is still running.
+
+struct dict_gc_view_lookup_test {
+    DICTIONARY *view;
+    const char *victim_value;
+    const char *live_value;
+    size_t deletes;
+    bool armed;                     // the callback releases the lookup only during the explicit collection
+    bool ready;                     // the lookup thread is running
+    bool go;                        // released: do the lookup
+    bool lookup_done;               // written by the lookup thread
+    bool lookup_found_live;         // written by the lookup thread
+    bool lookup_done_in_callback;   // the lookup finished while the delete callback was running
+};
+
+static void dict_gc_view_lookup_thread(void *arg) {
+    struct dict_gc_view_lookup_test *t = arg;
+
+    __atomic_store_n(&t->ready, true, __ATOMIC_RELEASE);
+    while(!__atomic_load_n(&t->go, __ATOMIC_ACQUIRE))
+        sleep_usec(1000);
+
+    const char *value = dictionary_get(t->view, "NAME-B");
+    __atomic_store_n(&t->lookup_found_live, value == t->live_value, __ATOMIC_RELAXED);
+    __atomic_store_n(&t->lookup_done, true, __ATOMIC_RELEASE);
+}
+
+static void dict_gc_view_lookup_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct dict_gc_view_lookup_test *t = data;
+
+    if(value != t->victim_value)
+        return;
+
+    t->deletes++;
+
+    if(!t->armed || __atomic_load_n(&t->go, __ATOMIC_RELAXED))
+        return;
+
+    __atomic_store_n(&t->go, true, __ATOMIC_RELEASE);
+
+    usec_t deadline = now_monotonic_usec() + 2 * USEC_PER_SEC;
+    while(!__atomic_load_n(&t->lookup_done, __ATOMIC_ACQUIRE) && now_monotonic_usec() < deadline)
+        sleep_usec(1000);
+
+    t->lookup_done_in_callback = __atomic_load_n(&t->lookup_done, __ATOMIC_ACQUIRE);
+}
+
+static size_t dictionary_gc_view_lookup_unittest(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+    struct dict_gc_view_lookup_test t = { 0 };
+
+    fprintf(stderr, "\n\nChecking lookups on a view do not wait for its GC delete callbacks...\n");
+
+    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &stats, 0);
+    DICTIONARY *view = dictionary_create_view(master);
+    t.view = view;
+    dictionary_register_delete_callback(master, dict_gc_view_lookup_delete_callback, &t);
+
+    DICTIONARY_ITEM *ma = dictionary_set_and_acquire_item(master, "ID-A", "VALUE-A", 8);
+    DICTIONARY_ITEM *mb = dictionary_set_and_acquire_item(master, "ID-B", "VALUE-B", 8);
+    t.victim_value = dictionary_acquired_item_value(ma);
+    t.live_value = dictionary_acquired_item_value(mb);
+
+    DICTIONARY_ITEM *va = dictionary_view_set_and_acquire_item(view, "NAME-A", ma);
+    DICTIONARY_ITEM *vb = dictionary_view_set_and_acquire_item(view, "NAME-B", mb);
+    dictionary_acquired_item_release(view, vb);
+    dictionary_acquired_item_release(master, mb);
+    dictionary_acquired_item_release(master, ma);
+
+    // rrdset_index_del_name(): delete the name while holding it, so the view item is only flagged
+    dictionary_del(view, "NAME-A");
+    dictionary_acquired_item_release(view, va);
+
+    // rrdset_index_del(): the id item is unreferenced, so the master frees it at once, dropping only its
+    // own link - the view item still holds the value, so no callback yet
+    dictionary_del(master, "ID-A");
+
+    if(t.deletes != 0) {
+        fprintf(stderr, "GC VIEW LOOKUP: the delete callback ran before the view collection - "
+                        "the test did not reach the path it is meant to\n");
+        errors++;
+    }
+
+    // start the lookup thread outside any dictionary lock, and wait until it runs, so the callback's
+    // timer covers only the lookup
+    ND_THREAD *thread = nd_thread_create("dictviewlkp", NETDATA_THREAD_OPTION_DONT_LOG, dict_gc_view_lookup_thread, &t);
+    if(!thread) {
+        fprintf(stderr, "GC VIEW LOOKUP: cannot create the lookup thread\n");
+        errors++;
+    }
+    else {
+        while(!__atomic_load_n(&t.ready, __ATOMIC_ACQUIRE))
+            sleep_usec(1000);
+    }
+
+    // the view collection drops the last link and runs the callback, which releases the lookup
+    t.armed = (thread != NULL);
+    dictionary_garbage_collect(view);
+    t.armed = false;
+
+    if(thread) {
+        // a lookup blocked on the view's index lock finishes once the collection releases it; release the
+        // thread anyway in case the callback never ran, so the join cannot hang
+        __atomic_store_n(&t.go, true, __ATOMIC_RELEASE);
+        nd_thread_join(thread);
+
+        if(!t.lookup_done_in_callback) {
+            fprintf(stderr, "GC VIEW LOOKUP: a lookup on the view waited for the delete callback to finish - "
+                            "the view's index lock is held during delivery\n");
+            errors++;
+        }
+
+        if(!__atomic_load_n(&t.lookup_found_live, __ATOMIC_RELAXED)) {
+            fprintf(stderr, "GC VIEW LOOKUP: the lookup did not return the live item\n");
+            errors++;
+        }
+    }
+
+    if(t.deletes != 1) {
+        fprintf(stderr, "GC VIEW LOOKUP: expected exactly 1 delete callback from the view collection, got %zu\n", t.deletes);
+        errors++;
+    }
+
+    // the live name remains, the victim is gone and nothing is pending
+    errors += unittest_check_dictionary("gc view lookup", view, 1, 1, 0, 0, 0);
+
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    if(!errors)
+        fprintf(stderr, "GC view lookup during delivery test OK\n");
+
+    return errors;
+}
+
 size_t dictionary_unittest_views(void) {
     size_t errors = 0;
     struct dictionary_stats stats = {};
@@ -2415,6 +2559,7 @@ int dictionary_unittest(size_t entries) {
 
     errors += dictionary_gc_cursor_unittest();
     errors += dictionary_gc_view_orphans_unittest();
+    errors += dictionary_gc_view_lookup_unittest();
 
     errors += dictionary_destroy_race_unittest();
     errors += dictionary_nested_destroy_unittest();
