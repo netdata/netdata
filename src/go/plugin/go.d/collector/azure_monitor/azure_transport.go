@@ -152,29 +152,28 @@ type nativeAttemptKey struct{}
 // RoundTrip. The first connection selected in each outer attempt shares its
 // admission. A second selection is an HTTP/2 retry and needs a fresh decision.
 type nativeAttempt struct {
-	op       *queryOperation
-	post     bool
-	started  bool // The initial admission already covers the first acquisition.
-	selected bool // GotConn ran since the most recent outer acquisition.
-	rewound  bool // net/http had to reconstruct the preceding request body.
+	op                *queryOperation
+	started           bool // The initial admission already covers the first acquisition.
+	selected          bool // GotConn ran since the most recent outer acquisition.
+	chargeReplacement bool // The previous connection could have transmitted a POST.
 }
 
 func (a *nativeAttempt) beforeConnect(ctx context.Context) error {
 	if a.started {
-		// An HTTP/1 Metrics POST retried with its untouched body wrote zero
-		// bytes. Check holds again, reusing its existing POST reservation.
-		if err := a.op.authorize(ctx, a.post && a.selected && a.rewound); err != nil {
+		if err := a.op.authorize(ctx, a.chargeReplacement); err != nil {
 			return err
 		}
 	}
-	a.started, a.selected, a.rewound = true, false, false
+	a.started, a.selected, a.chargeReplacement = true, false, false
 	return nil
 }
 
 func trackNativeAttempts(req *http.Request, op *queryOperation, post bool) (*http.Request, context.CancelCauseFunc) {
-	a := &nativeAttempt{op: op, post: post}
+	a := &nativeAttempt{op: op}
+	_, idempotent := req.Header["Idempotency-Key"]
+	_, xIdempotent := req.Header["X-Idempotency-Key"]
 	ctx, cancel := context.WithCancelCause(context.WithValue(req.Context(), nativeAttemptKey{}, a))
-	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) {
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) {
 		if a.selected {
 			// Only the inner HTTP/2 loop selects twice without resolving
 			// a proxy. It checks cancellation after backoff, before HEADERS.
@@ -182,17 +181,15 @@ func trackNativeAttempts(req *http.Request, op *queryOperation, post bool) (*htt
 				cancel(err)
 			}
 		}
-		a.started, a.selected, a.rewound = true, true, false
-	}})
-	req = req.WithContext(ctx)
-	if rewind := req.GetBody; post && rewind != nil {
-		req.GetBody = func() (io.ReadCloser, error) {
-			body, err := rewind()
-			a.rewound = err == nil
-			return body, err
+		a.started, a.selected = true, true
+		if post {
+			// net/http can retry a non-idempotent HTTP/1 POST only after a
+			// zero-byte write, even if it buffered and rewound the body.
+			conn, ok := info.Conn.(interface{ ConnectionState() tls.ConnectionState })
+			a.chargeReplacement = idempotent || xIdempotent || (ok && conn.ConnectionState().NegotiatedProtocol == "h2")
 		}
-	}
-	return req, cancel
+	}})
+	return req.WithContext(ctx), cancel
 }
 
 // Injected transports expose entry and body reconstruction. Leave their

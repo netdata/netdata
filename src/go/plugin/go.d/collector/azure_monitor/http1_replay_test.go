@@ -23,18 +23,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHTTP1MetricsReplayBeforeBodyRead(t *testing.T) {
-	for _, held := range []bool{false, true} {
-		name := "replacement uses original reservation"
-		if held {
-			name = "replacement checks hold"
-		}
-		t.Run(name, func(t *testing.T) {
+func TestHTTP1MetricsRetryAfterZeroWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		held, failFlush bool
+	}{
+		{name: "untouched body uses original reservation"},
+		{name: "untouched body checks hold", held: true},
+		{name: "buffered body uses original reservation", failFlush: true},
+		{name: "buffered body checks hold", failFlush: true, held: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 				defer cancel()
 				ctx = policy.WithRetryOptions(ctx, policy.RetryOptions{MaxRetries: -1})
-				client, reset, firstConn, requests, payloads := http1ReplayClient(t, ctx, held)
+				client, reset, firstConn, requests, payloads := http1ReplayClient(t, ctx, tc.held, tc.failFlush)
 				p, launch, first, other := delayedReplayOperations(t, client, true)
 				p.supplementalUsed = maxRecoveryMetricsCalls // Includes the selected request's dispatch reservation.
 				go func() {
@@ -66,7 +70,7 @@ func TestHTTP1MetricsReplayBeforeBodyRead(t *testing.T) {
 				case <-ctx.Done():
 					t.Fatal("the Metrics request did not select the warmed connection")
 				}
-				if held {
+				if tc.held {
 					var response *azcore.ResponseError
 					require.ErrorAs(t, <-launch(ctx, other), &response)
 					require.Equal(t, http.StatusTooManyRequests, response.StatusCode)
@@ -74,18 +78,23 @@ func TestHTTP1MetricsReplayBeforeBodyRead(t *testing.T) {
 					<-payloads
 				}
 
-				reset()
-				<-firstConn.closed
-				// Let net/http close its writer while GotConn is still holding
-				// the first request before the transport hands off its body.
-				synctest.Wait()
+				if !tc.failFlush {
+					reset()
+					<-firstConn.closed
+					// Let net/http close the writer before it takes the body.
+					synctest.Wait()
+				}
 				require.EqualValues(t, 1, firstConn.writes.Load(), "only warm-up wrote to the first connection")
 				close(resume)
 				err := <-done
 				synctest.Wait()
-				assert.EqualValues(t, 1, firstConn.writes.Load())
+				wantWrites := 1 // The warm-up request.
+				if tc.failFlush {
+					wantWrites++ // The attempted flush wrote zero bytes.
+				}
+				assert.EqualValues(t, wantWrites, firstConn.writes.Load())
 				assert.Equal(t, maxRecoveryMetricsCalls, p.supplementalUsed)
-				if held {
+				if tc.held {
 					assert.ErrorIs(t, err, errHeldAzureRequest)
 					assert.Zero(t, len(requests), "the held POST must send no headers")
 					assert.Zero(t, len(payloads))
@@ -101,7 +110,7 @@ func TestHTTP1MetricsReplayBeforeBodyRead(t *testing.T) {
 	}
 }
 
-func http1ReplayClient(t *testing.T, ctx context.Context, held bool) (*http.Client, func(), *resetBeforeWriteConn, <-chan string, <-chan string) {
+func http1ReplayClient(t *testing.T, ctx context.Context, held, failFlush bool) (*http.Client, func(), *resetBeforeWriteConn, <-chan string, <-chan string) {
 	t.Helper()
 	transport := newAzureRequestHTTPTransport(nil)
 	var dials atomic.Int32
@@ -125,6 +134,9 @@ func http1ReplayClient(t *testing.T, ctx context.Context, held bool) (*http.Clie
 				if req.URL.Path == "/warmup" {
 					_ = req.Body.Close()
 					_, _ = io.WriteString(peer, "HTTP/1.1 204 No Content\r\n\r\n")
+					if failFlush {
+						continue
+					}
 					select {
 					case <-resetPeer:
 					case <-ctx.Done():
@@ -149,7 +161,7 @@ func http1ReplayClient(t *testing.T, ctx context.Context, held bool) (*http.Clie
 		if dial != 1 {
 			return client, nil
 		}
-		fault := &resetBeforeWriteConn{Conn: client, closed: make(chan struct{})}
+		fault := &resetBeforeWriteConn{Conn: client, closed: make(chan struct{}), failFlush: failFlush}
 		initial <- fault
 		return fault, nil
 	}
@@ -173,10 +185,11 @@ func http1ReplayClient(t *testing.T, ctx context.Context, held bool) (*http.Clie
 
 type resetBeforeWriteConn struct {
 	net.Conn
-	reset  atomic.Bool
-	writes atomic.Int32
-	closed chan struct{}
-	once   sync.Once
+	failFlush bool
+	reset     atomic.Bool
+	writes    atomic.Int32
+	closed    chan struct{}
+	once      sync.Once
 }
 
 func (c *resetBeforeWriteConn) Read(b []byte) (int, error) {
@@ -189,7 +202,9 @@ func (c *resetBeforeWriteConn) Read(b []byte) (int, error) {
 }
 
 func (c *resetBeforeWriteConn) Write(b []byte) (int, error) {
-	c.writes.Add(1)
+	if count := c.writes.Add(1); c.failFlush && count == 2 {
+		return 0, syscall.ECONNRESET
+	}
 	return c.Conn.Write(b)
 }
 
