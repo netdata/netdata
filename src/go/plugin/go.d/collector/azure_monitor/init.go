@@ -292,8 +292,7 @@ func defaultNewResourceGraphClient(subscriptionID string, cred azcore.TokenCrede
 }
 
 func defaultNewMetricsClient(endpoint string, cred azcore.TokenCredential, cloudCfg azcloud.Configuration) (metricsQueryClient, error) {
-	opts := withAzureRequestTransport(azcore.ClientOptions{Cloud: cloudCfg})
-	client, err := azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: opts})
+	client, err := azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: azcore.ClientOptions{Cloud: cloudCfg}})
 	if err != nil {
 		return nil, err
 	}

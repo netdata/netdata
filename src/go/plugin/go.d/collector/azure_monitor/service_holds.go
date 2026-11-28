@@ -183,11 +183,14 @@ func throttleStatus(status int) bool {
 	return status == http.StatusTooManyRequests || status == metricsBackendThrottled
 }
 
+type throttleReceipt struct {
+	status  int
+	headers http.Header
+	at      time.Time
+}
+
+// A zero status means the error, if any, is not a throttle.
 func throttleFromError(err error, at time.Time) throttleReceipt {
-	var captured *receivedThrottleError
-	if errors.As(err, &captured) {
-		return captured.receipt
-	}
 	var response *azcore.ResponseError
 	if !errors.As(err, &response) || !throttleStatus(response.StatusCode) {
 		return throttleReceipt{at: at}

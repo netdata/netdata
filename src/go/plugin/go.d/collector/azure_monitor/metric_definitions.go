@@ -36,7 +36,7 @@ type metricDefinitionsClient struct{ *arm.Client }
 
 func newMetricDefinitionsClient(cred azcore.TokenCredential, options azcore.ClientOptions) (*metricDefinitionsClient, error) {
 	opts := &arm.ClientOptions{
-		ClientOptions:         withAzureRequestTransport(options),
+		ClientOptions:         options,
 		DisableRPRegistration: true, // Definition lookups are read-only and must preserve ARM's error.
 	}
 	client, err := arm.NewClient("azure_monitor", "v1.0.0", cred, opts)
@@ -56,18 +56,17 @@ func (c *metricDefinitionsClient) list(ctx context.Context, key definitionKey) (
 	// The collector schedules retries across polls. Return throttling responses
 	// immediately so server deadlines survive the current recovery budget.
 	ctx = policy.WithRetryOptions(ctx, policy.RetryOptions{MaxRetries: -1})
-	ctx, op := queryOperationContext(ctx)
 	req, err := runtime.NewRequest(ctx, http.MethodGet, endpoint.String())
 	if err != nil {
 		return nil, err
 	}
 	resp, err := c.Pipeline().Do(req)
 	if err != nil {
-		return nil, preserveCapturedThrottle(err, op.captured)
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, preserveCapturedThrottle(runtime.NewResponseError(resp), op.captured)
+		return nil, runtime.NewResponseError(resp)
 	}
 	var result struct{ Value []metricDefinition }
 	if err := runtime.UnmarshalAsJSON(resp, &result); err != nil {

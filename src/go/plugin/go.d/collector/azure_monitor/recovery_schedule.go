@@ -22,7 +22,12 @@ type adviceRequest struct {
 	done         bool
 }
 
-type queryCompletion struct {
+// A dispatched ARM read or Metrics request. Its worker fills the outcome and
+// reports once. Holds and the supplemental limit are applied at dispatch.
+type queryOperation struct {
+	request     plannedRequest
+	read        *adviceRequest
+	started     time.Time // Dispatch time on the collector clock.
 	result      queryBatchResult
 	definitions metricDefinitions
 	err         error
@@ -30,8 +35,6 @@ type queryCompletion struct {
 }
 
 type queryPoll struct {
-	// Unsent portions of a locally held request keep its time allowance only in this poll.
-	continuations               map[*metricQuestion]time.Time
 	startedReads                bool
 	hasDueRecovery              bool
 	sleepers                    map[definitionKey][]*metricQuestion
@@ -49,10 +52,9 @@ type queryPoll struct {
 	primary                     []plannedRequest
 	sortReads                   bool
 	armUntil, dataUntil         time.Time
-	events                      chan queryEvent
-	idle                        []*queryOperation
+	events                      chan *queryOperation
 	active, succeeded, failed   int
-	supplementalUsed            int // Dispatch reserves the first POST for each supplemental operation.
+	supplementalUsed            int // Metrics requests started for questions in this poll.
 	debug                       bool
 	samples                     []metricSample
 }
@@ -132,13 +134,14 @@ func (p *queryPoll) startRead() bool {
 		}
 		p.active++
 		p.readsActive++
-		op := p.takeOperation()
-		op.read = r
-		armCtx, cancel := context.WithDeadline(context.WithValue(p.ctx, queryOperationKey{}, op), p.armUntil)
+		p.markReadAdmission(r)
+		op := &queryOperation{read: r, started: p.c.now()}
+		armCtx, cancel := context.WithDeadline(p.ctx, p.armUntil)
 		go func() {
 			defer cancel()
-			defs, err := p.c.queryExecutor.lookupDefinitions(armCtx, r.wire)
-			op.complete(queryCompletion{definitions: defs, err: err, at: p.c.now()})
+			op.definitions, op.err = p.c.queryExecutor.lookupDefinitions(armCtx, r.wire)
+			op.at = p.c.now()
+			p.events <- op
 		}()
 		return true
 	}
@@ -146,7 +149,7 @@ func (p *queryPoll) startRead() bool {
 }
 
 func (p *queryPoll) finishRead(op *queryOperation) {
-	r, e := op.read, op.finished
+	r := op.read
 	r.done = true
 	// Each read can release only the questions that requested it. Avoid
 	// rescanning the fleet for each ARM response during a large rejection.
@@ -156,33 +159,26 @@ func (p *queryPoll) finishRead(op *queryOperation) {
 			break
 		}
 	}
-	if op.deferred {
-		return
-	}
-	if !op.attempted {
-		// A client can occupy the lookup slot without reaching the wire.
-		p.markReadAdmission(r)
-	}
 	a := p.state.advice[r.key]
-	throttled := p.recordCompletedServiceResponse(op, e.err, e.at)
-	if e.err != nil {
+	throttled := p.recordServiceResponse(op, op.err)
+	if op.err != nil {
 		if !throttled {
 			a.backoff = min(5*time.Minute, max(time.Minute, 2*a.backoff))
-			a.retry = e.at.Add(a.backoff)
+			a.retry = op.at.Add(a.backoff)
 		}
-		class, detail := batchFailureReason(e.err)
+		class, detail := batchFailureReason(op.err)
 		p.c.Limit("metric-definitions:"+r.key.namespace+":"+class, 1, time.Hour).Warningf("metric definitions lookup failed: namespace=%q class=%s %s", r.wire.namespace, class, detail)
 		return
 	}
 	old := a.definitions
-	a.definitions, a.fetched, a.retry, a.backoff = e.definitions, e.at, time.Time{}, 0
+	a.definitions, a.fetched, a.retry, a.backoff = op.definitions, op.at, time.Time{}, 0
 	// Only previously denied single cells sleep. A newly advertised name
 	// wakes immediately even if its last confirmation was very recent.
 	for _, q := range p.sleepers[r.key] {
 		if q.nextCheck.IsZero() || len(q.batch.Resources) != 1 || q.batch.Resources[0].definitionKey(q.batch.Profile) != r.key {
 			continue
 		}
-		if advertised(e.definitions, q.batch) != 0 && advertised(old, q.batch) == 0 {
+		if advertised(op.definitions, q.batch) != 0 && advertised(old, q.batch) == 0 {
 			q.recheckEarly = true
 			p.preparedValid = false
 		}
@@ -202,10 +198,10 @@ func (p *queryPoll) startMetrics(r plannedRequest, ctx context.Context) {
 	p.active++
 	if len(r.questions) == 0 {
 		p.ordinaryActive++
+	} else {
+		p.markMetricsAdmission(r.questions)
 	}
-	op := p.takeOperation()
-	op.request = r
-	ctx = context.WithValue(ctx, queryOperationKey{}, op)
+	op := &queryOperation{request: r, started: p.c.now()}
 	end := r.deadline
 	if len(r.questions) > 0 && (end.IsZero() || p.dataUntil.Before(end)) {
 		end = p.dataUntil
@@ -216,9 +212,39 @@ func (p *queryPoll) startMetrics(r plannedRequest, ctx context.Context) {
 			ctx, cancel = context.WithDeadline(ctx, end)
 			defer cancel()
 		}
-		result := p.c.queryExecutor.executeQueryBatch(ctx, r.batch, p.queryTime, p.c.QueryOffset, p.debug)
-		op.complete(queryCompletion{result: result, at: p.c.now()})
+		op.result = p.c.queryExecutor.executeQueryBatch(ctx, r.batch, p.queryTime, p.c.QueryOffset, p.debug)
+		op.at = p.c.now()
+		p.events <- op
 	}()
+}
+
+// Each admission, including one that fails transiently, moves the questions
+// behind older unserved work in later polls.
+func (p *queryPoll) markMetricsAdmission(questions []*metricQuestion) {
+	turn := p.state.ticket()
+	for _, q := range questions {
+		q.turn = turn
+		q.recheckEarly = false
+	}
+}
+
+// A throttle starts or extends a hold. A success clears a headerless backoff
+// streak. Other failures say nothing about the service's quota.
+func (p *queryPoll) recordServiceResponse(op *queryOperation, err error) bool {
+	receipt := throttleFromError(err, op.at)
+	if err != nil && receipt.status == 0 {
+		return false
+	}
+	if r := op.read; r != nil {
+		p.state.holds.recordARM(r.key, r.subscription, receipt, op.started)
+	} else {
+		p.state.holds.recordMetrics(op.request.batch, receipt, op.started)
+	}
+	if receipt.status == 0 {
+		return false
+	}
+	p.preparedValid = false
+	return true
 }
 
 // Each newly rejected ordinary request gets the time remaining in this poll,
@@ -282,12 +308,6 @@ func (p *queryPoll) startRecovery() bool {
 		ready := p.prepared
 		if len(ready) > 0 {
 			q := ready[0]
-			until := p.continuations[q]
-			if !until.IsZero() && !time.Now().Before(until) {
-				q.lastPoll = p.state.poll
-				p.preparedValid = false
-				return true
-			}
 			// While preparing cohorts, give outstanding definitions a chance to
 			// identify working counters before spending the cap on denials.
 			if q.evidence.waitsForReadPriority() && time.Now().Before(p.armUntil) {
@@ -305,7 +325,7 @@ func (p *queryPoll) startRecovery() bool {
 			owners := []*metricQuestion{q}
 			for _, other := range ready[1:] {
 				b := other.batch
-				if p.continuations[other] != until || other.evidence != q.evidence || other.cohort != q.cohort || b.chunk != batch.chunk ||
+				if other.evidence != q.evidence || other.cohort != q.cohort || b.chunk != batch.chunk ||
 					b.mask != batch.mask ||
 					b.SubscriptionID != batch.SubscriptionID ||
 					b.Region != batch.Region ||
@@ -323,7 +343,7 @@ func (p *queryPoll) startRecovery() bool {
 				owner.lastPoll = p.state.poll
 			}
 			ctx := policy.WithRetryOptions(p.ctx, policy.RetryOptions{MaxRetries: -1})
-			p.startMetrics(plannedRequest{batch: batch, cohort: q.cohort, questions: owners, deadline: until}, ctx)
+			p.startMetrics(plannedRequest{batch: batch, cohort: q.cohort, questions: owners}, ctx)
 			return true
 		}
 	}
@@ -352,33 +372,19 @@ func (p *queryPoll) newRejection(b queryBatch, cohort uint64, confirm bool, at t
 }
 
 func (p *queryPoll) finishMetrics(op *queryOperation) {
-	req, e := op.request, op.finished
-	res := e.result
+	req, res := op.request, op.result
 	b := req.batch
 	if len(req.questions) > 0 || res.Err != nil || len(res.incompatible) > 0 {
 		p.preparedValid = false
 	}
-	if op.deferred {
-		p.deferMetrics(op)
-		return
-	}
-	// A provider result completes this request. Subsequent incompatibility probes
-	// are new work and use the remaining recovery allowance.
-	for _, q := range req.questions {
-		delete(p.continuations, q)
-	}
-	if !op.attempted {
-		// Injected clients can complete without entering the SDK transport.
-		p.markMetricsAdmission(req.questions)
-	}
-	p.recordCompletedServiceResponse(op, res.Err, e.at)
+	p.recordServiceResponse(op, res.Err)
 	if res.Err != nil {
 		p.failed++
 		p.c.logBatchFailure(&b, res.Err, p.queryTime)
 		if rejectedMetrics(res.Err) {
 			if len(req.questions) == 0 {
 				p.state.demote(b)
-				p.newRejection(b, req.cohort, false, e.at)
+				p.newRejection(b, req.cohort, false, op.at)
 			} else {
 				for _, q := range req.questions {
 					switch {
@@ -389,7 +395,7 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 						q.lastPoll = 0
 						q.recheckEarly = true
 					case len(b.Resources) == 1 && b.mask&(b.mask-1) == 0:
-						p.deny(q, e.at)
+						p.deny(q, op.at)
 					default:
 						q.rejected = true
 						q.lastPoll = 0
@@ -406,12 +412,12 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 	}
 	p.samples = append(p.samples, res.Samples...)
 	if len(req.questions) == 0 {
-		p.accept(b, nil, req.cohort, res, e.at)
+		p.accept(b, nil, req.cohort, res, op.at)
 		return
 	}
 	for _, q := range req.questions {
 		delete(p.state.questions, q)
-		p.accept(q.batch, q, q.cohort, res, e.at)
+		p.accept(q.batch, q, q.cohort, res, op.at)
 	}
 }
 
@@ -419,49 +425,6 @@ func (p *queryPoll) requeueOrdinary(r plannedRequest, free []queryBatch) {
 	for _, part := range free {
 		r.batch = part
 		p.primary = append(p.primary, r)
-	}
-}
-
-func (p *queryPoll) deferMetrics(op *queryOperation) {
-	r := op.request
-	available := func(row resourceInfo) uint32 { return op.available[row.idKey] }
-	if len(r.questions) == 0 {
-		r.deadline = op.deadline
-		free, _ := metricParts(r.batch, available)
-		p.requeueOrdinary(r, free)
-		return
-	}
-	if p.continuations == nil {
-		p.continuations = make(map[*metricQuestion]time.Time)
-	}
-	for _, q := range r.questions {
-		p.continuations[q] = op.deadline
-	}
-	if !op.attempted {
-		p.supplementalUsed--
-		for _, q := range r.questions {
-			q.lastPoll = 0
-		}
-		return
-	}
-	// The attempted rectangle keeps its charge and scheduling age. Only
-	// cells outside the hold that blocked the replay can be admitted again.
-	for _, q := range r.questions {
-		free, held := metricParts(q.batch, available)
-		if len(free) == 0 {
-			continue
-		}
-		if len(held) == 0 {
-			q.lastPoll = 0
-			continue
-		}
-		delete(p.state.questions, q)
-		for _, part := range free {
-			p.child(q, part, q.evidence)
-		}
-		for _, part := range held {
-			p.child(q, part, q.evidence).lastPoll = p.state.poll
-		}
 	}
 }
 
@@ -532,7 +495,7 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	slots := max(1, c.queryExecutor.maxConcurrency)
 	p := queryPoll{
 		c: c, state: s, ctx: ctx, queryTime: now, deadline: deadline,
-		due: make(map[*metricChunk]bool), events: make(chan queryEvent, slots),
+		due: make(map[*metricChunk]bool), events: make(chan *queryOperation, slots),
 		primary: s.plan(batches, now, c.Limits.MaxBatchResources),
 		debug:   logger.Level.Enabled(slog.LevelDebug),
 	}
@@ -550,8 +513,8 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	primaryCtx := policy.WithRetryOptions(ctx, policy.RetryOptions{ShouldRetry: retryPrimaryMetrics})
 	for {
 		select {
-		case e := <-p.events:
-			p.onEvent(e)
+		case op := <-p.events:
+			p.finish(op)
 			continue
 		default:
 		}
@@ -584,14 +547,14 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 				timer := time.NewTimer(time.Until(wake))
 				select {
 				case <-timer.C:
-				case e := <-p.events:
-					p.onEvent(e)
+				case op := <-p.events:
+					p.finish(op)
 				}
 				timer.Stop()
 				continue
 			}
 		}
-		p.onEvent(<-p.events)
+		p.finish(<-p.events)
 	}
 	s.pruneAdvice()
 	if p.failed > 0 && p.succeeded == 0 {

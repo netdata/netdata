@@ -82,8 +82,6 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 
 	reqCtx, cancel := withOptionalTimeout(ctx, e.timeout)
 	defer cancel()
-	reqCtx, op := queryOperationContext(reqCtx)
-	op.deadline, _ = reqCtx.Deadline()
 
 	resp, err := client.QueryResources(
 		reqCtx,
@@ -99,7 +97,7 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 		},
 	)
 	if err != nil {
-		return queryBatchResult{Err: preserveCapturedThrottle(err, op.captured)}
+		return queryBatchResult{Err: err}
 	}
 
 	result := reduceQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch), resourceByID)

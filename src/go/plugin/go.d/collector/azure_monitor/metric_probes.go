@@ -97,9 +97,6 @@ func (p *queryPoll) child(q *metricQuestion, b queryBatch, evidence metricEviden
 	if q.rejected && b.mask == q.batch.mask && len(b.Resources) < len(q.batch.Resources) {
 		child.cohort = p.state.ticket()
 	}
-	if until, ok := p.continuations[q]; ok {
-		p.continuations[&child] = until
-	}
 	return p.state.add(&child)
 }
 

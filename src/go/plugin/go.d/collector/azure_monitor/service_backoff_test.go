@@ -3,6 +3,7 @@
 package azure_monitor
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -16,9 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
-func TestCollectMetricsBackoffUsesSendAdmission(t *testing.T) {
+func TestCollectMetricsBackoffIgnoresRequestsStartedBeforeHold(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		peerStatus int
@@ -115,7 +117,7 @@ func TestCollectMetricsBackoffUsesSendAdmission(t *testing.T) {
 	}
 }
 
-func TestCollectARMBackoffUsesSendAdmission(t *testing.T) {
+func TestCollectARMBackoffIgnoresReadsStartedBeforeHold(t *testing.T) {
 	for _, test := range []struct {
 		name         string
 		peerSucceeds bool
@@ -214,62 +216,62 @@ func TestCollectARMBackoffUsesSendAdmission(t *testing.T) {
 	}
 }
 
-func TestCollectPostHoldReplayResetsBackoffDespiteLateThrottle(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		row := testResource(recoveryTestNamespace, "edge", nil)
-		graph := &mockResourceGraph{resources: []map[string]any{row}}
-		c := newTestCollectorWithMocks(graph, &mockMetricsClient{})
-		c.Config = testConfig()
-		c.Timeout = confopt.Duration(90 * time.Second)
-		c.Limits.MaxConcurrency = 3
-		useHoldAdmissionProfiles(t, c, [][]string{{"A"}, {"A"}, {"A"}, {"B"}})
+func waitForAdmissionSignal(ctx context.Context, signal <-chan struct{}) error {
+	select {
+	case <-signal:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
-		start := time.Now()
-		peersSent := make(chan struct{})
-		var mu sync.Mutex
-		var sends []time.Duration
-		initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
-			return nil, fmt.Errorf("unexpected definitions read: %s", req.URL.Path)
-		}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
-			if slices.Equal(query.Names, []string{"B"}) {
-				return recoveryWireTotals(req, query, 5)
-			}
-			at := time.Since(start)
-			mu.Lock()
-			sends = append(sends, at)
-			attempt := len(sends)
-			mu.Unlock()
-			switch attempt {
-			case 1:
-				if err := waitForAdmissionSignal(req.Context(), peersSent); err != nil {
-					return nil, err
-				}
-				return recoveryWireError(req, metricsBackendThrottled, "Overloaded")
-			case 2:
-				time.Sleep(61 * time.Second)
-				resp, err := azureTestResponse(req, http.StatusUnauthorized, nil)
-				resp.Header.Set("WWW-Authenticate", `Bearer error="insufficient_claims", claims="e30="`)
-				return resp, err
-			case 3:
-				close(peersSent)
-				time.Sleep(70 * time.Second)
-				return recoveryWireError(req, metricsBackendThrottled, "Overloaded")
-			default:
-				if at == 2*time.Minute {
-					return recoveryWireError(req, metricsBackendThrottled, "Overloaded")
-				}
-			}
-			return recoveryWireTotals(req, query, 7)
-		})
-
-		series := collectRecoveryCounters(t, c)
-		requireRecoveryCounter(t, series, "B", "edge", 5)
-		require.Equal(t, []time.Duration{0, 0, 0, 61 * time.Second}, sends, "the replay crossed the expired hold")
-		for _, at := range []time.Duration{2 * time.Minute, 3 * time.Minute} {
-			before := len(sends)
-			time.Sleep(at - time.Since(start))
-			collectRecoveryCounters(t, c)
-			assert.Contains(t, sends[before:], at, "the late throttle must not reinstate or advance backoff")
+func useHoldAdmissionProfiles(t *testing.T, c *Collector, selections [][]string) {
+	t.Helper()
+	var profiles []string
+	sources := make(map[string]string, len(selections))
+	for i, selection := range selections {
+		profile := fmt.Sprintf("hold_%d", i)
+		namespace := recoveryTestNamespace
+		if i%2 != 0 {
+			namespace = strings.ToUpper(namespace)
 		}
-	})
+		profiles = append(profiles, profile)
+		var metrics, dimensions strings.Builder
+		for _, name := range selection {
+			metric := strings.ToLower(name)
+			fmt.Fprintf(&metrics, `
+  - id: %s
+    azure_name: %s
+    series:
+      - aggregation: total
+        kind: counter`, metric, name)
+			fmt.Fprintf(&dimensions, `
+        - selector: %s
+          name: %s`, azureprofiles.ExportedSeriesName(profile, metric, "total"), metric)
+		}
+		sources[profile+".yaml"] = fmt.Sprintf(`
+display_name: %s
+resource_type: %s
+metric_namespace: %s
+metrics:%s
+template:
+  family: Recovery
+  context_namespace: %s
+  charts:
+    - id: am_recovery_counts_%s
+      title: Recovery counts
+      context: counts
+      family: Recovery
+      type: line
+      units: counts/s
+      algorithm: incremental
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:%s
+`, profile, recoveryTestNamespace, namespace, metrics.String(), profile, profile, dimensions.String())
+	}
+	c.Profiles.ModeExact = testProfilesModeEntries(profiles...)
+	catalog := mustLoadStockCatalog(t, sources)
+	c.loadProfileCatalog = func() (azureprofiles.Catalog, error) { return catalog, nil }
 }

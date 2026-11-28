@@ -54,7 +54,7 @@ func initRecoveryWire(
 		}
 	})}
 	c.newMetricsClient = func(endpoint string, _ azcore.TokenCredential, _ azcloud.Configuration) (metricsQueryClient, error) {
-		return azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: withAzureRequestTransport(opts)})
+		return azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: opts})
 	}
 	require.NoError(t, c.Init(t.Context()))
 	definitions, err := newMetricDefinitionsClient(cred, opts)
