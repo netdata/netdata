@@ -466,7 +466,7 @@ bool apps_os_get_pid_cmdline_linux(struct pid_stat *p, char *cmdline, size_t byt
         p->cmdline_filename = strdupz(filename);
     }
 
-    int fd = open(p->cmdline_filename, procfile_open_flags, 0666);
+    int fd = open(p->cmdline_filename, procfile_open_flags);
     if(unlikely(fd == -1))
         return false;
 
@@ -557,7 +557,7 @@ bool apps_os_read_pid_limits_linux(struct pid_stat *p, void *ptr __maybe_unused)
         p->limits_filename = strdupz(filename);
     }
 
-    int fd = open(p->limits_filename, procfile_open_flags, 0666);
+    int fd = open(p->limits_filename, procfile_open_flags);
     if(unlikely(fd == -1)) goto cleanup;
 
     ssize_t bytes = read(fd, proc_pid_limits_buffer, MAX_PROC_PID_LIMITS);

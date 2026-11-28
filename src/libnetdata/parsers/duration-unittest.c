@@ -131,6 +131,13 @@ static const duration_test_case_t test_cases[] = {
     { "7 ago days", NULL, "s", 0, false, NULL, "'ago' in wrong position should fail" },
     { "7 days ago 1 hour", NULL, "s", 0, false, NULL, "text after 'ago' should fail" },
     { "7d ago 1h", NULL, "s", 0, false, NULL, "duration after 'ago' should fail" },
+    { "null", NULL, "s", 0, false, NULL, "null is not a duration" },
+    { "nan", NULL, "s", 0, false, NULL, "nan is not a duration" },
+    { "inf", NULL, "s", 0, false, NULL, "inf is not a duration" },
+    { "1s null ago", NULL, "s", 0, false, NULL, "null segment before 'ago' should fail" },
+    { "1s nan ago", NULL, "s", 0, false, NULL, "nan segment before 'ago' should fail" },
+    { "1s inf ago", NULL, "s", 0, false, NULL, "inf segment before 'ago' should fail" },
+    { "1s nullago", NULL, "s", 0, false, NULL, "null segment glued to 'ago' should fail" },
     
     // Complex expressions with arithmetic
     { "-7d+1h", NULL, "s", -608400, true, "-7d1h", "negative days plus positive hours" },
