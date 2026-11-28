@@ -79,7 +79,8 @@ func selectNames(batch queryBatch, mask uint32) queryBatch {
 }
 
 type plannedRequest struct {
-	deadline  time.Time // A continuation inherits the original operation deadline.
+	deadline  time.Time // Ordinary work released from a hold ends with the poll's recovery deadline.
+	resent    bool      // Already repeated in this poll after a throttle.
 	batch     queryBatch
 	cohort    uint64
 	questions []*metricQuestion // Original ownership survives a combined wire request.
@@ -88,7 +89,7 @@ type plannedRequest struct {
 func (s *recoveryState) plan(batches []queryBatch, now time.Time, maxResources int) []plannedRequest {
 	s.holds.expire(now)
 	out := make([]plannedRequest, 0, len(batches))
-	if len(s.ordinary) == 0 && !s.holds.hasMetrics() {
+	if len(s.ordinary) == 0 {
 		for _, b := range batches {
 			out = append(out, plannedRequest{batch: b})
 		}
@@ -103,19 +104,12 @@ func (s *recoveryState) plan(batches []queryBatch, now time.Time, maxResources i
 	}
 	open := make(map[packingKey]int)
 	for _, b := range batches {
-		for i, r := range b.Resources {
-			one := b
-			one.Resources = b.Resources[i : i+1]
-			held := s.holds.metricMask(one, now)
+		for _, r := range b.Resources {
 			shapes, ok := s.ordinary[resourceChunk{b.chunk, r.idKey}]
 			if !ok {
 				shapes = []requestShape{{mask: b.mask}}
 			}
 			for _, shape := range shapes {
-				shape.mask &^= held
-				if shape.mask == 0 {
-					continue
-				}
 				k := packingKey{b.chunk, b.SubscriptionID, b.Region, shape}
 				index, ok := open[k]
 				if !ok {

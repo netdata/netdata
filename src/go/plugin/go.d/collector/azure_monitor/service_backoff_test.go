@@ -17,7 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestCollectMetricsBackoffIgnoresRequestsStartedBeforeHold(t *testing.T) {
@@ -99,7 +101,8 @@ func TestCollectMetricsBackoffIgnoresRequestsStartedBeforeHold(t *testing.T) {
 				}
 				switch {
 				case test.retryAfter != "":
-					assert.Empty(t, collectAt(2*time.Minute), "the late explicit server deadline is still honored")
+					assert.Equal(t, []time.Duration{160 * time.Second, 160 * time.Second}, collectAt(2*time.Minute),
+						"held requests wait inside the poll for the late explicit server deadline")
 					assert.Equal(t, []time.Duration{3 * time.Minute, 3 * time.Minute}, collectAt(3*time.Minute))
 				case test.peerStatus == http.StatusOK:
 					assert.NotEmpty(t, collectAt(2*time.Minute), "a fresh attempt follows the first cooldown")
@@ -274,4 +277,75 @@ template:
 	c.Profiles.ModeExact = testProfilesModeEntries(profiles...)
 	catalog := mustLoadStockCatalog(t, sources)
 	c.loadProfileCatalog = func() (azureprofiles.Catalog, error) { return catalog, nil }
+}
+
+func TestCollectResendsThrottledOrdinaryRequestWhenHoldExpires(t *testing.T) {
+	for name, test := range map[string]struct {
+		retryAfter []string        // Per attempt; a missing entry answers with samples.
+		polls      []time.Duration // Poll start offsets.
+		wantSends  []time.Duration
+		wantTotals []int // Counter value after each poll; -1 is a gap.
+	}{
+		"short Retry-After is served in the same poll": {
+			retryAfter: []string{"2"},
+			polls:      []time.Duration{0},
+			wantSends:  []time.Duration{0, 2300 * time.Millisecond},
+			wantTotals: []int{5},
+		},
+		"a second throttle ends the attempts for this poll": {
+			retryAfter: []string{"2", "2"},
+			polls:      []time.Duration{0, time.Minute},
+			wantSends:  []time.Duration{0, 2300 * time.Millisecond, time.Minute},
+			wantTotals: []int{-1, 5},
+		},
+		"headerless backoff does not skip the poll at its expiry": {
+			retryAfter: []string{""},
+			polls:      []time.Duration{0, time.Minute, 2 * time.Minute},
+			wantSends:  []time.Duration{0, time.Minute + 300*time.Millisecond, 2 * time.Minute},
+			wantTotals: []int{-1, 5, 10},
+		},
+		"a hold beyond the poll deadline leaves a gap": {
+			retryAfter: []string{"55"},
+			polls:      []time.Duration{0, time.Minute},
+			wantSends:  []time.Duration{0, time.Minute},
+			wantTotals: []int{-1, 5},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				row := testResource(recoveryTestNamespace, "edge", nil)
+				c := newTestCollectorWithMocks(&mockResourceGraph{resources: []map[string]any{row}}, &mockMetricsClient{})
+				c.Config = testConfig()
+				useRecoveryTestProfile(t, c, []string{"A"}, nil)
+				start := time.Now()
+				var sends []time.Duration
+				initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+					return nil, fmt.Errorf("unexpected definitions read: %s", req.URL.Path)
+				}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+					sends = append(sends, time.Since(start))
+					attempt := len(sends)
+					time.Sleep(300 * time.Millisecond)
+					if attempt > len(test.retryAfter) {
+						return recoveryWireTotals(req, query, 5)
+					}
+					resp, err := recoveryWireError(req, metricsBackendThrottled, "Overloaded")
+					if value := test.retryAfter[attempt-1]; value != "" {
+						resp.Header.Set("Retry-After", value)
+					}
+					return resp, err
+				})
+				for i, at := range test.polls {
+					time.Sleep(at - time.Since(start))
+					series, _ := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+					value, ok := seriesValue(series, ".a_total", "edge")
+					if want := test.wantTotals[i]; want < 0 {
+						assert.False(t, ok, "poll %d leaves a gap", i)
+					} else if assert.True(t, ok, "poll %d publishes the window", i) {
+						assert.EqualValues(t, want, value, "poll %d", i)
+					}
+				}
+				assert.Equal(t, test.wantSends, sends)
+			})
+		})
+	}
 }

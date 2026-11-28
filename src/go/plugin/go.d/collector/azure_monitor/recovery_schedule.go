@@ -50,6 +50,9 @@ type queryPoll struct {
 	reads                       map[definitionKey]*adviceRequest
 	pending                     []*adviceRequest
 	primary                     []plannedRequest
+	held                        []plannedRequest // Ordinary work waiting for a service hold to expire.
+	heldUntil                   time.Time        // First expiry among held work, on the collector clock.
+	heldStale                   bool
 	sortReads                   bool
 	armUntil, dataUntil         time.Time
 	events                      chan *queryOperation
@@ -377,10 +380,14 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 	if len(req.questions) > 0 || res.Err != nil || len(res.incompatible) > 0 {
 		p.preparedValid = false
 	}
-	p.recordServiceResponse(op, res.Err)
+	throttled := p.recordServiceResponse(op, res.Err)
 	if res.Err != nil {
 		p.failed++
 		p.c.logBatchFailure(&b, res.Err, p.queryTime)
+		if throttled && len(req.questions) == 0 && !req.resent {
+			req.resent = true
+			p.hold(req)
+		}
 		if rejectedMetrics(res.Err) {
 			if len(req.questions) == 0 {
 				p.state.demote(b)
@@ -421,11 +428,49 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 	}
 }
 
-func (p *queryPoll) requeueOrdinary(r plannedRequest, free []queryBatch) {
-	for _, part := range free {
-		r.batch = part
-		p.primary = append(p.primary, r)
+func (p *queryPoll) hold(r plannedRequest) {
+	p.held = append(p.held, r)
+	p.heldStale = true
+}
+
+// Ordinary work blocked by a service hold stays in the poll. Its unheld cells
+// are sent now and the rest when the hold expires before the recovery deadline.
+func (p *queryPoll) releaseHeld() {
+	at := p.c.now()
+	if !p.heldStale && at.Before(p.heldUntil) {
+		return
 	}
+	held := p.held
+	p.held, p.heldUntil, p.heldStale = nil, time.Time{}, false
+	for _, r := range held {
+		b := r.batch
+		free, blocked := metricParts(b, func(row resourceInfo) uint32 {
+			mask, expiry := p.state.holds.resourceMetricHolds(b, row, at)
+			p.heldUntil = earliestDeadline(p.heldUntil, expiry)
+			return b.mask &^ mask
+		})
+		r.deadline = p.deadline
+		for _, part := range free {
+			r.batch = part
+			p.primary = append(p.primary, r)
+		}
+		for _, part := range blocked {
+			r.batch = part
+			p.held = append(p.held, r)
+		}
+	}
+}
+
+// The wall-clock time to wake an otherwise idle poll for held ordinary work.
+func (p *queryPoll) heldWake() time.Time {
+	if len(p.held) == 0 || p.heldStale {
+		return time.Time{}
+	}
+	wake := time.Now().Add(p.heldUntil.Sub(p.c.now()))
+	if !wake.Before(p.deadline) {
+		return time.Time{}
+	}
+	return wake
 }
 
 func (p *queryPoll) accept(b queryBatch, q *metricQuestion, cohort uint64, res queryBatchResult, at time.Time) {
@@ -518,18 +563,15 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 			continue
 		default:
 		}
+		if ctx.Err() == nil && len(p.held) > 0 && time.Now().Before(deadline) {
+			p.releaseHeld()
+		}
 		if ctx.Err() == nil && p.active < slots {
 			if len(p.primary) > 0 {
 				r := p.primary[0]
 				p.primary = p.primary[1:]
 				if s.holds.hasMetrics() && s.holds.metricMask(r.batch, c.now()) != 0 {
-					at := c.now()
-					free, _ := metricParts(r.batch, func(row resourceInfo) uint32 {
-						one := r.batch
-						one.Resources = []resourceInfo{row}
-						return one.mask &^ s.holds.metricMask(one, at)
-					})
-					p.requeueOrdinary(r, free)
+					p.hold(r)
 					continue
 				}
 				p.startMetrics(r, primaryCtx)
@@ -539,22 +581,30 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 				continue
 			}
 		}
-		if p.active == 0 {
-			break
-		}
-		if p.active < slots && ctx.Err() == nil {
-			if wake := p.nextRecoveryWake(); !wake.IsZero() {
-				timer := time.NewTimer(time.Until(wake))
-				select {
-				case <-timer.C:
-				case op := <-p.events:
-					p.finish(op)
-				}
-				timer.Stop()
-				continue
+		// Wake for work a free slot can start later in this poll. Only held
+		// ordinary work keeps an otherwise idle poll waiting.
+		var wake time.Time
+		if ctx.Err() == nil && p.active < slots {
+			wake = p.heldWake()
+			if p.active > 0 {
+				wake = earliestDeadline(wake, p.nextRecoveryWake())
 			}
 		}
-		p.finish(<-p.events)
+		if wake.IsZero() {
+			if p.active == 0 {
+				break
+			}
+			p.finish(<-p.events)
+			continue
+		}
+		timer := time.NewTimer(time.Until(wake))
+		select {
+		case <-timer.C:
+		case op := <-p.events:
+			p.finish(op)
+		case <-ctx.Done():
+		}
+		timer.Stop()
 	}
 	s.pruneAdvice()
 	if p.failed > 0 && p.succeeded == 0 {

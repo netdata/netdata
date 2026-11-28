@@ -68,7 +68,7 @@ modules:
             - **Minimum collection interval:** 60 seconds (enforced). Azure Monitor metrics granularity is typically 1 minute.
             - **Metrics reporting delay:** Azure Monitor metrics have a 1-3 minute reporting delay. The collector uses `query_offset` (default: 180s) as a minimum offset and automatically uses a larger effective offset for slower time-grain batches when needed.
             - For time grains longer than the collection interval, Netdata carries a value forward only when the last scheduled query returned a sample.
-            - A 429 or 529 response from the regional Metrics API pauses requests for the affected resources and metrics. When Azure Resource Manager (ARM) throttles a metric-definition lookup and reports an exhausted subscription or tenant quota, the collector pauses definition lookups in that scope. It honors the server’s retry interval and backs off when the response omits it.
+            - A 429 or 529 response from the regional Metrics API pauses requests for the affected resources and metrics. When Azure Resource Manager (ARM) throttles a metric-definition lookup and reports an exhausted subscription or tenant quota, the collector pauses definition lookups in that scope. It honors the server’s retry interval and backs off when the response omits it. A scheduled query paused this way is sent again in the same poll when the pause ends early enough, at most once.
         performance_impact:
           description: |
             :::caution
