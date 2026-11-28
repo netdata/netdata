@@ -114,8 +114,8 @@ pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;
 pub(crate) use prefix_map::{BuildError, PrefixMap};
 pub use query::{
-    Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
-    compile_pattern, compile_query,
+    Bucket, FacetResult, FieldValueIds, Filter, Grid, Matcher, MaterializedRow, Timeline,
+    Timestamps, compile_pattern, compile_query,
 };
 pub use reader::{read_summary, read_summary_path};
 pub use registry::{Evictions, File, Registry, RetentionPolicy};

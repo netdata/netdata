@@ -53,8 +53,8 @@ use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::resource::v1::Resource;
 
 use sfsq::logs::{
-    Direction, LogSource, LogsData, LogsQuery, LogsQueryBuilder, LogsShard, SfstCandidate, Source,
-    WalScan, WalTail, run,
+    AggregateKind, AggregateResult, AggregateSpec, Direction, LogSource, LogsData, LogsQuery,
+    LogsQueryBuilder, LogsShard, Parts, SfstCandidate, Source, WalScan, WalTail, run,
 };
 use sfst::{Filter, Grid, IndexReader, MaterializedRow};
 
@@ -447,7 +447,18 @@ fn ng_index_candidate(wal_dir: &Path) -> SfstCandidate {
     }
 }
 
-fn assert_equiv(ctx: &str, via_sfst: &LogsShard, via_scan: &LogsShard) {
+/// The shard's value aggregation, finished for comparison.
+fn finished(shard: &LogsShard, query: &LogsQuery) -> Option<AggregateResult> {
+    let spec = query.aggregate()?;
+    Some(shard.values.clone()?.finish(spec))
+}
+
+fn assert_equiv(ctx: &str, query: &LogsQuery, via_sfst: &LogsShard, via_scan: &LogsShard) {
+    assert_eq!(
+        finished(via_sfst, query),
+        finished(via_scan, query),
+        "aggregate diverged [{ctx}]"
+    );
     assert_eq!(
         via_sfst.matched, via_scan.matched,
         "matched diverged [{ctx}]"
@@ -488,7 +499,7 @@ fn check_corpus(
     for (qlabel, query) in queries(&candidate.summary) {
         let via_sfst = LogsShard::evaluate(&candidate, &query);
         let via_scan = scan.evaluate(&query);
-        assert_equiv(&format!("{label} / {qlabel}"), &via_sfst, &via_scan);
+        assert_equiv(&format!("{label} / {qlabel}"), &query, &via_sfst, &via_scan);
         if via_sfst.matched > 0 {
             nonzero += 1;
         }
@@ -662,6 +673,68 @@ fn query_matrix(summary: &sfst::Summary) -> Vec<(String, LogsQuery)> {
         ))
         .histogram_field("attributes.level")
         .build(),
+    ));
+    let top = |field: &str, by: Option<&str>, n: usize| AggregateSpec {
+        field: field.into(),
+        by: by.map(Into::into),
+        kind: AggregateKind::Top(n),
+    };
+    let quantiles = |field: &str, by: Option<&str>| AggregateSpec {
+        field: field.into(),
+        by: by.map(Into::into),
+        kind: AggregateKind::Quantiles(vec![0.0, 0.5, 0.9, 0.99, 1.0]),
+    };
+    out.push((
+        "agg-top-by".into(),
+        b(g_eight)
+            .aggregate(top("attributes.code", Some("attributes.level"), 5))
+            .build(),
+    ));
+    out.push((
+        "agg-top-multivalued-filtered".into(),
+        b(g_sub)
+            .filter(Filter::new().select("attributes.level", "info"))
+            .aggregate(top("attributes.tags[]", Some("attributes.host"), 3))
+            .build(),
+    ));
+    out.push((
+        "agg-quantiles-polymorphic".into(),
+        b(g_eight)
+            .aggregate(quantiles("attributes.mixed", None))
+            .build(),
+    ));
+    out.push((
+        "agg-quantiles-by-multivalued".into(),
+        b(g_eight)
+            .query("err")
+            .aggregate(quantiles(
+                "severity_number",
+                Some("attributes.endpoints[].host"),
+            ))
+            .build(),
+    ));
+    out.push((
+        "agg-absent-field-only".into(),
+        b(g_wide)
+            .parts(Parts::NONE)
+            .aggregate(top("nope", Some("attributes.level"), 3))
+            .build(),
+    ));
+    out.push((
+        "agg-parts-limited".into(),
+        b(g_eight)
+            .parts(Parts {
+                matched: true,
+                ..Parts::NONE
+            })
+            .aggregate(top("attributes.level", Some("nope"), 10))
+            .build(),
+    ));
+    out.push((
+        "agg-by-itself".into(),
+        b(g_eight)
+            .aggregate(top("attributes.tags[]", Some("attributes.tags[]"), 3))
+            .build(),
     ));
     out.push((
         "window-past-data".into(),
@@ -1065,4 +1138,150 @@ fn duplicate_tail_file_seq_is_skipped_not_double_served() {
     assert_eq!(dup.matched, single.matched, "duplicate tail double-counted");
     assert_eq!(dup.rows, single.rows, "duplicate tail changed served rows");
     assert_eq!(dup.histogram, single.histogram);
+}
+
+// ---------------------------------------------------------------------------
+// Value aggregation over the high-cardinality tier
+// ---------------------------------------------------------------------------
+
+/// 1,500 logs whose `attributes.req` / `attributes.num` are unique per log
+/// (high tier: ≥1000 distinct), `attributes.dur` repeats (mid tier), and
+/// `attributes.ids` is a high-card array that sometimes repeats a value
+/// within one log — the seeded corpora stay far below the high tier.
+fn high_card_corpus() -> Corpus {
+    let levels = ["info", "error", "warn"];
+    let records: Vec<LogRecord> = (0..1500u64)
+        .map(|i| {
+            let mut attributes = vec![
+                kv("req", s(&format!("r{i:05}"))),
+                kv("num", s(&format!("{}.25", i * 7 % 1500))),
+                kv("dur", int_val((i * 13 % 400) as i64)),
+            ];
+            if i % 5 != 0 {
+                attributes.push(kv("level", s(levels[(i % 3) as usize])));
+            }
+            if i % 2 == 0 {
+                let a = format!("u{}", i / 2);
+                let b = if i % 4 == 0 {
+                    a.clone()
+                } else {
+                    format!("w{i}")
+                };
+                attributes.push(kv("ids", string_array(&[&a, &b])));
+            }
+            LogRecord {
+                time_unix_nano: (BASE_S + i) * NS,
+                attributes,
+                ..LogRecord::default()
+            }
+        })
+        .collect();
+    let batches = records
+        .chunks(500)
+        .map(|chunk| {
+            vec![ResourceLogs {
+                resource: Some(Resource {
+                    attributes: vec![kv("service.name", s("harness"))],
+                    ..Resource::default()
+                }),
+                scope_logs: vec![ScopeLogs {
+                    log_records: chunk.to_vec(),
+                    ..ScopeLogs::default()
+                }],
+                ..ResourceLogs::default()
+            }]
+        })
+        .collect();
+    Corpus { batches }
+}
+
+#[test]
+fn aggregate_over_high_card_fields_matches_tail_scan() {
+    let corpus = high_card_corpus();
+    let dir = tempfile::tempdir().expect("tempdir");
+    let wal_path = write_flattened_wal(dir.path(), &corpus);
+    let candidate = ng_index_candidate(dir.path());
+    let scan = WalScan::scan_flattened(&wal_path).expect("scan_flattened");
+
+    let start = BASE_S as i64 * NS as i64;
+    let full = Grid::new(start, 1500 * NS as i64, 1);
+    let part = Grid::new(start + 200 * NS as i64, 700 * NS as i64, 1);
+    let spec = |field: &str, by: Option<&str>, kind: AggregateKind| AggregateSpec {
+        field: field.into(),
+        by: by.map(Into::into),
+        kind,
+    };
+    let q = || AggregateKind::Quantiles(vec![0.0, 0.25, 0.5, 0.99, 1.0]);
+    let queries = [
+        (
+            "top-high",
+            full,
+            spec("attributes.req", None, AggregateKind::Top(5)),
+        ),
+        (
+            "top-high-array-dedup",
+            full,
+            spec(
+                "attributes.ids[]",
+                Some("attributes.level"),
+                AggregateKind::Top(4),
+            ),
+        ),
+        ("quantiles-high", part, spec("attributes.num", None, q())),
+        (
+            "quantiles-high-by-mid",
+            full,
+            spec("attributes.num", Some("attributes.dur"), q()),
+        ),
+        (
+            "quantiles-mid-by-high",
+            part,
+            spec("attributes.dur", Some("attributes.req"), q()),
+        ),
+        (
+            "top-high-by-itself",
+            part,
+            spec(
+                "attributes.ids[]",
+                Some("attributes.ids[]"),
+                AggregateKind::Top(1),
+            ),
+        ),
+        (
+            "top-low-by-high-array",
+            full,
+            spec(
+                "attributes.level",
+                Some("attributes.ids[]"),
+                AggregateKind::Top(2),
+            ),
+        ),
+    ];
+
+    let shard = LogsShard::evaluate(&candidate, &LogsQueryBuilder::new(full).build());
+    for (field, tier) in [
+        ("attributes.req", sfst::FieldTier::High),
+        ("attributes.num", sfst::FieldTier::High),
+        ("attributes.ids[]", sfst::FieldTier::High),
+        ("attributes.dur", sfst::FieldTier::Mid),
+        ("attributes.level", sfst::FieldTier::Low),
+    ] {
+        assert_eq!(
+            shard.fields.get(field).map(|f| f.tier),
+            Some(tier),
+            "{field}"
+        );
+    }
+
+    for (label, grid, spec) in queries {
+        let query = LogsQueryBuilder::new(grid)
+            .parts(Parts::NONE)
+            .aggregate(spec)
+            .build();
+        let via_sfst = LogsShard::evaluate(&candidate, &query);
+        let via_scan = scan.evaluate(&query);
+        let result = finished(&via_sfst, &query).expect("aggregate computed");
+        assert!(!result.groups.is_empty(), "vacuous [{label}]");
+        assert_eq!(result, finished(&via_scan, &query).unwrap(), "[{label}]");
+    }
 }

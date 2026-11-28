@@ -11,6 +11,8 @@
 use std::collections::BTreeSet;
 
 use super::cursor::Cursor;
+use super::query::Parts;
+use super::values::AggregateResult;
 
 /// The merged result of a log query across its sources.
 ///
@@ -38,7 +40,8 @@ pub struct LogsData {
     pub available_fields: sfst::FieldTable,
     /// The row-table column schema: the union of every source's field
     /// names, all tiers (so high-card attributes still get a column),
-    /// sorted.
+    /// sorted. A rows-only query (no step 1) has no field table: its
+    /// columns are the fields the returned rows carry.
     pub columns: Vec<String>,
     /// The materialized page, newest-first, each row tagged with its
     /// [`Cursor`] in the global total order — the value the consumer
@@ -48,6 +51,10 @@ pub struct LogsData {
     pub has_newer: bool,
     /// An older row exists beyond the page (consumer "scroll down").
     pub has_older: bool,
+    /// The parts the query computed; the others are returned empty.
+    pub parts: Parts,
+    /// The value aggregation's answer, when the query asked for one.
+    pub aggregate: Option<AggregateResult>,
 }
 
 impl LogsData {
@@ -77,6 +84,8 @@ impl LogsData {
             rows: Vec::new(),
             has_newer: false,
             has_older: false,
+            parts: Parts::ALL,
+            aggregate: None,
         }
     }
 }

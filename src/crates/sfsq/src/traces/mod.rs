@@ -48,8 +48,8 @@
 //! - explore — [`explore()`]: the span explorer's histogram (spans per
 //!   bucket stacked by a key, duration heatmap rows, percentiles) and
 //!   newest-first span rows, one row per stored span.
-//! - duration_hist — the log-linear duration histogram behind the
-//!   overview's per-bucket percentiles and the explorer's heatmap rows and
+//! - `crate::duration_hist` (shared with the logs engine) — the log-linear
+//!   duration histogram behind the overview's per-bucket percentiles and the explorer's heatmap rows and
 //!   percentiles ([`DurationPercentiles`], [`heatmap_row_bounds`]).
 //! - fold / rollup — the aggregate machinery behind overview (rollup's
 //!   parts also build search's rows):
@@ -70,7 +70,7 @@
 //!   every operation that takes one.
 
 mod by_id;
-mod duration_hist;
+
 mod explore;
 mod fold;
 mod gate;
@@ -86,10 +86,10 @@ mod vocab;
 mod wal_scan;
 mod window;
 
+pub use crate::duration_hist::{DurationPercentiles, HEATMAP_ROWS, heatmap_row_bounds};
 pub use by_id::{
     DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id,
 };
-pub use duration_hist::{DurationPercentiles, HEATMAP_ROWS, heatmap_row_bounds};
 pub use explore::{
     DEFAULT_ROWS_LIMIT, ExploreData, ExploreQuery, ExploreRequestError, HistogramBucket,
     HistogramData, ROW_COLUMNS_MAX, ROWS_LIMIT_MAX, RowKey, RowsData, RowsSpec,

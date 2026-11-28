@@ -4265,6 +4265,7 @@ dependencies = [
  "ng-flatten",
  "ng-index",
  "opentelemetry-proto",
+ "rayon",
  "regex",
  "serde",
  "sfst",

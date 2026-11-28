@@ -52,8 +52,10 @@
 //!   contract), and one module per operation (`by_id`, `search` with
 //!   its `gate` pre-assembly filter, `overview`, `suggest`, `explore`);
 //!   `fold` merges cross-source aggregates over `rollup`'s per-trace
-//!   shapes; `vocab`/`window`/`wal_scan`/`order`/`duration_hist` are
-//!   shared support.
+//!   shapes; `vocab`/`window`/`wal_scan`/`order` are shared support.
+//! - `duration_hist` (private) — the log-linear histogram shared by the
+//!   traces duration percentiles and the logs quantile aggregation's
+//!   approximate mode.
 //!
 //! Each subsystem module's own docs are the authority for its pieces;
 //! their `pub use`s are the crate's public surface.
@@ -61,6 +63,7 @@
 pub mod logs;
 pub mod traces;
 
+mod duration_hist;
 mod source;
 
 pub use source::Source;

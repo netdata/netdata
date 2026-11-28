@@ -81,6 +81,13 @@ parser (see the Cloud doc's "Selecting log sources" section).
   10-second cloud-proxy default isn't relevant (the agent itself
   honors the body timeout up to its own ceiling).
 
+- **`otel-logs` aggregations**: `otel-logs` accepts `parts` (compute
+  only some response parts, for example `["rows"]` or `["matched"]`)
+  and `aggregate` (top values or quantiles of one field, optionally
+  grouped by another field). See the Cloud doc's
+  [`parts` and `aggregate`](../query-netdata-cloud/query-logs.md#otel-logs-only-parts-and-aggregate)
+  section.
+
 ## See also
 
 - [../query-netdata-cloud/query-logs.md](../query-netdata-cloud/query-logs.md)
