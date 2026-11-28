@@ -490,6 +490,12 @@ static void stream_sender_move_running_to_connector_or_remove_internal(struct st
 
     stream_parent_set_host_disconnect_reason(s->host, reason, now_realtime_sec());
     stream_sender_clear_parent_claim_id(s->host);
+
+    // the parent we streamed to is no longer upstream of this host: drop it (and
+    // everything above it) from the stored path and tell the child, so that a
+    // reconnection to another parent does not carry the old chain along
+    stream_path_parent_disconnected(s->host);
+
     sender_host_buffer_free(s->host);
 
     pulse_host_status(s->host, PULSE_HOST_STATUS_SND_OFFLINE, reason);

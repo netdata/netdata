@@ -78,12 +78,12 @@ above), so a child-originated update flows all the way to the apex.
 
 ## 5. The cycle terminator
 
-The `if(!from_parent)` guard at `stream-path.c:423` is **load-bearing**.
+The `if(!from_parent)` guard at `stream-path.c:503` is **load-bearing**.
 Without it, every parent-to-child echo would generate a child-to-parent
 re-send, generating another echo, forever.
 
 Combined with the volatile self-overlay (see §3), even the hash check at
-`stream-path.c:422` cannot stop oscillation: the live timing fields change
+`stream-path.c:502` cannot stop oscillation: the live timing fields change
 between emits, so the hash would differ on every round-trip even when the
 structural content is identical.
 
@@ -102,18 +102,28 @@ from a small, sparse set of triggers — they do NOT fire on every metric
 write:
 
 - **Connect** — `stream_sender_on_ready_to_dispatch` at
-  `stream-sender.c:157` calls `stream_path_send_to_parent(localhost)` when
-  the sender becomes ready.
+  `stream-sender.c:181` calls `stream_path_send_to_parent(s->host)` when
+  the host's sender becomes ready.
 - **Retention boundary movement** — `rrdcontext_post_process_updates` at
-  `rrdcontext-worker.c:99-104` calls `stream_path_retention_updated(host)`
+  `rrdcontext-worker.c:109` calls `stream_path_retention_updated(host)`
   only when `host->retention.first_time_s` changes. This is sparse — once
   per DB rotation / archive event.
-- **node_id update** — `sqlite_metadata.c:288` (when persisted) and
-  `command-nodeid.c:163` (when receiving a NODE_ID command from a child)
-  call `stream_path_node_id_updated(host)`.
-- **Parent disconnect** — `stream-sender.c:171` calls
-  `stream_path_parent_disconnected(s->host)` when our upstream connection
-  drops. This truncates self's stored chain back to localhost.
+- **node_id update** — `sqlite_metadata.c:347` (when persisted) and
+  `command-nodeid.c:161` (when the sender receives a NODE_ID command from
+  its parent) call `stream_path_node_id_updated(host)`.
+- **Parent disconnect** — every running sender leaves the dispatcher
+  through `stream_sender_move_running_to_connector_or_remove_internal`,
+  which calls `stream_path_parent_disconnected(s->host)`
+  (`stream-sender.c:497`) whether the sender will reconnect or is being
+  removed. This truncates the host's stored chain after the localhost
+  entry and, for a relayed host, sends the truncated chain to its child
+  (`localhost` has no child to update), so a reconnection
+  to another parent starts from `[..., self]` and the old parent is not
+  carried over. If the stored chain has no localhost entry (e.g. the
+  parent sent its own chain before it received ours), nothing is
+  truncated. `stream_sender_on_disconnect` (`stream-sender.c:207`)
+  truncates again when a sender waiting in the connector queue is
+  cancelled or removed.
 
 Storage convergence has lag. Right after a child connects, the parent's
 storage of the child's path is `[child]` only. After the next sparse trigger
@@ -136,10 +146,10 @@ Known consumers of `host->stream.path.array` in this tree:
   synthesis from PR #22432). Reads stored data, falls back to the
   rrdhost-derived live data via `rrdhost_status()` for the localhost
   classification (Bug A in PR #22432).
-- `src/database/contexts/api_v2_contexts.c:425, :510` — emits
+- `src/database/contexts/api_v2_contexts.c:463, :554` — emits
   `streaming_path` per host via `rrdhost_stream_path_to_json` (so the
   emit-time self-append fires). No direct array access.
-- `src/streaming/stream-path.c:145-158` — `rrdhost_stream_path_total_reboot_time_ms`
+- `src/streaming/stream-path.c:147-160` — `rrdhost_stream_path_total_reboot_time_ms`
   walks the stored array looking for localhost's own entry. **This shares
   Bug A's blind assumption**: on the apex parent, the localhost entry is
   not in storage, so this function returns 0 silently. This is the same
