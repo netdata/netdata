@@ -3,7 +3,7 @@
 `wmi.plugin` monitors Windows hosts without installing anything on them. It runs on a Netdata Agent (the poller) and
 reads CPU, memory, process, uptime, Remote Desktop session, clock offset, time synchronization, network, TCP, UDP, disk
 and SMB file server metrics from each configured host over WMI, using DCOM or WinRM HTTPS, and pings each host. Each
-host appears in Netdata as its own virtual node.
+host appears in Netdata as its own virtual node. It authenticates with NTLMv2, or over DCOM with Kerberos.
 
 What it collects, how to prepare the Windows hosts, every option and the known errors are on the Windows (WMI)
 integration page, generated from [`collector/windows/metadata.yaml`](collector/windows/metadata.yaml).
@@ -34,6 +34,15 @@ such as `${env:WMI_PASSWORD}` resolve the same way:
 ```
 
 The debug output shows the job's checks and collections, and the charts it sends for the host's virtual node.
+
+## Kerberos
+
+Kerberos jobs (`auth: kerberos`, DCOM only) read no `krb5.conf` and no credentials cache: the realm comes from the
+`username` domain and the domain controllers from `kdc` or the domain's DNS SRV records. Each job requests a service
+ticket for `host/<host>` with AES encryption over TCP 88, keeps it in memory and reuses it until it nears expiry or the
+host refuses a session (`internal/wmiquery/kerberos.go`). The unit tests run these exchanges against an in-process KDC
+and authenticate the ticket with go-msrpc's own Kerberos acceptor, so they need no domain; a live check needs an Active
+Directory domain with the host as a member.
 
 ## Find a counter set's WMI class
 

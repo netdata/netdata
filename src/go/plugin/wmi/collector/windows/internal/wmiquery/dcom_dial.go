@@ -5,28 +5,7 @@ package wmiquery
 import (
 	"context"
 	"net"
-
-	"github.com/oiweiwei/go-msrpc/dcerpc"
-	"github.com/oiweiwei/go-msrpc/ssp/credential"
-	"github.com/oiweiwei/go-msrpc/ssp/gssapi"
-	"github.com/oiweiwei/go-msrpc/ssp/ntlm"
 )
-
-// securityOptions authenticates every bind with job-scoped NTLMv2 credentials
-// and seals the traffic (packet privacy).
-func securityOptions(host, username, password string) []dcerpc.Option {
-	config := ntlm.NewConfig()
-	config.NTLMVersion = ntlm.NTLMv2
-	mechanism := ntlm.Mechanism{}
-	creds := credential.NewFromPassword(username, password)
-	return []dcerpc.Option{
-		dcerpc.WithMechanism(mechanism, config),
-		dcerpc.WithCredentials(gssapi.NewCredential("", []gssapi.OID{mechanism.Type()}, gssapi.InitiateOnly, creds)),
-		dcerpc.WithSecurtyProvider(dcerpc.AuthTypeWinNT),
-		dcerpc.WithTargetName("host/" + host),
-		dcerpc.WithSeal(),
-	}
-}
 
 // rpcDialer owns every TCP socket in a collection cycle. The advertised WMI ports
 // must be reached on the same address as the activation call.

@@ -67,6 +67,7 @@ require (
 	github.com/netdata/gosnmp v0.0.0-20261112121521-088919090b99
 	github.com/netdata/systemd-journal-sdk/go v0.10.0
 	github.com/oiweiwei/go-msrpc v1.6.7
+	github.com/oiweiwei/gokrb5.fork/v9 v9.0.8
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/prometheus/client_model v0.6.3
@@ -203,7 +204,6 @@ require (
 	github.com/oiweiwei/go-math v1.0.0 // indirect
 	github.com/oiweiwei/go-oem v1.0.0 // indirect
 	github.com/oiweiwei/go-smb2.fork v1.0.2 // indirect
-	github.com/oiweiwei/gokrb5.fork/v9 v9.0.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

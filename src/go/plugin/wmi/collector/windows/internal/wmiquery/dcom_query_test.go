@@ -32,7 +32,7 @@ func TestReadPagesPreservesRowsOnTimeoutAndFinalPage(t *testing.T) {
 	}
 	calls := 0
 	deadline := time.Now().Add(time.Second)
-	rows, err := readPages(t.Context(), &dcom.ORPCThis{}, deadline, func(
+	rows, err := readPages(t.Context(), "NTLM", &dcom.ORPCThis{}, deadline, func(
 		_ context.Context, request *enumerator.NextRequest, _ ...dcerpc.CallOption,
 	) (*enumerator.NextResponse, error) {
 		assert.Positive(t, request.Timeout)
@@ -52,7 +52,7 @@ func TestReadPagesPreservesRowsOnTimeoutAndFinalPage(t *testing.T) {
 }
 
 func TestReadPagesEmptyResult(t *testing.T) {
-	rows, err := readPages(t.Context(), &dcom.ORPCThis{}, time.Now().Add(time.Second), func(
+	rows, err := readPages(t.Context(), "NTLM", &dcom.ORPCThis{}, time.Now().Add(time.Second), func(
 		_ context.Context, _ *enumerator.NextRequest, _ ...dcerpc.CallOption,
 	) (*enumerator.NextResponse, error) {
 		return &enumerator.NextResponse{
@@ -68,7 +68,7 @@ func TestReadPagesDiscardsPartialRowsOnCancellation(t *testing.T) {
 	defer cancel()
 	object := testClassObject(t, "adapter 1", 1)
 	calls := 0
-	rows, err := readPages(ctx, &dcom.ORPCThis{}, time.Now().Add(time.Second), func(
+	rows, err := readPages(ctx, "NTLM", &dcom.ORPCThis{}, time.Now().Add(time.Second), func(
 		_ context.Context, _ *enumerator.NextRequest, _ ...dcerpc.CallOption,
 	) (*enumerator.NextResponse, error) {
 		calls++
@@ -87,7 +87,7 @@ func TestReadPagesDiscardsPartialRowsOnCancellation(t *testing.T) {
 }
 
 func TestReadPagesRejectsMalformedPage(t *testing.T) {
-	rows, err := readPages(t.Context(), &dcom.ORPCThis{}, time.Now().Add(time.Second), func(
+	rows, err := readPages(t.Context(), "NTLM", &dcom.ORPCThis{}, time.Now().Add(time.Second), func(
 		_ context.Context, _ *enumerator.NextRequest, _ ...dcerpc.CallOption,
 	) (*enumerator.NextResponse, error) {
 		return &enumerator.NextResponse{

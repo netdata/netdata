@@ -59,7 +59,10 @@ type Collector struct {
 	// by device; an empty entry stands for a disk Windows does not list there.
 	diskDrives map[string]diskDrive
 
-	winrmTLS   *tls.Config
+	winrmTLS *tls.Config
+	// dcomAuth authenticates the DCOM sessions; a Kerberos one keeps the
+	// job's service ticket between polls.
+	dcomAuth   wmiquery.DCOMAuth
 	newSession func(context.Context) (querySession, error)
 	// now reads the poller's clock around each query, so the host's clock can
 	// be compared with it.
@@ -87,7 +90,7 @@ func (c *Collector) openSession(ctx context.Context) (querySession, error) {
 	if c.Transport == transportWinRM {
 		return wmiquery.OpenWinRM(c.Host, c.Username, c.Password, c.winrmTLS), nil
 	}
-	session, err := wmiquery.OpenDCOM(ctx, c.Host, c.Username, c.Password)
+	session, err := wmiquery.OpenDCOM(ctx, c.Host, c.dcomAuth)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +102,14 @@ func (c *Collector) Configuration() any { return c.Config }
 func (c *Collector) Init(ctx context.Context) error {
 	if err := c.Config.validate(); err != nil {
 		return err
+	}
+	switch c.Auth {
+	case authKerberos:
+		account, realm, _ := kerberosPrincipal(c.Username)
+		kdcs, _ := kdcAddresses(c.KDC)
+		c.dcomAuth = wmiquery.NewKerberosAuth(account, realm, c.Password, kdcs)
+	default:
+		c.dcomAuth = wmiquery.NewNTLMAuth(c.Username, c.Password)
 	}
 	if c.Transport == transportWinRM {
 		cfg, err := tlscfg.NewTLSConfig(ctx, tlscfg.TLSConfig{
@@ -140,8 +151,12 @@ func (c *Collector) Collect(ctx context.Context) error {
 	return nil
 }
 
-// Cleanup has nothing to release: every poll closes its own session.
-func (c *Collector) Cleanup(context.Context) {}
+// Cleanup forgets the job's Kerberos ticket. Every poll closes its own session.
+func (c *Collector) Cleanup(context.Context) {
+	if c.dcomAuth != nil {
+		c.dcomAuth.Close()
+	}
+}
 
 func (c *Collector) VirtualNode() *vnodes.VirtualNode { return c.vnode }
 
