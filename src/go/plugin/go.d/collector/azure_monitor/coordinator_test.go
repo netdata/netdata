@@ -740,3 +740,94 @@ func TestCollectDistinguishesOmittedHistoryFromUnavailableAdvice(t *testing.T) {
 		}
 	}
 }
+
+func TestCollectDeniesNamesARMOmitsAsOneGroup(t *testing.T) {
+	const resources = 50
+	var rows []map[string]any
+	for i := range resources {
+		rows = append(rows, testResource(recoveryTestNamespace, fmt.Sprintf("edge-%02d", i), nil))
+	}
+	c := newTestCollectorWithMocks(&mockResourceGraph{resources: rows}, &mockMetricsClient{})
+	c.Config = testConfig()
+	useRecoveryTestProfile(t, c, []string{"A", "B", "X", "Y"}, nil)
+	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	var mu sync.Mutex
+	now := start
+	c.now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+	// ARM starts listing X for one resource, then Azure accepts X for all.
+	const listedMinute, acceptedMinute = 50, 200
+	listedID := strings.ToLower(rows[7]["id"].(string))
+	type call struct {
+		names     string
+		resources int
+	}
+	var rejected, accepted []call
+	initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+		mu.Lock()
+		minute := int(now.Sub(start) / time.Minute)
+		mu.Unlock()
+		if minute >= listedMinute && strings.Contains(strings.ToLower(req.URL.Path), listedID) {
+			return recoveryWireDefinitions(req, "A", "B", "X")
+		}
+		return recoveryWireDefinitions(req, "A", "B")
+	}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		minute := int(now.Sub(start) / time.Minute)
+		one := call{strings.Join(query.Names, ","), len(query.ResourceIDs)}
+		onlyListed := len(query.ResourceIDs) == 1 && strings.ToLower(query.ResourceIDs[0]) == listedID
+		xWorks := minute >= acceptedMinute || (minute >= listedMinute && onlyListed)
+		if slices.Contains(query.Names, "Y") || (slices.Contains(query.Names, "X") && !xWorks) {
+			rejected = append(rejected, one)
+			return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
+		}
+		accepted = append(accepted, one)
+		return recoveryWireTotals(req, query, 5)
+	})
+
+	poll := func(minute int) map[string]metrix.SampleValue {
+		mu.Lock()
+		now = start.Add(time.Duration(minute) * time.Minute)
+		rejected, accepted = nil, nil
+		mu.Unlock()
+		return collectRecoveryCounters(t, c)
+	}
+	group := func(name string, n int) call { return call{name, n} }
+
+	series := poll(0)
+	requireRecoveryCounter(t, series, "A", "edge-00", 5)
+	assert.ElementsMatch(t, []call{group("A,B,X,Y", 50), group("X,Y", 50), group("X", 50), group("Y", 50)}, rejected,
+		"one confirmation of the omitted names and one per name, with no narrowing by resource")
+
+	// Rechecks back off from the definition TTL and keep each name's group whole.
+	rechecks := map[int]bool{5: true, 15: true, 35: true}
+	for minute := 1; minute < listedMinute; minute++ {
+		poll(minute)
+		if rechecks[minute] {
+			assert.ElementsMatch(t, []call{group("X", 50), group("Y", 50)}, rejected, "minute %d", minute)
+		} else {
+			assert.Empty(t, rejected, "minute %d", minute)
+		}
+		assert.Equal(t, []call{group("A,B", 50)}, accepted, "minute %d", minute)
+	}
+
+	// New ARM advice for one member wakes only that member.
+	series = poll(listedMinute)
+	requireRecoveryCounter(t, series, "X", "edge-07", 5)
+	assert.Empty(t, rejected, "the other members stay asleep")
+	assert.Contains(t, accepted, group("X", 1))
+	_, ok := seriesValue(series, ".x_total", `resource_name="edge-08",`)
+	assert.False(t, ok, "X stays a gap for members ARM still omits")
+
+	// A later group recheck finds that Azure now accepts the name for everyone.
+	var recovered int
+	for minute := listedMinute + 1; minute <= acceptedMinute+60 && recovered == 0; minute++ {
+		series = poll(minute)
+		if _, ok := seriesValue(series, ".x_total", `resource_name="edge-08",`); ok {
+			recovered = minute
+			assert.Contains(t, accepted, group("X", 49))
+		}
+	}
+	assert.GreaterOrEqual(t, recovered, acceptedMinute)
+	assert.LessOrEqual(t, recovered, acceptedMinute+60, "the group is rechecked at least hourly")
+}

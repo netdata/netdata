@@ -141,18 +141,36 @@ func (p *queryPoll) partition(q *metricQuestion) []*metricQuestion {
 			}
 			part := selectNames(b, mask)
 			part.Resources = resources
-			children = append(children, p.child(q, part, evidence))
+			child := p.child(q, part, evidence)
+			if !q.nextCheck.IsZero() {
+				// New advice woke part of a sleeping group. Members ARM still
+				// omits keep waiting for the group's recheck.
+				child.recheckEarly = evidence != unadvertisedMetrics
+				p.trackSleeper(child)
+			}
+			children = append(children, child)
 		}
 	}
 	delete(p.state.questions, q)
 	return children
 }
 
-func (p *queryPoll) refine(q *metricQuestion) []*metricQuestion {
+// ARM omits this name for every member and Azure rejected them together.
+// They sleep and are rechecked as one request instead of being narrowed to
+// single resources, which costs about two metered calls per member.
+func deniedTogether(q *metricQuestion) bool {
+	return q.evidence == unadvertisedMetrics && bits.OnesCount32(q.batch.mask) == 1
+}
+
+func (p *queryPoll) refine(q *metricQuestion, at time.Time) []*metricQuestion {
+	if deniedTogether(q) {
+		p.deny(q, at)
+		return nil
+	}
 	b := q.batch
 	delete(p.state.questions, q)
 	var children []*metricQuestion
-	if len(b.Resources) > 1 && (q.evidence != unadvertisedMetrics || bits.OnesCount32(b.mask) == 1) {
+	if len(b.Resources) > 1 && q.evidence != unadvertisedMetrics {
 		half := len(b.Resources) / 2
 		for _, members := range [][]resourceInfo{b.Resources[:half], b.Resources[half:]} {
 			part := b
@@ -174,8 +192,10 @@ func (p *queryPoll) trackSleeper(q *metricQuestion) {
 	if p.sleepers == nil {
 		p.sleepers = make(map[definitionKey][]*metricQuestion)
 	}
-	k := q.batch.Resources[0].definitionKey(q.batch.Profile)
-	p.sleepers[k] = append(p.sleepers[k], q)
+	for _, r := range q.batch.Resources {
+		k := r.definitionKey(q.batch.Profile)
+		p.sleepers[k] = append(p.sleepers[k], q)
+	}
 }
 
 func (p *queryPoll) deny(q *metricQuestion, at time.Time) {
@@ -249,7 +269,7 @@ func (p *queryPoll) readyQuestions(at time.Time) []*metricQuestion {
 			continue
 		}
 		if q.rejected {
-			queue = append(queue, p.refine(q)...)
+			queue = append(queue, p.refine(q, at)...)
 			continue
 		}
 		ready = append(ready, q)

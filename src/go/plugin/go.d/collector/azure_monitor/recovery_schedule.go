@@ -175,10 +175,10 @@ func (p *queryPoll) finishRead(op *queryOperation) {
 	}
 	old := a.definitions
 	a.definitions, a.fetched, a.retry, a.backoff = op.definitions, op.at, time.Time{}, 0
-	// Only previously denied single cells sleep. A newly advertised name
-	// wakes immediately even if its last confirmation was very recent.
+	// A name newly advertised for this resource wakes its denied question
+	// even if the last confirmation was very recent.
 	for _, q := range p.sleepers[r.key] {
-		if q.nextCheck.IsZero() || len(q.batch.Resources) != 1 || q.batch.Resources[0].definitionKey(q.batch.Profile) != r.key {
+		if q.nextCheck.IsZero() {
 			continue
 		}
 		if advertised(op.definitions, q.batch) != 0 && advertised(old, q.batch) == 0 {
@@ -395,6 +395,8 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 			} else {
 				for _, q := range req.questions {
 					switch {
+					case deniedTogether(q):
+						p.deny(q, op.at)
 					case len(req.questions) > 1:
 						// The combined rectangle failed. Each original owner's
 						// strictly smaller request remains independently askable.
