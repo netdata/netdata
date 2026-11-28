@@ -45,6 +45,8 @@ type queryPoll struct {
 	c                           *Collector
 	state                       *recoveryState
 	ctx                         context.Context
+	single                      context.Context // No SDK retries: each counted request is one wire attempt.
+	asked                       bool            // A question was started in this poll.
 	queryTime, deadline         time.Time
 	due                         map[*metricChunk]bool
 	reads                       map[definitionKey]*adviceRequest
@@ -345,8 +347,8 @@ func (p *queryPoll) startRecovery() bool {
 			for _, owner := range owners {
 				owner.lastPoll = p.state.poll
 			}
-			ctx := policy.WithRetryOptions(p.ctx, policy.RetryOptions{MaxRetries: -1})
-			p.startMetrics(plannedRequest{batch: batch, cohort: q.cohort, questions: owners}, ctx)
+			p.asked = true
+			p.startMetrics(plannedRequest{batch: batch, cohort: q.cohort, questions: owners}, p.single)
 			return true
 		}
 	}
@@ -383,7 +385,7 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 	throttled := p.recordServiceResponse(op, res.Err)
 	if m := req.merge; m != nil {
 		if res.Err != nil {
-			p.rejectMerge(m, res.Err, op.at)
+			p.rejectMerge(m, res.Err, op.at, throttled)
 			return
 		}
 		// The union replaced its members' requests at no extra cost.
@@ -395,7 +397,7 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 		p.failed++
 		p.c.logBatchFailure(&b, res.Err, p.queryTime)
 		if throttled && len(req.questions) == 0 && !req.resent {
-			req.resent = true
+			req.resent, req.deadline = true, p.deadline
 			p.hold(req)
 		}
 		if rejectedMetrics(res.Err) {
@@ -442,7 +444,7 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 
 // The members of a failed union keep their earlier requests in this poll, so
 // the attempt costs one request and no sample.
-func (p *queryPoll) rejectMerge(m *mergeAttempt, err error, at time.Time) {
+func (p *queryPoll) rejectMerge(m *mergeAttempt, err error, at time.Time, throttled bool) {
 	ttl := p.c.definitionTTL()
 	if state := p.state.merges[m.key]; state != nil {
 		if rejectedMetrics(err) {
@@ -454,7 +456,13 @@ func (p *queryPoll) rejectMerge(m *mergeAttempt, err error, at time.Time) {
 	}
 	class, detail := batchFailureReason(err)
 	p.c.Debugf("merging resource batches failed: profile=%s grain=%s class=%s %s", m.key.chunk.profile.Name, m.key.chunk.TimeGrain, class, detail)
-	p.primary = append(p.primary, m.fallback...)
+	for _, r := range m.fallback {
+		if throttled {
+			// The union already was these members' first attempt.
+			r.resent, r.deadline = true, p.deadline
+		}
+		p.primary = append(p.primary, r)
+	}
 }
 
 func (p *queryPoll) hold(r plannedRequest) {
@@ -471,13 +479,7 @@ func (p *queryPoll) releaseHeld() {
 	}
 	held := p.held
 	p.held, p.heldUntil, p.heldStale = nil, time.Time{}, false
-	late := !time.Now().Before(p.deadline)
 	for _, r := range held {
-		if late && (r.resent || !r.deadline.IsZero()) {
-			// Work that was throttled or waited is not sent after the deadline.
-			p.held = append(p.held, r)
-			continue
-		}
 		b := r.batch
 		free, blocked := metricParts(b, func(row resourceInfo) uint32 {
 			mask, expiry := p.state.holds.resourceMetricHolds(b, row, at)
@@ -488,7 +490,7 @@ func (p *queryPoll) releaseHeld() {
 			r.batch = part
 			p.primary = append(p.primary, r)
 		}
-		// Work that waited for a hold ends with the poll's recovery deadline.
+		// Work that waits for a hold is bound to the poll's recovery deadline.
 		r.deadline = p.deadline
 		for _, part := range blocked {
 			r.batch = part
@@ -510,18 +512,16 @@ func (p *queryPoll) heldWake() time.Time {
 	return wake
 }
 
+// Azure accepted the request. Only an embedded incompatibility removes a name
+// from it; any other per-metric error is a gap in an otherwise valid request.
 func (p *queryPoll) accept(b queryBatch, q *metricQuestion, cohort uint64, res queryBatchResult, at time.Time) {
-	errorsByResource := res.incompatible
-	if q != nil {
-		errorsByResource = res.metricErrors
-	}
-	if len(errorsByResource) == 0 {
+	if len(res.incompatible) == 0 {
 		if q != nil {
 			p.state.promote(b, cohort)
 		}
 		return
 	}
-	good, bad := metricParts(b, func(r resourceInfo) uint32 { return b.mask &^ errorsByResource[r.idKey] })
+	good, bad := metricParts(b, func(r resourceInfo) uint32 { return b.mask &^ res.incompatible[r.idKey] })
 	if q != nil {
 		for _, part := range good {
 			p.state.promote(part, cohort)
@@ -539,12 +539,6 @@ func (p *queryPoll) accept(b queryBatch, q *metricQuestion, cohort uint64, res q
 				cell := selectNames(one, m&-m)
 				if q == nil {
 					p.newRejection(cell, cohort, true, at)
-					continue
-				}
-				if res.incompatible[r.idKey]&cell.mask == 0 {
-					deferred := *q
-					deferred.batch = cell
-					p.state.add(&deferred)
 					continue
 				}
 				denied := &metricQuestion{batch: cell, cohort: cohort, turn: q.turn, delay: q.delay}
@@ -577,7 +571,8 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	slots := max(1, c.queryExecutor.maxConcurrency)
 	p := queryPoll{
 		c: c, state: s, ctx: ctx, queryTime: now, deadline: deadline,
-		due: make(map[*metricChunk]bool), events: make(chan *queryOperation, slots),
+		single: policy.WithRetryOptions(ctx, policy.RetryOptions{MaxRetries: -1}),
+		due:    make(map[*metricChunk]bool), events: make(chan *queryOperation, slots),
 		primary: s.plan(batches, now, c.Limits.MaxBatchResources, c.definitionTTL()),
 		debug:   logger.Level.Enabled(slog.LevelDebug),
 	}
@@ -609,15 +604,24 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 			if len(p.primary) > 0 {
 				r := p.primary[0]
 				p.primary = p.primary[1:]
+				late := !time.Now().Before(deadline)
+				if late && !r.deadline.IsZero() {
+					// Work that was throttled or waited for a hold is dropped
+					// once the recovery deadline has passed.
+					continue
+				}
 				held := s.holds.hasMetrics() && s.holds.metricMask(r.batch, c.now()) != 0
 				if m := r.merge; m != nil {
 					// A trial union is the one extra request if Azure rejects it.
-					if held || p.supplementalUsed >= maxRecoveryMetricsCalls {
+					if held || late || p.supplementalUsed >= maxRecoveryMetricsCalls {
 						p.primary = append(p.primary, m.fallback...)
 						continue
 					}
 					p.supplementalUsed++
-				} else if held {
+					p.startMetrics(r, p.single)
+					continue
+				}
+				if held {
 					p.hold(r)
 					continue
 				}

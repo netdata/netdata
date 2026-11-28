@@ -384,3 +384,47 @@ func TestCollectResendsThrottledOrdinaryRequestWhenHoldExpires(t *testing.T) {
 		})
 	}
 }
+
+// Work released from a hold while every slot is busy reaches dispatch after
+// the recovery deadline. It is dropped there, not sent late.
+func TestCollectDropsReleasedWorkThatReachesDispatchAfterDeadline(t *testing.T) {
+	for _, retryAfter := range []string{"0", "10"} {
+		t.Run("Retry-After "+retryAfter, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				delays := map[string]time.Duration{"a": 30 * time.Second, "b": 56 * time.Second, "c": 40 * time.Second}
+				// The throttled resource sorts first, so its first send is at the start of the poll.
+				rows := []map[string]any{testResource(recoveryTestNamespace, "0-held", nil)}
+				for _, name := range []string{"a", "b", "c"} {
+					rows = append(rows, testResource(recoveryTestNamespace, name, nil))
+				}
+				c := newTestCollectorWithMocks(&mockResourceGraph{resources: rows}, &mockMetricsClient{})
+				c.Config = testConfig()
+				c.Timeout = confopt.Duration(90 * time.Second)
+				c.Limits.MaxConcurrency = 2
+				c.Limits.MaxBatchResources = 1
+				useRecoveryTestProfile(t, c, []string{"A"}, nil)
+				start := time.Now()
+				var mu sync.Mutex
+				var heldSends []time.Duration
+				initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+					return nil, fmt.Errorf("unexpected definitions read: %s", req.URL.Path)
+				}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+					name := query.ResourceIDs[0][strings.LastIndex(query.ResourceIDs[0], "/")+1:]
+					if name == "0-held" {
+						mu.Lock()
+						heldSends = append(heldSends, time.Since(start))
+						mu.Unlock()
+						resp, err := recoveryWireError(req, http.StatusTooManyRequests, "TooManyRequests")
+						resp.Header.Set("Retry-After", retryAfter)
+						return resp, err
+					}
+					time.Sleep(delays[name])
+					return recoveryWireTotals(req, query, 5)
+				})
+				series := collectRecoveryCounters(t, c)
+				assert.Len(t, heldSends, 1, "sent at %v", heldSends)
+				assert.Len(t, series, 3, "the three healthy resources publish their window")
+			})
+		})
+	}
+}

@@ -838,13 +838,21 @@ func TestCollectMergesResourceSplitsThatWorkTogether(t *testing.T) {
 		incompatiblePair bool
 		wantRequests     map[int]int // Requests per poll at the given minute.
 		wantUnions       []int       // Minutes with a request for all fifty resources.
-		wantMerged       int         // First minute with one request for the 49 healthy resources.
+		wantMerged       int         // First minute with an accepted request for the 49 healthy resources.
+		unavailableAt    int         // Minute in which Azure answers that request with 503.
 	}{
 		"one bad resource": {
 			// Minute 6 also rechecks the denied name of the bad resource.
 			wantRequests: map[int]int{4: 7, 5: 7, 6: 3, 7: 2, 30: 2},
 			wantUnions:   []int{0},
 			wantMerged:   6,
+		},
+		"merge fails transiently": {
+			unavailableAt: 6,
+			// One merge request, its six members, the bad resource's A, and its B recheck.
+			wantRequests: map[int]int{5: 7, 6: 9, 7: 7, 10: 7, 11: 2, 12: 2},
+			wantUnions:   []int{0},
+			wantMerged:   11,
 		},
 		"resources that cannot share a request": {
 			incompatiblePair: true,
@@ -881,10 +889,15 @@ func TestCollectMergesResourceSplitsThatWorkTogether(t *testing.T) {
 				if len(query.ResourceIDs) == len(ids) {
 					unions = append(unions, int(now.Sub(start)/time.Minute))
 				}
-				if len(query.ResourceIDs) == len(ids)-1 && merged == 0 {
-					merged = int(now.Sub(start) / time.Minute)
+				minute := int(now.Sub(start) / time.Minute)
+				unavailable := len(query.ResourceIDs) == len(ids)-1 && test.unavailableAt != 0 && minute == test.unavailableAt
+				if len(query.ResourceIDs) == len(ids)-1 && merged == 0 && !unavailable {
+					merged = minute
 				}
 				mu.Unlock()
+				if unavailable {
+					return recoveryWireError(req, http.StatusServiceUnavailable, "ServiceUnavailable")
+				}
 				bad := has(ids[7])
 				if test.incompatiblePair {
 					bad = has(ids[0]) && has(ids[49])
@@ -924,4 +937,88 @@ func TestCollectMergesResourceSplitsThatWorkTogether(t *testing.T) {
 			assert.Len(t, last, 5, "every tracked counter was collected")
 		})
 	}
+}
+
+// Azure accepted the request shape, so a metric that keeps answering with an
+// error inside it is ordinary work with a gap, not an open recovery question.
+func TestCollectPromotesAcceptedQuestionWithLastingMetricError(t *testing.T) {
+	row := testResource(recoveryTestNamespace, "edge", nil)
+	c := newTestCollectorWithMocks(&mockResourceGraph{resources: []map[string]any{row}}, &mockMetricsClient{})
+	c.Config = testConfig()
+	useRecoveryTestProfile(t, c, []string{"A", "B", "C"}, nil)
+	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	now := start
+	c.now = func() time.Time { return now }
+	initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+		return recoveryWireDefinitions(req, "A", "B", "C")
+	}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+		if len(query.Names) > 1 {
+			return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
+		}
+		if query.Names[0] != "C" {
+			return recoveryWireTotals(req, query, 5)
+		}
+		name, code := "C", "InternalServerError"
+		return azureTestResponse(req, http.StatusOK, azmetrics.MetricResults{Values: []azmetrics.MetricData{{
+			ResourceID: &query.ResourceIDs[0],
+			Values:     []azmetrics.Metric{{Name: &azmetrics.LocalizableString{Value: &name}, ErrorCode: &code}},
+		}}})
+	})
+	for minute := range 3 {
+		now = start.Add(time.Duration(minute) * time.Minute)
+		series := collectRecoveryCounters(t, c)
+		requireRecoveryCounter(t, series, "A", "edge", 5*(minute+1))
+		requireRecoveryCounter(t, series, "B", "edge", 5*(minute+1))
+		_, ok := seriesValue(series, ".c_total", "edge")
+		assert.False(t, ok, "C is a gap at minute %d", minute)
+		assert.Empty(t, c.recovery.questions, "no supplemental work remains after minute %d", minute)
+	}
+}
+
+func TestCollectThrottledMergeSendsItsMembersOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var rows []map[string]any
+		var ids []string
+		for i := range 50 {
+			row := testResource(recoveryTestNamespace, fmt.Sprintf("edge-%02d", i), nil)
+			rows = append(rows, row)
+			ids = append(ids, strings.ToLower(row["id"].(string)))
+		}
+		c := newTestCollectorWithMocks(&mockResourceGraph{resources: rows}, &mockMetricsClient{})
+		c.Config = testConfig()
+		useRecoveryTestProfile(t, c, []string{"A", "B"}, nil)
+		start := time.Now()
+		const mergeMinute = 6
+		type send struct {
+			at        time.Duration
+			resources int
+		}
+		var mu sync.Mutex
+		var throttled []send
+		initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+			return recoveryWireDefinitions(req, "A", "B")
+		}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+			has := func(id string) bool {
+				return slices.ContainsFunc(query.ResourceIDs, func(v string) bool { return strings.ToLower(v) == id })
+			}
+			if at := time.Since(start) - mergeMinute*time.Minute; at >= 0 && at < time.Minute && has(ids[0]) {
+				mu.Lock()
+				throttled = append(throttled, send{at, len(query.ResourceIDs)})
+				mu.Unlock()
+				resp, err := recoveryWireError(req, http.StatusTooManyRequests, "TooManyRequests")
+				resp.Header.Set("Retry-After", "2")
+				return resp, err
+			}
+			if has(ids[7]) && slices.Contains(query.Names, "B") {
+				return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
+			}
+			return recoveryWireTotals(req, query, 5)
+		})
+		for minute := range mergeMinute + 1 {
+			time.Sleep(time.Duration(minute)*time.Minute - time.Since(start))
+			collectRecoveryCounters(t, c)
+		}
+		assert.Equal(t, []send{{0, 49}, {2 * time.Second, 6}}, throttled,
+			"the merge and one re-send of the members after its hold, not a second re-send")
+	})
 }

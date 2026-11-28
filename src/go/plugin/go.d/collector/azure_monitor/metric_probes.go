@@ -208,7 +208,8 @@ func (p *queryPoll) deny(q *metricQuestion, at time.Time) {
 	}
 	q.nextCheck = at.Add(q.delay)
 	q.lastPoll = p.state.poll
-	q.recheckEarly = false
+	// Each admission clears recheckEarly. If it is set here, new advice
+	// arrived while this check was in flight and still deserves a check.
 	p.trackSleeper(q)
 	q.rejected = false
 }
@@ -276,7 +277,7 @@ func (p *queryPoll) readyQuestions(at time.Time) []*metricQuestion {
 	}
 	// Queue order breaks equal-age ties. Each actual admission, including a
 	// transient failure, moves behind older unserved work across future polls.
-	evidenceFirst := p.supplementalUsed != 0
+	evidenceFirst := p.asked
 	slices.SortFunc(ready, func(a, b *metricQuestion) int {
 		// Give the oldest work the first turn every poll, then prefer
 		// evidence for recovering working samples in the remaining window.
