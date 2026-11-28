@@ -81,6 +81,39 @@ func TestCollectRequestsOnlyCompatibleAggregations(t *testing.T) {
 	assert.ElementsMatch(t, want, seen)
 }
 
+func TestCollectVirtualWANDefaultQueryBudget(t *testing.T) {
+	rg := &mockResourceGraph{resources: []map[string]any{testResource("Microsoft.Network/vpnGateways", "wan", nil)}}
+	mx := &mockMetricsClient{}
+	c := newTestCollectorWithMocks(rg, mx)
+	c.Config = testConfig()
+	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	c.now = func() time.Time { return now }
+	require.NoError(t, c.Init(t.Context()))
+
+	for range 5 {
+		_, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+		require.NoError(t, err)
+		require.Equal(t, 3, mx.calls())
+		now = now.Add(time.Minute)
+	}
+
+	got := make(map[string][]string)
+	for _, call := range mx.queryCalls() {
+		assert.Equal(t, "PT5M", call.Interval)
+		got[call.Aggregation] = slices.Sorted(slices.Values(call.MetricNames))
+	}
+	assert.Equal(t, map[string][]string{
+		"average": {"AverageBandwidth", "BgpPeerStatus"},
+		"maximum": {"InboundFlowsCount", "OutboundFlowsCount"},
+		"total":   {"TunnelEgressBytes", "TunnelEgressPacketDropCount", "TunnelIngressBytes", "TunnelIngressPacketDropCount"},
+	}, got)
+
+	_, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	assert.Equal(t, 6, mx.calls())
+}
+
 type azureTestTransport func(*http.Request) (*http.Response, error)
 
 func (f azureTestTransport) Do(req *http.Request) (*http.Response, error) { return f(req) }

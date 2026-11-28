@@ -1,0 +1,138 @@
+---
+# Optional full profile (27 metrics)
+#   wget https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/examples/virtual_wan_vpn_gateway.yaml
+# Save it as go.d/azure_monitor.profiles/virtual_wan_vpn_gateway.yaml in your user configuration directory and restart the Agent.
+display_name: Azure Virtual WAN Site-to-Site VPN Gateway
+resource_type: Microsoft.Network/vpnGateways
+metrics:
+  - id: average_bandwidth
+    azure_name: AverageBandwidth
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: inbound_flows_count
+    azure_name: InboundFlowsCount
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: outbound_flows_count
+    azure_name: OutboundFlowsCount
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: tunnel_ingress_bytes
+    azure_name: TunnelIngressBytes
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: tunnel_egress_bytes
+    azure_name: TunnelEgressBytes
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: tunnel_ingress_packet_drop_count
+    azure_name: TunnelIngressPacketDropCount
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: tunnel_egress_packet_drop_count
+    azure_name: TunnelEgressPacketDropCount
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: bgp_peer_status
+    azure_name: BgpPeerStatus
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure Virtual WAN Site-to-Site VPN Gateway
+  context_namespace: virtual_wan_vpn_gateway
+  chart_defaults:
+    label_promotion:
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
+      - subscription_id
+    instances:
+      by_labels:
+        - resource_uid
+  charts:
+    - id: am_azure_virtual_wan_vpn_gateway__gateway_bandwidth
+      title: Azure Virtual WAN Gateway Bandwidth
+      context: gateway_bandwidth
+      family: Traffic
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: average_bandwidth_average
+          name: average
+          options:
+            float: true
+    - id: am_azure_virtual_wan_vpn_gateway__gateway_flows
+      title: Azure Virtual WAN Peak Gateway Flows
+      context: gateway_flows
+      family: Traffic
+      type: line
+      units: flows
+      algorithm: absolute
+      dimensions:
+        - selector: inbound_flows_count_maximum
+          name: inbound
+        - selector: outbound_flows_count_maximum
+          name: outbound
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_traffic
+      title: Azure Virtual WAN Tunnel Traffic
+      context: tunnel_traffic
+      family: Tunnel Traffic
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_ingress_bytes_total
+          name: ingress
+          options:
+            divisor: 300
+        - selector: tunnel_egress_bytes_total
+          name: egress
+          options:
+            divisor: 300
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_packet_drops
+      title: Azure Virtual WAN Tunnel Packet Drops
+      context: tunnel_packet_drops
+      family: Packet Drops
+      type: line
+      units: packets/s
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_ingress_packet_drop_count_total
+          name: ingress
+          options:
+            divisor: 300
+        - selector: tunnel_egress_packet_drop_count_total
+          name: egress
+          options:
+            divisor: 300
+    - id: am_azure_virtual_wan_vpn_gateway__bgp_peer_status
+      title: Azure Virtual WAN Average BGP Peer Status
+      context: bgp_peer_status
+      family: Routing
+      type: line
+      units: ratio
+      algorithm: absolute
+      dimensions:
+        - selector: bgp_peer_status_average
+          name: average
+          options:
+            float: true
