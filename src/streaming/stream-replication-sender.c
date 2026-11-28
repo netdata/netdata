@@ -574,7 +574,8 @@ static struct replication_query *replication_response_prepare(
         time_t requested_after,
         time_t requested_before,
         STREAM_CAPABILITIES capabilities,
-        bool synchronous
+        bool synchronous,
+        bool defer_streaming
         ) {
 
     bool query_enable_streaming = requested_enable_streaming;
@@ -615,6 +616,14 @@ static struct replication_query *replication_response_prepare(
             query_enable_streaming = true;
         }
     }
+
+    // A query that enables streaming takes the chart's data collection lock
+    // and holds it until the reply is sent. Prefetch must not prepare it:
+    // the slot may wait behind other queries and replication throttling,
+    // stalling the chart's collection. Return NULL, so that it is prepared
+    // when it is executed.
+    if(defer_streaming && query_enable_streaming)
+        return NULL;
 
     return replication_query_prepare(
             st,
@@ -1270,7 +1279,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
                 rq->start_streaming,
                 rq->after,
                 rq->before,
-                rq->sender->capabilities, true);
+                rq->sender->capabilities, true, false);
     }
 
     if(likely(workers)) worker_is_busy(WORKER_JOB_QUERYING);
@@ -1625,7 +1634,17 @@ static int replication_pipeline_execute_next(void) {
                         rq->after,
                         rq->before,
                         rq->sender->capabilities,
-                        rtp.max_requests_ahead == 1);
+                        rtp.max_requests_ahead == 1,
+                        true);
+
+                    if(!rq->q) {
+                        // deferred to execution: keep the decision to start
+                        // streaming (the window may stop qualifying by then),
+                        // and do not keep the chart pointer while the slot
+                        // waits, it is looked up again then
+                        rq->start_streaming = true;
+                        rq->st = NULL;
+                    }
                 }
             }
 
