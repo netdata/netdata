@@ -1834,5 +1834,34 @@
       "limit-3",
       "limit-1"
     ]
+  },
+  {
+    "name": "CASE-048/fold-view-range",
+    "proves": "after a cardinality fold the reported min/max (v1 jsonwrap min/max, v2/v3 view.min/max) equal the extrema of every value the reduced result returns, the \"remaining N dimensions\" row sums included, hidden columns counted as in unfolded results",
+    "components": [
+      "v1-sum",
+      "v2-sum",
+      "v3-sum",
+      "v1-percentage",
+      "v3-shrinking",
+      "v3-hidden-zero"
+    ]
+  },
+  {
+    "name": "CASE-048/fold-remaining-nonzero",
+    "proves": "with options=nonzero the \"remaining N dimensions\" column of a cardinality fold is exposed only when some row sum is nonzero (folded zeros, or signed values that cancel, hide it), and options=raw still exposes it",
+    "components": [
+      "zero-tail",
+      "signed-cancel",
+      "signed-cancel-raw"
+    ]
+  },
+  {
+    "name": "CASE-048/fold-nonzero-never-empty",
+    "proves": "options=nonzero never hides every column of a cardinality-folded result: when no exposed column of the reduced result is nonzero the effective options drop nonzero and the zero columns are returned",
+    "components": [
+      "limit-1-cancel",
+      "tie-cancel"
+    ]
   }
 ]

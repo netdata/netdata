@@ -358,6 +358,9 @@ set at the end.
 | CASE-045/terminal-smoothing-empty | SES and DES return null with EMPTY after the existing terminal EOF allowance when a later tier is skipped, with retained-source and single-plan controls | n/a |  |
 | CASE-046/details-as-after-fold | with options=details every grouped metric's "as" names the result dimension it is aggregated into: after a cardinality fold kept metrics keep their own dimension name and folded metrics name the "remaining N dimensions" bucket, with a no-limit control | n/a | #24897 |
 | CASE-047/v1-jsonwrap-arrays-after-fold | the v1 jsonwrap arrays chart_ids, chart_labels[key] and latest_values stay parallel to dimension_ids: after a cardinality fold kept columns carry their own metric's chart, label and last collected value and the "remaining N dimensions" column carries null, with a no-limit control | n/a | #24898 |
+| CASE-048/fold-view-range | after a cardinality fold the reported min/max (v1 jsonwrap min/max, v2/v3 view.min/max) equal the extrema of every value the reduced result returns, the "remaining N dimensions" row sums included, hidden columns counted as in unfolded results | n/a |  |
+| CASE-048/fold-remaining-nonzero | with options=nonzero the "remaining N dimensions" column of a cardinality fold is exposed only when some row sum is nonzero (folded zeros, or signed values that cancel, hide it), and options=raw still exposes it | n/a |  |
+| CASE-048/fold-nonzero-never-empty | options=nonzero never hides every column of a cardinality-folded result: when no exposed column of the reduced result is nonzero the effective options drop nonzero and the zero columns are returned | n/a |  |
 
 ## Corpus-wide pusher discipline
 
