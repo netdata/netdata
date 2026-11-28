@@ -584,8 +584,7 @@ static bool sanitize_command_argument_string(char *dst, const char *src, size_t 
     return true;
 }
 
-ALWAYS_INLINE
-static int read_txt_file(const char *filename, char *buffer, size_t size) {
+static inline int read_txt_file(const char *filename, char *buffer, size_t size) {
     if(unlikely(!size)) return 3;
 
     int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
@@ -606,8 +605,7 @@ static int read_txt_file(const char *filename, char *buffer, size_t size) {
     return 0;
 }
 
-ALWAYS_INLINE
-static bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
+static inline bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
     struct stat st;
     if (stat(filename, &st) == -1 || !S_ISREG(st.st_mode))
         return false;
@@ -658,8 +656,7 @@ static bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max
     return true; // Success
 }
 
-ALWAYS_INLINE
-static int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
+static inline int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
     if (unlikely(!size)) return 3;
 
     // O_NOFOLLOW closes a symlink-based arbitrary-file-read primitive: a real
@@ -699,8 +696,7 @@ static int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
     return 0;
 }
 
-ALWAYS_INLINE
-static int read_single_number_file(const char *filename, unsigned long long *result) {
+static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
     int ret = read_txt_file(filename, buffer, sizeof(buffer));
@@ -714,8 +710,7 @@ static int read_single_number_file(const char *filename, unsigned long long *res
     return 0;
 }
 
-ALWAYS_INLINE
-static int read_single_signed_number_file(const char *filename, long long *result) {
+static inline int read_single_signed_number_file(const char *filename, long long *result) {
     char buffer[30 + 1];
 
     int ret = read_txt_file(filename, buffer, sizeof(buffer));
@@ -729,8 +724,7 @@ static int read_single_signed_number_file(const char *filename, long long *resul
     return 0;
 }
 
-ALWAYS_INLINE
-static int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
+static inline int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
     int ret = read_txt_file(filename, buffer, sizeof(buffer));
