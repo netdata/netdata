@@ -36,7 +36,7 @@ Monitor Azure Kubernetes Service (AKS) with metrics covering:
 - **Autoscaler** -- autoscaler health, unneeded nodes, unschedulable pods
 
 
-It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/migrate-to-batch-api) to collect metrics, grouping requests by subscription, region, and time grain. Resources are discovered via [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) queries at startup and refreshed periodically. Authentication is handled through [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/) (service principal, managed identity, or default credentials).
+It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/migrate-to-batch-api) to collect metrics, grouping metrics by subscription, region, time grain, and aggregation. Resources are discovered via [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) queries at startup and refreshed periodically. Authentication is handled through [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/) (service principal, managed identity, or default credentials).
 
 
 This collector is supported on all platforms.
@@ -76,22 +76,27 @@ The collector has two discovery phases:
 
 - **Minimum collection interval:** 60 seconds (enforced). Azure Monitor metrics granularity is typically 1 minute.
 - **Metrics reporting delay:** Azure Monitor metrics have a 1-3 minute reporting delay. The collector uses `query_offset` (default: 180s) as a minimum offset and automatically uses a larger effective offset for slower time-grain batches when needed.
-- **API throttling:** Azure Monitor applies per-subscription rate limits. The collector uses bounded concurrency and batching to stay within limits, but monitoring many resources in a single subscription may require tuning `limits.*` options.
+- For time grains longer than the collection interval, Netdata carries a value forward only when the last scheduled query returned a sample.
+- A 429 or 529 response from the regional Metrics API pauses requests for the affected resources and metrics. When Azure Resource Manager (ARM) throttles a metric-definition lookup and reports an exhausted subscription or tenant quota, the collector pauses definition lookups in that scope. It honors the server’s retry interval and backs off when the response omits it. A scheduled query paused this way is sent again in the same poll when the pause ends early enough, at most once. That repeat is a metered query and is not one of the eight additional queries described under the cost notes.
 
 
 #### Performance Impact
 
-The collector batches resources and metrics to minimize Azure API calls and uses bounded concurrency to avoid overwhelming the API.
+:::caution
+Azure meters platform metric queries through the Metrics data plane. The first 1 million API calls per subscription per month are free. Additional usage is billed per 1,000 API calls, and the number of metrics requested can affect the cost. Other jobs and applications share the allowance. See [Azure Monitor pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/).
+:::
 
-**Default concurrency and batching limits:**
+**What drives usage.** Each profile queries each subscription and region separately. For each due time grain and aggregation, one request can cover up to 50 resources and 20 metric names by default. These scheduled queries account for normal Metrics API usage. Different resource capabilities can require more batches.
 
-| Setting | Default | Description |
-|:--------|:--------|:------------|
-| `limits.max_concurrency` | 4 | Maximum concurrent batch queries |
-| `limits.max_batch_resources` | 50 | Maximum resources per batch request |
-| `limits.max_metrics_per_query` | 20 | Maximum metrics per batch request |
+After a metric incompatibility, the collector can read resource-specific metric definitions from Azure Resource Manager (ARM) and send additional metered requests to the Metrics API. Each job can send up to eight additional Metrics queries per poll, including retries with compatible names, smaller batches, checks of names ARM omits, and later rechecks. The limit counts the requests the collector starts; the Azure SDK can repeat one after an authentication challenge or a redirect. These queries share the job's remaining time and concurrency limits. ARM reads use the management API. Outside that limit, the Azure SDK may retry a scheduled query after a transient failure, and the collector repeats a throttled scheduled query once per poll; each attempt is a metered query.
 
-For large deployments, consider splitting resources across multiple jobs. If you hit Azure API rate limits, reduce `max_concurrency`.
+When more batches need recovery than a poll can handle, work that had fewer chances to run gets priority in later eligible polls. If the Metrics API keeps rejecting a name and its definition stays unchanged, the default wait between rechecks increases from 5 to 10, 20, 40, and then 60 minutes. Resources whose definitions all omit the rejected name are rechecked together in one query. Resource batches that recovery split are combined again after the discovery refresh interval when Azure accepts them together; a rejected attempt counts as one of the eight additional queries and is retried with the same increasing wait. If refreshed definitions start listing the metric as supported, the collector can recheck it sooner within the same eight-query limit. A recheck can be later if Azure requests a longer wait, the time grain is slower, or the job reaches a collection limit.
+
+**Estimate before enabling.** Multiply the expected requests per poll by the number of polls in a month. Count each slower time grain only when it is due. For example, the stock Stream Analytics profile uses four aggregations every minute. Six regions in one subscription, each fitting in one resource batch, use 24 requests per minute. At continuous collection that is 1,036,800 scheduled requests in 30 days, before recovery or SDK retries.
+
+**Check actual usage.** To see billed usage, select the subscription in Azure Cost Management cost analysis and group Azure Monitor costs by meter. The collector's debug logs show Metrics batches, requested names and aggregations when you need to explain the volume. See [Azure Cost Management cost analysis](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/quick-acm-cost-analysis).
+
+**Reduce calls.** Narrow the selected profiles and discovered resources to remove batches. Increasing `update_every` also reduces calls. Each query covers one Azure time-grain bucket, so polling every two minutes skips alternate one-minute buckets and undercounts totals for those metrics. Keep `limits.max_batch_resources` and `limits.max_metrics_per_query` at their defaults for the largest batches. Lowering `limits.max_concurrency` spreads requests over time and can help with throttling.
 
 
 ## Setup
@@ -809,6 +814,18 @@ The request failed before the collector could read its metrics. The warning iden
 **Fix**
 
 For an authorization error, verify the collector identity has Monitoring Reader access at subscription scope for the Azure Monitor batch API. For DNS or network errors, check access to the regional Metrics endpoint from the Agent host. Warnings repeat at most once per hour per profile and failure class. Debug mode shows each failed request. Jobs using secret references may show a redacted message.
+
+
+#### `metric definitions lookup failed`
+
+**Cause**
+
+Azure rejected a metric request and the collector could not read the affected resource's metric definitions. The collector can keep querying combinations that previously worked and test smaller batches for the affected resource within its recovery allowance. Some metrics may remain missing until the Metrics API accepts a later query.
+
+
+**Fix**
+
+For an authorization error, verify the collector identity has `Microsoft.Insights/metricDefinitions/read` on the resource. For network errors, check the Agent's connection to the Azure Resource Manager endpoint for the configured cloud.
 
 
 ### Other Problems
