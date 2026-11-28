@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/url"
 	"runtime"
 	"sync"
 	"time"
@@ -22,12 +23,27 @@ import (
 // azcore does not export its default client. Keep the pinned SDK's settings
 // and share one connection pool for the two Azure APIs using this decorator.
 var defaultAzureRequestClient = sync.OnceValue(func() *http.Client {
-	return &http.Client{Transport: newAzureRequestHTTPTransport()}
+	return &http.Client{Transport: newAzureRequestHTTPTransport(http.ProxyFromEnvironment)}
 })
 
-func newAzureRequestHTTPTransport() *http.Transport {
+type azureNativeTransport struct{ *http.Transport }
+
+func newAzureRequestHTTPTransport(proxy func(*http.Request) (*url.URL, error)) *azureNativeTransport {
 	transport := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
+		// net/http resolves the proxy on each outer attempt, before it takes
+		// a connection. Returning an admission error here prevents an HTTP/1
+		// write even when a stale pooled connection needed no body rewind.
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			if a, ok := req.Context().Value(nativeAttemptKey{}).(*nativeAttempt); ok {
+				if err := a.beforeConnect(req.Context()); err != nil {
+					return nil, err
+				}
+			}
+			if proxy != nil {
+				return proxy(req)
+			}
+			return nil, nil
+		},
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   10,
@@ -46,7 +62,7 @@ func newAzureRequestHTTPTransport() *http.Transport {
 		http2Transport.ReadIdleTimeout = 10 * time.Second
 		http2Transport.PingTimeout = 5 * time.Second
 	}
-	return transport
+	return &azureNativeTransport{transport}
 }
 
 type azureRequestTransport struct {
@@ -61,6 +77,10 @@ func withAzureRequestTransport(options azcore.ClientOptions) azcore.ClientOption
 		next = defaultAzureRequestClient()
 	}
 	if client, ok := next.(*http.Client); ok {
+		if _, owned := client.Transport.(*azureNativeTransport); owned {
+			options.Transport = client
+			return options
+		}
 		// Authorize each redirect after net/http prepares it. Retain the
 		// client's redirect policy, timeouts and underlying connection pool.
 		wrapped := *client
@@ -81,11 +101,14 @@ func (t azureRequestTransport) Do(req *http.Request) (*http.Response, error) {
 }
 
 func (t azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	_, native := t.next.(*http.Transport)
-	return doAzureRequest(req, t.next.RoundTrip, native)
+	return doAzureRequest(req, t.next.RoundTrip, false)
 }
 
-func doAzureRequest(req *http.Request, next func(*http.Request) (*http.Response, error), traceHTTP2 bool) (*http.Response, error) {
+func (t *azureNativeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return doAzureRequest(req, t.Transport.RoundTrip, true)
+}
+
+func doAzureRequest(req *http.Request, next func(*http.Request) (*http.Response, error), native bool) (*http.Response, error) {
 	ctx := req.Context()
 	op, _ := ctx.Value(queryOperationKey{}).(*queryOperation)
 	if op == nil {
@@ -100,7 +123,11 @@ func doAzureRequest(req *http.Request, next func(*http.Request) (*http.Response,
 	}
 	var cancel context.CancelCauseFunc
 	if op.events != nil {
-		req, cancel = gateAzureReplays(req, op, post, traceHTTP2)
+		if native {
+			req, cancel = trackNativeAttempts(req, op, post)
+		} else {
+			req = gateTransportRewinds(req, op, post)
+		}
 	}
 	resp, err := next(req)
 	if cancel != nil {
@@ -119,58 +146,79 @@ func doAzureRequest(req *http.Request, next func(*http.Request) (*http.Response,
 	return resp, err
 }
 
-func gateAzureReplays(req *http.Request, op *queryOperation, post, traceHTTP2 bool) (*http.Request, context.CancelCauseFunc) {
-	ctx := req.Context()
-	var cancel context.CancelCauseFunc
-	var gotConn, h2, rewound, admitted bool
-	if traceHTTP2 {
-		ctx, cancel = context.WithCancelCause(ctx)
-		// HTTP/2 obtains the next connection after the retry delay. GotConn
-		// runs synchronously before headers, even if it reuses the same
-		// connection. Its writer honors cancellation before sending headers.
-		ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) {
-			tlsConn, ok := info.Conn.(interface{ ConnectionState() tls.ConnectionState })
-			h2 = ok && tlsConn.ConnectionState().NegotiatedProtocol == "h2"
-			if gotConn && h2 && !admitted {
-				if err := op.authorize(ctx, post); err != nil {
-					cancel(err)
-				}
-			}
-			gotConn, rewound, admitted = true, false, false
-		}})
-	}
+type nativeAttemptKey struct{}
 
-	// Keep replay hooks off the request http.Client uses for redirects.
-	// Each redirect is authorized separately when it enters RoundTrip.
+// net/http can retry in its outer connection loop or inside a single HTTP/2
+// RoundTrip. The first connection selected in each outer attempt shares its
+// admission. A second selection is an HTTP/2 retry and needs a fresh decision.
+type nativeAttempt struct {
+	op       *queryOperation
+	post     bool
+	started  bool // The initial admission already covers the first acquisition.
+	selected bool // GotConn ran since the most recent outer acquisition.
+	rewound  bool // net/http had to reconstruct the preceding request body.
+}
+
+func (a *nativeAttempt) beforeConnect(ctx context.Context) error {
+	if a.started {
+		// An HTTP/1 Metrics POST retried with its untouched body wrote zero
+		// bytes. Check holds again, reusing its existing POST reservation.
+		if err := a.op.authorize(ctx, a.post && a.selected && a.rewound); err != nil {
+			return err
+		}
+	}
+	a.started, a.selected, a.rewound = true, false, false
+	return nil
+}
+
+func trackNativeAttempts(req *http.Request, op *queryOperation, post bool) (*http.Request, context.CancelCauseFunc) {
+	a := &nativeAttempt{op: op, post: post}
+	ctx, cancel := context.WithCancelCause(context.WithValue(req.Context(), nativeAttemptKey{}, a))
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) {
+		if a.selected {
+			// Only the inner HTTP/2 loop selects twice without resolving
+			// a proxy. It checks cancellation after backoff, before HEADERS.
+			if err := op.authorize(ctx, post); err != nil {
+				cancel(err)
+			}
+		}
+		a.started, a.selected, a.rewound = true, true, false
+	}})
 	req = req.WithContext(ctx)
+	if rewind := req.GetBody; post && rewind != nil {
+		req.GetBody = func() (io.ReadCloser, error) {
+			body, err := rewind()
+			a.rewound = err == nil
+			return body, err
+		}
+	}
+	return req, cancel
+}
+
+// Injected transports expose entry and body reconstruction. Leave their
+// connection pool and redirect policy under their owner's control.
+func gateTransportRewinds(req *http.Request, op *queryOperation, post bool) *http.Request {
 	rewind := req.GetBody
 	if req.Method == http.MethodGet && (req.Body == nil || req.Body == http.NoBody) {
-		// HTTP/1.1 skips GetBody for a bodyless GET. An empty reader makes
-		// the transport consult the gate without adding a payload.
+		req = req.WithContext(req.Context())
 		req.Body = io.NopCloser(http.NoBody)
 		rewind = func() (io.ReadCloser, error) { return io.NopCloser(http.NoBody), nil }
+	} else if rewind != nil {
+		req = req.WithContext(req.Context())
 	}
 	if rewind != nil {
 		req.GetBody = func() (io.ReadCloser, error) {
 			body, err := rewind()
-			if err != nil {
-				return nil, err
-			}
-			// HTTP/2 first rewinds before the retry delay. A second rewind
-			// without GotConn is net/http falling back after HTTP/2 could
-			// not get a connection. Admit it here as it can use HTTP/1.1.
-			if !h2 || (rewound && !admitted) {
-				if err := op.authorize(ctx, post); err != nil {
+			if err == nil {
+				if err := op.authorize(req.Context(), post); err != nil {
 					_ = body.Close()
 					return nil, err
 				}
-				admitted = true
 			}
-			rewound = true
-			return body, nil
+			return body, err
 		}
 	}
-	return req, cancel
+	return req
 }
 
 type azureResponseBody struct {

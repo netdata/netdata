@@ -11,10 +11,10 @@ import (
 // A worker publishes a receipt before reading the response body. The same
 // ingress orders it against other workers' send requests and completions.
 type queryEvent struct {
-	op      *queryOperation
-	send    context.Context
-	receipt throttleReceipt
-	post    bool
+	op         *queryOperation
+	send       context.Context
+	receipt    throttleReceipt
+	chargePost bool
 }
 
 type queryOperation struct {
@@ -50,12 +50,12 @@ func queryOperationContext(ctx context.Context) (context.Context, *queryOperatio
 	return context.WithValue(ctx, queryOperationKey{}, op), op
 }
 
-func (op *queryOperation) authorize(ctx context.Context, post bool) error {
+func (op *queryOperation) authorize(ctx context.Context, chargePost bool) error {
 	if op.events == nil {
 		return ctx.Err()
 	}
 	select {
-	case op.events <- queryEvent{op: op, send: ctx, post: post}:
+	case op.events <- queryEvent{op: op, send: ctx, chargePost: chargePost}:
 		// The coordinator always answers published requests, even if the
 		// worker's deadline has since expired.
 		return <-op.reply
@@ -101,7 +101,7 @@ func (p *queryPoll) onEvent(e queryEvent) {
 	op := e.op
 	switch {
 	case e.send != nil:
-		op.reply <- p.authorizeSend(op, e.send, e.post)
+		op.reply <- p.authorizeSend(op, e.send, e.chargePost)
 	case e.receipt.status != 0:
 		op.received = true
 		p.recordServiceResponse(op, e.receipt)
@@ -112,7 +112,7 @@ func (p *queryPoll) onEvent(e queryEvent) {
 	}
 }
 
-func (p *queryPoll) authorizeSend(op *queryOperation, ctx context.Context, post bool) error {
+func (p *queryPoll) authorizeSend(op *queryOperation, ctx context.Context, chargePost bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (p *queryPoll) authorizeSend(op *queryOperation, ctx context.Context, post 
 			}
 		}
 		if op.attempted {
-			if post && len(op.request.questions) != 0 {
+			if chargePost && len(op.request.questions) != 0 {
 				if p.supplementalUsed == maxRecoveryMetricsCalls {
 					return errSupplementalBudgetExhausted
 				}

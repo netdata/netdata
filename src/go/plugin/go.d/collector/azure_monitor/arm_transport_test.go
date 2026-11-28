@@ -11,11 +11,13 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +34,37 @@ import (
 )
 
 const emptyMetricDefinitions = `{"value":[]}`
+
+func TestAzureNativeTransportPreservesProxySelection(t *testing.T) {
+	proxyURL, err := url.Parse("http://proxy.example:8080")
+	require.NoError(t, err)
+	for _, reject := range []bool{false, true} {
+		t.Run(fmt.Sprintf("resolver rejects=%t", reject), func(t *testing.T) {
+			rejected := errors.New("proxy selection failed")
+			dialed := errors.New("proxy selected")
+			transport := newAzureRequestHTTPTransport(func(req *http.Request) (*url.URL, error) {
+				assert.Equal(t, "management.azure.com", req.URL.Host)
+				if reject {
+					return nil, rejected
+				}
+				return proxyURL, nil
+			})
+			defer transport.CloseIdleConnections()
+			transport.DialContext = func(_ context.Context, _, addr string) (net.Conn, error) {
+				assert.Equal(t, proxyURL.Host, addr)
+				return nil, dialed
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://management.azure.com/", nil)
+			require.NoError(t, err)
+			_, err = transport.RoundTrip(req)
+			if reject {
+				assert.ErrorIs(t, err, rejected)
+			} else {
+				assert.ErrorIs(t, err, dialed)
+			}
+		})
+	}
+}
 
 type wireDefinitionRead struct {
 	method, path, host, authorization string
@@ -158,7 +191,8 @@ func definitionReplayClient(t *testing.T, ctx context.Context, protocol string, 
 		})
 		return client, nil
 	}
-	rt := &http.Transport{DialTLSContext: dial}
+	rt := newAzureRequestHTTPTransport(nil)
+	rt.DialTLSContext = dial
 	t.Cleanup(func() { rt.CloseIdleConnections(); peers.Wait() })
 	client := &http.Client{Transport: rt}
 	// Go retries a transmitted HTTP/1.1 GET after EOF on a reused connection.
@@ -227,8 +261,7 @@ func replayHTTP2Client(t *testing.T, ctx context.Context, serve func(net.Conn)) 
 		Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}},
 	}
 
-	rt := newAzureRequestHTTPTransport()
-	rt.Proxy = nil
+	rt := newAzureRequestHTTPTransport(nil)
 	rt.TLSClientConfig.RootCAs = ca
 	var peers sync.WaitGroup
 	rt.DialTLSContext = func(dialCtx context.Context, _, addr string) (net.Conn, error) {
