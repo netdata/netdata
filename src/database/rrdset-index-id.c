@@ -86,6 +86,13 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     st->db.entries = (ctr->memory_mode != RRD_DB_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
+    if(unlikely(!rrdset_update_every_is_valid(st->update_every))) {
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+               "RRDSET: chart '%s' of host '%s' has invalid update every %d; using %d",
+               chart_full_id, rrdhost_hostname(host), ctr->update_every, (int)nd_profile.update_every);
+        st->update_every = nd_profile.update_every;
+    }
     st->rrd_memory_mode = ctr->memory_mode;
 
     st->chart_type = ctr->chart_type;

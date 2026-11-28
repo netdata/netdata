@@ -40,6 +40,14 @@ static void *rrddim_alloc_db(size_t entries) {
     return callocz(entries, sizeof(storage_number));
 }
 
+// The update every to open the collect handle of a tier with. A tier whose update every does not fit
+// (rrdset_tier_update_every_s() == 0) stores nothing for the chart (store_metric_at_tier()), but it still gets a
+// handle, with the update every of a chart collected every second, so the handle never has a step of 0.
+static uint32_t rrddim_tier_handle_update_every_s(RRDSET *st, size_t tier) {
+    uint32_t tier_update_every = rrdset_tier_update_every_s(st, tier);
+    return tier_update_every ? tier_update_every : st->rrdhost->db[tier].tier_grouping;
+}
+
 static void rrddim_reinitialize_collection(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
@@ -49,7 +57,7 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
-                storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
+                storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, rrddim_tier_handle_update_every_s(st, tier), rd->rrdset->smg[tier]);
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 }
@@ -136,7 +144,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (rd->tiers[tier].smh) {
-                uint32_t tier_update_every = st->rrdhost->db[tier].tier_grouping * st->update_every;
+                uint32_t tier_update_every = rrddim_tier_handle_update_every_s(st, tier);
 
                 rd->tiers[tier].last_completed_point_flush_modulo = rrddim_collection_modulo(st, tier_update_every);
 

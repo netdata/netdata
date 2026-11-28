@@ -223,21 +223,37 @@ void netdata_conf_dbengine_init(const char *hostname) {
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
 
-    size_t grouping_iterations = nd_profile.update_every;
     storage_tiers_grouping_iterations[0] = nd_profile.update_every;
 
+    // The update every of the last tier of a chart collected at the default update every must fit in INT32_MAX
+    // seconds (see rrdset_tier_update_every_s(): a tier that does not fit gets no data), so the grouping of the
+    // last tier is capped. Every tier after the current one keeps room for its minimum of 2 iterations.
+    long long grouping_max = INT32_MAX / nd_profile.update_every;
+    long long grouping = 1;
+
     for (size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
-        grouping_iterations = storage_tiers_grouping_iterations[tier];
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
-        grouping_iterations = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-        if(grouping_iterations < 2) {
-            grouping_iterations = 2;
-            inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
+        long long iterations = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, (long long)storage_tiers_grouping_iterations[tier]);
+        if(iterations < 2) {
+            iterations = 2;
+            inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, iterations);
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
                    hostname, tier);
         }
-        storage_tiers_grouping_iterations[tier] = grouping_iterations;
+
+        long long iterations_max = grouping_max / (grouping * (1LL << (nd_profile.storage_tiers - 1 - tier)));
+        if(iterations > iterations_max) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "DBENGINE on '%s': 'dbengine tier %zu update every iterations' = %lld is too big for "
+                   "the update every of %d seconds and %zu tiers. Assuming %lld.",
+                   hostname, tier, iterations, (int)nd_profile.update_every, nd_profile.storage_tiers, iterations_max);
+            iterations = iterations_max;
+            inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, iterations);
+        }
+
+        storage_tiers_grouping_iterations[tier] = (size_t)iterations;
+        grouping *= iterations;
     }
 
     default_multidb_disk_quota_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);

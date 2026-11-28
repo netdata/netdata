@@ -333,10 +333,10 @@ static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, uint32_t update_every);
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, uint32_t update_every);
 
-static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, uint32_t update_every) {
     if(unlikely(!sch))
         return;
 

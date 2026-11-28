@@ -591,7 +591,7 @@ static struct replication_query *replication_response_prepare(
         query_before = 0;
         query_enable_streaming = true;
     }
-    else if(query_before >= (wall_clock_time - (st->update_every * 100))) {
+    else if(query_before >= (wall_clock_time - (time_t)st->update_every * 100)) {
         query_before = wall_clock_time;
         query_enable_streaming = true;
     }

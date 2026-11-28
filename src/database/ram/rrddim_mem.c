@@ -359,7 +359,7 @@ void rrddim_retention_delete_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_
     ;
 }
 
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, uint32_t update_every) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 

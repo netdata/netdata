@@ -2383,6 +2383,53 @@ static int test_rrdset_rejects_invalid_update_every(void) {
     if(st->update_every != original_update_every)
         rrdset_set_update_every_s(st, original_update_every);
 
+    // a new chart with an invalid update every gets the default one
+    const int invalid_update_every[] = { 0, -1, -1073741824 };
+    for(size_t i = 0; i < sizeof(invalid_update_every) / sizeof(invalid_update_every[0]); i++) {
+        char id[64];
+        snprintfz(id, sizeof(id), "unittest-update-every-new-%zu", i);
+        RRDSET *st2 = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1,
+            invalid_update_every[i], RRDSET_TYPE_LINE);
+        if(st2->update_every != original_update_every) {
+            fprintf(stderr, "%s: new chart with update every %d got %d instead of %ld\n",
+                    __FUNCTION__, invalid_update_every[i], st2->update_every, (long)original_update_every);
+            rc = 1;
+        }
+        rrdset_free(st2);
+    }
+
+    // a tier update every that does not fit in INT32_MAX is 0 (the tier stores nothing), never a wrapped value
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        RRDSET *s = callocz(1, sizeof(*s));
+        s->rrdhost = h;
+        h->db[0].tier_grouping = 1;
+        h->db[1].tier_grouping = 60;
+
+        const struct { int update_every; size_t tier; uint32_t expected; } cases[] = {
+            { 1, 0, 1 },
+            { 1, 1, 60 },
+            { INT32_MAX, 0, INT32_MAX },
+            { INT32_MAX / 60, 1, (INT32_MAX / 60) * 60 },
+            { INT32_MAX / 60 + 1, 1, 0 },
+            { 1073741824, 1, 0 },       // 2^30 x 60 wraps to 0 in 32 bits
+            { -1073741824, 1, 0 },
+        };
+        for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+            s->update_every = cases[i].update_every;
+            uint32_t got = rrdset_tier_update_every_s(s, cases[i].tier);
+            if(got != cases[i].expected) {
+                fprintf(stderr, "%s: tier %zu update every of chart update every %d is %u, expected %u\n",
+                        __FUNCTION__, cases[i].tier, cases[i].update_every, got, cases[i].expected);
+                rc = 1;
+            }
+        }
+
+        freez(s);
+        freez(h);
+    }
+
     __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);
     __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
 

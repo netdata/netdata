@@ -62,6 +62,10 @@ static void store_metric_at_tier_save_last_completed(RRDDIM *rd, size_t tier, st
 
 ALWAYS_INLINE_HOT
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
+    // a tier whose update every does not fit in INT32_MAX stores nothing for this chart
+    if(unlikely(!rrdset_tier_update_every_s(rd->rrdset, tier)))
+        return;
+
     // Slow collection can skip a flush instant; preserve the modulo phase without requiring an exact hit.
     if(LAST_COMPLETED_POINT_EXISTS(t) &&
        sp.start_time_s - sp.start_time_s % t->last_completed_point_flush_modulo > t->last_completed_point.end_time_s)

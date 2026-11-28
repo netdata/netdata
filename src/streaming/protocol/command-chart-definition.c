@@ -187,7 +187,7 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
     rrddim_foreach_done(rd);
     rrdset_metadata_exposed_upstream(st, version);
 
-    st->stream.snd.resync_time_s = st->last_collected_time.tv_sec + (stream_send.initial_clock_resync_iterations * st->update_every);
+    st->stream.snd.resync_time_s = st->last_collected_time.tv_sec + ((time_t)stream_send.initial_clock_resync_iterations * st->update_every);
     return replication_progress;
 }
 

@@ -20,8 +20,12 @@ static void rrdset_observe_receiver_update_every(RRDSET *st) {
         ;
 }
 
+bool rrdset_update_every_is_valid(time_t update_every_s) {
+    return update_every_s >= 1 && update_every_s <= INT32_MAX;
+}
+
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
-    if(unlikely(update_every_s <= 0 || update_every_s > INT32_MAX)) {
+    if(unlikely(!rrdset_update_every_is_valid(update_every_s))) {
         internal_error(
             true,
             "RRDSET '%s' ignoring invalid update every %lld; keeping %d",
@@ -44,10 +48,12 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-            if (rd->tiers[tier].sch)
-                storage_engine_store_change_collection_frequency(
-                    rd->tiers[tier].sch,
-                    (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+            // a tier whose update every does not fit keeps its handle, flushed, and stores nothing
+            uint32_t tier_update_every = rrdset_tier_update_every_s(st, tier);
+            if (tier_update_every)
+                storage_engine_store_change_collection_frequency(rd->tiers[tier].sch, tier_update_every);
+            else
+                storage_engine_store_flush(rd->tiers[tier].sch);
         }
     }
     rrddim_foreach_done(rd);
@@ -192,7 +198,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
             if(!discard_reason) discard_reason = "COLLECTION TIME IN FUTURE";
 #endif
         }
-        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
+        else if(unlikely((usec_t)since_last_usec > (usec_t)st->update_every * 5 * USEC_PER_SEC)) {
 // oops! the database is too far behind
 #ifdef NETDATA_INTERNAL_CHECKS
             netdata_log_info("RRD database for chart '%s' on host '%s' is %0.5" NETDATA_DOUBLE_MODIFIER
