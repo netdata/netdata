@@ -80,7 +80,7 @@ void pulse_trace_allocations_do(bool extended) {
             , "netdata"
             , "pulse"
             , 900000
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_STACKED
         );
     }
@@ -97,7 +97,7 @@ void pulse_trace_allocations_do(bool extended) {
             , "netdata"
             , "pulse"
             , 900001
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_LINE
         );
     }
@@ -114,7 +114,7 @@ void pulse_trace_allocations_do(bool extended) {
             , "netdata"
             , "pulse"
             , 900002
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_STACKED
         );
     }
@@ -131,7 +131,7 @@ void pulse_trace_allocations_do(bool extended) {
             , "netdata"
             , "pulse"
             , 900003
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_LINE
         );
     }

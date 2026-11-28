@@ -81,7 +81,7 @@ void pulse_web_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 130200
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -110,7 +110,7 @@ void pulse_web_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 130300
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -143,7 +143,7 @@ void pulse_web_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 130500
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -197,7 +197,7 @@ void pulse_web_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 130600
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 

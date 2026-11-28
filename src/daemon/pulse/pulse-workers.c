@@ -186,7 +186,7 @@ static void workers_total_spinlock_contention_chart(void) {
                 , "netdata"
                 , "pulse"
                 , 920000
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
         }
@@ -218,7 +218,7 @@ static void workers_total_spinlock_contention_chart(void) {
                 , "netdata"
                 , "pulse"
                 , 920001
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
         }
@@ -250,7 +250,7 @@ static void workers_total_spinlock_contention_chart(void) {
                 , "netdata"
                 , "pulse"
                 , 920002
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
         }
@@ -290,7 +290,7 @@ static void workers_total_memory_calls_chart(void) {
                 , "netdata"
                 , "pulse"
                 , 920005
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -334,7 +334,7 @@ static void workers_total_cpu_utilization_chart(void) {
             "netdata",
             "pulse",
             999000,
-            localhost->rrd_update_every,
+            pulse_update_every(),
             RRDSET_TYPE_STACKED);
     }
 
@@ -432,7 +432,7 @@ static RRDSET *workers_chart_create(
         , "netdata"
         , "pulse"
         , wu->priority + priority_offset
-        , localhost->rrd_update_every
+        , pulse_update_every()
         , chart_type
     );
 }
@@ -486,7 +486,7 @@ static void workers_utilization_update_custom_charts(struct worker_utilization *
                 , "netdata"
                 , "pulse"
                 , wu->priority + 10 + i
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -971,6 +971,13 @@ static void worker_utilization_charts_callback(void *ptr
         wu->per_job_type[i].data[0].busy_time += job_types_busy_time[i];
 
         NETDATA_DOUBLE value = job_types_custom_metrics[i];
+
+        // increments are counted over this worker's collection window, which spans the
+        // pulse interval: turn them into the per second rate their units say they are
+        if((job_types_metric_types[i] == WORKER_METRIC_INCREMENT ||
+            job_types_metric_types[i] == WORKER_METRIC_INCREMENTAL_TOTAL) && duration_usec)
+            value = value * (NETDATA_DOUBLE)USEC_PER_SEC / (NETDATA_DOUBLE)duration_usec;
+
         if(netdata_double_isnumber(value)) {
             if(!wu->per_job_type[i].count_value) {
                 wu->per_job_type[i].count_value = 1;

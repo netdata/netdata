@@ -142,7 +142,7 @@ static void pulse_aclk_time_heatmap(void) {
             "netdata",
             "pulse",
             PULSE_NETWORK_CHART_PRIORITY + 1,
-            localhost->rrd_update_every,
+            pulse_update_every(),
             RRDSET_TYPE_HEATMAP);
 
         rds[0] = rrddim_add(st, "instant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -220,7 +220,7 @@ static void pulse_network_bytes_chart(struct pulse_network_chart *c, const char 
             "netdata",
             "pulse",
             PULSE_NETWORK_CHART_PRIORITY,
-            localhost->rrd_update_every,
+            pulse_update_every(),
             RRDSET_TYPE_AREA);
 
         rrdlabels_add(c->st->rrdlabels, "endpoint", endpoint, RRDLABEL_SRC_AUTO);
@@ -282,7 +282,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 2,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
 
                 rrdlabels_add(st_aclk_inflight->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
@@ -317,7 +317,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 6,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
 
                 rrdlabels_add(st_aclk_timeouts->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
@@ -346,7 +346,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 2,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_AREA);
 
                 rrdlabels_add(st_aclk_queue_size->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
@@ -376,7 +376,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 3,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_AREA);
 
                 rrdlabels_add(st_aclk_messages->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
@@ -406,7 +406,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 2,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
                 rrdlabels_add(st_aclk_bytes->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
                 rd_bytes = rrddim_add(st_aclk_bytes, "bytes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -431,7 +431,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 3,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
                 rrdlabels_add(st_aclk_puback_wait->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
                 rd_puback_max = rrddim_add(st_aclk_puback_wait, "max", NULL, 1, USEC_PER_SEC, RRD_ALGORITHM_ABSOLUTE);
@@ -455,7 +455,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 3,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
                 rrdlabels_add(st_aclk_send_wait->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
                 rd_overall = rrddim_add(st_aclk_send_wait, "overall", NULL, 1, USEC_PER_SEC, RRD_ALGORITHM_ABSOLUTE);
@@ -494,7 +494,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 4,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_LINE);
                 rd_min = rrddim_add(st_stats, "min", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
                 rd_avg = rrddim_add(st_stats, "avg", NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
@@ -525,7 +525,7 @@ void pulse_network_do(bool extended __maybe_unused) {
                     "netdata",
                     "pulse",
                     PULSE_NETWORK_CHART_PRIORITY + 5,
-                    localhost->rrd_update_every,
+                    pulse_update_every(),
                     RRDSET_TYPE_AREA);
 
                 rrdlabels_add(st_aclk_buffer->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);

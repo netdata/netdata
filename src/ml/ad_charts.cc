@@ -722,7 +722,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                     , NETDATA_ML_PLUGIN // plugin
                     , NETDATA_ML_MODULE_DETECTION // module
                     , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
-                    , localhost->rrd_update_every // update_every
+                    , pulse_update_every() // update_every: fed by the pulse thread
                     , RRDSET_TYPE_AREA // chart_type
             );
 
@@ -753,7 +753,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                     , NETDATA_ML_PLUGIN // plugin
                     , NETDATA_ML_MODULE_DETECTION // module
                     , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
-                    , localhost->rrd_update_every // update_every
+                    , pulse_update_every() // update_every: fed by the pulse thread
                     , RRDSET_TYPE_LINE // chart_type
             );
 
@@ -787,7 +787,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                     , NETDATA_ML_PLUGIN // plugin
                     , NETDATA_ML_MODULE_DETECTION // module
                     , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
-                    , localhost->rrd_update_every // update_every
+                    , pulse_update_every() // update_every: fed by the pulse thread
                     , RRDSET_TYPE_LINE // chart_type
             );
 
@@ -816,7 +816,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                     , NETDATA_ML_PLUGIN // plugin
                     , NETDATA_ML_MODULE_DETECTION // module
                     , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
-                    , localhost->rrd_update_every // update_every
+                    , pulse_update_every() // update_every: fed by the pulse thread
                     , RRDSET_TYPE_LINE // chart_type
             );
 

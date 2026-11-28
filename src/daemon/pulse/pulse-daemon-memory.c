@@ -133,7 +133,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                 "netdata",
                 "pulse",
                 130100,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             rd_db_dbengine = rrddim_add(st_memory, "dbengine", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -281,7 +281,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                 "netdata",
                 "pulse",
                 130102,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_STACKED);
 
             for(size_t i = 0; i < PULSE_BUFFERS_MAX; i++)
@@ -314,7 +314,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                 "netdata",
                 "pulse",
                 130103,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_AREA);
 
             rd_available = rrddim_add(st_memory_available, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

@@ -23,7 +23,7 @@ void pulse_heartbeat_do(bool extended) {
             , "netdata"
             , "pulse"
             , 900000
-            , localhost->rrd_update_every
+            , pulse_update_every()
             , RRDSET_TYPE_AREA);
 
         rd_heartbeat_min = rrddim_add(st_heartbeat, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

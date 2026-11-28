@@ -32,7 +32,7 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
                 "netdata",
                 "stats",
                 134900, // before "dbengine memory" (dbengine2_statistics_charts)
-                10,
+                MAX(10, pulse_update_every()), // slow-moving, but never faster than we feed it
                 RRDSET_TYPE_LINE);
 
             stats[tier].rd_space = rrddim_add(stats[tier].st, "space", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

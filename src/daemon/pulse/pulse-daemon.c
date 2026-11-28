@@ -24,7 +24,7 @@ static void pulse_daemon_cpu_usage_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 130000
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_STACKED
             );
 
@@ -61,7 +61,7 @@ static void pulse_daemon_uptime_do(bool extended __maybe_unused) {
                 "netdata",
                 "pulse",
                 130150,
-                localhost->rrd_update_every,
+                pulse_update_every(),
                 RRDSET_TYPE_LINE);
 
             rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

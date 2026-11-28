@@ -60,7 +60,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 131004
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -92,7 +92,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
                 , "netdata"
                 , "pulse"
                 , 131005
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 

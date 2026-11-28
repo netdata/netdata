@@ -57,7 +57,9 @@ static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    usec_t timeout = nd_profile.update_every * USEC_PER_SEC + nd_profile.update_every * USEC_PER_SEC / 3;
+    // the budget since our previous run: we run every pulse step
+    usec_t step = (usec_t)pulse_update_every() * USEC_PER_SEC;
+    usec_t timeout = step + step / 3;
     usec_t now = now_monotonic_usec();
     if(!last_run)
         last_run = now;
@@ -119,7 +121,7 @@ void pulse_sqlite3_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 131100
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -149,7 +151,7 @@ void pulse_sqlite3_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 131101
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -185,7 +187,7 @@ void pulse_sqlite3_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 131102
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -216,7 +218,7 @@ void pulse_sqlite3_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 131103
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -260,7 +262,7 @@ void pulse_sqlite3_do(bool extended) {
                 , "netdata"
                 , "pulse"
                 , 131104
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 

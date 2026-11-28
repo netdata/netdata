@@ -105,7 +105,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "pulse"
                 , priority + 0
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -146,7 +146,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "pulse"
                 , priority + 1
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -196,7 +196,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "pulse"
                 , priority + 2
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -255,7 +255,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "pulse"
                 , priority + 3
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
@@ -301,7 +301,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "pulse"
                 , priority + 4
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_STACKED
             );
 
@@ -346,7 +346,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "pulse"
                 , priority + 5
-                , localhost->rrd_update_every
+                , pulse_update_every()
                 , RRDSET_TYPE_LINE
             );
 
