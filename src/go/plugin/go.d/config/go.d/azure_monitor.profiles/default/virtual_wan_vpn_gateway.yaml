@@ -1,0 +1,387 @@
+---
+display_name: Azure Virtual WAN Site-to-Site VPN Gateway
+resource_type: Microsoft.Network/vpnGateways
+metrics:
+  - id: average_bandwidth
+    azure_name: AverageBandwidth
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: inbound_flows_count
+    azure_name: InboundFlowsCount
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: outbound_flows_count
+    azure_name: OutboundFlowsCount
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: tunnel_average_bandwidth
+    azure_name: TunnelAverageBandwidth
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: tunnel_ingress_bytes
+    azure_name: TunnelIngressBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_egress_bytes
+    azure_name: TunnelEgressBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_ingress_packets
+    azure_name: TunnelIngressPackets
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_egress_packets
+    azure_name: TunnelEgressPackets
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_peak_packets
+    azure_name: TunnelPeakPackets
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: tunnel_total_flow_count
+    azure_name: TunnelTotalFlowCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_ingress_packet_drop_count
+    azure_name: TunnelIngressPacketDropCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_egress_packet_drop_count
+    azure_name: TunnelEgressPacketDropCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_ingress_packet_drop_ts_mismatch
+    azure_name: TunnelIngressPacketDropTSMismatch
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_egress_packet_drop_ts_mismatch
+    azure_name: TunnelEgressPacketDropTSMismatch
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_nat_packet_drop
+    azure_name: TunnelNatPacketDrop
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_nat_allocations
+    azure_name: TunnelNatAllocations
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: tunnel_nat_flow_count
+    azure_name: TunnelNatFlowCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: tunnel_nated_bytes
+    azure_name: TunnelNatedBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_reverse_nated_bytes
+    azure_name: TunnelReverseNatedBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_nated_packets
+    azure_name: TunnelNatedPackets
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tunnel_reverse_nated_packets
+    azure_name: TunnelReverseNatedPackets
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: mmsa_count
+    azure_name: MmsaCount
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: qmsa_count
+    azure_name: QmsaCount
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: bgp_peer_status
+    azure_name: BgpPeerStatus
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: bgp_routes_advertised
+    azure_name: BgpRoutesAdvertised
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: bgp_routes_learned
+    azure_name: BgpRoutesLearned
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: vnet_address_prefix_count
+    azure_name: VnetAddressPrefixCount
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+template:
+  family: Azure Virtual WAN Site-to-Site VPN Gateway
+  context_namespace: virtual_wan_vpn_gateway
+  chart_defaults:
+    label_promotion:
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
+      - subscription_id
+    instances:
+      by_labels:
+        - resource_uid
+  charts:
+    - id: am_azure_virtual_wan_vpn_gateway__gateway_bandwidth
+      title: Azure Virtual WAN Gateway Bandwidth
+      context: gateway_bandwidth
+      family: Traffic
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: average_bandwidth_average
+          name: average
+          options:
+            float: true
+    - id: am_azure_virtual_wan_vpn_gateway__gateway_flows
+      title: Azure Virtual WAN Peak Gateway Flows
+      context: gateway_flows
+      family: Traffic
+      type: line
+      units: flows
+      algorithm: absolute
+      dimensions:
+        - selector: inbound_flows_count_maximum
+          name: inbound
+        - selector: outbound_flows_count_maximum
+          name: outbound
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_bandwidth
+      title: Azure Virtual WAN Average Tunnel Bandwidth
+      context: tunnel_bandwidth
+      family: Tunnel Traffic
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_average_bandwidth_average
+          name: average
+          options:
+            float: true
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_traffic
+      title: Azure Virtual WAN Tunnel Traffic
+      context: tunnel_traffic
+      family: Tunnel Traffic
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_ingress_bytes_total
+          name: ingress
+        - selector: tunnel_egress_bytes_total
+          name: egress
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_packets
+      title: Azure Virtual WAN Tunnel Packet Rate
+      context: tunnel_packets
+      family: Tunnel Traffic
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_ingress_packets_total
+          name: ingress
+        - selector: tunnel_egress_packets_total
+          name: egress
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_peak_packet_rate
+      title: Azure Virtual WAN Peak Tunnel Packet Rate
+      context: tunnel_peak_packet_rate
+      family: Tunnel Traffic
+      type: line
+      units: packets/s
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_peak_packets_maximum
+          name: peak
+          options:
+            float: true
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_flow_creation
+      title: Azure Virtual WAN Tunnel Flow Creation Rate
+      context: tunnel_flow_creation
+      family: Tunnel Traffic
+      type: line
+      units: flows/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_total_flow_count_total
+          name: created
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_packet_drops
+      title: Azure Virtual WAN Tunnel Packet Drops
+      context: tunnel_packet_drops
+      family: Packet Drops
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_ingress_packet_drop_count_total
+          name: ingress
+        - selector: tunnel_egress_packet_drop_count_total
+          name: egress
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_traffic_selector_mismatch_drops
+      title: Azure Virtual WAN Tunnel Packet Drops from Traffic Selector Mismatches
+      context: tunnel_traffic_selector_mismatch_drops
+      family: Packet Drops
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_ingress_packet_drop_ts_mismatch_total
+          name: ingress
+        - selector: tunnel_egress_packet_drop_ts_mismatch_total
+          name: egress
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_nat_packet_drops
+      title: Azure Virtual WAN Tunnel NAT Packet Drops
+      context: tunnel_nat_packet_drops
+      family: Packet Drops
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_nat_packet_drop_total
+          name: dropped
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_nat_allocations
+      title: Azure Virtual WAN Tunnel NAT Allocations
+      context: tunnel_nat_allocations
+      family: Tunnel NAT
+      type: line
+      units: allocations
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_nat_allocations_total
+          name: allocations
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_nat_flows
+      title: Azure Virtual WAN Tunnel NAT Flows
+      context: tunnel_nat_flows
+      family: Tunnel NAT
+      type: line
+      units: flows
+      algorithm: absolute
+      dimensions:
+        - selector: tunnel_nat_flow_count_total
+          name: flows
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_nat_traffic
+      title: Azure Virtual WAN Tunnel NAT Traffic
+      context: tunnel_nat_traffic
+      family: Tunnel NAT
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_nated_bytes_total
+          name: translated
+        - selector: tunnel_reverse_nated_bytes_total
+          name: reverse_translated
+    - id: am_azure_virtual_wan_vpn_gateway__tunnel_nat_packets
+      title: Azure Virtual WAN Tunnel NAT Packet Rate
+      context: tunnel_nat_packets
+      family: Tunnel NAT
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: tunnel_nated_packets_total
+          name: translated
+        - selector: tunnel_reverse_nated_packets_total
+          name: reverse_translated
+    - id: am_azure_virtual_wan_vpn_gateway__ipsec_security_associations
+      title: Azure Virtual WAN IPsec Security Associations
+      context: ipsec_security_associations
+      family: IPsec
+      type: line
+      units: associations
+      algorithm: absolute
+      dimensions:
+        - selector: mmsa_count_total
+          name: main_mode
+        - selector: qmsa_count_total
+          name: quick_mode
+    - id: am_azure_virtual_wan_vpn_gateway__bgp_peer_status
+      title: Azure Virtual WAN Average BGP Peer Status
+      context: bgp_peer_status
+      family: Routing
+      type: line
+      units: ratio
+      algorithm: absolute
+      dimensions:
+        - selector: bgp_peer_status_average
+          name: average
+          options:
+            float: true
+    - id: am_azure_virtual_wan_vpn_gateway__bgp_routes
+      title: Azure Virtual WAN BGP Routes
+      context: bgp_routes
+      family: Routing
+      type: line
+      units: routes
+      algorithm: absolute
+      dimensions:
+        - selector: bgp_routes_advertised_total
+          name: advertised
+        - selector: bgp_routes_learned_total
+          name: learned
+    - id: am_azure_virtual_wan_vpn_gateway__vnet_address_prefixes
+      title: Azure Virtual WAN Virtual Network Address Prefixes
+      context: vnet_address_prefixes
+      family: Routing
+      type: line
+      units: prefixes
+      algorithm: absolute
+      dimensions:
+        - selector: vnet_address_prefix_count_total
+          name: prefixes

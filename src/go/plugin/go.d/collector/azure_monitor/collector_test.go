@@ -1368,13 +1368,9 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 	}{
 		"auto discover": {
 			resources: []map[string]any{
-				{
-					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
-					"name":          "pg-a",
-					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
-					"resourceGroup": "rg-a",
-					"location":      "eastus",
-				},
+				testResource("Microsoft.DBforPostgreSQL/flexibleServers", "pg-a", nil),
+				testResource("Microsoft.Network/virtualNetworkGateways", "vnet", nil),
+				testResource("Microsoft.Network/vpnGateways", "wan", nil),
 			},
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
@@ -1383,8 +1379,17 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 				c.Config.Profiles.ModeCombined = nil
 			},
 			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
-				require.NotEmpty(t, c.runtime.Profiles)
-				assert.Equal(t, "postgres_flexible", c.runtime.Profiles[0].Name)
+				got := make(map[string][]string)
+				for profile, resources := range c.discovery.ByProfile {
+					for _, resource := range resources {
+						got[profile] = append(got[profile], resource.Name)
+					}
+				}
+				assert.Equal(t, map[string][]string{
+					"postgres_flexible":       {"pg-a"},
+					"vpn_gateway":             {"vnet"},
+					"virtual_wan_vpn_gateway": {"wan"},
+				}, got)
 			},
 		},
 		"combined with explicit profiles": {
