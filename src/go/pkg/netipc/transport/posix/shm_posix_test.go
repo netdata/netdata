@@ -274,8 +274,7 @@ func TestShmStaleRecovery(t *testing.T) {
 }
 
 func TestShmStaleRecoveryInGroupWritableRunDir(t *testing.T) {
-	// Crash recovery must work regardless of run-dir permissions
-	// (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+	// Crash recovery must also work with group-writable runtime directories.
 	runDir := t.TempDir()
 	if err := os.Chmod(runDir, 0o775); err != nil {
 		t.Fatalf("chmod run dir: %v", err)

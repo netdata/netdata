@@ -171,22 +171,9 @@ Netdata includes automatic log rotation support:
 2. **Signal handling**: Send `SIGHUP` to Netdata to reopen all log files
 3. **Automatic handling** for journal and ETW outputs (managed by the OS)
 
-Example logrotate configuration:
-
-```
-/var/log/netdata/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    sharedscripts
-    postrotate
-        /bin/kill -HUP `cat /run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
-    endscript
-}
-```
+The [stock logrotate template](https://github.com/netdata/netdata/blob/master/system/logrotate/netdata.in) signals the
+systemd-managed main process directly, including when the Agent uses a custom command socket. Other init systems
+and manually managed instances retain the PID-file signal path.
 
 ## Log Fields
 

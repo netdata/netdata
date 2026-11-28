@@ -508,7 +508,6 @@ cat << BANNER1
 BANNER1
 
 [ "$(id -u)" -eq 0 ] && cat << BANNER2
-   - pid file       at ${TPUT_CYAN}${NETDATA_PREFIX}/var/run/netdata.pid${TPUT_RESET}
    - logrotate file at ${TPUT_CYAN}/etc/logrotate.d/netdata${TPUT_RESET}
 BANNER2
 

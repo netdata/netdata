@@ -11,10 +11,11 @@ LogNamespace=netdata
 Type=simple
 User=root
 Group=netdata
-RuntimeDirectory=netdata
-RuntimeDirectoryMode=0775
-PIDFile=/run/netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
+# tmpfiles and the Agent own /run/netdata as the runtime user. RuntimeDirectory
+# would recursively reassign surviving IPC files to root before the Agent starts.
+# Keep the Agent's fallback when a standalone service install has no tmpfiles rule.
+ExecStartPre=-/bin/sh -c 'exec systemd-tmpfiles --create --prefix=/run/netdata netdata.conf'
+ExecStart=@sbindir_POST@/netdata -D
 PermissionsStartOnly=true
 
 # saving a big db on slow disks may need some time
@@ -72,7 +73,8 @@ ProtectHome=read-only
 #PrivateTmp=true
 ProtectControlGroups=on
 # We whitelist this because it's the standard location to listen on a UNIX socket.
-ReadWriteDirectories=/run/netdata
+# The startup tmpfiles command can create the directory if it is missing.
+ReadWriteDirectories=-/run/netdata
 # This is needed to make email-based alert deliver work if Postfix is the email provider on the system.
 ReadWriteDirectories=-/var/spool/postfix/maildrop
 # LXCFS directories (https://github.com/lxc/lxcfs#lxcfs)

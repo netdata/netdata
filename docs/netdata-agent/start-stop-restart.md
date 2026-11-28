@@ -41,6 +41,13 @@ Restarting the Netdata Agent will cause temporary gaps in your collected metrics
 
 Use the commands above to check whether the Netdata Agent service is running.
 
+The default systemd unit uses systemd's process tracking instead of `/run/netdata/netdata.pid`. Scripts that need the
+Agent's process ID should query the service manager:
+
+```bash
+systemctl show --property=MainPID --value netdata
+```
+
 You can also verify that the Agent is reachable by opening `http://NODE:19999` in a browser, or by running:
 
 ```bash
