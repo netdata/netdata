@@ -120,7 +120,7 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
-        analytics_log_dashboard();
+        info_fields_count_hit(INFO_FIELDS_HIT_DASHBOARD);
         if(unlikely(!http_can_access_dashboard(w)))
             return web_client_permission_denied_acl(w);
     }

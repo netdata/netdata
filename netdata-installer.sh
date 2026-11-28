@@ -1195,6 +1195,9 @@ fi
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
 
+# The analytics script is no longer shipped; an install over an old one would keep it.
+run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/anonymous-statistics.sh"
+
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
   run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"

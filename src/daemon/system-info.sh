@@ -27,35 +27,33 @@ count_cpu_list() {
 # lxcfs supplies the container-visible count instead of the host's sysfs view.
 detect_cpu_count() {
   LCPU_COUNT="unknown"
-  CPU_COUNT_SOURCE="none"
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
-    CPU_COUNT_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n kern.smp.cpus)" || LCPU_COUNT="unknown"
     return
   elif [ "${KERNEL_NAME}" = Darwin ]; then
-    CPU_COUNT_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n hw.logicalcpu)" || LCPU_COUNT="unknown"
     return
   elif [ "${KERNEL_NAME}" = Linux ]; then
     if is_inside_lxc_container; then
-      CPU_COUNT_SOURCE="procfs"
       LCPU_COUNT="$(grep -c ^processor /proc/cpuinfo 2>/dev/null)" || LCPU_COUNT="unknown"
       return
     fi
     if cpu_list=$(cat /sys/devices/system/cpu/present 2>/dev/null) &&
       LCPU_COUNT=$(printf '%s\n' "${cpu_list}" | count_cpu_list); then
-      CPU_COUNT_SOURCE="sysfs"
       return
     fi
   fi
 
   if [ -d /sys/devices/system/cpu ] &&
     LCPU_COUNT=$(find /sys/devices/system/cpu -mindepth 1 -maxdepth 1 -type d -name 'cpu[0-9]*' 2>/dev/null | grep -cE '/cpu[0-9]+$'); then
-    CPU_COUNT_SOURCE="sysfs"
-  elif LCPU_COUNT=$(grep -c ^processor /proc/cpuinfo 2>/dev/null); then
-    CPU_COUNT_SOURCE="procfs"
-  elif command -v nproc >/dev/null 2>&1; then
-    CPU_COUNT_SOURCE="nproc"
+    return
+  fi
+
+  if LCPU_COUNT=$(grep -c ^processor /proc/cpuinfo 2>/dev/null); then
+    return
+  fi
+
+  if command -v nproc >/dev/null 2>&1; then
     LCPU_COUNT="$(nproc)" || LCPU_COUNT="unknown"
   else
     LCPU_COUNT="unknown"
@@ -64,16 +62,12 @@ detect_cpu_count() {
 
 detect_ram() {
   TOTAL_RAM="unknown"
-  RAM_DETECTION="none"
 
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
-    RAM_DETECTION="sysctl"
     TOTAL_RAM="$(sysctl -n hw.physmem)" || TOTAL_RAM="unknown"
   elif [ "${KERNEL_NAME}" = Darwin ]; then
-    RAM_DETECTION="sysctl"
     TOTAL_RAM="$(sysctl -n hw.memsize)" || TOTAL_RAM="unknown"
   elif [ -r /proc/meminfo ]; then
-    RAM_DETECTION="procfs"
     TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -f 1 -d ' ')"
     case "${TOTAL_RAM}" in
       ''|*[!0-9]*) TOTAL_RAM="unknown" ;;
@@ -105,15 +99,12 @@ sum_disk_sizes() {
 
 detect_disk() {
   DISK_SIZE="unknown"
-  DISK_DETECTION="none"
   DISK_STATUS=V
 
   if [ "${KERNEL_NAME}" = "Darwin" ]; then
-    if disk_output=$(diskutil info / 2>/dev/null) &&
+    if ! { disk_output=$(diskutil info / 2>/dev/null) &&
       DISK_SIZE=$(printf '%s\n' "${disk_output}" | awk '/Disk Size/ {total += substr($5,2,length($5))} END { print total }') &&
-      [ -n "$DISK_SIZE" ] && [ "$DISK_SIZE" != "0" ]; then
-      DISK_DETECTION="diskutil"
-    else
+      [ -n "$DISK_SIZE" ] && [ "$DISK_SIZE" != "0" ]; }; then
       types='hfs'
       vfs_output=$(lsvfs) || DISK_STATUS=F
 
@@ -125,7 +116,6 @@ detect_disk() {
         types="${types},ufs"
       fi
 
-      DISK_DETECTION="df"
       disk_output=$(/bin/df -k -t ${types}) || DISK_STATUS=F
       DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | sum_disk_sizes 1024) || DISK_STATUS=F
     fi
@@ -136,7 +126,6 @@ detect_disk() {
     # a multipath disk counts once per path.
     # Not df: each ZFS dataset reports its used space plus the pool's free space, so the
     # total counts free space once per dataset and changes on every write.
-    DISK_DETECTION="geom"
     if geom_output=$(sysctl -n kern.geom.conftxt) &&
       disk_size=$(printf '%s\n' "${geom_output}" | awk '$2 == "DISK" && $3 !~ /^cd[0-9]/ { print $4 }' | sum_disk_sizes 1); then
       DISK_SIZE="${disk_size}"
@@ -160,7 +149,6 @@ detect_disk() {
         fi
       done
 
-      DISK_DETECTION="sysfs"
       DISK_SIZE="0"
       for disk in /sys/block/*; do
         [ -e "${disk}" ] || continue
@@ -174,11 +162,9 @@ detect_disk() {
         DISK_SIZE="$((DISK_SIZE + size))"
       done
     elif df --version 2>/dev/null | grep -qF "GNU coreutils"; then
-      DISK_DETECTION="df"
       disk_output=$(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size) || DISK_STATUS=F
       DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sort -u -k 1 | awk '{print $2}' | sum_disk_sizes 1) || DISK_STATUS=F
     else
-      DISK_DETECTION="df"
       include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
       disk_output=$(df -T -P) || DISK_STATUS=F
       DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sort -u -k 1 | grep -E "${include_fs_types}" | awk '{print $3}' | sum_disk_sizes 1024) || DISK_STATUS=F
@@ -477,7 +463,6 @@ virtualization_normalize_name() {
 
 CONTAINER="unknown"
 CONT_DETECTION="none"
-CONTAINER_IS_OFFICIAL_IMAGE="${NETDATA_OFFICIAL_IMAGE:-false}"
 
 if [ -z "${VIRTUALIZATION}" ]; then
   VIRTUALIZATION="unknown"
@@ -835,12 +820,9 @@ detect_host_l4t_version /etc/nv_tegra_release
 
 LCPU_COUNT="unknown"
 CPU_MODEL="unknown"
-CPU_VENDOR="unknown"
 CPU_FREQ="unknown"
-CPU_INFO_SOURCE="none"
 
 detect_cpu_count
-CPU_INFO_SOURCE="${CPU_COUNT_SOURCE}"
 
 possible_cpu_freq=""
 lscpu="$(command -v lscpu)"
@@ -850,8 +832,6 @@ dmidecode_output=""
 
 if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
   lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)"
-  CPU_INFO_SOURCE="${CPU_INFO_SOURCE} lscpu"
-  CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_MODEL="$(echo "${lscpu_output}" | grep "^Model name:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU max MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*')"
   if [ -z "$possible_cpu_freq" ]; then
@@ -863,8 +843,6 @@ if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
   [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
 elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1; then
   dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
-  CPU_INFO_SOURCE="${CPU_INFO_SOURCE} dmidecode"
-  CPU_VENDOR="$(echo "${dmidecode_output}" | grep -F "Manufacturer:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_MODEL="$(echo "${dmidecode_output}" | grep -F "Version:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   possible_cpu_freq="$(echo "${dmidecode_output}" | grep -F "Current Speed:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 else
@@ -882,54 +860,26 @@ else
 
   if [ "${KERNEL_NAME}" = Darwin ]; then
     CPU_MODEL="$(sysctl -n machdep.cpu.brand_string)"
-    if [ "${ARCHITECTURE}" = "x86_64" ]; then
-      CPU_VENDOR="$(sysctl -n machdep.cpu.vendor)"
-    else
-      CPU_VENDOR="Apple"
-    fi
-    echo "${CPU_INFO_SOURCE}" | grep -qv sysctl && CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
   elif uname --version 2>/dev/null | grep -qF 'GNU coreutils'; then
-    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
     CPU_MODEL="$(uname -p)"
-    CPU_VENDOR="$(uname -i)"
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
-    if (echo "${CPU_INFO_SOURCE}" | grep -qv sysctl); then
-      CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
-    fi
-
     CPU_MODEL="$(sysctl -n hw.model)"
   elif [ -r /proc/cpuinfo ]; then
-    if (echo "${CPU_INFO_SOURCE}" | grep -qv procfs); then
-      CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
-    fi
-
     CPU_MODEL="$(grep -F "model name" /proc/cpuinfo | head -n 1 | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-    CPU_VENDOR="$(grep -F "vendor_id" /proc/cpuinfo | head -n 1 | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   fi
 fi
 
 if [ "${KERNEL_NAME}" = Darwin ] && [ "${ARCHITECTURE}" = "x86_64" ]; then
   CPU_FREQ="$(sysctl -n hw.cpufrequency)"
 elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ]; then
-  if (echo "${CPU_INFO_SOURCE}" | grep -qv sysfs); then
-    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
-  fi
-
   value="$(cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency)"
   CPU_FREQ="$((value * 1000))"
 elif [ -n "${possible_cpu_freq}" ]; then
   CPU_FREQ="${possible_cpu_freq}"
 elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ]; then
-  if (echo "${CPU_INFO_SOURCE}" | grep -qv sysfs); then
-    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
-  fi
-
   value="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
   CPU_FREQ="$((value * 1000))"
 elif [ -r /proc/cpuinfo ]; then
-  if (echo "${CPU_INFO_SOURCE}" | grep -qv procfs); then
-    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
-  fi
   value=$(grep "cpu MHz" /proc/cpuinfo 2>/dev/null | grep -o "[0-9]*" | head -n 1 | awk '{printf "%0.f",int($0*1000000)}')
   [ -n "$value" ] && CPU_FREQ="$value"
 fi
@@ -1029,7 +979,6 @@ printf 'NETDATA_CONTAINER_OS_ID_LIKE=%s\n' "${CONTAINER_ID_LIKE}"
 printf 'NETDATA_CONTAINER_OS_VERSION=%s\n' "${CONTAINER_VERSION}"
 printf 'NETDATA_CONTAINER_OS_VERSION_ID=%s\n' "${CONTAINER_VERSION_ID}"
 printf 'NETDATA_CONTAINER_OS_DETECTION=%s\n' "${CONTAINER_OS_DETECTION}"
-printf 'NETDATA_CONTAINER_IS_OFFICIAL_IMAGE=%s\n' "${CONTAINER_IS_OFFICIAL_IMAGE}"
 printf 'NETDATA_HOST_OS_NAME=%s\n' "${HOST_NAME}"
 printf 'NETDATA_HOST_OS_ID=%s\n' "${HOST_ID}"
 printf 'NETDATA_HOST_OS_ID_LIKE=%s\n' "${HOST_ID_LIKE}"
@@ -1054,14 +1003,10 @@ echo "NETDATA_SYSTEM_VIRT_DETECTION=${VIRT_DETECTION}"
 echo "NETDATA_SYSTEM_CONTAINER=${CONTAINER}"
 echo "NETDATA_SYSTEM_CONTAINER_DETECTION=${CONT_DETECTION}"
 echo "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=${LCPU_COUNT}"
-echo "NETDATA_SYSTEM_CPU_VENDOR=${CPU_VENDOR}"
 echo "NETDATA_SYSTEM_CPU_MODEL=${CPU_MODEL}"
 echo "NETDATA_SYSTEM_CPU_FREQ=${CPU_FREQ}"
-echo "NETDATA_SYSTEM_CPU_DETECTION=${CPU_INFO_SOURCE}"
 echo "NETDATA_SYSTEM_TOTAL_RAM=${TOTAL_RAM}"
-echo "NETDATA_SYSTEM_RAM_DETECTION=${RAM_DETECTION}"
 echo "NETDATA_SYSTEM_TOTAL_DISK_SIZE=${DISK_SIZE}"
-echo "NETDATA_SYSTEM_DISK_DETECTION=${DISK_DETECTION}"
 echo "NETDATA_INSTANCE_CLOUD_TYPE=${CLOUD_TYPE}"
 echo "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=${CLOUD_INSTANCE_TYPE}"
 echo "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION}"

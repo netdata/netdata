@@ -227,6 +227,9 @@ if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
   run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
 fi
 
+# The analytics script is no longer shipped; an overlay upgrade would keep it.
+run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/anonymous-statistics.sh"
+
 # The otel-signal-viewer plugin was removed in favour of otel-plugin. Native
 # packages drop its files via Obsoletes/Replaces, but an overlay upgrade only
 # stops shipping them, so both artifacts linger here. Only stock paths are

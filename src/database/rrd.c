@@ -101,7 +101,6 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         sql_init_meta_failure_reason(reason, sizeof(reason), &os_errno);
 
         if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
-            set_late_analytics_variables(system_info);
             // report the OS error SQLite saw, not whatever errno the startup code left behind
             errno = os_errno;
             fatal("Failed to initialize SQLite metadata database: %s", reason);

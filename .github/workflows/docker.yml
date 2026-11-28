@@ -484,10 +484,6 @@ jobs:
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Set common image build arguments
         id: build-args
         if: needs.file-check.outputs.run == 'true'
@@ -498,7 +494,6 @@ jobs:
         run: |
           {
             echo 'args<<EOF'
-            echo "OFFICIAL_IMAGE=${OFFICIAL_IMAGE:-}"
             echo "EXTRA_INSTALL_OPTS=$EXTRA_INSTALL_OPTS"
             echo "BUILD_ARCH=$BUILD_ARCH"
             echo "RELEASE_CHANNEL=${NETDATA_RELEASE_CHANNEL:-nightly}"
@@ -528,7 +523,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: netdata/netdata:test
           load: true
-          cache-to: ${{ env.OFFICIAL_IMAGE == 'true' && 'type=local,dest=/tmp/build-cache-regular,mode=max' || '' }}
+          cache-to: ${{ github.repository == 'netdata/netdata' && github.event_name == 'workflow_dispatch' && 'type=local,dest=/tmp/build-cache-regular,mode=max' || '' }}
           build-args: ${{ steps.build-args.outputs.args }}
       - name: Check regular image inventory
         if: needs.file-check.outputs.run == 'true'
@@ -580,7 +575,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: netdata/netdata:test-dem
           load: true
-          cache-to: ${{ env.OFFICIAL_IMAGE == 'true' && 'type=local,dest=/tmp/build-cache-dem,mode=max' || '' }}
+          cache-to: ${{ github.repository == 'netdata/netdata' && github.event_name == 'workflow_dispatch' && 'type=local,dest=/tmp/build-cache-dem,mode=max' || '' }}
           build-args: ${{ steps.build-args.outputs.args }}
       - name: Validate and qualify the native DEM image
         if: matrix.dem
@@ -616,7 +611,6 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Building or testing a Docker image for ${{ matrix.platform }} failed.
               Checkout: ${{ steps.checkout.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Build regular image: ${{ steps.build.outcome }}
@@ -702,10 +696,6 @@ jobs:
         with:
           name: cache-${{ matrix.variant }}-${{ matrix.arch }}
           path: /tmp/build-cache
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
@@ -743,7 +733,6 @@ jobs:
           cache-from: type=local,src=/tmp/build-cache
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
@@ -779,7 +768,6 @@ jobs:
               ${{ github.repository }}: Creating or uploading Docker image for ${{ matrix.platform }} on Docker Hub failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch build cache: ${{ steps.fetch-cache.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
@@ -914,10 +902,6 @@ jobs:
         with:
           name: cache-${{ matrix.variant }}-${{ matrix.arch }}
           path: /tmp/build-cache
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
@@ -955,7 +939,6 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
@@ -992,7 +975,6 @@ jobs:
               ${{ github.repository }}: Creating or uploading Docker image for ${{ matrix.platform }} on Quay.io failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch build cache: ${{ steps.fetch-cache.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
@@ -1128,10 +1110,6 @@ jobs:
         with:
           name: cache-${{ matrix.variant }}-${{ matrix.arch }}
           path: /tmp/build-cache
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
@@ -1169,7 +1147,6 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
@@ -1206,7 +1183,6 @@ jobs:
               ${{ github.repository }}: Creating or uploading Docker image for ${{ matrix.platform }} on GHCR failed.
               Checkout: ${{ steps.checkout.outcome }}
               Fetch build cache: ${{ steps.fetch-cache.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}

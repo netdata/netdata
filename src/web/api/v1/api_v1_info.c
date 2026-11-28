@@ -152,15 +152,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_boolean(wb, "https-enabled", true);
 
-    analytics_info_to_json(wb);
-
-    buffer_json_member_add_uint64(wb, "allmetrics-prometheus-used", analytics_data.prometheus_hits);
-    buffer_json_member_add_uint64(wb, "allmetrics-shell-used", analytics_data.shell_hits);
-    buffer_json_member_add_uint64(wb, "allmetrics-json-used", analytics_data.json_hits);
-    buffer_json_member_add_uint64(wb, "dashboard-used", analytics_data.dashboard_hits);
-
-    buffer_json_member_add_uint64(wb, "charts-count", analytics_data.charts_count);
-    buffer_json_member_add_uint64(wb, "metrics-count", analytics_data.metrics_count);
+    info_fields_to_json(wb);
 
 #if defined(ENABLE_ML)
     buffer_json_member_add_object(wb, "ml-info");
