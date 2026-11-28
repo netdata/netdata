@@ -339,12 +339,12 @@ template:
           name: translated
         - selector: tunnel_reverse_nated_packets_total
           name: reverse_translated
-    - id: am_azure_virtual_wan_vpn_gateway__ipsec_security_associations
-      title: Azure Virtual WAN IPsec Security Associations
-      context: ipsec_security_associations
+    - id: am_azure_virtual_wan_vpn_gateway__ipsec_security_association_changes
+      title: Azure Virtual WAN IPsec Security Association Changes
+      context: ipsec_security_association_changes
       family: IPsec
       type: line
-      units: associations
+      units: changes
       algorithm: absolute
       dimensions:
         - selector: mmsa_count_total

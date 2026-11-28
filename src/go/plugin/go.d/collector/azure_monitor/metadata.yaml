@@ -6090,7 +6090,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-virtual_wan_vpn_gateway
       monitored_instance:
         name: Azure Virtual WAN Site-to-Site VPN Gateway
-        description: Monitor tunnel traffic, packet drops, BGP routes, and IPsec security associations on Azure Virtual WAN site-to-site VPN gateways.
+        description: Monitor tunnel traffic, packet drops, BGP routes, and changes to IPsec security associations on Azure Virtual WAN site-to-site VPN gateways.
         link: https://learn.microsoft.com/azure/virtual-wan/
         icon_filename: azure.svg
         categories:
@@ -6110,7 +6110,9 @@ modules:
 
           In auto mode, the collector selects the `virtual_wan_vpn_gateway` profile for `Microsoft.Network/vpnGateways`. Each chart shows one gateway, with Azure aggregating across its tunnels, peers, or instances. See [Azure Monitor setup](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md).
 
-          BGP peer status averages the reported connectivity values (1 for connected, 0 for disconnected). BGP route counts include routes reported by each peer and gateway instance. NAT flow and allocation counts show the total Azure reports in each one-minute interval.
+          BGP peer status averages Azure's connectivity values (1 for connected, 0 for disconnected). Azure includes each gateway instance paired with itself at 0, so the average can fall below 1 even when all remote peers are connected. Route counts include the routes reported by each peer and gateway instance. See [Microsoft's guidance on site-to-site VPN gateway metrics](https://learn.microsoft.com/en-us/azure/virtual-wan/monitor-virtual-wan#site-to-site-vpn-gateway).
+
+          IPsec counts show how many main mode and quick mode security associations were created or deleted in each five-minute interval. NAT flow and allocation counts show the total Azure reports in each one-minute interval.
 
           With default settings, up to 50 gateways in one subscription and region share three scheduled Metrics API requests each minute. Two additional scheduled requests run every five minutes for gateway flows, IPsec security associations, and VNet address prefixes.
         method_description: *method_description
@@ -6230,9 +6232,9 @@ modules:
               dimensions:
                 - name: translated
                 - name: reverse_translated
-            - name: azure_monitor.virtual_wan_vpn_gateway.ipsec_security_associations
-              description: Azure Virtual WAN IPsec Security Associations
-              unit: associations
+            - name: azure_monitor.virtual_wan_vpn_gateway.ipsec_security_association_changes
+              description: Azure Virtual WAN IPsec Security Association Changes
+              unit: changes
               chart_type: line
               dimensions:
                 - name: main_mode
