@@ -101,8 +101,8 @@ static int become_user(const char *username, int pid_fd) {
         }
     }
 
+    // no unconditional chown of stdout: an inherited stdout file keeps its owner (we keep writing through the open fd)
     nd_log_chown_log_files(uid, gid);
-    chown_open_file(STDOUT_FILENO, uid, gid);
     chown_open_file(STDERR_FILENO, uid, gid);
     chown_open_file(pid_fd, uid, gid);
 
@@ -239,8 +239,6 @@ static void process_nice_level(void) {
     int nice_level = (int)inicfg_get_number(&netdata_config, CONFIG_SECTION_GLOBAL, "process nice level", 0);
     if(nice(nice_level) == -1)
         netdata_log_error("Cannot set netdata CPU nice level to %d.", nice_level);
-    else
-        netdata_log_debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
 #endif // HAVE_NICE
 }
 

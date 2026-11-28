@@ -39,8 +39,7 @@ static bool inicfg_windows_is_quoted_path_list_dir_var(const struct config_secti
 
 static bool inicfg_windows_is_log_path_setting(const struct config_section *sect, const struct config_option *opt) {
     return ((!string_strcmp(sect->name, CONFIG_SECTION_LOGS) &&
-             (!string_strcmp(opt->name, "debug") ||
-              !string_strcmp(opt->name, "daemon") ||
+             (!string_strcmp(opt->name, "daemon") ||
               !string_strcmp(opt->name, "collector") ||
               !string_strcmp(opt->name, "access") ||
               !string_strcmp(opt->name, "health"))) ||
@@ -172,7 +171,6 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 
-    netdata_log_debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
@@ -203,7 +201,6 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
 
         s = trim(buffer);
         if(!s || !*s || *s == '#') {
-            netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
 

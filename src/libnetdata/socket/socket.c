@@ -683,26 +683,20 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
             case AF_UNIX:
-                // netdata_log_debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
                 // set the port - certain versions of libc return garbage on unix sockets
                 strncpyz(client_port, "UNIX", portsize - 1);
                 break;
 
             case AF_INET:
-                // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             case AF_INET6:
                 if (strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
-                    // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 }
-                // else
-                //    netdata_log_debug(D_LISTENER, "New IPv6 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             default:
-                // netdata_log_debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
         if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {

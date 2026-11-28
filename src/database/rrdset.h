@@ -29,7 +29,7 @@ struct storage_alignment;
 // flags are set/unset in a manner that is not thread safe
 // and may lead to missing information.
 typedef enum __attribute__ ((__packed__)) rrdset_flags {
-    RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
+    // (1 << 2) is unused
     RRDSET_FLAG_OBSOLETE                         = (1 << 3),  // this is marked by the collector/module as obsolete
     RRDSET_FLAG_EXPORTING_SEND                   = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
     RRDSET_FLAG_EXPORTING_IGNORE                 = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
@@ -348,17 +348,6 @@ static inline bool rrdset_check_upstream_exposed(RRDSET *st) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void rrdset_metadata_updated(RRDSET *st);
-
-// --------------------------------------------------------------------------------------------------------------------
-
-#ifdef NETDATA_INTERNAL_CHECKS
-#define rrdset_debug(st, fmt, args...) do { \
-        if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); \
-    } while(0)
-#else
-#define rrdset_debug(st, fmt, args...) debug_dummy()
-#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 

@@ -126,7 +126,6 @@ static inline RRDCALC_STATUS rrdcalc_value2status(NETDATA_DOUBLE n) {
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t *next_run) {
     if(unlikely(!st)) {
-        netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
@@ -137,24 +136,18 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
             *next_run = rc->next_update;
         }
 
-        netdata_log_debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %" PRIdMAX " secs).",
-                          rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                          (intmax_t)nd_time_t_elapsed_saturating(rc->next_update, now));
         return 0;
     }
 
     if(unlikely(rc->config.update_every <= 0)) {
-        netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
-        netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as obsolete", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
     if(unlikely(!st->last_collected_time.tv_sec || st->counter_done < 2)) {
-        netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
@@ -163,26 +156,14 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
     time_t last = rrdset_last_entry_s(st);
 
     if(unlikely(nd_time_t_add_compare(now, update_every, first) < 0 /* || now - update_every > last */)) {
-        netdata_log_debug(D_HEALTH
-                          , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
-                          , rrdcalc_chart_name(rc), rrdcalc_name(rc), (unsigned long) now, (unsigned long) first
-                          , (unsigned long) last);
         return 0;
     }
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
         intmax_t lookup_offset = (intmax_t)rc->config.before + (intmax_t)rc->config.after;
-        time_t needed = nd_time_t_add_saturating(now, lookup_offset);
 
         if(nd_time_t_add_compare(now, lookup_offset + update_every, first) < 0 ||
            nd_time_t_add_compare(now, lookup_offset - update_every, last) > 0) {
-            netdata_log_debug(D_HEALTH,
-                "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu).",
-                rrdcalc_chart_name(rc),
-                rrdcalc_name(rc),
-                (unsigned long) needed,
-                (unsigned long) first,
-                (unsigned long) last);
             return 0;
         }
     }
@@ -190,21 +171,14 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
     return 1;
 }
 
-static void health_sleep(time_t next_run, uint64_t loop __maybe_unused) {
+static void health_sleep(time_t next_run) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %" PRIdMAX " secs",
-                          (unsigned long long)loop,
-                          (intmax_t)nd_time_t_elapsed_saturating(next_run, now));
         while (now < next_run && service_running(SERVICE_HEALTH)) {
             sleep_usec(USEC_PER_SEC);
             now = now_realtime_sec();
         }
-    }
-    else {
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration now",
-                          (unsigned long long)loop);
     }
 }
 
@@ -307,11 +281,9 @@ static inline int check_if_resumed_from_suspension(void) {
 }
 
 static void do_eval_expression(
-    RRDHOST *host,
     RRDSET *st,
     RRDCALC *rc,
     EVAL_EXPRESSION *expression,
-    const char *expression_type __maybe_unused,
     size_t job_type,
     RRDCALC_FLAGS error_type,
     RRDCALC_STATUS *calc_status,
@@ -337,37 +309,10 @@ static void do_eval_expression(
         if (result)
             *result = NAN;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_HEALTH)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(D_HEALTH,
-                              "Health on host '%s', alarm '%s.%s': %s expression failed with error: %s",
-                              string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
-                              expression_error_msg(expression)
-            );
-            rrdhost_identity_release(&identity);
-        }
-#endif
         return;
     }
 
     rc->run_flags &= ~error_type;
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(debug_flags & D_HEALTH)) {
-        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-        netdata_log_debug(D_HEALTH,
-                          "Health on host '%s', alarm '%s.%s': %s expression gave value "
-                          NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
-                          string2str(identity.hostname),
-                          rrdcalc_chart_name(rc),
-                          rrdcalc_name(rc),
-                          expression_type,
-                          expression_result(expression),
-                          expression_error_msg(expression),
-                          rrdcalc_source(rc));
-        rrdhost_identity_release(&identity);
-    }
-#endif
     if (calc_status)
         *calc_status = rrdcalc_value2status(expression_result(expression));
     else
@@ -626,15 +571,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 rc->value = NAN;
                 rc->run_flags |= RRDCALC_FLAG_DB_ERROR;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-                if(unlikely(debug_flags & D_HEALTH)) {
-                    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-                    netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d",
-                                      string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc), ret
-                    );
-                    rrdhost_identity_release(&identity);
-                }
-#endif
             } else
                 rc->run_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
@@ -643,34 +579,15 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 rc->value = NAN;
                 rc->run_flags |= RRDCALC_FLAG_DB_NAN;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-                if(unlikely(debug_flags & D_HEALTH)) {
-                    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-                    netdata_log_debug(D_HEALTH,
-                                      "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
-                                      string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc)
-                    );
-                    rrdhost_identity_release(&identity);
-                }
-#endif
             } else
                 rc->run_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-            if(unlikely(debug_flags & D_HEALTH)) {
-                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-                netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
-                                  string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc), rc->value
-                );
-                rrdhost_identity_release(&identity);
-            }
-#endif
         }
 
         // ------------------------------------------------------------
         // if there is calculation expression, run it
 
-        do_eval_expression(host, st, rc, rc->config.calculation, "calculation", WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
+        do_eval_expression(st, rc, rc->config.calculation, WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
         rrdset_acquired_release(rsa);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
@@ -703,8 +620,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
             RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
 
-            do_eval_expression(host, st, rc, rc->config.warning, "warning", WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
-            do_eval_expression(host, st, rc, rc->config.critical, "critical", WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
+            do_eval_expression(st, rc, rc->config.warning, WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
+            do_eval_expression(st, rc, rc->config.critical, WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
 
             // --------------------------------------------------------
             // decide the final alarm status
@@ -1032,7 +949,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 if(likely(drsa)) {
                     rrdset_acquired_release(drsa);
                     health_send_notification(host, ae, hrm);
-                    netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                     health_alarm_wait_for_execution(ae);
                 }
             }
@@ -1121,7 +1037,7 @@ static void health_event_loop(void) {
         }
 
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
-        uint64_t loop = __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
 
         // Bound retained query scratch to this iteration, across all hosts.
         ONEWAYALLOC *iter_owa = onewayalloc_create(0);
@@ -1157,7 +1073,7 @@ static void health_event_loop(void) {
         wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
         worker_is_idle();
         
-        health_sleep(next_run, loop);
+        health_sleep(next_run);
     } // forever
 }
 

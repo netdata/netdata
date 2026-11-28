@@ -287,7 +287,6 @@ static bool websocket_send_first_response(WS_CLIENT *wsc, const char *accept_key
     size_t header_len = buffer_strlen(wb);
     ssize_t bytes = nd_sock_write_persist(&wsc->sock, header_str, header_len, 20);
 
-    websocket_debug(wsc, "Sent WebSocket handshake response: %zd bytes out of %zu bytes", bytes, header_len);
     return bytes == (ssize_t)header_len;
 }
 
@@ -320,7 +319,6 @@ short int websocket_handle_handshake(struct web_client *w) {
         wsc->user_auth.method = USER_AUTH_METHOD_GOD;
         wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
         mcp_api_key_verified = true;
-        websocket_debug(wsc, "MCP developer preview API key verified via Authorization header - enabling full access");
     }
 #endif
 
@@ -345,7 +343,6 @@ short int websocket_handle_handshake(struct web_client *w) {
                 
                 // Set the client's max outbound frame size
                 wsc->max_outbound_frame_size = max_frame_size;
-                websocket_debug(wsc, "Setting custom max outbound frame size: %zu bytes", max_frame_size);
             }
         }
         
@@ -380,9 +377,6 @@ short int websocket_handle_handshake(struct web_client *w) {
                     wsc->user_auth.method = USER_AUTH_METHOD_GOD;
                     wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
                     mcp_api_key_verified = true;
-                    websocket_debug(wsc, "MCP developer preview API key verified - enabling full access");
-                } else {
-                    websocket_debug(wsc, "Invalid MCP developer preview API key provided");
                 }
             }
         }
@@ -481,7 +475,6 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_message = mcp_websocket_on_message;
             wsc->on_close = mcp_websocket_on_close;
             wsc->on_disconnect = mcp_websocket_on_disconnect;
-            websocket_debug(wsc, "Setting up MCP protocol callbacks");
             break;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -491,7 +484,6 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_message = jsonrpc_on_message_callback;
             wsc->on_close = jsonrpc_on_close;
             wsc->on_disconnect = jsonrpc_on_disconnect;
-            websocket_debug(wsc, "Setting up jsonrpc protocol callbacks");
             break;
 
         case WS_PROTOCOL_ECHO:
@@ -500,7 +492,6 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_message = echo_on_message_callback;
             wsc->on_close = echo_on_close;
             wsc->on_disconnect = echo_on_disconnect;
-            websocket_debug(wsc, "Setting up echo protocol callbacks");
             break;
 #endif
 

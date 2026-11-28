@@ -58,7 +58,6 @@ static void web_client_enable_deflate(struct web_client *w, bool gzip) {
         // cloud sends the entire response at once, not in chunks
         web_client_flag_set(w, WEB_CLIENT_CHUNKED_TRANSFER);
 
-    netdata_log_debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
 }
 
 static void http_header_origin(struct web_client *w, const char *v, size_t len __maybe_unused) {
@@ -348,7 +347,6 @@ static void http_header_sec_websocket_version(struct web_client *w, const char *
     // We only support version 13, which will be checked during handshake
     // No need to store this as we only accept one version
     if(strcmp(v, "13") != 0) {
-        netdata_log_debug(D_WEB_CLIENT, "%llu: WebSocket version %s not supported, only version 13 is supported", w->id, v);
         web_client_clear_websocket(w);
     }
 }
@@ -458,11 +456,6 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
             token = strtok_r(NULL, ",", &saveptr);
         }
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: Client requested WebSocket extensions: %s, "
-                                        "enabled flags: %u, client_max_window_bits: %u, server_max_window_bits: %u",
-                          w->id, v, w->websocket.ext_flags,
-                          w->websocket.client_max_window_bits,
-                          w->websocket.server_max_window_bits);
     }
 }
 

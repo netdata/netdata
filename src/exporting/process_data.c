@@ -156,9 +156,6 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t *last_timestamp)
 {
     RRDSET *st = rd->rrdset;
-#ifdef NETDATA_INTERNAL_CHECKS
-    RRDHOST *host = st->rrdhost;
-#endif
     time_t after = instance->after;
     time_t before = instance->before;
 
@@ -193,22 +190,6 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
     if (unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_EXPORTING)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(
-                D_EXPORTING,
-                "EXPORTING: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
-                string2str(identity.hostname),
-                rrdset_id(st),
-                rrddim_id(rd),
-                (unsigned long)after,
-                (unsigned long)before,
-                (unsigned long)first_t,
-                (unsigned long)last_t);
-            rrdhost_identity_release(&identity);
-        }
-#endif
         return NAN;
     }
 
@@ -234,20 +215,6 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     pulse_queries_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_EXPORTING)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(
-                D_EXPORTING,
-                "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
-                string2str(identity.hostname),
-                rrdset_id(st),
-                rrddim_id(rd),
-                (unsigned long)after,
-                (unsigned long)before);
-            rrdhost_identity_release(&identity);
-        }
-#endif
         return NAN;
     }
 

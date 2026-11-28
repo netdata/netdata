@@ -122,13 +122,9 @@ bool websocket_client_process_message(WS_CLIENT *wsc) {
 
     worker_is_busy(WORKERS_WEBSOCKET_MESSAGE);
 
-    websocket_debug(wsc, "Processing message (opcode=0x%x, is_compressed=%d, length=%zu)",
-               wsc->opcode, wsc->is_compressed,
-        wsb_length(&wsc->payload));
 
     // Handle control frames immediately
     if (wsc->opcode != WS_OPCODE_TEXT && wsc->opcode != WS_OPCODE_BINARY) {
-        websocket_debug(wsc, "Control frame (opcode=0x%x) should not be handled by %s()", wsc->opcode, __FUNCTION__);
         return false;
     }
 
@@ -165,9 +161,6 @@ bool websocket_client_process_message(WS_CLIENT *wsc) {
     // Now handle the uncompressed message - using the new function
     // that contains the actual handler logic
 
-   websocket_debug(wsc, "Handling message: type=%s, length=%zu, protocol=%d",
-                   (wsc->opcode == WS_OPCODE_BINARY) ? "binary" : "text",
-                   wsb_length(wsb), wsc->protocol);
 
    // Ensure text messages are null-terminated
    if (wsc->opcode == WS_OPCODE_TEXT)
@@ -175,7 +168,6 @@ bool websocket_client_process_message(WS_CLIENT *wsc) {
 
    // Call the message callback if set - this allows protocols to be handled dynamically
    if (wsc->on_message) {
-       websocket_debug(wsc, "Calling client message handler for protocol %d", wsc->protocol);
        wsc->on_message(wsc, wsb_data(wsb), wsb_length(wsb), wsc->opcode);
    }
    else {

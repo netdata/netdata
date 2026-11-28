@@ -322,7 +322,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_receiver_reconcile_keepalive(rpt);
         }
 
-        netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->remote_ip, initial_response);
         ssize_t bytes_sent = nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60);
 
         if(bytes_sent != (ssize_t)strlen(initial_response)) {

@@ -372,13 +372,6 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 }
 
 RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(debug_flags & D_RRD_CALLS)) {
-        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-        netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, string2str(identity.hostname));
-        rrdhost_identity_release(&identity);
-    }
-#endif
     RRDSET *st = rrdset_index_find(host, id);
 
     if(st) {
@@ -392,13 +385,6 @@ RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete) {
 }
 
 RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool include_obsolete) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(debug_flags & D_RRD_CALLS)) {
-        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-        netdata_log_debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, string2str(identity.hostname));
-        rrdhost_identity_release(&identity);
-    }
-#endif
 
     char buf[RRD_ID_LENGTH_MAX + 1];
     strncpyz(buf, type, RRD_ID_LENGTH_MAX - 1);
@@ -422,13 +408,6 @@ RRDSET_ACQUIRED *rrdset_acquire(RRDHOST *host, const char *id) {
 }
 
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(debug_flags & D_RRD_CALLS)) {
-        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-        netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", string2str(identity.hostname), id);
-        rrdhost_identity_release(&identity);
-    }
-#endif
 
     RRDSET_ACQUIRED *sta = rrdset_acquire(host, id);
     if(sta) {
@@ -512,7 +491,6 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // allocate it
 
-    netdata_log_debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     struct rrdset_constructor ctr;
 

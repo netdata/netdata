@@ -45,7 +45,6 @@ SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list
 // list can be NULL, in which case, this does nothing.
 void simple_pattern_free(SIMPLE_PATTERN *list);
 
-void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
 int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 size_t simple_pattern_exact_entries(SIMPLE_PATTERN *p, size_t max_len);

@@ -830,17 +830,6 @@ int main(int argc, char **argv) {
     }
     // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(debug_flags != 0) {
-        struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
-        if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            netdata_log_info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-#ifdef HAVE_SYS_PRCTL_H
-        prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif
-    }
-#endif /* NETDATA_INTERNAL_CHECKS */
-
     procfile_set_adaptive_allocation(true, 0, 0, 0);
     os_get_system_cpus_uncached();
     apps_managers_and_aggregators_init(); // before parsing args!

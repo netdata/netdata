@@ -142,7 +142,6 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
         // create the chart
         st[i] = rrdset_create(host, "netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest",
                               NULL, 1, update_every, RRDSET_TYPE_LINE);
-        rrdset_flag_set(st[i], RRDSET_FLAG_DEBUG);
         rrdset_flag_set(st[i], RRDSET_FLAG_STORE_FIRST);
         for (j = 0 ; j < DIMS ; ++j) {
             snprintfz(name, sizeof(name) - 1, "dim-%d", j);

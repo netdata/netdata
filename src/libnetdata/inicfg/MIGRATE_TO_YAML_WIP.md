@@ -791,7 +791,7 @@ System directory paths for configuration, logs, cache, etc.
 | `health config` | string | Directory containing custom health configuration files (alerts, notifications). Default is "health.d" under config directory. |
 | `home` | string | Netdata home directory, used as base for relative paths. Default varies by installation method ("/opt/netdata" for static builds, "/" for package installs). |
 | `lib` | string | Directory for Netdata's variable state files, runtime data, and persistent storage. Default is "/var/lib/netdata" or "/opt/netdata/var/lib/netdata". |
-| `log` | string | Directory where Netdata writes log files (access.log, error.log, debug.log). Default is "/var/log/netdata" or "/opt/netdata/var/log/netdata". |
+| `log` | string | Directory where Netdata writes log files (access.log, error.log). Default is "/var/log/netdata" or "/opt/netdata/var/log/netdata". |
 | `plugins` | string | Directory containing plugin executables and scripts. Multiple paths can be configured. Default includes "/usr/libexec/netdata/plugins.d". |
 | `stock config` | string | Directory containing default/stock configuration files that ship with Netdata. Used as fallback when user configs are missing. Default is distribution-specific. |
 | `stock health config` | string | Directory containing default health configuration files (stock alerts). Default is "health.d" under stock config directory. |
@@ -907,7 +907,6 @@ Logging configuration and debugging settings
 
 | Key | Type | Comments |
 |-----|------|----------|
-| `debug flags` | string | Hexadecimal bitmask for enabling debug output for specific subsystems. Format: "0x0000000000000000". Used for troubleshooting and development. Default is "0x0000000000000000" (no debug). |
 | `facility` | string | Syslog facility for log messages when using syslog output. Common values: "daemon", "local0-local7", "user". Default is "daemon". |
 | `level` | string | Minimum log level to output. Options: "error", "warning", "info", "debug". Can be overridden by NETDATA_LOG_LEVEL environment variable. Default is "info". |
 | `logs flood protection period` | duration | Time window for counting log messages to prevent log flooding. Messages exceeding the threshold within this period are suppressed. Default is 60 seconds. |

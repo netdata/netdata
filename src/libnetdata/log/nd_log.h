@@ -81,36 +81,6 @@ struct log_stack_entry {
 void log_stack_pop(void *ptr);
 void log_stack_push(struct log_stack_entry *lgs);
 
-#define D_WEB_BUFFER        (1ULL << 0)
-#define D_WEB_CLIENT        (1ULL << 1)
-#define D_LISTENER          (1ULL << 2)
-#define D_WEB_DATA          (1ULL << 3)
-#define D_OPTIONS           (1ULL << 4)
-#define D_PROCNETDEV_LOOP   (1ULL << 5)
-#define D_RRD_STATS         (1ULL << 6)
-#define D_WEB_CLIENT_ACCESS (1ULL << 7)
-#define D_TC_LOOP           (1ULL << 8)
-#define D_DEFLATE           (1ULL << 9)
-#define D_CONFIG            (1ULL << 10)
-#define D_PLUGINSD          (1ULL << 11)
-#define D_PROCFILE          (1ULL << 12)
-#define D_RRD_CALLS         (1ULL << 13)
-#define D_DICTIONARY        (1ULL << 14)
-#define D_CGROUP            (1ULL << 15)
-#define D_REGISTRY          (1ULL << 16)
-#define D_HEALTH            (1ULL << 17)
-#define D_LOCKS             (1ULL << 18)
-#define D_EXPORTING         (1ULL << 19)
-#define D_STATSD            (1ULL << 20)
-#define D_STREAM            (1ULL << 21)
-#define D_ANALYTICS         (1ULL << 22)
-#define D_RRDENGINE         (1ULL << 23)
-#define D_ACLK              (1ULL << 24)
-#define D_WEBSOCKET         (1ULL << 25)
-#define D_MCP               (1ULL << 26)
-#define D_SYSTEM            (1ULL << 27)
-
-extern uint64_t debug_flags;
 extern const char *program_name;
 extern int aclklog_enabled;
 
@@ -125,10 +95,8 @@ void nd_log_limits_unlimited(void);
 #define NDLP_INFO_STR "info"
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) netdata_logger(NDLS_DAEMON, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
-#define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
 #endif
 

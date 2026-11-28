@@ -22,33 +22,14 @@ static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type __maybe_unused
 /**
  * Discard response
  *
- * Discards a response received by an exporting connector instance after logging a sample of it to error.log
+ * Discards a response received by an exporting connector instance
  *
  * @param buffer buffer with response data.
  * @param instance an instance data structure.
  * @return Always returns 0.
  */
 int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    char sample[1024];
-    const char *s = buffer_tostring(buffer);
-    char *d = sample, *e = &sample[sizeof(sample) - 1];
-
-    for(; *s && d < e ;s++) {
-        char c = *s;
-        if(unlikely(!isprint((uint8_t)c))) c = ' ';
-        *d++ = c;
-    }
-    *d = '\0';
-
-    netdata_log_debug(D_EXPORTING,
-                      "EXPORTING: received %zu bytes from %s connector instance. Ignoring them. Sample: '%s'",
-                      buffer_strlen(buffer),
-                      instance->config.name,
-                      sample);
-#else
     UNUSED(instance);
-#endif /* NETDATA_INTERNAL_CHECKS */
 
     buffer_flush(buffer);
     return 0;

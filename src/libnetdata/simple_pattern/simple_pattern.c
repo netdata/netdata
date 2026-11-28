@@ -340,26 +340,6 @@ void simple_pattern_free(SIMPLE_PATTERN *list) {
     free_pattern(((struct simple_pattern *)list));
 }
 
-/* Debugging patterns
-
-   This code should be dead - it is useful for debugging but should not be called by production code.
-   Feel free to comment it out, but please leave it in the file.
-*/
-extern void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p)
-{
-    struct simple_pattern *root = (struct simple_pattern *)p;
-    if(root==NULL) {
-        netdata_log_debug(debug_type,"dump_pattern(NULL)");
-        return;
-    }
-    netdata_log_debug(debug_type,"dump_pattern(%p) child=%p next=%p mode=%u match=%s", root, root->child, root->next, root->mode,
-          root->match);
-    if(root->child!=NULL)
-        simple_pattern_dump(debug_type, (SIMPLE_PATTERN*)root->child);
-    if(root->next!=NULL)
-        simple_pattern_dump(debug_type, (SIMPLE_PATTERN*)root->next);
-}
-
 /* Heuristic: decide if the pattern could match a DNS name.
 
    Although this functionality is used directly by socket.c:connection_allowed() it must be in this file

@@ -66,7 +66,6 @@ static inline void cgroup_free_network_interfaces(struct cgroup *cg) {
 }
 
 static inline void cgroup_free(struct cgroup *cg) {
-    netdata_log_debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
     if(cg->st_cpu && cg->chart_var_cpu_limit) {
         rrdvar_chart_variable_release(cg->st_cpu, cg->chart_var_cpu_limit);
@@ -226,8 +225,6 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
     cg->pending_renames--;
 
-    netdata_log_debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
-    netdata_log_debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
 
     POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_rename_script, cg->id, cg->intermediate_id, NULL);
     if (!instance) {
@@ -347,7 +344,6 @@ static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
 }
 
 static inline struct cgroup *discovery_cgroup_add(const char *id) {
-    netdata_log_debug(D_CGROUP, "adding to list, cgroup with id '%s'", id);
 
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
@@ -370,8 +366,8 @@ static inline struct cgroup *discovery_cgroup_add(const char *id) {
         discovered_cgroup_root = cg;
     else {
         struct cgroup *t;
-        for (t = discovered_cgroup_root; t->discovered_next; t = t->discovered_next) {
-        }
+        for (t = discovered_cgroup_root; t->discovered_next; t = t->discovered_next)
+            ;
         t->discovered_next = cg;
     }
 
@@ -379,7 +375,6 @@ static inline struct cgroup *discovery_cgroup_add(const char *id) {
 }
 
 static inline struct cgroup *discovery_cgroup_find(const char *id) {
-    netdata_log_debug(D_CGROUP, "searching for cgroup '%s'", id);
 
     uint32_t hash = simple_hash(id);
 
@@ -389,7 +384,6 @@ static inline struct cgroup *discovery_cgroup_find(const char *id) {
             break;
     }
 
-    netdata_log_debug(D_CGROUP, "cgroup '%s' %s in memory", id, (cg)?"found":"not found");
     return cg;
 }
 
@@ -486,7 +480,6 @@ static inline int discovery_find_walkdir(const char *base, const char *dirpath) 
     if (!dirpath)
         dirpath = base;
 
-    netdata_log_debug(D_CGROUP, "searching for directories in '%s' (base '%s')", dirpath ? dirpath : "", base);
 
     size_t dirlen = strlen(dirpath), baselen = strlen(base);
 
@@ -838,7 +831,6 @@ static inline void discovery_cleanup_all_cgroups() {
                     if (t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE &&
                         (is_cgroup_systemd_service(t) == is_cgroup_systemd_service(cg)) &&
                         t->hash_chart_id == cg->hash_chart_id && !strcmp(t->chart_id, cg->chart_id)) {
-                        netdata_log_debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
                         t->enabled = 1;
                         t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;
                         break;
@@ -866,7 +858,6 @@ static inline void discovery_cleanup_all_cgroups() {
 }
 
 static inline void discovery_copy_discovered_cgroups_to_reader() {
-    netdata_log_debug(D_CGROUP, "copy discovered cgroups to the main group list");
 
     struct cgroup *cg;
 
@@ -948,13 +939,11 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
 
     ff = procfile_reopen(ff, filename, NULL, CGROUP_PROCFILE_FLAG);
     if (unlikely(!ff)) {
-        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
     if (unlikely(!ff)) {
-        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
@@ -972,13 +961,11 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
 
     ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
     if (unlikely(!ff)) {
-        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
     if (unlikely(!ff)) {
-        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
@@ -1022,13 +1009,11 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
 
     if (matches_systemd_services_cgroups(cg->id)) {
-        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'cgroups to match as systemd services'", cg->id, cg->chart_id);
         convert_cgroup_to_systemd_service(cg);
         return;
     }
 
     if (matches_enabled_cgroup_renames(cg->id)) {
-        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'run script to rename cgroups matching', will try to rename it", cg->id, cg->chart_id);
         if (is_inside_k8s && is_cgroup_k8s_container(cg->id)) {
             // it may take up to a minute for the K8s API to return data for the container
             // tested on AWS K8s cluster with 100% CPU utilization
@@ -1062,7 +1047,6 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
 
 static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
-    netdata_log_debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s'", cg->id, cg->chart_id);
 
     char cgroup_identifier[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
@@ -1073,7 +1057,6 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         snprintfz(cgroup_identifier, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_unified_base, cg->id);
     }
 
-    netdata_log_debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
     POPEN_INSTANCE *instance = spawn_popen_run_variadic(cgroups_network_interface_script, "--cgroup", cgroup_identifier, NULL);
     if(!instance) {
         collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
@@ -1178,12 +1161,16 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_names(cg->name))) {
-        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'", cg->id, cg->name);
+        nd_log_collector(NDLP_DEBUG,
+                         "CGROUP: cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'",
+                         cg->id, cg->name);
         return;
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_paths(cg->id))) {
-        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'", cg->id, cg->name);
+        nd_log_collector(NDLP_DEBUG,
+                         "CGROUP: cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'",
+                         cg->id, cg->name);
         return;
     }
 
@@ -1207,7 +1194,6 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 }
 
 static inline void discovery_find_all_cgroups() {
-    netdata_log_debug(D_CGROUP, "searching for cgroups");
 
     worker_is_busy(WORKER_DISCOVERY_INIT);
     discovery_orchestrator_begin_cycle();
@@ -1246,7 +1232,6 @@ static inline void discovery_find_all_cgroups() {
     // sole writer of the fields it reads and will not splice again this cycle.
     cgroup_snapshot_rebuild_and_publish();
 
-    netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
 
 static void discovery_run_all_cgroups(bool opportunistic)

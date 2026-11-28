@@ -12,7 +12,6 @@ typedef enum  __attribute__((__packed__)) {
     NDLS_COLLECTORS,  // collector.log
     NDLS_DAEMON,      // error.log
     NDLS_HEALTH,      // health.log
-    NDLS_DEBUG,       // debug.log
 
     // terminator
     _NDLS_MAX,

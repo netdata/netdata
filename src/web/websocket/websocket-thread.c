@@ -3,12 +3,10 @@
 #include "daemon/daemon-service.h"
 #include "websocket-internal.h"
 
-static void websocket_thread_client_socket_error(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc, const char *reason) {
+static void websocket_thread_client_socket_error(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc) {
     internal_fatal(wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );
 
     worker_is_busy(WORKERS_WEBSOCKET_SOCK_ERROR);
-
-    websocket_debug(wsc, reason);
 
     // Send command to remove the client
     // Note: on_disconnect will be called in websocket_thread_remove_client
@@ -41,7 +39,6 @@ static void websocket_thread_remove_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc
 
     // Notify the protocol handler that the client is being disconnected
     if (wsc->on_disconnect) {
-        websocket_debug(wsc, "Calling on_disconnect callback for protocol %s", WEBSOCKET_PROTOCOL_2str(wsc->protocol));
         wsc->on_disconnect(wsc);
     }
 
@@ -52,10 +49,7 @@ static void websocket_thread_remove_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc
     websocket_write_data(wsc);
 
     // Remove client from the poll - use socket fd directly
-    bool removed = nd_poll_del(wth->ndpl, wsc->sock.fd);
-    if(!removed) {
-        websocket_debug(wsc, "Failed to remove client %zu from poll", wsc->id);
-    }
+    nd_poll_del(wth->ndpl, wsc->sock.fd);
 
     websocket_decompression_cleanup(wsc);
     websocket_compression_cleanup(wsc);
@@ -74,7 +68,6 @@ static void websocket_thread_remove_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc
     if(!have_lock)
         spinlock_unlock(&wth->clients_spinlock);
 
-    websocket_debug(wsc, "Removed and resources freed", wth->id, wsc->id);
     websocket_client_free(wsc);
 }
 
@@ -403,7 +396,6 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 if (websocket_thread_add_client(wth, wsc)) {
                     // Call the on_connect callback if provided to notify protocol handler of new client
                     if (wsc->on_connect) {
-                        websocket_debug(wsc, "Calling on_connect callback for protocol %s", WEBSOCKET_PROTOCOL_2str(wsc->protocol));
                         wsc->on_connect(wsc);
                     }
                 }
@@ -536,18 +528,18 @@ void websocket_thread(void *ptr) {
 
             // Check for errors
             if(ev.events & ND_POLL_HUP) {
-                websocket_thread_client_socket_error(wth, wsc, "Client hangup");
+                websocket_thread_client_socket_error(wth, wsc);
                 continue;
             }
             if(ev.events & ND_POLL_ERROR) {
-                websocket_thread_client_socket_error(wth, wsc, "Socket error");
+                websocket_thread_client_socket_error(wth, wsc);
                 continue;
             }
 
             // Process read events
             if(ev.events & ND_POLL_READ) {
                 if(websocket_receive_data(wsc) < 0) {
-                    websocket_thread_client_socket_error(wth, wsc, "Failed to receive data");
+                    websocket_thread_client_socket_error(wth, wsc);
                     continue;
                 }
             }
@@ -555,7 +547,7 @@ void websocket_thread(void *ptr) {
             // Process write events
             if(ev.events & ND_POLL_WRITE) {
                 if(websocket_write_data(wsc) < 0) {
-                    websocket_thread_client_socket_error(wth, wsc, "Failed to send data");
+                    websocket_thread_client_socket_error(wth, wsc);
                     continue;
                 }
 
@@ -644,7 +636,6 @@ void websocket_thread(void *ptr) {
             int flags = fcntl(wsc->sock.fd, F_GETFL, 0);
             if(flags >= 0 && !(flags & O_NONBLOCK)) {
                 if(fcntl(wsc->sock.fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-                    websocket_debug(wsc, "Failed to set O_NONBLOCK during shutdown: %s", strerror(errno));
                     skip_client = true;
                 }
             }
@@ -652,17 +643,12 @@ void websocket_thread(void *ptr) {
             if(!skip_client) {
                 // Set send timeout: 100ms max per client
                 struct timeval timeout = { .tv_sec = 0, .tv_usec = 100000 };
-                if(setsockopt(wsc->sock.fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-                    websocket_debug(wsc, "Failed to set SO_SNDTIMEO during shutdown: %s (continuing)", strerror(errno));
-                    // Non-critical, continue anyway
-                }
+                // non-critical: continue even if it fails
+                (void)setsockopt(wsc->sock.fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
                 // Try to send close frame (won't block due to O_NONBLOCK + SO_SNDTIMEO)
                 websocket_protocol_send_close(wsc, WS_CLOSE_GOING_AWAY, "Server shutting down");
-                ssize_t written = websocket_write_data(wsc);
-                if(written < 0) {
-                    websocket_debug(wsc, "Failed to send close frame during shutdown");
-                }
+                websocket_write_data(wsc);
                 clients_closed++;
             }
             else {
