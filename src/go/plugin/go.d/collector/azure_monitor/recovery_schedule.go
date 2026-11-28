@@ -411,6 +411,10 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 				for _, q := range req.questions {
 					switch {
 					case deniedTogether(q):
+						// Checked before the multi-owner case on purpose. A joint
+						// rejection is the expected answer for a name ARM omits.
+						// Separating the owners would give each its own cohort
+						// and one recheck per owner from then on.
 						p.deny(q, op.at)
 					case len(req.questions) > 1:
 						// The combined rectangle failed. Each original owner's

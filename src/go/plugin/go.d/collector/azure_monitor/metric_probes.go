@@ -157,7 +157,13 @@ func (p *queryPoll) partition(q *metricQuestion) []*metricQuestion {
 
 // ARM omits this name for every member and Azure rejected them together.
 // They sleep and are rechecked as one request instead of being narrowed to
-// single resources, which costs about two metered calls per member.
+// single resources, which costs about two metered calls per member and one
+// recheck per member from then on.
+//
+// Accepted trade-off: a member Azure would serve while ARM still omits the
+// name stays hidden until ARM lists it for that member or Azure accepts the
+// whole group. A name with samples in history is measuredButOmitted instead
+// and is still narrowed by resource.
 func deniedTogether(q *metricQuestion) bool {
 	return q.evidence == unadvertisedMetrics && bits.OnesCount32(q.batch.mask) == 1
 }
