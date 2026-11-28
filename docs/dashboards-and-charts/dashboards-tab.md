@@ -119,7 +119,7 @@ Elements automatically align to the grid system after moving or resizing.
 | Action                     | How to Perform                                                                                                                                                                                              |
 |----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Go to chart**            | Use the 3-dot icon on any chart → click **Go-to-Chart**. Navigate directly to the chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) or the single-node dashboard. |
-| **Rename a chart**         | Use the 3-dot icon on any chart → click **Rename**.                                                                                                                                                         |
+| **Rename a card**          | Use the 3-dot icon on any card → click **Edit** → set the **Title** field → click **Save Changes**.                                                                                                          |
 | **Remove a chart or card** | Use the 3-dot icon on the element → click **Remove**.                                                                                                                                                       |
 
 ## Managing Your Dashboard
