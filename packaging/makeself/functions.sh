@@ -52,10 +52,25 @@ errata_ldflags() {
 
 cache_path() {
   local key="${1}"
-  # A dependency built with other compiler flags must not be reused, so the flags are part of the cache identity.
-  local flags
-  flags="$(printf '%s' "${TUNING_FLAGS:-}" | sha256sum | cut -c 1-12)"
-  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${flags}/${key}"
+  # A dependency built with other compiler flags or another recipe must not be reused, so both are part of the cache
+  # identity. Every dependency recipe counts, not only the key's own: a cached build can embed an earlier dependency
+  # (the curl executable links OpenSSL), and this file's helpers shape the links. The CI cache key
+  # (.github/scripts/get-static-cache-key.sh) also hashes all of build-static.sh (here only TUNING_FLAGS) and the
+  # builder image's packages.
+  local makeself="${NETDATA_SOURCE_PATH}/packaging/makeself"
+  local id f
+  id="$(
+    (
+      printf '%s\n' "${TUNING_FLAGS:-}"
+      for f in "${makeself}"/jobs/*.sh "${makeself}/bundled-packages.version" "${makeself}/functions.sh"; do
+        case "${f##*/}" in
+          *netdata*|*-makeself*) ;;
+          *) cat "${f}" || exit 1 ;;
+        esac
+      done
+    ) | sha256sum | cut -c 1-12
+  )" || return 1
+  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${id}/${key}"
 }
 
 build_path() {

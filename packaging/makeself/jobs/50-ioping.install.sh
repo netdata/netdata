@@ -15,7 +15,7 @@ build_dir="ioping-${IOPING_VERSION}"
 fetch "${build_dir}" "${IOPING_SOURCE}/archive/refs/tags/v${IOPING_VERSION}.tar.gz" \
     "${IOPING_ARTIFACT_SHA256}" "${cache_key}"
 
-export CFLAGS="${TUNING_FLAGS} -static -pipe"
+export CFLAGS="${TUNING_FLAGS} -O2 -static -pipe"
 export CXXFLAGS="${CFLAGS}"
 LDFLAGS="$(errata_ldflags)"
 export LDFLAGS

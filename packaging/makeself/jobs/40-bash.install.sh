@@ -15,7 +15,7 @@ build_dir="bash-${BASH_VERSION}"
 fetch "${build_dir}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
     "${BASH_ARTIFACT_SHA256}" "${cache_key}"
 
-export CFLAGS="${TUNING_FLAGS} -pipe"
+export CFLAGS="${TUNING_FLAGS} -O2 -pipe"
 export CXXFLAGS="${CFLAGS}"
 LDFLAGS="$(errata_ldflags)"
 export LDFLAGS
