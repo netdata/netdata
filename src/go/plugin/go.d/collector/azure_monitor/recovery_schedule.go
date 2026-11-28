@@ -381,6 +381,16 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 		p.preparedValid = false
 	}
 	throttled := p.recordServiceResponse(op, res.Err)
+	if m := req.merge; m != nil {
+		if res.Err != nil {
+			p.rejectMerge(m, res.Err, op.at)
+			return
+		}
+		// The union replaced its members' requests at no extra cost.
+		p.supplementalUsed--
+		req.cohort = p.state.ticket()
+		p.state.adopt(b, req.cohort)
+	}
 	if res.Err != nil {
 		p.failed++
 		p.c.logBatchFailure(&b, res.Err, p.queryTime)
@@ -428,6 +438,23 @@ func (p *queryPoll) finishMetrics(op *queryOperation) {
 		delete(p.state.questions, q)
 		p.accept(q.batch, q, q.cohort, res, op.at)
 	}
+}
+
+// The members of a failed union keep their earlier requests in this poll, so
+// the attempt costs one request and no sample.
+func (p *queryPoll) rejectMerge(m *mergeAttempt, err error, at time.Time) {
+	ttl := p.c.definitionTTL()
+	if state := p.state.merges[m.key]; state != nil {
+		if rejectedMetrics(err) {
+			state.next = at.Add(state.delay)
+			state.delay += min(state.delay, max(time.Hour, ttl)-state.delay)
+		} else {
+			state.next = at.Add(ttl)
+		}
+	}
+	class, detail := batchFailureReason(err)
+	p.c.Debugf("merging resource batches failed: profile=%s grain=%s class=%s %s", m.key.chunk.profile.Name, m.key.chunk.TimeGrain, class, detail)
+	p.primary = append(p.primary, m.fallback...)
 }
 
 func (p *queryPoll) hold(r plannedRequest) {
@@ -543,7 +570,7 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	p := queryPoll{
 		c: c, state: s, ctx: ctx, queryTime: now, deadline: deadline,
 		due: make(map[*metricChunk]bool), events: make(chan *queryOperation, slots),
-		primary: s.plan(batches, now, c.Limits.MaxBatchResources),
+		primary: s.plan(batches, now, c.Limits.MaxBatchResources, c.definitionTTL()),
 		debug:   logger.Level.Enabled(slog.LevelDebug),
 	}
 	for _, b := range batches {
@@ -572,7 +599,15 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 			if len(p.primary) > 0 {
 				r := p.primary[0]
 				p.primary = p.primary[1:]
-				if s.holds.hasMetrics() && s.holds.metricMask(r.batch, c.now()) != 0 {
+				held := s.holds.hasMetrics() && s.holds.metricMask(r.batch, c.now()) != 0
+				if m := r.merge; m != nil {
+					// A trial union is the one extra request if Azure rejects it.
+					if held || p.supplementalUsed >= maxRecoveryMetricsCalls {
+						p.primary = append(p.primary, m.fallback...)
+						continue
+					}
+					p.supplementalUsed++
+				} else if held {
 					p.hold(r)
 					continue
 				}

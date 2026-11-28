@@ -831,3 +831,97 @@ func TestCollectDeniesNamesARMOmitsAsOneGroup(t *testing.T) {
 	assert.GreaterOrEqual(t, recovered, acceptedMinute)
 	assert.LessOrEqual(t, recovered, acceptedMinute+60, "the group is rechecked at least hourly")
 }
+
+func TestCollectMergesResourceSplitsThatWorkTogether(t *testing.T) {
+	for name, test := range map[string]struct {
+		// Azure rejects B for one resource, or for two resources only when they share a request.
+		incompatiblePair bool
+		wantRequests     map[int]int // Requests per poll at the given minute.
+		wantUnions       []int       // Minutes with a request for all fifty resources.
+		wantMerged       int         // First minute with one request for the 49 healthy resources.
+	}{
+		"one bad resource": {
+			// Minute 6 also rechecks the denied name of the bad resource.
+			wantRequests: map[int]int{4: 7, 5: 7, 6: 3, 7: 2, 30: 2},
+			wantUnions:   []int{0},
+			wantMerged:   6,
+		},
+		"resources that cannot share a request": {
+			incompatiblePair: true,
+			wantRequests:     map[int]int{4: 2, 5: 2, 6: 3, 7: 2, 11: 3, 12: 2, 21: 3, 41: 3, 81: 3, 90: 2},
+			wantUnions:       []int{0, 6, 11, 21, 41, 81},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var rows []map[string]any
+			var ids []string
+			for i := range 50 {
+				row := testResource(recoveryTestNamespace, fmt.Sprintf("edge-%02d", i), nil)
+				rows = append(rows, row)
+				ids = append(ids, strings.ToLower(row["id"].(string)))
+			}
+			c := newTestCollectorWithMocks(&mockResourceGraph{resources: rows}, &mockMetricsClient{})
+			c.Config = testConfig()
+			useRecoveryTestProfile(t, c, []string{"A", "B"}, nil)
+			start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+			var mu sync.Mutex
+			now := start
+			c.now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+			var requests, merged int
+			var unions []int
+			initRecoveryWire(t, c, func(req *http.Request) (*http.Response, error) {
+				// ARM lists both names everywhere, so it cannot explain the rejection.
+				return recoveryWireDefinitions(req, "A", "B")
+			}, func(req *http.Request, query recoveryWireQuery) (*http.Response, error) {
+				has := func(id string) bool {
+					return slices.ContainsFunc(query.ResourceIDs, func(v string) bool { return strings.ToLower(v) == id })
+				}
+				mu.Lock()
+				requests++
+				if len(query.ResourceIDs) == len(ids) {
+					unions = append(unions, int(now.Sub(start)/time.Minute))
+				}
+				if len(query.ResourceIDs) == len(ids)-1 && merged == 0 {
+					merged = int(now.Sub(start) / time.Minute)
+				}
+				mu.Unlock()
+				bad := has(ids[7])
+				if test.incompatiblePair {
+					bad = has(ids[0]) && has(ids[49])
+				}
+				if bad && slices.Contains(query.Names, "B") {
+					return recoveryWireError(req, http.StatusBadRequest, "BadRequest")
+				}
+				return recoveryWireTotals(req, query, 5)
+			})
+			last := make(map[string]float64)
+			for minute := range 91 {
+				mu.Lock()
+				now = start.Add(time.Duration(minute) * time.Minute)
+				requests = 0
+				mu.Unlock()
+				series := collectRecoveryCounters(t, c)
+				// Once a counter is collected, no later poll may skip its window:
+				// a merge attempt, accepted or not, never costs a sample.
+				for _, key := range []string{"a_total|edge-00", "a_total|edge-07", "a_total|edge-49", "b_total|edge-00", "b_total|edge-49"} {
+					metric, resource, _ := strings.Cut(key, "|")
+					value, ok := seriesValue(series, "."+metric, fmt.Sprintf("resource_name=%q,", resource))
+					if before, seen := last[key]; seen {
+						if !ok || float64(value) != before+5 {
+							t.Errorf("%s for %s at minute %d: got %v (present=%v), want %v", metric, resource, minute, value, ok, before+5)
+						}
+					}
+					if ok {
+						last[key] = float64(value)
+					}
+				}
+				if want, ok := test.wantRequests[minute]; ok {
+					assert.Equal(t, want, requests, "requests at minute %d", minute)
+				}
+			}
+			assert.Equal(t, test.wantUnions, unions)
+			assert.Equal(t, test.wantMerged, merged)
+			assert.Len(t, last, 5, "every tracked counter was collected")
+		})
+	}
+}
